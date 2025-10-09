@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
@@ -20,11 +21,18 @@ export function Landing() {
   const [isLoading, setIsLoading] = useState<Provider | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [webViewInfo, setWebViewInfo] = useState<ReturnType<typeof detectWebView> | null>(null)
-  const { signInWithOAuth } = useAuth()
+  const { user, loading, signInWithOAuth } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     setWebViewInfo(detectWebView())
   }, [])
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, loading, navigate])
 
   const handleOAuthLogin = async (provider: Provider) => {
     try {
