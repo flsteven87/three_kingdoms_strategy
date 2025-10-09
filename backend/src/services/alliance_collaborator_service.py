@@ -342,9 +342,11 @@ class AllianceCollaboratorService:
                     user_response = self._supabase.auth.admin.get_user_by_id(str(user_id))
                     user = user_response.user if user_response else None
 
-                    if user and user.user_metadata:
-                        collab["user_full_name"] = user.user_metadata.get("full_name")
-                        collab["user_avatar_url"] = user.user_metadata.get("avatar_url")
+                    if user:
+                        collab["user_email"] = user.email
+                        if user.user_metadata:
+                            collab["user_full_name"] = user.user_metadata.get("full_name")
+                            collab["user_avatar_url"] = user.user_metadata.get("avatar_url")
 
                 except Exception as e:
                     logger.warning(f"Failed to fetch user metadata for {user_id}: {e}")
