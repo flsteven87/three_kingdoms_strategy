@@ -1,16 +1,18 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { Construction } from 'lucide-react'
 
 const MemberPerformance: React.FC = () => {
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">成員表現</h2>
-        <p className="text-muted-foreground mt-1">
-          查看個別成員的詳細表現數據與趨勢分析
-        </p>
-      </div>
+    <AllianceGuard>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">成員表現</h2>
+          <p className="text-muted-foreground mt-1">
+            查看個別成員的詳細表現數據與趨勢分析
+          </p>
+        </div>
 
       {/* Under Development Alert */}
       <Alert className="border-blue-500/50 bg-blue-50 dark:bg-blue-950/20">
@@ -80,7 +82,8 @@ const MemberPerformance: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </AllianceGuard>
   )
 }
 

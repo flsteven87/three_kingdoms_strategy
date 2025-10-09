@@ -118,27 +118,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       <div className="border-t border-border p-4 space-y-3">
         {user && (
           <div className="flex items-center gap-3 px-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
               <span className="text-sm font-medium text-primary">
                 {user.email?.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user.email}</p>
+              <p className="text-sm font-medium truncate">
+                {user.email?.split('@')[0]}
+              </p>
               <p className="text-xs text-muted-foreground">已登入</p>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSignOut}
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              title="登出"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         )}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSignOut}
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-        >
-          <LogOut className="h-4 w-4" />
-          <span>登出</span>
-        </Button>
 
         <div className="text-xs text-muted-foreground px-2">
           <p className="font-medium">Version 0.1.0</p>

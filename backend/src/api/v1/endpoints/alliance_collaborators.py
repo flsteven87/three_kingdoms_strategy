@@ -7,19 +7,21 @@ Alliance Collaborators API Endpoints
 - 🔴 Use Depends() for dependency injection
 """
 
+import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.core.auth import get_current_user_id
-from src.core.database import get_supabase_client
 from src.core.dependencies import get_alliance_collaborator_service
 from src.models.alliance_collaborator import (
     AllianceCollaboratorCreate,
     AllianceCollaboratorListResponse,
 )
 from src.services.alliance_collaborator_service import AllianceCollaboratorService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["alliance-collaborators"])
 
@@ -142,18 +144,25 @@ async def process_pending_invitations(
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
-    # Get user email from Supabase Auth
-    supabase = get_supabase_client()
-    user = supabase.auth.admin.get_user_by_id(str(current_user_id))
+    try:
+        # Get user email from Service layer
+        email = await service.get_user_email(current_user_id)
 
-    if not user or not user.user.email:
-        return {"processed_count": 0, "message": "User email not found"}
+        if not email:
+            logger.warning(f"User email not found for user_id: {current_user_id}")
+            return {"processed_count": 0, "message": "User email not found"}
 
-    processed_count = await service.process_pending_invitations(
-        current_user_id, user.user.email
-    )
+        # Process pending invitations
+        processed_count = await service.process_pending_invitations(current_user_id, email)
 
-    return {
-        "processed_count": processed_count,
-        "message": f"Processed {processed_count} pending invitations",
-    }
+        return {
+            "processed_count": processed_count,
+            "message": f"Processed {processed_count} pending invitations",
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing invitations for user {current_user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process invitations",
+        ) from e

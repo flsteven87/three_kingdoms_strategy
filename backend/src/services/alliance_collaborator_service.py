@@ -7,6 +7,7 @@ Alliance Collaborator Service
 - 🟡 Exception chaining with 'from e'
 """
 
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -16,6 +17,8 @@ from src.repositories.alliance_collaborator_repository import (
     AllianceCollaboratorRepository,
 )
 from src.repositories.pending_invitation_repository import PendingInvitationRepository
+
+logger = logging.getLogger(__name__)
 
 
 class AllianceCollaboratorService:
@@ -206,6 +209,25 @@ class AllianceCollaboratorService:
                 detail="Failed to remove collaborator",
             ) from e
 
+    async def get_user_email(self, user_id: UUID) -> str | None:
+        """
+        Get user email from Supabase Auth.
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Email address or None if not found
+
+        符合 CLAUDE.md 🔴: Service layer handles external API calls
+        """
+        try:
+            user_response = self._supabase.auth.admin.get_user_by_id(str(user_id))
+            return user_response.user.email if user_response and user_response.user else None
+        except Exception as e:
+            logger.error(f"Failed to get user email for {user_id}: {e}")
+            return None
+
     async def process_pending_invitations(self, user_id: UUID, email: str) -> int:
         """
         Process all pending invitations for a newly registered user.
@@ -223,28 +245,36 @@ class AllianceCollaboratorService:
         符合 CLAUDE.md 🔴: Service layer orchestrates multi-step workflow
         """
         try:
+            logger.info(f"Looking for pending invitations for: {email}")
+
             # 1. Get all pending invitations for this email
             pending_invitations = await self._invitation_repo.get_pending_by_email(email)
 
             if not pending_invitations:
+                logger.info(f"No pending invitations found for: {email}")
                 return 0
 
+            logger.info(f"Found {len(pending_invitations)} pending invitation(s) for: {email}")
             processed_count = 0
 
             # 2. Process each invitation
             for invitation in pending_invitations:
                 try:
+                    logger.debug(f"Processing invitation to alliance_id: {invitation.alliance_id}")
+
                     # Check if already a collaborator (prevent duplicates)
                     is_existing = await self._collaborator_repo.is_collaborator(
                         invitation.alliance_id, user_id
                     )
 
                     if is_existing:
+                        logger.warning("User already a collaborator, marking invitation as accepted")
                         await self._invitation_repo.mark_as_accepted(invitation.id)
                         processed_count += 1
                         continue
 
                     # Add user as collaborator
+                    logger.debug(f"Adding user as collaborator with role: {invitation.role}")
                     await self._collaborator_repo.add_collaborator(
                         alliance_id=invitation.alliance_id,
                         user_id=user_id,
@@ -255,14 +285,18 @@ class AllianceCollaboratorService:
                     # Mark invitation as accepted
                     await self._invitation_repo.mark_as_accepted(invitation.id)
                     processed_count += 1
+                    logger.debug("Successfully processed invitation")
 
-                except Exception:
+                except Exception as e:
+                    logger.error(f"Failed to process invitation: {e}")
                     # Continue processing other invitations even if one fails
                     continue
 
+            logger.info(f"Processed {processed_count}/{len(pending_invitations)} invitations")
             return processed_count
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in process_pending_invitations: {e}")
             # Don't raise exception - this is a background process
             return 0
 

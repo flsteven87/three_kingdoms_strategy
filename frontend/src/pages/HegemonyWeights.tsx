@@ -12,14 +12,11 @@
 
 import React from 'react'
 import { Loader2, Scale } from 'lucide-react'
-import { useAlliance } from '@/hooks/use-alliance'
+import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { useSeasons } from '@/hooks/use-seasons'
 import { HegemonyWeightCard } from '@/components/hegemony-weights/HegemonyWeightCard'
 
 const HegemonyWeights: React.FC = () => {
-  // Fetch alliance data
-  const { data: alliance } = useAlliance()
-
   // Fetch all seasons
   const { data: seasons, isLoading } = useSeasons()
 
@@ -34,26 +31,16 @@ const HegemonyWeights: React.FC = () => {
       })
     : []
 
-  if (!alliance) {
-    return (
+  return (
+    <AllianceGuard>
       <div className="space-y-6">
+        {/* Header */}
         <div>
           <h2 className="text-2xl font-bold tracking-tight">霸業權重配置</h2>
-          <p className="text-muted-foreground mt-1">請先設定同盟資訊</p>
+          <p className="text-muted-foreground mt-1">
+            設定各賽季的指標權重與時間點權重，用於計算盟友霸業排名
+          </p>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">霸業權重配置</h2>
-        <p className="text-muted-foreground mt-1">
-          設定各賽季的指標權重與時間點權重，用於計算盟友霸業排名
-        </p>
-      </div>
 
       {/* Info Card */}
       <div className="p-4 rounded-lg border bg-muted/30">
@@ -100,7 +87,8 @@ const HegemonyWeights: React.FC = () => {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </AllianceGuard>
   )
 }
 

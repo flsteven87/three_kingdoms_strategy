@@ -12,13 +12,12 @@ import React, { useCallback } from 'react'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CSVUploadCard } from '@/components/uploads/CSVUploadCard'
+import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { useSeasons } from '@/hooks/use-seasons'
-import { useAlliance } from '@/hooks/use-alliance'
 import { useCsvUploads, useUploadCsv, useDeleteCsvUpload } from '@/hooks/use-csv-uploads'
 import type { Season } from '@/types/season'
 
 const DataManagement: React.FC = () => {
-  const { data: alliance } = useAlliance()
   const { data: seasons, isLoading: seasonsLoading } = useSeasons()
   const uploadMutation = useUploadCsv()
 
@@ -43,24 +42,14 @@ const DataManagement: React.FC = () => {
     [uploadMutation]
   )
 
-  if (!alliance) {
-    return (
+  return (
+    <AllianceGuard>
       <div className="space-y-6">
+        {/* Header */}
         <div>
           <h2 className="text-2xl font-bold tracking-tight">資料管理</h2>
-          <p className="text-muted-foreground mt-1">請先設定同盟資訊</p>
+          <p className="text-muted-foreground mt-1">CSV 數據上傳與管理</p>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">資料管理</h2>
-        <p className="text-muted-foreground mt-1">CSV 數據上傳與管理</p>
-      </div>
 
       {/* Loading State */}
       {seasonsLoading && (
@@ -91,7 +80,8 @@ const DataManagement: React.FC = () => {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </AllianceGuard>
   )
 }
 

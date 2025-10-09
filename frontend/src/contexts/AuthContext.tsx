@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase, type Session, type User } from '@/lib/supabase'
 import { apiClient } from '@/lib/api-client'
 import type { Provider } from '@supabase/supabase-js'
+
+const IS_DEV = import.meta.env.DEV
 
 interface AuthState {
   user: User | null
@@ -21,13 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     session: null,
-    loading: true // Start with loading true
+    loading: true
   })
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      // Update API client token
       apiClient.setAuthToken(session?.access_token ?? null)
 
       setAuthState({
@@ -40,7 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Update API client token when auth state changes
+        if (IS_DEV) {
+          console.log('🔐 Auth state changed:', event, session?.user?.email)
+        }
+
         apiClient.setAuthToken(session?.access_token ?? null)
 
         setAuthState({
@@ -52,17 +58,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Process pending invitations on sign-in
         if (event === 'SIGNED_IN' && session) {
           try {
-            await apiClient.processPendingInvitations()
-          } catch {
-            // Don't block login if this fails
+            if (IS_DEV) {
+              console.log('🔄 Processing pending invitations for:', session.user?.email)
+            }
+
+            const result = await apiClient.processPendingInvitations()
+
+            if (IS_DEV) {
+              console.log('✅ Invitation processing result:', result)
+            }
+
+            // If invitations were processed, invalidate alliance queries
+            if (result.processed_count > 0) {
+              if (IS_DEV) {
+                console.log(`🎉 ${result.processed_count} invitation(s) accepted!`)
+              }
+
+              // Invalidate alliance query to refetch
+              await queryClient.invalidateQueries({ queryKey: ['alliance'] })
+            }
+          } catch (error) {
+            if (IS_DEV) {
+              console.error('❌ Failed to process pending invitations:', error)
+            }
+            // Don't block login
           }
         }
       }
     )
 
-    // Cleanup subscription
     return () => subscription.unsubscribe()
-  }, [])
+  }, [queryClient])
 
   const signInWithOAuth = async (provider: Provider) => {
     const { error } = await supabase.auth.signInWithOAuth({

@@ -10,11 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, TrendingUp, Users, Target, Loader2, Award } from 'lucide-react'
+import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { useAlliance } from '@/hooks/use-alliance'
 import { useSeasons } from '@/hooks/use-seasons'
 import { useHegemonyScoresPreview } from '@/hooks/use-hegemony-weights'
-import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -249,7 +248,7 @@ const HegemonyScoreTab: React.FC<HegemonyScoreTabProps> = ({ seasonId }) => {
 // ============================================================================
 
 const AllianceAnalytics: React.FC = () => {
-  const { data: alliance, isLoading } = useAlliance()
+  const { data: alliance } = useAlliance()
   const { data: seasons } = useSeasons(false)
   const [activeTab, setActiveTab] = useState('hegemony')
 
@@ -258,52 +257,16 @@ const AllianceAnalytics: React.FC = () => {
     return seasons?.find(s => s.is_active) || seasons?.[0] || null
   }, [seasons])
 
-  // Show setup prompt if no alliance
-  if (!isLoading && !alliance) {
-    return (
+  return (
+    <AllianceGuard>
       <div className="space-y-6">
+        {/* Page Header */}
         <div>
           <h2 className="text-2xl font-bold tracking-tight">同盟分析</h2>
           <p className="text-muted-foreground mt-1">
-            查看同盟表現數據與趨勢分析
+            {alliance?.name || '載入中...'} - 表現數據與趨勢分析
           </p>
         </div>
-
-        <Card className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
-          <CardHeader>
-            <div className="flex items-start gap-4">
-              <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-500 mt-1" />
-              <div className="flex-1">
-                <CardTitle className="text-yellow-900 dark:text-yellow-100">
-                  尚未設定同盟
-                </CardTitle>
-                <CardDescription className="text-yellow-800 dark:text-yellow-200 mt-2">
-                  在開始使用分析功能之前，請先前往設定頁面建立你的同盟資訊
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Link to="/settings">
-              <Button className="gap-2">
-                前往設定
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">同盟分析</h2>
-        <p className="text-muted-foreground mt-1">
-          {alliance?.name || '載入中...'} - 表現數據與趨勢分析
-        </p>
-      </div>
 
       {/* Info Alert */}
       <Alert>
@@ -398,7 +361,8 @@ const AllianceAnalytics: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AllianceGuard>
   )
 }
 

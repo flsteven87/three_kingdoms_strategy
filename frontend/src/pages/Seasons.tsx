@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SeasonCard } from '@/components/seasons/SeasonCard'
+import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { useAlliance } from '@/hooks/use-alliance'
 import {
   useSeasons,
@@ -119,32 +120,22 @@ const Seasons: React.FC = () => {
     })
   }, [])
 
-  if (!alliance) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">賽季管理</h2>
-          <p className="text-muted-foreground mt-1">請先設定同盟資訊</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">賽季管理</h2>
-          <p className="text-muted-foreground mt-1">管理遊戲賽季與數據週期</p>
+    <AllianceGuard>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">賽季管理</h2>
+            <p className="text-muted-foreground mt-1">管理遊戲賽季與數據週期</p>
+          </div>
+          {!isCreating && (
+            <Button onClick={() => setIsCreating(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              新增賽季
+            </Button>
+          )}
         </div>
-        {!isCreating && (
-          <Button onClick={() => setIsCreating(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            新增賽季
-          </Button>
-        )}
-      </div>
 
       {/* Create New Season Card */}
       {isCreating && (
@@ -253,7 +244,8 @@ const Seasons: React.FC = () => {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </AllianceGuard>
   )
 }
 
