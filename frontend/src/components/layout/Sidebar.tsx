@@ -67,9 +67,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const handleSignOut = async () => {
     try {
       await signOut()
-      navigate('/login')
+      navigate('/landing')
     } catch {
-      // Silently handle logout errors - user will be redirected anyway
+      // Silent error handling
     }
   }
 
