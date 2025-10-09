@@ -11,6 +11,14 @@ import axios, { type AxiosInstance } from 'axios'
 import type { Alliance, AllianceCreate, AllianceUpdate } from '@/types/alliance'
 import type { Season, SeasonCreate, SeasonUpdate } from '@/types/season'
 import type { CsvUpload, CsvUploadResponse } from '@/types/csv-upload'
+import type {
+  HegemonyWeight,
+  HegemonyWeightCreate,
+  HegemonyWeightUpdate,
+  HegemonyWeightWithSnapshot,
+  HegemonyScorePreview,
+  SnapshotWeightsSummary
+} from '@/types/hegemony-weight'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087'
 
@@ -173,6 +181,105 @@ class ApiClient {
    */
   async deleteCsvUpload(uploadId: string): Promise<void> {
     await this.client.delete(`/api/v1/uploads/${uploadId}`)
+  }
+
+  // ==================== Hegemony Weight API ====================
+
+  /**
+   * Get all hegemony weight configurations for a season
+   */
+  async getHegemonyWeights(seasonId: string): Promise<HegemonyWeightWithSnapshot[]> {
+    const response = await this.client.get<HegemonyWeightWithSnapshot[]>(
+      '/api/v1/hegemony-weights',
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data
+  }
+
+  /**
+   * Get summary of all snapshot weights for a season
+   */
+  async getHegemonyWeightsSummary(seasonId: string): Promise<SnapshotWeightsSummary> {
+    const response = await this.client.get<SnapshotWeightsSummary>(
+      '/api/v1/hegemony-weights/summary',
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data
+  }
+
+  /**
+   * Initialize default hegemony weights for all CSV uploads in a season
+   */
+  async initializeHegemonyWeights(seasonId: string): Promise<HegemonyWeight[]> {
+    const response = await this.client.post<HegemonyWeight[]>(
+      '/api/v1/hegemony-weights/initialize',
+      null,
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data
+  }
+
+  /**
+   * Create a new hegemony weight configuration
+   */
+  async createHegemonyWeight(
+    seasonId: string,
+    data: HegemonyWeightCreate
+  ): Promise<HegemonyWeight> {
+    const response = await this.client.post<HegemonyWeight>(
+      '/api/v1/hegemony-weights',
+      data,
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data
+  }
+
+  /**
+   * Update hegemony weight configuration
+   */
+  async updateHegemonyWeight(
+    weightId: string,
+    data: HegemonyWeightUpdate
+  ): Promise<HegemonyWeight> {
+    const response = await this.client.patch<HegemonyWeight>(
+      `/api/v1/hegemony-weights/${weightId}`,
+      data
+    )
+    return response.data
+  }
+
+  /**
+   * Delete hegemony weight configuration
+   */
+  async deleteHegemonyWeight(weightId: string): Promise<void> {
+    await this.client.delete(`/api/v1/hegemony-weights/${weightId}`)
+  }
+
+  /**
+   * Calculate and preview hegemony scores for top members
+   */
+  async previewHegemonyScores(
+    seasonId: string,
+    limit: number = 10
+  ): Promise<HegemonyScorePreview[]> {
+    const response = await this.client.get<HegemonyScorePreview[]>(
+      '/api/v1/hegemony-weights/preview',
+      {
+        params: {
+          season_id: seasonId,
+          limit
+        }
+      }
+    )
+    return response.data
   }
 }
 

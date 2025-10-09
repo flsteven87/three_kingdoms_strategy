@@ -9,7 +9,7 @@ Three Kingdoms Strategy Manager FastAPI Application
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1.endpoints import alliances, seasons, uploads
+from src.api.v1.endpoints import alliances, hegemony_weights, seasons, uploads
 from src.core.config import settings
 
 # Create FastAPI app
@@ -37,6 +37,7 @@ app.add_middleware(
 app.include_router(alliances.router, prefix="/api/v1")
 app.include_router(seasons.router, prefix="/api/v1")
 app.include_router(uploads.router, prefix="/api/v1")
+app.include_router(hegemony_weights.router, prefix="/api/v1")
 
 # Health check endpoint (public)
 @app.get("/health")

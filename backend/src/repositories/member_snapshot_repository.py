@@ -71,6 +71,36 @@ class MemberSnapshotRepository(SupabaseRepository[MemberSnapshot]):
 
         return self._build_models(data)
 
+    async def get_by_member_and_upload(
+        self, member_id: UUID, csv_upload_id: UUID
+    ) -> MemberSnapshot | None:
+        """
+        Get member snapshot for specific member and CSV upload
+
+        Args:
+            member_id: Member UUID
+            csv_upload_id: CSV upload UUID
+
+        Returns:
+            Member snapshot instance or None if not found
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = (
+            self.client.from_(self.table_name)
+            .select("*")
+            .eq("member_id", str(member_id))
+            .eq("csv_upload_id", str(csv_upload_id))
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
+
+        if not data:
+            return None
+
+        return self._build_model(data)
+
     async def get_by_alliance(
         self, alliance_id: UUID, limit: int = 1000
     ) -> list[MemberSnapshot]:

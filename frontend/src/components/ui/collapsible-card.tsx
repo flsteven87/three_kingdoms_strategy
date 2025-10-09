@@ -13,6 +13,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 interface CollapsibleCardProps {
   readonly icon?: React.ReactNode
   readonly title: React.ReactNode
+  readonly badge?: React.ReactNode
   readonly description?: string
   readonly children: React.ReactNode
   readonly actions?: React.ReactNode
@@ -24,6 +25,7 @@ interface CollapsibleCardProps {
 export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
   icon,
   title,
+  badge,
   description,
   children,
   actions,
@@ -79,15 +81,22 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                 {icon}
               </div>
             )}
-            <div>
-              <CardTitle className={cn(
-                "text-lg transition-all duration-200",
-                isExpanded
-                  ? "text-primary font-semibold"
-                  : "group-hover:text-primary/80"
-              )}>
-                {title}
-              </CardTitle>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className={cn(
+                  "text-lg transition-all duration-200",
+                  isExpanded
+                    ? "text-primary font-semibold"
+                    : "group-hover:text-primary/80"
+                )}>
+                  {title}
+                </CardTitle>
+                {badge && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    {badge}
+                  </div>
+                )}
+              </div>
               {description && (
                 <CardDescription className="mt-1 group-hover:text-foreground/80 transition-colors duration-200">
                   {description}

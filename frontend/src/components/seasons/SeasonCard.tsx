@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import type { Season } from '@/types/season'
 
 interface SeasonCardProps {
@@ -31,6 +32,7 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
   onActivate
 }) => {
   const [isEditing, setIsEditing] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editData, setEditData] = useState({
     name: season.name,
     start_date: season.start_date,
@@ -66,11 +68,13 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
     await onActivate(season.id)
   }, [season.id, onActivate])
 
-  const handleDelete = useCallback(async () => {
-    if (window.confirm(`確定要刪除賽季「${season.name}」嗎？\n此操作無法復原，相關的所有數據都會被刪除。`)) {
-      await onDelete(season.id)
-    }
-  }, [season.id, season.name, onDelete])
+  const handleDeleteClick = useCallback(() => {
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    await onDelete(season.id)
+  }, [season.id, onDelete])
 
   const actions = (
     <div className="flex items-center gap-2">
@@ -117,7 +121,7 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
           <Button
             size="sm"
             variant="ghost"
-            onClick={handleDelete}
+            onClick={handleDeleteClick}
             className="h-8 px-2 text-destructive hover:text-destructive"
           >
             <Trash2 className="h-4 w-4" />
@@ -129,25 +133,23 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
 
   const icon = <Calendar className="h-4 w-4" />
 
-  const title = (
-    <div className="flex items-center gap-2">
-      <span>{season.name}</span>
-      {season.is_active && (
-        <Badge variant="default" className="ml-2">
-          活躍中
-        </Badge>
-      )}
-    </div>
-  )
+  const title = season.name
+
+  const badge = season.is_active ? (
+    <Badge variant="default" className="text-xs">
+      進行中
+    </Badge>
+  ) : undefined
 
   const description = season.is_active
-    ? '目前活躍的賽季，所有新上傳的數據將歸類至此賽季'
+    ? '目前進行中的賽季，所有新上傳的數據將歸類至此賽季'
     : `${season.start_date}${season.end_date ? ` - ${season.end_date}` : ' - 進行中'}`
 
   return (
     <CollapsibleCard
       icon={icon}
       title={title}
+      badge={badge}
       description={description}
       actions={actions}
       collapsible={true}
@@ -230,6 +232,17 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleConfirmDelete}
+        title="刪除賽季"
+        description="確定要刪除此賽季嗎？"
+        itemName={season.name}
+        warningMessage="此操作將永久刪除賽季及相關的所有數據（CSV 上傳記錄、成員快照等），且無法復原。"
+      />
     </CollapsibleCard>
   )
 }

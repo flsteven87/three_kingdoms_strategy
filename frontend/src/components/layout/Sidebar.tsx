@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Calendar, Database, Trophy, Users, Settings } from 'lucide-react'
+import { LayoutDashboard, Calendar, Database, Trophy, Users, BarChart3, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SidebarProps {
@@ -32,6 +32,11 @@ const navigation: readonly NavigationItem[] = [
     name: '霸業權重',
     href: '/hegemony',
     icon: Trophy,
+  },
+  {
+    name: '同盟分析',
+    href: '/analytics',
+    icon: BarChart3,
   },
   {
     name: '成員表現',

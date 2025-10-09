@@ -1,92 +1,111 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+/**
+ * Hegemony Weights Page - Season-based Weight Configuration
+ *
+ * 符合 CLAUDE.md 🔴:
+ * - JSX syntax only
+ * - TanStack Query for server state
+ * - Type-safe component
+ * - Each season is a CollapsibleCard
+ * - Auto-expand active season
+ * - Auto-load snapshot weights
+ */
+
+import React from 'react'
+import { Loader2, Scale } from 'lucide-react'
+import { useAlliance } from '@/hooks/use-alliance'
+import { useSeasons } from '@/hooks/use-seasons'
+import { HegemonyWeightCard } from '@/components/hegemony-weights/HegemonyWeightCard'
 
 const HegemonyWeights: React.FC = () => {
+  // Fetch alliance data
+  const { data: alliance } = useAlliance()
+
+  // Fetch all seasons
+  const { data: seasons, isLoading } = useSeasons()
+
+  /**
+   * Sort seasons: active first, then by start_date descending
+   */
+  const sortedSeasons = seasons
+    ? [...seasons].sort((a, b) => {
+        if (a.is_active && !b.is_active) return -1
+        if (!a.is_active && b.is_active) return 1
+        return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+      })
+    : []
+
+  if (!alliance) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">霸業權重配置</h2>
+          <p className="text-muted-foreground mt-1">請先設定同盟資訊</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">霸業權重</h2>
-        <p className="text-muted-foreground mt-1">
-          自定義霸業評分權重配置
-        </p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">霸業權重配置</h2>
+          <p className="text-muted-foreground mt-1">
+            設定各賽季的指標權重與時間點權重，用於計算盟友霸業排名
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Scale className="h-4 w-4" />
+          <span>兩層權重系統</span>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>評分權重設定</CardTitle>
-          <CardDescription>Configure scoring weights for different metrics</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">貢獻權重</label>
-                <input
-                  type="number"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="0.4"
-                  defaultValue="0.4"
-                />
-              </div>
+      {/* Info Card */}
+      <div className="p-4 rounded-lg border bg-muted/30">
+        <h3 className="text-sm font-semibold mb-2">權重系統說明</h3>
+        <ul className="space-y-1 text-sm text-muted-foreground">
+          <li>
+            <strong>指標權重：</strong>
+            每個快照內「總貢獻/總功績/總協助/總捐獻」的比重（總和需為 100%）
+          </li>
+          <li>
+            <strong>快照權重：</strong>
+            各時間快照在最終計算中的比重（總和需為 100%）
+          </li>
+          <li>
+            <strong>計算公式：</strong>
+            快照分數 = Σ(指標數據 × 指標權重)，最終分數 = Σ(快照分數 × 快照權重)
+          </li>
+        </ul>
+      </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">戰功權重</label>
-                <input
-                  type="number"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="0.3"
-                  defaultValue="0.3"
-                />
-              </div>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">助攻權重</label>
-                <input
-                  type="number"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="0.2"
-                  defaultValue="0.2"
-                />
-              </div>
+      {/* Empty State */}
+      {!isLoading && sortedSeasons.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
+          <Scale className="h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-muted-foreground mb-4">尚未建立任何賽季</p>
+          <p className="text-sm text-muted-foreground max-w-md">
+            請先前往「賽季管理」頁面建立賽季，並上傳 CSV 數據快照後，再回到此處配置霸業權重。
+          </p>
+        </div>
+      )}
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">捐獻權重</label>
-                <input
-                  type="number"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="0.1"
-                  defaultValue="0.1"
-                />
-              </div>
-            </div>
-
-            <div className="pt-4">
-              <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
-                儲存設定
-              </button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>權重說明</CardTitle>
-          <CardDescription>Understanding weight calculation</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              霸業評分 = 貢獻 × 貢獻權重 + 戰功 × 戰功權重 + 助攻 × 助攻權重 + 捐獻 × 捐獻權重
-            </p>
-            <p>
-              所有權重總和應等於 1.0，系統會自動進行正規化處理。
-            </p>
-            <p>
-              建議根據同盟的戰略目標調整各項指標的權重，以更準確地評估成員貢獻。
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Season Weight Cards */}
+      {!isLoading && sortedSeasons.length > 0 && (
+        <div className="space-y-4">
+          {sortedSeasons.map((season) => (
+            <HegemonyWeightCard key={season.id} season={season} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

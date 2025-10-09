@@ -8,6 +8,7 @@ import Seasons from './pages/Seasons'
 import DataManagement from './pages/DataManagement'
 import HegemonyWeights from './pages/HegemonyWeights'
 import MemberPerformance from './pages/MemberPerformance'
+import AllianceAnalytics from './pages/AllianceAnalytics'
 import Settings from './pages/Settings'
 
 // Protected Route Component
@@ -87,6 +88,16 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <MemberPerformance />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <AllianceAnalytics />
                 </DashboardLayout>
               </ProtectedRoute>
             }
