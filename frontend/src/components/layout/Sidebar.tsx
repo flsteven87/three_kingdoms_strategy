@@ -1,6 +1,8 @@
-import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Calendar, Database, Trophy, Users, BarChart3, Settings } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, Calendar, Database, Trophy, Users, BarChart3, Settings, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
+import { Button } from '@/components/ui/button'
 
 interface SidebarProps {
   readonly className?: string
@@ -52,12 +54,23 @@ const navigation: readonly NavigationItem[] = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, signOut } = useAuth()
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
       return location.pathname === '/dashboard'
     }
     return location.pathname.startsWith(href)
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      navigate('/login')
+    } catch {
+      // Silently handle logout errors - user will be redirected anyway
+    }
   }
 
   return (
@@ -101,9 +114,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         })}
       </nav>
 
-      {/* Footer Info */}
-      <div className="border-t border-border p-4">
-        <div className="text-xs text-muted-foreground">
+      {/* User Info & Logout */}
+      <div className="border-t border-border p-4 space-y-3">
+        {user && (
+          <div className="flex items-center gap-3 px-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+              <span className="text-sm font-medium text-primary">
+                {user.email?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{user.email}</p>
+              <p className="text-xs text-muted-foreground">已登入</p>
+            </div>
+          </div>
+        )}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSignOut}
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>登出</span>
+        </Button>
+
+        <div className="text-xs text-muted-foreground px-2">
           <p className="font-medium">Version 0.1.0</p>
         </div>
       </div>
