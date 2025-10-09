@@ -9,6 +9,11 @@
 
 import axios, { type AxiosInstance } from 'axios'
 import type { Alliance, AllianceCreate, AllianceUpdate } from '@/types/alliance'
+import type {
+  AllianceCollaborator,
+  AllianceCollaboratorCreate,
+  AllianceCollaboratorsResponse
+} from '@/types/alliance-collaborator'
 import type { Season, SeasonCreate, SeasonUpdate } from '@/types/season'
 import type { CsvUpload, CsvUploadResponse } from '@/types/csv-upload'
 import type {
@@ -77,6 +82,39 @@ class ApiClient {
    */
   async deleteAlliance(): Promise<void> {
     await this.client.delete('/api/v1/alliances')
+  }
+
+  // ==================== Alliance Collaborator API ====================
+
+  /**
+   * Get all collaborators of an alliance
+   */
+  async getCollaborators(allianceId: string): Promise<AllianceCollaboratorsResponse> {
+    const response = await this.client.get<AllianceCollaboratorsResponse>(
+      `/api/v1/alliances/${allianceId}/collaborators`
+    )
+    return response.data
+  }
+
+  /**
+   * Add collaborator to alliance by email
+   */
+  async addCollaborator(
+    allianceId: string,
+    data: AllianceCollaboratorCreate
+  ): Promise<AllianceCollaborator> {
+    const response = await this.client.post<AllianceCollaborator>(
+      `/api/v1/alliances/${allianceId}/collaborators`,
+      data
+    )
+    return response.data
+  }
+
+  /**
+   * Remove collaborator from alliance
+   */
+  async removeCollaborator(allianceId: string, userId: string): Promise<void> {
+    await this.client.delete(`/api/v1/alliances/${allianceId}/collaborators/${userId}`)
   }
 
   // ==================== Season API ====================

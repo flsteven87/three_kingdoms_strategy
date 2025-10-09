@@ -8,6 +8,7 @@
 import { useAlliance } from '@/hooks/use-alliance'
 import { AllianceSetupForm } from '@/components/alliance/AllianceSetupForm'
 import { AllianceSettings } from '@/components/alliance/AllianceSettings'
+import { AllianceCollaboratorManager } from '@/components/alliance/AllianceCollaboratorManager'
 import {
   Card,
   CardContent,
@@ -48,7 +49,10 @@ const Settings: React.FC = () => {
             </CardContent>
           </Card>
         ) : alliance ? (
-          <AllianceSettings />
+          <div className="space-y-4">
+            <AllianceSettings />
+            <AllianceCollaboratorManager allianceId={alliance.id} />
+          </div>
         ) : (
           <div className="max-w-2xl">
             <AllianceSetupForm />

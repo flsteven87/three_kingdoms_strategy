@@ -41,7 +41,7 @@ class SeasonService:
             ValueError: If user has no alliance
         """
         # Verify user has alliance
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance:
             raise ValueError("User has no alliance")
 
@@ -63,7 +63,7 @@ class SeasonService:
             PermissionError: If user doesn't own the season
         """
         # Verify user has alliance
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance:
             raise ValueError("User has no alliance")
 
@@ -91,7 +91,7 @@ class SeasonService:
             ValueError: If user has no alliance
         """
         # Verify user has alliance
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance:
             raise ValueError("User has no alliance")
 
@@ -113,7 +113,7 @@ class SeasonService:
             PermissionError: If alliance_id doesn't match user's alliance
         """
         # Verify user has alliance
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance:
             raise ValueError("User has no alliance")
 
@@ -201,7 +201,7 @@ class SeasonService:
             PermissionError: If user doesn't own the season
         """
         # Verify ownership
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance:
             raise ValueError("User has no alliance")
 

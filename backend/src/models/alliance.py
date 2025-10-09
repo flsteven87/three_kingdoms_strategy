@@ -35,10 +35,13 @@ class AllianceUpdate(BaseModel):
 
 
 class Alliance(AllianceBase):
-    """Alliance model with all fields"""
+    """
+    Alliance model with all fields.
+
+    Note: user_id has been removed - use alliance_collaborators table instead
+    """
 
     id: UUID
-    user_id: UUID
     created_at: datetime
     updated_at: datetime
 

@@ -55,7 +55,7 @@ class HegemonyWeightService:
         if not season:
             raise ValueError(f"Season {season_id} not found")
 
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance or alliance.id != season.alliance_id:
             raise PermissionError("You don't have permission to access this season")
 
@@ -210,7 +210,7 @@ class HegemonyWeightService:
         if not weight:
             raise ValueError(f"Weight {weight_id} not found")
 
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance or alliance.id != weight.alliance_id:
             raise PermissionError("You don't have permission to update this weight")
 
@@ -239,7 +239,7 @@ class HegemonyWeightService:
         if not weight:
             raise ValueError(f"Weight {weight_id} not found")
 
-        alliance = await self._alliance_repo.get_by_user_id(user_id)
+        alliance = await self._alliance_repo.get_by_collaborator(user_id)
         if not alliance or alliance.id != weight.alliance_id:
             raise PermissionError("You don't have permission to delete this weight")
 

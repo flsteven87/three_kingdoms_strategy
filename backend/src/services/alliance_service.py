@@ -10,6 +10,9 @@ Alliance Service Layer
 from uuid import UUID
 
 from src.models.alliance import Alliance, AllianceCreate, AllianceUpdate
+from src.repositories.alliance_collaborator_repository import (
+    AllianceCollaboratorRepository,
+)
 from src.repositories.alliance_repository import AllianceRepository
 
 
@@ -21,24 +24,28 @@ class AllianceService:
     """
 
     def __init__(self):
-        """Initialize alliance service with repository"""
+        """Initialize alliance service with repositories"""
         self._repo = AllianceRepository()
+        self._collaborator_repo = AllianceCollaboratorRepository()
 
     async def get_user_alliance(self, user_id: UUID) -> Alliance | None:
         """
-        Get user's alliance
+        Get user's alliance (via alliance_collaborators).
 
         Args:
             user_id: User UUID from authentication
 
         Returns:
             Alliance instance or None if not found
+
+        Note:
+            Changed from get_by_user_id() to get_by_collaborator()
         """
-        return await self._repo.get_by_user_id(user_id)
+        return await self._repo.get_by_collaborator(user_id)
 
     async def create_alliance(self, user_id: UUID, alliance_data: AllianceCreate) -> Alliance:
         """
-        Create new alliance for user
+        Create new alliance and automatically add creator as owner.
 
         Args:
             user_id: User UUID from authentication
@@ -49,23 +56,36 @@ class AllianceService:
 
         Raises:
             ValueError: If user already has an alliance
+
+        Note:
+            Phase 1 Change:
+            - No longer stores user_id in alliances table
+            - Automatically adds creator to alliance_collaborators with role='owner'
         """
         # Check if user already has an alliance
-        existing = await self._repo.get_by_user_id(user_id)
+        existing = await self._repo.get_by_collaborator(user_id)
         if existing:
             raise ValueError("User already has an alliance")
 
-        # Create alliance
+        # 1. Create alliance (no user_id field)
         data = alliance_data.model_dump()
-        data["user_id"] = str(user_id)
+        alliance = await self._repo.create(data)
 
-        return await self._repo.create(data)
+        # 2. Add creator as owner in alliance_collaborators
+        await self._collaborator_repo.add_collaborator(
+            alliance_id=alliance.id,
+            user_id=user_id,
+            role="owner",
+            invited_by=None,  # Owner is not invited by anyone
+        )
+
+        return alliance
 
     async def update_alliance(
         self, user_id: UUID, alliance_data: AllianceUpdate
     ) -> Alliance:
         """
-        Update user's alliance
+        Update user's alliance.
 
         Args:
             user_id: User UUID from authentication
@@ -76,9 +96,12 @@ class AllianceService:
 
         Raises:
             ValueError: If user has no alliance
+
+        Note:
+            Changed from get_by_user_id() to get_by_collaborator()
         """
         # Get user's alliance
-        alliance = await self._repo.get_by_user_id(user_id)
+        alliance = await self._repo.get_by_collaborator(user_id)
         if not alliance:
             raise ValueError("User has no alliance to update")
 
@@ -89,7 +112,7 @@ class AllianceService:
 
     async def delete_alliance(self, user_id: UUID) -> bool:
         """
-        Delete user's alliance
+        Delete user's alliance (only owner can delete).
 
         Args:
             user_id: User UUID from authentication
@@ -98,11 +121,22 @@ class AllianceService:
             True if deleted successfully
 
         Raises:
-            ValueError: If user has no alliance
+            ValueError: If user has no alliance or not owner
+
+        Note:
+            Phase 1 Change:
+            - Verify user is owner via alliance_collaborators
+            - CASCADE will automatically delete all collaborators
         """
         # Get user's alliance
-        alliance = await self._repo.get_by_user_id(user_id)
+        alliance = await self._repo.get_by_collaborator(user_id)
         if not alliance:
             raise ValueError("User has no alliance to delete")
 
+        # Verify user is owner
+        role = await self._collaborator_repo.get_collaborator_role(alliance.id, user_id)
+        if role != "owner":
+            raise ValueError("Only alliance owner can delete alliance")
+
+        # Delete alliance (collaborators will be deleted via CASCADE)
         return await self._repo.delete(alliance.id)

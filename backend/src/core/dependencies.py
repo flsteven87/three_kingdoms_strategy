@@ -8,6 +8,7 @@ FastAPI dependency injection providers
 from supabase import Client
 
 from src.core.database import get_supabase_client
+from src.services.alliance_collaborator_service import AllianceCollaboratorService
 from src.services.alliance_service import AllianceService
 from src.services.csv_upload_service import CSVUploadService
 from src.services.season_service import SeasonService
@@ -77,3 +78,22 @@ def get_season_service() -> SeasonService:
     符合 CLAUDE.md 🔴: Provider Pattern for service injection
     """
     return SeasonService()
+
+
+def get_alliance_collaborator_service() -> AllianceCollaboratorService:
+    """
+    Get alliance collaborator service instance
+
+    Returns:
+        AllianceCollaboratorService instance
+
+    Usage:
+        @app.get("/alliances/{id}/collaborators")
+        async def get_collaborators(
+            service: Annotated[AllianceCollaboratorService, Depends(get_alliance_collaborator_service)]
+        ):
+            pass
+
+    符合 CLAUDE.md 🔴: Provider Pattern for service injection
+    """
+    return AllianceCollaboratorService()

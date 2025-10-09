@@ -20,9 +20,9 @@ class AllianceRepository(SupabaseRepository[Alliance]):
         """Initialize alliance repository"""
         super().__init__(table_name="alliances", model_class=Alliance)
 
-    async def get_by_user_id(self, user_id: UUID) -> Alliance | None:
+    async def get_by_collaborator(self, user_id: UUID) -> Alliance | None:
         """
-        Get alliance by user ID
+        Get user's alliance (via alliance_collaborators relationship).
 
         Args:
             user_id: User UUID
@@ -30,21 +30,26 @@ class AllianceRepository(SupabaseRepository[Alliance]):
         Returns:
             Alliance instance or None if not found
 
-        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        Note:
+            This replaces get_by_user_id() - now queries through alliance_collaborators
         """
+        # Query alliance through collaborators relationship
+        # Get first alliance user is collaborator of (Phase 1: single alliance per user)
         result = (
-            self.client.from_(self.table_name)
-            .select("*")
+            self.client.from_("alliance_collaborators")
+            .select("alliances(*)")
             .eq("user_id", str(user_id))
+            .order("joined_at", desc=True)
+            .limit(1)
             .execute()
         )
 
-        data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
+        data = self._handle_supabase_result(result, allow_empty=True)
 
-        if not data:
+        if not data or not data[0].get("alliances"):
             return None
 
-        return self._build_model(data)
+        return self._build_model(data[0]["alliances"])
 
     async def create(self, alliance_data: dict) -> Alliance:
         """

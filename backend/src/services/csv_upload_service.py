@@ -12,6 +12,9 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
+from src.repositories.alliance_collaborator_repository import (
+    AllianceCollaboratorRepository,
+)
 from src.repositories.alliance_repository import AllianceRepository
 from src.repositories.csv_upload_repository import CsvUploadRepository
 from src.repositories.member_repository import MemberRepository
@@ -30,6 +33,7 @@ class CSVUploadService:
         self._snapshot_repo = MemberSnapshotRepository()
         self._season_repo = SeasonRepository()
         self._alliance_repo = AllianceRepository()
+        self._collaborator_repo = AllianceCollaboratorRepository()
         self._parser = CSVParserService()
 
     async def upload_csv(
@@ -73,10 +77,19 @@ class CSVUploadService:
         if not season:
             raise HTTPException(status_code=404, detail="Season not found")
 
-        # Verify user owns the alliance
+        # Verify user is a collaborator of the alliance
+        is_collaborator = await self._collaborator_repo.is_collaborator(
+            alliance_id=season.alliance_id, user_id=user_id
+        )
+        if not is_collaborator:
+            raise HTTPException(
+                status_code=403, detail="Unauthorized: You are not a collaborator of this alliance"
+            )
+
+        # Get alliance for subsequent operations
         alliance = await self._alliance_repo.get_by_id(season.alliance_id)
-        if not alliance or alliance.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Unauthorized: You don't own this season")
+        if not alliance:
+            raise HTTPException(status_code=404, detail="Alliance not found")
 
         # Step 2: Determine snapshot date (custom or from filename)
         if custom_snapshot_date:
@@ -192,14 +205,18 @@ class CSVUploadService:
 
         符合 CLAUDE.md 🔴: Service layer authorization
         """
-        # Validate user owns the season
+        # Validate user is a collaborator of the season's alliance
         season = await self._season_repo.get_by_id(season_id)
         if not season:
             raise HTTPException(status_code=404, detail="Season not found")
 
-        alliance = await self._alliance_repo.get_by_id(season.alliance_id)
-        if not alliance or alliance.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Unauthorized")
+        is_collaborator = await self._collaborator_repo.is_collaborator(
+            alliance_id=season.alliance_id, user_id=user_id
+        )
+        if not is_collaborator:
+            raise HTTPException(
+                status_code=403, detail="Unauthorized: You are not a collaborator of this alliance"
+            )
 
         uploads = await self._csv_upload_repo.get_by_season(season_id)
 
@@ -234,14 +251,18 @@ class CSVUploadService:
         if not upload:
             raise HTTPException(status_code=404, detail="Upload not found")
 
-        # Verify user owns the alliance
+        # Verify user is a collaborator of the alliance
         season = await self._season_repo.get_by_id(upload.season_id)
         if not season:
             raise HTTPException(status_code=404, detail="Season not found")
 
-        alliance = await self._alliance_repo.get_by_id(season.alliance_id)
-        if not alliance or alliance.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Unauthorized")
+        is_collaborator = await self._collaborator_repo.is_collaborator(
+            alliance_id=season.alliance_id, user_id=user_id
+        )
+        if not is_collaborator:
+            raise HTTPException(
+                status_code=403, detail="Unauthorized: You are not a collaborator of this alliance"
+            )
 
         # Delete upload (CASCADE will delete snapshots)
         return await self._csv_upload_repo.delete(upload_id)
