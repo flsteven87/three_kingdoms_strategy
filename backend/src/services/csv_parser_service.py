@@ -70,7 +70,22 @@ class CSVParserService:
 
         符合 CLAUDE.md 🟡: Pure data transformation
         """
-        reader = csv.DictReader(StringIO(csv_content))
+        # Remove UTF-8 BOM if present
+        if csv_content.startswith('\ufeff'):
+            csv_content = csv_content[1:]
+
+        # Read CSV and strip whitespace from field names
+        lines = csv_content.splitlines()
+        if not lines:
+            raise ValueError("CSV file is empty")
+
+        # Strip whitespace from header
+        header = [field.strip() for field in lines[0].split(',')]
+
+        # Create new CSV content with cleaned header
+        cleaned_csv = ','.join(header) + '\n' + '\n'.join(lines[1:])
+
+        reader = csv.DictReader(StringIO(cleaned_csv))
 
         members = []
         for row in reader:

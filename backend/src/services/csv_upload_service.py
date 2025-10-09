@@ -38,7 +38,7 @@ class CSVUploadService:
         season_id: UUID,
         filename: str,
         csv_content: str,
-        snapshot_date: datetime | None = None,
+        custom_snapshot_date: str | None = None,
     ) -> dict:
         """
         Complete CSV upload workflow
@@ -48,7 +48,7 @@ class CSVUploadService:
             season_id: Season UUID
             filename: CSV filename
             csv_content: CSV file content as string
-            snapshot_date: Optional override for snapshot date (defaults to filename parsing)
+            custom_snapshot_date: Optional custom snapshot datetime (ISO format string)
 
         Returns:
             Upload result with statistics
@@ -58,7 +58,7 @@ class CSVUploadService:
 
         Workflow:
             1. Validate user owns the season
-            2. Extract snapshot date from filename (if not provided)
+            2. Extract snapshot date from filename or custom date
             3. Parse CSV content
             4. Check for existing upload on same date (delete if exists)
             5. Create CSV upload record
@@ -78,8 +78,15 @@ class CSVUploadService:
         if not alliance or alliance.user_id != user_id:
             raise HTTPException(status_code=403, detail="Unauthorized: You don't own this season")
 
-        # Step 2: Extract snapshot date from filename if not provided
-        if snapshot_date is None:
+        # Step 2: Determine snapshot date (custom or from filename)
+        if custom_snapshot_date:
+            try:
+                snapshot_date = datetime.fromisoformat(custom_snapshot_date.replace('Z', '+00:00'))
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid snapshot date format: {str(e)}"
+                ) from e
+        else:
             try:
                 snapshot_date = self._parser.extract_datetime_from_filename(filename)
             except ValueError as e:
@@ -102,7 +109,7 @@ class CSVUploadService:
         )
 
         if existing_upload:
-            # Delete existing upload (CASCADE will delete snapshots)
+            # Delete existing upload (CASCADE will delete snapshots automatically)
             await self._csv_upload_repo.delete(existing_upload.id)
 
         # Step 5: Create CSV upload record
@@ -116,22 +123,20 @@ class CSVUploadService:
 
         csv_upload = await self._csv_upload_repo.create(upload_data)
 
-        # Step 6: Upsert members
-        member_ids_map = {}
-        for member_data in members_data:
-            member_name = member_data["member_name"]
+        # Step 6: Upsert members (update last_seen_at for existing, insert new)
+        members_upsert_data = [
+            {
+                "alliance_id": str(alliance.id),
+                "name": member_data["member_name"],
+                "first_seen_at": snapshot_date.isoformat(),
+                "last_seen_at": snapshot_date.isoformat(),
+                "is_active": True,
+            }
+            for member_data in members_data
+        ]
 
-            # Upsert member (create if new, update if exists)
-            member = await self._member_repo.upsert_by_name(
-                alliance_id=alliance.id,
-                name=member_name,
-                member_data={
-                    "last_seen_at": snapshot_date.isoformat(),
-                    "is_active": True,
-                },
-            )
-
-            member_ids_map[member_name] = member.id
+        members = await self._member_repo.upsert_batch(members_upsert_data)
+        member_ids_map = {member.name: member.id for member in members}
 
         # Step 7: Batch create snapshots
         snapshots_data = []

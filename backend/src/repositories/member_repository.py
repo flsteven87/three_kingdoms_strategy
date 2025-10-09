@@ -124,7 +124,7 @@ class MemberRepository(SupabaseRepository[Member]):
         Args:
             alliance_id: Alliance UUID
             name: Member name
-            member_data: Member data dictionary
+            member_data: Member data dictionary (must include last_seen_at)
 
         Returns:
             Member instance
@@ -139,9 +139,69 @@ class MemberRepository(SupabaseRepository[Member]):
             return await self.update(existing.id, member_data)
 
         # Create new member
-        member_data["alliance_id"] = str(alliance_id)
-        member_data["name"] = name
-        return await self.create(member_data)
+        create_data = {
+            "alliance_id": str(alliance_id),
+            "name": name,
+            "first_seen_at": member_data.get("last_seen_at"),  # Set first_seen_at on creation
+            **member_data,
+        }
+        return await self.create(create_data)
+
+    async def upsert_batch(self, members_data: list[dict]) -> list[Member]:
+        """
+        Batch upsert members (INSERT new, UPDATE existing)
+
+        Args:
+            members_data: List of member data dictionaries with all required fields:
+                - alliance_id: Alliance UUID (string)
+                - name: Member name
+                - first_seen_at: First seen datetime (ISO format)
+                - last_seen_at: Last seen datetime (ISO format)
+                - is_active: Active status
+
+        Returns:
+            List of upserted member instances
+
+        符合 CLAUDE.md 🔴: Batch upsert for performance
+        """
+        result = (
+            self.client.from_(self.table_name)
+            .upsert(
+                members_data,
+                on_conflict="alliance_id,name",
+                ignore_duplicates=False,
+            )
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=False)
+
+        return self._build_models(data)
+
+    async def delete_by_alliance(self, alliance_id: UUID) -> bool:
+        """
+        Delete ALL members for an alliance
+        This is used before each CSV upload to ensure clean data
+
+        Args:
+            alliance_id: Alliance UUID
+
+        Returns:
+            True if deleted successfully
+
+        Note: This will CASCADE delete all related snapshots
+        符合 CLAUDE.md 🔴: Hard delete for clean re-upload
+        """
+        result = (
+            self.client.from_(self.table_name)
+            .delete()
+            .eq("alliance_id", str(alliance_id))
+            .execute()
+        )
+
+        self._handle_supabase_result(result, allow_empty=True)
+
+        return True
 
     async def delete(self, member_id: UUID) -> bool:
         """

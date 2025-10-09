@@ -9,6 +9,8 @@
 
 import axios, { type AxiosInstance } from 'axios'
 import type { Alliance, AllianceCreate, AllianceUpdate } from '@/types/alliance'
+import type { Season, SeasonCreate, SeasonUpdate } from '@/types/season'
+import type { CsvUpload, CsvUploadResponse } from '@/types/csv-upload'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087'
 
@@ -67,6 +69,110 @@ class ApiClient {
    */
   async deleteAlliance(): Promise<void> {
     await this.client.delete('/api/v1/alliances')
+  }
+
+  // ==================== Season API ====================
+
+  /**
+   * Get all seasons for current user's alliance
+   */
+  async getSeasons(activeOnly: boolean = false): Promise<Season[]> {
+    const response = await this.client.get<Season[]>('/api/v1/seasons', {
+      params: { active_only: activeOnly }
+    })
+    return response.data
+  }
+
+  /**
+   * Get active season for current user's alliance
+   */
+  async getActiveSeason(): Promise<Season | null> {
+    const response = await this.client.get<Season | null>('/api/v1/seasons/active')
+    return response.data
+  }
+
+  /**
+   * Get specific season by ID
+   */
+  async getSeason(seasonId: string): Promise<Season> {
+    const response = await this.client.get<Season>(`/api/v1/seasons/${seasonId}`)
+    return response.data
+  }
+
+  /**
+   * Create new season
+   */
+  async createSeason(data: SeasonCreate): Promise<Season> {
+    const response = await this.client.post<Season>('/api/v1/seasons', data)
+    return response.data
+  }
+
+  /**
+   * Update season
+   */
+  async updateSeason(seasonId: string, data: SeasonUpdate): Promise<Season> {
+    const response = await this.client.patch<Season>(`/api/v1/seasons/${seasonId}`, data)
+    return response.data
+  }
+
+  /**
+   * Delete season
+   */
+  async deleteSeason(seasonId: string): Promise<void> {
+    await this.client.delete(`/api/v1/seasons/${seasonId}`)
+  }
+
+  /**
+   * Set season as active (deactivates all other seasons)
+   */
+  async activateSeason(seasonId: string): Promise<Season> {
+    const response = await this.client.post<Season>(`/api/v1/seasons/${seasonId}/activate`)
+    return response.data
+  }
+
+  // ==================== CSV Upload API ====================
+
+  /**
+   * Get all CSV uploads for a season
+   */
+  async getCsvUploads(seasonId: string): Promise<CsvUpload[]> {
+    const response = await this.client.get<{ uploads: CsvUpload[]; total: number }>(
+      '/api/v1/uploads',
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data.uploads
+  }
+
+  /**
+   * Upload CSV file with optional custom snapshot date
+   */
+  async uploadCsv(
+    seasonId: string,
+    file: File,
+    snapshotDate?: string
+  ): Promise<CsvUploadResponse> {
+    const formData = new FormData()
+    formData.append('season_id', seasonId)
+    formData.append('file', file)
+    if (snapshotDate) {
+      formData.append('snapshot_date', snapshotDate)
+    }
+
+    const response = await this.client.post<CsvUploadResponse>('/api/v1/uploads', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response.data
+  }
+
+  /**
+   * Delete CSV upload
+   */
+  async deleteCsvUpload(uploadId: string): Promise<void> {
+    await this.client.delete(`/api/v1/uploads/${uploadId}`)
   }
 }
 

@@ -22,10 +22,11 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 @router.post("")
 async def upload_csv(
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
     season_id: Annotated[UUID, Form()],
     file: Annotated[UploadFile, File()],
-    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    snapshot_date: Annotated[str | None, Form()] = None,
 ):
     """
     Upload CSV file for a season
@@ -33,6 +34,7 @@ async def upload_csv(
     Args:
         season_id: Season UUID
         file: CSV file upload
+        snapshot_date: Optional custom snapshot datetime (ISO format)
         service: CSV upload service (injected)
         user_id: User UUID (from JWT token)
 
@@ -55,21 +57,26 @@ async def upload_csv(
         ) from e
 
     # Upload CSV
-    result = await service.upload_csv(
-        user_id=user_id,
-        season_id=season_id,
-        filename=file.filename,
-        csv_content=csv_content,
-    )
-
-    return result
+    try:
+        result = await service.upload_csv(
+            user_id=user_id,
+            season_id=season_id,
+            filename=file.filename,
+            csv_content=csv_content,
+            custom_snapshot_date=snapshot_date,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
 
 
 @router.get("")
 async def list_uploads(
-    season_id: UUID,
-    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
     user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
+    season_id: UUID,
 ):
     """
     Get all CSV uploads for a season
@@ -91,9 +98,9 @@ async def list_uploads(
 
 @router.delete("/{upload_id}")
 async def delete_upload(
-    upload_id: UUID,
-    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
     user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
+    upload_id: UUID,
 ):
     """
     Delete a CSV upload (with cascading snapshots)
