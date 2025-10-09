@@ -6,8 +6,7 @@
  */
 
 import { useAlliance } from '@/hooks/use-alliance'
-import { AllianceSetupForm } from '@/components/alliance/AllianceSetupForm'
-import { AllianceSettings } from '@/components/alliance/AllianceSettings'
+import { AllianceForm } from '@/components/alliance/AllianceForm'
 import { AllianceCollaboratorManager } from '@/components/alliance/AllianceCollaboratorManager'
 import {
   Card,
@@ -18,7 +17,7 @@ import {
 } from '@/components/ui/card'
 
 const Settings: React.FC = () => {
-  const { data: alliance, isLoading } = useAlliance()
+  const { data: alliance } = useAlliance()
 
   return (
     <div className="space-y-6">
@@ -42,22 +41,10 @@ const Settings: React.FC = () => {
           </p>
         </div>
 
-        {isLoading ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center text-muted-foreground">載入中...</div>
-            </CardContent>
-          </Card>
-        ) : alliance ? (
-          <div className="space-y-4">
-            <AllianceSettings />
-            <AllianceCollaboratorManager allianceId={alliance.id} />
-          </div>
-        ) : (
-          <div className="max-w-2xl">
-            <AllianceSetupForm />
-          </div>
-        )}
+        <div className="space-y-4">
+          <AllianceForm />
+          {alliance && <AllianceCollaboratorManager allianceId={alliance.id} />}
+        </div>
       </div>
 
       {/* Account Settings Section */}
