@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { WebViewWarning } from '@/components/WebViewWarning'
+import { detectWebView } from '@/lib/detect-webview'
 import type { Provider } from '@supabase/supabase-js'
 
 const GOOGLE_ICON = (
@@ -17,7 +19,12 @@ const GOOGLE_ICON = (
 export function Landing() {
   const [isLoading, setIsLoading] = useState<Provider | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [webViewInfo, setWebViewInfo] = useState<ReturnType<typeof detectWebView> | null>(null)
   const { signInWithOAuth } = useAuth()
+
+  useEffect(() => {
+    setWebViewInfo(detectWebView())
+  }, [])
 
   const handleOAuthLogin = async (provider: Provider) => {
     try {
@@ -66,6 +73,13 @@ export function Landing() {
           </div>
 
           <div className="space-y-4 pt-2">
+            {webViewInfo?.isWebView && webViewInfo.platform && (
+              <WebViewWarning
+                platform={webViewInfo.platform}
+                suggestion={webViewInfo.suggestion}
+              />
+            )}
+
             {error && (
               <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
                 <p className="text-sm text-destructive text-center">{error}</p>
@@ -76,7 +90,7 @@ export function Landing() {
               size="lg"
               className="w-full"
               onClick={() => handleOAuthLogin('google')}
-              disabled={isLoading !== null}
+              disabled={isLoading !== null || webViewInfo?.isWebView}
             >
               {isLoading === 'google' ? (
                 <>
@@ -91,9 +105,11 @@ export function Landing() {
               )}
             </Button>
 
-            <p className="text-xs text-center text-muted-foreground">
-              登入即表示您同意我們的服務條款和隱私政策
-            </p>
+            {!webViewInfo?.isWebView && (
+              <p className="text-xs text-center text-muted-foreground">
+                登入即表示您同意我們的服務條款和隱私政策
+              </p>
+            )}
           </div>
 
           <div className="pt-8 border-t">
