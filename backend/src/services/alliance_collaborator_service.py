@@ -304,14 +304,14 @@ class AllianceCollaboratorService:
         self, current_user_id: UUID, alliance_id: UUID
     ) -> list[dict]:
         """
-        Get all collaborators of alliance.
+        Get all collaborators of alliance with enriched user data.
 
         Args:
             current_user_id: Current authenticated user
             alliance_id: Alliance UUID
 
         Returns:
-            list[dict]: List of collaborators
+            list[dict]: List of collaborators with user_full_name and user_avatar_url
 
         Raises:
             HTTPException 403: Not a collaborator
@@ -326,7 +326,32 @@ class AllianceCollaboratorService:
                     detail="You are not a collaborator of this alliance",
                 )
 
-            return await self._collaborator_repo.get_alliance_collaborators(alliance_id)
+            collaborators = await self._collaborator_repo.get_alliance_collaborators(
+                alliance_id
+            )
+
+            # Enrich with user metadata from Supabase Auth
+            enriched_collaborators = []
+            for collab in collaborators:
+                user_id = collab.get("user_id")
+                if not user_id:
+                    enriched_collaborators.append(collab)
+                    continue
+
+                try:
+                    user_response = self._supabase.auth.admin.get_user_by_id(str(user_id))
+                    user = user_response.user if user_response else None
+
+                    if user and user.user_metadata:
+                        collab["user_full_name"] = user.user_metadata.get("full_name")
+                        collab["user_avatar_url"] = user.user_metadata.get("avatar_url")
+
+                except Exception as e:
+                    logger.warning(f"Failed to fetch user metadata for {user_id}: {e}")
+
+                enriched_collaborators.append(collab)
+
+            return enriched_collaborators
 
         except HTTPException:
             raise

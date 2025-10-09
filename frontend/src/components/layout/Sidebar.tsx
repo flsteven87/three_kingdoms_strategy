@@ -118,16 +118,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       <div className="border-t border-border p-4 space-y-3">
         {user && (
           <div className="flex items-center gap-3 px-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
-              <span className="text-sm font-medium text-primary">
-                {user.email?.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {/* User Avatar - show Google profile picture if available */}
+            {user.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt={user.user_metadata?.full_name || user.email || 'User'}
+                className="h-8 w-8 rounded-full object-cover shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                <span className="text-sm font-medium text-primary">
+                  {(user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || '?').toUpperCase()}
+                </span>
+              </div>
+            )}
+
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
-                {user.email?.split('@')[0]}
+                {user.user_metadata?.full_name || user.email?.split('@')[0]}
               </p>
-              <p className="text-xs text-muted-foreground">已登入</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {user.user_metadata?.full_name ? user.email : '已登入'}
+              </p>
             </div>
             <Button
               variant="ghost"

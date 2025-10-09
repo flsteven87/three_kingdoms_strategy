@@ -154,19 +154,42 @@ export const AllianceCollaboratorManager: React.FC<AllianceCollaboratorManagerPr
                   key={collaborator.id}
                   className="flex items-center justify-between p-3 border rounded-lg"
                 >
-                  <div>
-                    <p className="font-medium">
-                      {collaborator.user_email || collaborator.user_id}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {collaborator.role === 'owner' ? '👑 擁有者' : '👤 成員'}
-                      {collaborator.joined_at && (
-                        <>
-                          {' · 加入於 '}
-                          {new Date(collaborator.joined_at).toLocaleDateString('zh-TW')}
-                        </>
-                      )}
-                    </p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* User Avatar */}
+                    {collaborator.user_avatar_url ? (
+                      <img
+                        src={collaborator.user_avatar_url}
+                        alt={collaborator.user_full_name || collaborator.user_email || 'User'}
+                        className="h-10 w-10 rounded-full object-cover shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                        <span className="text-sm font-medium text-primary">
+                          {(collaborator.user_full_name?.charAt(0) ||
+                            collaborator.user_email?.charAt(0) ||
+                            '?').toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {collaborator.user_full_name || collaborator.user_email || collaborator.user_id}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {collaborator.role === 'owner' ? '👑 擁有者' : '👤 成員'}
+                        {collaborator.user_full_name && collaborator.user_email && (
+                          <> · {collaborator.user_email}</>
+                        )}
+                        {collaborator.joined_at && (
+                          <>
+                            {' · 加入於 '}
+                            {new Date(collaborator.joined_at).toLocaleDateString('zh-TW')}
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
 
                   {collaborator.role !== 'owner' && collaborator.user_id && (
@@ -176,10 +199,11 @@ export const AllianceCollaboratorManager: React.FC<AllianceCollaboratorManagerPr
                       onClick={() =>
                         handleRemoveCollaborator(
                           collaborator.user_id!,
-                          collaborator.user_email || 'Unknown'
+                          collaborator.user_full_name || collaborator.user_email || 'Unknown'
                         )
                       }
                       disabled={removeCollaborator.isPending}
+                      className="shrink-0"
                     >
                       移除
                     </Button>

@@ -14,6 +14,8 @@ export interface AllianceCollaborator {
   readonly created_at?: string
   readonly user_email?: string
   readonly user_name?: string
+  readonly user_full_name?: string // Google OAuth full name
+  readonly user_avatar_url?: string // Google OAuth avatar URL
   // Pending invitation fields (when user not yet registered)
   readonly invited_email?: string
   readonly invited_at?: string
