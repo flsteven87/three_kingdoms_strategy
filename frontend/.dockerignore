@@ -1,0 +1,59 @@
+# Three Kingdoms Strategy Manager - Frontend .dockerignore
+# 排除不必要的檔案以優化 Docker build 時間和 image size
+
+# Dependencies (會在 Dockerfile 中重新安裝)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Build output (會在 Dockerfile 中重新生成)
+dist/
+build/
+.vite/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Environment files
+# 符合 CLAUDE.md 🔴: 環境變數由 Zeabur 注入
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage/
+.nyc_output/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+CLAUDE.md
+
+# CI/CD
+.github/
+
+# Misc
+*.log
+.cache/

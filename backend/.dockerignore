@@ -1,0 +1,64 @@
+# Three Kingdoms Strategy Manager - Backend .dockerignore
+# 排除不必要的檔案以優化 Docker build 時間和 image size
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# UV cache
+.uv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+tests/
+
+# Environment (CRITICAL: 不要將敏感資訊打包進 image)
+# 符合 CLAUDE.md 🔴: 環境變數由 Zeabur 注入
+.env
+.env.local
+.env.*.local
+.env.example
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+CLAUDE.md
+alliance_collaborator_system.md
+
+# CI/CD
+.github/
+
+# Misc
+*.log
+*.sqlite
+*.db
+data/
