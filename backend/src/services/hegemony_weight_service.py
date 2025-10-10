@@ -9,6 +9,7 @@ import logging
 from decimal import Decimal
 from uuid import UUID
 
+from src.core.utils.date_helpers import format_date_key
 from src.models.hegemony_weight import (
     HegemonyScorePreview,
     HegemonyWeight,
@@ -380,8 +381,9 @@ class HegemonyWeightService:
                         + Decimal(str(snapshot.total_donation or 0)) * weight_config.weight_donation
                     )
 
-                # Store snapshot score (date only, no time to avoid timezone issues)
-                date_key = weight_config.snapshot_date.strftime("%Y-%m-%d")
+                # Store snapshot score using consistent date formatting
+                # 符合 CLAUDE.md 🟢: Use centralized date helper for consistency
+                date_key = format_date_key(weight_config.snapshot_date)
                 snapshot_scores[date_key] = snapshot_score
 
                 # Apply tier 2 weight

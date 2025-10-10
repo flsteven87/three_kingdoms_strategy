@@ -33,17 +33,8 @@ import {
   useHegemonyScoresPreview
 } from '@/hooks/use-hegemony-weights'
 import { useCsvUploads } from '@/hooks/use-csv-uploads'
-
-// Chart imports
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from '@/components/ui/chart'
+import { HegemonyScoreChart, type ChartMemberData } from '@/components/hegemony-weights/HegemonyScoreChart'
+import { formatDateUTC, buildChartConfig } from '@/lib/hegemony-helpers'
 
 interface HegemonyWeightCardProps {
   readonly season: Season
@@ -60,71 +51,6 @@ interface LocalWeight {
   readonly weight_assist: number
   readonly weight_donation: number
   readonly snapshot_weight: number
-}
-
-interface ChartMemberData {
-  readonly member_name: string
-  readonly total_score: number
-  readonly rank: number
-  // Dynamic snapshot score fields will be added at runtime
-  [key: string]: string | number
-}
-
-/**
- * Format date to YYYY-MM-DD using UTC to avoid timezone issues
- */
-function formatDateUTC(date: string): string {
-  const d = new Date(date)
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
-}
-
-/**
- * Generate color with opacity based on index
- * Uses primary color with varying opacity for different snapshots
- */
-function generateSnapshotColor(index: number, total: number): string {
-  // Base primary color in oklch format
-  const baseColor = 'oklch(0.6487 0.1538 150.3071)'
-
-  // Calculate opacity: from 0.3 (oldest) to 1.0 (newest)
-  const opacity = 0.3 + (0.7 * index / (total - 1 || 1))
-
-  // Extract oklch values and add alpha channel
-  const match = baseColor.match(/oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)/)
-  if (!match) return baseColor
-
-  const [, l, c, h] = match
-  return `oklch(${l} ${c} ${h} / ${opacity.toFixed(2)})`
-}
-
-/**
- * Build dynamic chart config based on snapshot dates
- */
-function buildChartConfig(snapshotDates: string[]): ChartConfig {
-  const config: ChartConfig = {}
-
-  snapshotDates.forEach((date, index) => {
-    const snapshotKey = `snapshot_${index}`
-    config[snapshotKey] = {
-      label: formatDateUTC(date),
-      color: generateSnapshotColor(index, snapshotDates.length)
-    }
-  })
-
-  return config
-}
-
-/**
- * Format hegemony score for display
- */
-function formatScore(score: number): string {
-  if (score >= 1000000) {
-    return `${(score / 1000000).toFixed(1)}M`
-  }
-  if (score >= 1000) {
-    return `${(score / 1000).toFixed(0)}K`
-  }
-  return score.toFixed(0)
 }
 
 export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }) => {
@@ -805,63 +731,13 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
                   </div>
 
                   {/* Stacked Bar Chart */}
-                  <div className="w-full rounded-lg border bg-card p-6" style={{ height: `${chartHeight + 80}px` }}>
-                    <ChartContainer config={chartConfig} className="h-full w-full">
-                      <BarChart
-                        accessibilityLayer
-                        data={chartData}
-                        layout="vertical"
-                        margin={{
-                          left: 80,
-                          right: 40,
-                          top: 20,
-                          bottom: 60,
-                        }}
-                      >
-                        <CartesianGrid
-                          horizontal={false}
-                          strokeDasharray="3 3"
-                        />
-                        <YAxis
-                          dataKey="member_name"
-                          type="category"
-                          tickLine={false}
-                          axisLine={false}
-                          tickMargin={10}
-                          width={75}
-                        />
-                        <XAxis
-                          type="number"
-                          tickLine={false}
-                          axisLine={false}
-                          tickMargin={8}
-                          tickFormatter={(value) => formatScore(value)}
-                          domain={[0, xAxisMax]}
-                        />
-                        <ChartTooltip
-                          cursor={false}
-                          content={<ChartTooltipContent />}
-                        />
-                        <ChartLegend
-                          content={<ChartLegendContent />}
-                          verticalAlign="bottom"
-                        />
-                        {/* Dynamically render Bar components for each snapshot */}
-                        {snapshotDates.map((_, index) => {
-                          const snapshotKey = `snapshot_${index}`
-                          return (
-                            <Bar
-                              key={snapshotKey}
-                              dataKey={snapshotKey}
-                              fill={`var(--color-${snapshotKey})`}
-                              stackId="a"
-                              radius={index === snapshotDates.length - 1 ? [0, 4, 4, 0] : 0}
-                            />
-                          )
-                        })}
-                      </BarChart>
-                    </ChartContainer>
-                  </div>
+                  <HegemonyScoreChart
+                    chartData={chartData}
+                    snapshotDates={snapshotDates}
+                    chartConfig={chartConfig}
+                    chartHeight={chartHeight}
+                    xAxisMax={xAxisMax}
+                  />
                 </div>
               )}
             </TabsContent>
