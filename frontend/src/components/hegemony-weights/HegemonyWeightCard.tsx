@@ -32,6 +32,7 @@ import {
   useBatchUpdateHegemonyWeights,
   useHegemonyScoresPreview
 } from '@/hooks/use-hegemony-weights'
+import { useCsvUploads } from '@/hooks/use-csv-uploads'
 
 // Chart imports
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
@@ -135,6 +136,9 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
   const [previewLimit, setPreviewLimit] = useState<number>(20)
   const canManageWeights = useCanManageWeights()
 
+  // Fetch CSV uploads first to check if season has data
+  const { data: uploads } = useCsvUploads(season.id)
+
   // Fetch weights for this season
   const { data: weights, isLoading: isLoadingWeights, refetch } = useHegemonyWeights(season.id)
 
@@ -180,10 +184,12 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
   }, [weights, syncWeightsToLocal])
 
   /**
-   * Auto-initialize weights if not exists (only once)
+   * Auto-initialize weights if not exists AND season has CSV uploads (only once)
    */
   useEffect(() => {
+    const hasUploads = uploads && uploads.length > 0
     const shouldAutoInit =
+      hasUploads &&
       !isLoadingWeights &&
       (!weights || weights.length === 0) &&
       !initializeMutation.isPending &&
@@ -192,7 +198,6 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
 
     if (shouldAutoInit) {
       setHasAttemptedInit(true)
-      // Auto-initialize on first load
       initializeMutation.mutateAsync(season.id).then(() => {
         refetch()
       }).catch(() => {
@@ -200,7 +205,7 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoadingWeights, weights?.length, initializeMutation.isPending, initializeMutation.isSuccess, hasAttemptedInit])
+  }, [uploads?.length, isLoadingWeights, weights?.length, initializeMutation.isPending, initializeMutation.isSuccess, hasAttemptedInit])
 
   /**
    * Update Tier 1 weight (indicator weights)
@@ -424,20 +429,20 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
           </div>
         )}
 
-        {/* Empty State - No CSV uploads (initialization succeeded but returned empty) */}
-        {!isLoadingWeights && localWeights.length === 0 && initializeMutation.isSuccess && (
+        {/* Empty State - No CSV uploads */}
+        {!isLoadingWeights && (!uploads || uploads.length === 0) && (
           <div className="space-y-4">
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                此賽季尚未上傳任何 CSV 數據快照。請先前往「資料管理」頁面上傳數據後，再進行權重配置。
+                此賽季尚未上傳任何 CSV 數據快照。請先前往「資料管理」頁面上傳數據後，權重配置將自動初始化。
               </AlertDescription>
             </Alert>
           </div>
         )}
 
-        {/* Empty State - Auto-initializing */}
-        {!isLoadingWeights && localWeights.length === 0 && !initializeMutation.isSuccess && (
+        {/* Empty State - Auto-initializing (has uploads but no weights yet) */}
+        {!isLoadingWeights && uploads && uploads.length > 0 && localWeights.length === 0 && initializeMutation.isPending && (
           <div className="space-y-4">
             <Alert>
               <Loader2 className="h-4 w-4 animate-spin" />
