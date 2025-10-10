@@ -184,18 +184,6 @@ const Settings: React.FC = () => {
                   </Table>
                 </div>
               </div>
-
-              {/* Security Note */}
-              <div className="rounded-lg bg-muted/50 p-4">
-                <h4 className="font-semibold mb-2 flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  安全說明
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  系統採用三層權限防護機制：前端 UI 控制、後端 API 驗證、資料庫 RLS 政策。
-                  即使使用者嘗試繞過前端限制，後端與資料庫層級的防護仍會確保數據安全。
-                </p>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

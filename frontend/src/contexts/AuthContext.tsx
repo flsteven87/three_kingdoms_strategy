@@ -1,22 +1,16 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase, type Session, type User } from '@/lib/supabase'
 import { apiClient } from '@/lib/api-client'
 import type { Provider } from '@supabase/supabase-js'
+import { AuthContext, type AuthContextType } from './auth-context-definition'
 
 interface AuthState {
   user: User | null
   session: Session | null
   loading: boolean
 }
-
-interface AuthContextType extends AuthState {
-  signInWithOAuth: (provider: Provider) => Promise<void>
-  signOut: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
@@ -93,12 +87,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
 }

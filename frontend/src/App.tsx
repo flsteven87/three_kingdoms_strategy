@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { AuthProvider } from './contexts/AuthContext'
+import { useAuth } from './hooks/use-auth'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { Landing } from './pages/Landing'
 import { AuthCallback } from './pages/AuthCallback'

@@ -34,6 +34,7 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false)
   const [editData, setEditData] = useState({
     name: season.name,
     start_date: season.start_date,
@@ -67,8 +68,13 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
     setIsEditing(false)
   }, [season.id, editData, onUpdate])
 
-  const handleActivate = useCallback(async () => {
+  const handleActivateClick = useCallback(() => {
+    setActivateDialogOpen(true)
+  }, [])
+
+  const handleConfirmActivate = useCallback(async () => {
     await onActivate(season.id)
+    setActivateDialogOpen(false)
   }, [season.id, onActivate])
 
   const handleDeleteClick = useCallback(() => {
@@ -106,7 +112,7 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
             <Button
               size="sm"
               variant="outline"
-              onClick={handleActivate}
+              onClick={handleActivateClick}
               className="h-8"
             >
               <Activity className="h-4 w-4 mr-1" />
@@ -149,92 +155,107 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
     : `${season.start_date}${season.end_date ? ` - ${season.end_date}` : ' - 進行中'}`
 
   return (
-    <CollapsibleCard
-      icon={icon}
-      title={title}
-      badge={badge}
-      description={description}
-      actions={actions}
-      collapsible={true}
-      defaultExpanded={season.is_active}
-    >
-      {isEditing ? (
-        <div className="space-y-4">
-          {/* Edit Mode */}
-          <div className="grid gap-4">
-            <div className="space-y-2">
-              <Label htmlFor={`season-name-${season.id}`}>賽季名稱</Label>
-              <Input
-                id={`season-name-${season.id}`}
-                value={editData.name}
-                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                placeholder="例如：第一賽季、春季賽"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+    <>
+      <CollapsibleCard
+        icon={icon}
+        title={title}
+        badge={badge}
+        description={description}
+        actions={actions}
+        collapsible={true}
+        defaultExpanded={season.is_active}
+      >
+        {isEditing ? (
+          <div className="space-y-4">
+            {/* Edit Mode */}
+            <div className="grid gap-4">
               <div className="space-y-2">
-                <Label htmlFor={`season-start-${season.id}`}>開始日期</Label>
+                <Label htmlFor={`season-name-${season.id}`}>賽季名稱</Label>
                 <Input
-                  id={`season-start-${season.id}`}
-                  type="date"
-                  value={editData.start_date}
-                  onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                  id={`season-name-${season.id}`}
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  placeholder="例如：第一賽季、春季賽"
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor={`season-start-${season.id}`}>開始日期</Label>
+                  <Input
+                    id={`season-start-${season.id}`}
+                    type="date"
+                    value={editData.start_date}
+                    onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`season-end-${season.id}`}>結束日期</Label>
+                  <Input
+                    id={`season-end-${season.id}`}
+                    type="date"
+                    value={editData.end_date}
+                    onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
+                    placeholder="選填（留空表示進行中）"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor={`season-end-${season.id}`}>結束日期</Label>
+                <Label htmlFor={`season-desc-${season.id}`}>賽季說明</Label>
                 <Input
-                  id={`season-end-${season.id}`}
-                  type="date"
-                  value={editData.end_date}
-                  onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
-                  placeholder="選填（留空表示進行中）"
+                  id={`season-desc-${season.id}`}
+                  value={editData.description}
+                  onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                  placeholder="選填：補充說明或備註"
                 />
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* View Mode */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground mb-1">開始日期</p>
+                <p className="font-medium">{season.start_date}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">結束日期</p>
+                <p className="font-medium">{season.end_date || '進行中'}</p>
+              </div>
+            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor={`season-desc-${season.id}`}>賽季說明</Label>
-              <Input
-                id={`season-desc-${season.id}`}
-                value={editData.description}
-                onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                placeholder="選填：補充說明或備註"
-              />
+            {season.description && (
+              <div className="text-sm">
+                <p className="text-muted-foreground mb-1">說明</p>
+                <p className="text-foreground">{season.description}</p>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-border/50">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>建立於 {new Date(season.created_at).toLocaleDateString('zh-TW')}</span>
+                <span>更新於 {new Date(season.updated_at).toLocaleDateString('zh-TW')}</span>
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* View Mode */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground mb-1">開始日期</p>
-              <p className="font-medium">{season.start_date}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1">結束日期</p>
-              <p className="font-medium">{season.end_date || '進行中'}</p>
-            </div>
-          </div>
+        )}
+      </CollapsibleCard>
 
-          {season.description && (
-            <div className="text-sm">
-              <p className="text-muted-foreground mb-1">說明</p>
-              <p className="text-foreground">{season.description}</p>
-            </div>
-          )}
-
-          <div className="pt-4 border-t border-border/50">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>建立於 {new Date(season.created_at).toLocaleDateString('zh-TW')}</span>
-              <span>更新於 {new Date(season.updated_at).toLocaleDateString('zh-TW')}</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Activate Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={activateDialogOpen}
+        onOpenChange={setActivateDialogOpen}
+        onConfirm={handleConfirmActivate}
+        title="啟用賽季"
+        description="確定要啟用此賽季嗎？"
+        itemName={season.name}
+        warningMessage="啟用此賽季後，其他所有賽季將自動停用。系統的數據分析功能（總覽、同盟分析、成員表現等）將僅顯示此賽季的數據。已上傳的歷史數據不會受影響，您可以隨時切換回其他賽季。"
+        confirmText="確定啟用"
+        variant="default"
+      />
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog
@@ -246,6 +267,6 @@ export const SeasonCard: React.FC<SeasonCardProps> = ({
         itemName={season.name}
         warningMessage="此操作將永久刪除賽季及相關的所有數據（CSV 上傳記錄、成員快照等），且無法復原。"
       />
-    </CollapsibleCard>
+    </>
   )
 }

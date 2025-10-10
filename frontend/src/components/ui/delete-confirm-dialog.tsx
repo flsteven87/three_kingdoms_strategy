@@ -29,6 +29,8 @@ interface DeleteConfirmDialogProps {
   readonly itemName?: string
   readonly warningMessage?: string
   readonly isDeleting?: boolean
+  readonly confirmText?: string
+  readonly variant?: 'default' | 'destructive'
 }
 
 export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
@@ -39,7 +41,9 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
   description,
   itemName,
   warningMessage,
-  isDeleting = false
+  isDeleting = false,
+  confirmText = '確認刪除',
+  variant = 'destructive'
 }) => {
   const handleConfirm = async () => {
     await onConfirm()
@@ -50,7 +54,7 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-destructive">
+          <DialogTitle className={`flex items-center gap-2 ${variant === 'destructive' ? 'text-destructive' : ''}`}>
             <AlertTriangle className="h-5 w-5" />
             {title}
           </DialogTitle>
@@ -70,7 +74,7 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
         )}
 
         {warningMessage && (
-          <Alert variant="destructive" className="border-destructive/50">
+          <Alert variant={variant === 'destructive' ? 'destructive' : 'default'} className={variant === 'destructive' ? 'border-destructive/50' : ''}>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="text-sm">
               {warningMessage}
@@ -89,11 +93,11 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant={variant}
             onClick={handleConfirm}
             disabled={isDeleting}
           >
-            {isDeleting ? '刪除中...' : '確認刪除'}
+            {isDeleting ? '處理中...' : confirmText}
           </Button>
         </DialogFooter>
       </DialogContent>
