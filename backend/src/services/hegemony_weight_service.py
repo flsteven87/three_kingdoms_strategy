@@ -5,6 +5,7 @@ Business logic layer for hegemony weight management and score calculation.
 Follows CLAUDE.md 🔴: Service layer orchestrates repositories, no direct database calls.
 """
 
+import logging
 from decimal import Decimal
 from uuid import UUID
 
@@ -23,6 +24,8 @@ from src.repositories.member_repository import MemberRepository
 from src.repositories.member_snapshot_repository import MemberSnapshotRepository
 from src.repositories.season_repository import SeasonRepository
 from src.services.permission_service import PermissionService
+
+logger = logging.getLogger(__name__)
 
 
 class HegemonyWeightService:
@@ -145,39 +148,45 @@ class HegemonyWeightService:
         Raises:
             HTTPException 403: If user doesn't have permission
         """
-        _, alliance = await self._verify_season_access(user_id, season_id, ['owner', 'collaborator'])
-
-        # Get all CSV uploads for this season
-        uploads = await self._upload_repo.get_by_season(season_id)
-        if not uploads:
-            # Return empty list if no uploads exist yet (not an error)
-            return []
-
-        # Calculate even distribution of snapshot weights
-        snapshot_weight = Decimal("1.0") / Decimal(len(uploads))
-
-        # Create weight configurations
-        created_weights = []
-        for upload in uploads:
-            # Skip if weight already exists
-            existing = await self._weight_repo.get_by_csv_upload(upload.id)
-            if existing:
-                created_weights.append(existing)
-                continue
-
-            weight = await self._weight_repo.create_with_alliance(
-                alliance_id=alliance.id,
-                season_id=season_id,
-                csv_upload_id=upload.id,
-                weight_contribution=Decimal("0.2500"),
-                weight_merit=Decimal("0.2500"),
-                weight_assist=Decimal("0.2500"),
-                weight_donation=Decimal("0.2500"),
-                snapshot_weight=snapshot_weight,
+        try:
+            _, alliance = await self._verify_season_access(
+                user_id, season_id, ['owner', 'collaborator']
             )
-            created_weights.append(weight)
 
-        return created_weights
+            uploads = await self._upload_repo.get_by_season(season_id)
+            if not uploads:
+                return []
+
+            snapshot_weight = Decimal("1.0") / Decimal(len(uploads))
+            created_weights = []
+
+            for upload in uploads:
+                existing = await self._weight_repo.get_by_csv_upload(upload.id)
+                if existing:
+                    created_weights.append(existing)
+                    continue
+
+                weight = await self._weight_repo.create_with_alliance(
+                    alliance_id=alliance.id,
+                    season_id=season_id,
+                    csv_upload_id=upload.id,
+                    weight_contribution=Decimal("0.2500"),
+                    weight_merit=Decimal("0.2500"),
+                    weight_assist=Decimal("0.2500"),
+                    weight_donation=Decimal("0.2500"),
+                    snapshot_weight=snapshot_weight,
+                )
+                created_weights.append(weight)
+
+            return created_weights
+
+        except Exception as e:
+            logger.error(
+                f"Failed to initialize weights - season_id={season_id}, "
+                f"error={type(e).__name__}: {str(e)}",
+                exc_info=True
+            )
+            raise
 
     async def create_weight(
         self, user_id: UUID, season_id: UUID, data: HegemonyWeightCreate

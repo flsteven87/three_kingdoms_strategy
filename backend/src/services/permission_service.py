@@ -7,6 +7,7 @@ Permission Service
 - 🟡 Exception chaining with 'from e'
 """
 
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -14,6 +15,8 @@ from fastapi import HTTPException, status
 from src.repositories.alliance_collaborator_repository import (
     AllianceCollaboratorRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PermissionService:
@@ -43,11 +46,21 @@ class PermissionService:
             HTTPException: If repository operation fails
         """
         try:
-            return await self._collaborator_repo.get_collaborator_role(alliance_id, user_id)
+            role = await self._collaborator_repo.get_collaborator_role(alliance_id, user_id)
+            return role
+        except ValueError:
+            return None
+        except HTTPException:
+            raise
         except Exception as e:
+            logger.error(
+                f"Failed to get user role - user_id={user_id}, alliance_id={alliance_id}, "
+                f"error={type(e).__name__}: {str(e)}",
+                exc_info=True
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to get user role"
+                detail=f"Failed to get user role: {type(e).__name__}"
             ) from e
 
     async def check_permission(
@@ -114,6 +127,10 @@ class PermissionService:
             )
 
         if role not in required_roles:
+            logger.warning(
+                f"Permission denied - user_id={user_id}, role={role}, "
+                f"required={required_roles}, action={action}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You don't have permission to {action}. Required role: {' or '.join(required_roles)}, your role: {role}"

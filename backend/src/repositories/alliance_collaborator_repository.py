@@ -171,11 +171,11 @@ class AllianceCollaboratorRepository(SupabaseRepository[AllianceCollaboratorDB])
             .select("role")
             .eq("alliance_id", str(alliance_id))
             .eq("user_id", str(user_id))
-            .single()
+            .limit(1)
             .execute()
         )
 
-        data = self._handle_supabase_result(result, allow_empty=True)
+        data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
         return data.get("role") if data else None
 
     async def update_role(

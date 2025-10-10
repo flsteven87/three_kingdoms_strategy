@@ -5,6 +5,7 @@ API layer for hegemony weight configuration and score calculation.
 Follows CLAUDE.md 🔴: API layer delegates to Service layer, uses @router.get("") pattern
 """
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -20,6 +21,8 @@ from src.models.hegemony_weight import (
     SnapshotWeightsSummary,
 )
 from src.services.hegemony_weight_service import HegemonyWeightService
+
+logger = logging.getLogger(__name__)
 
 # 符合 CLAUDE.md 🔴: Use @router.get("") not @router.get("/")
 router = APIRouter(prefix="/hegemony-weights", tags=["hegemony-weights"])
@@ -44,14 +47,23 @@ async def initialize_season_weights(
     service = HegemonyWeightService()
 
     try:
-        return await service.initialize_weights_for_season(user_id, season_id)
+        result = await service.initialize_weights_for_season(user_id, season_id)
+        return result
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(
+            f"Unexpected error initializing weights - season_id={season_id}, "
+            f"error={type(e).__name__}: {str(e)}",
+            exc_info=True
+        )
         raise HTTPException(
-            status_code=500, detail=f"Failed to initialize weights: {str(e)}"
+            status_code=500,
+            detail=f"Failed to initialize weights: {type(e).__name__} - {str(e)}"
         ) from e
 
 
