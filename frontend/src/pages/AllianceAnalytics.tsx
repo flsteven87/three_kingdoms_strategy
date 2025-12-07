@@ -119,11 +119,11 @@ const HegemonyScoreTab: React.FC<HegemonyScoreTabProps> = ({ seasonId }) => {
   // Error state
   if (error) {
     return (
-      <Alert className="border-red-500/50 bg-red-50 dark:bg-red-950/20">
-        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-        <AlertDescription className="text-red-900 dark:text-red-100">
+      <Alert className="border-destructive/50 bg-destructive/10">
+        <AlertCircle className="h-4 w-4 text-destructive" />
+        <AlertDescription className="text-destructive">
           <strong className="font-semibold">載入失敗</strong>
-          <p className="mt-1 text-sm text-red-800 dark:text-red-200">
+          <p className="mt-1 text-sm text-destructive/80">
             無法載入霸業分數數據。請確保已上傳 CSV 數據並初始化權重配置。
           </p>
         </AlertDescription>
@@ -134,11 +134,11 @@ const HegemonyScoreTab: React.FC<HegemonyScoreTabProps> = ({ seasonId }) => {
   // Empty state
   if (!chartData || chartData.length === 0) {
     return (
-      <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
-        <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-        <AlertDescription className="text-yellow-900 dark:text-yellow-100">
+      <Alert className="border-muted-foreground/50 bg-muted/50">
+        <AlertCircle className="h-4 w-4 text-muted-foreground" />
+        <AlertDescription className="text-foreground">
           <strong className="font-semibold">尚無數據</strong>
-          <p className="mt-1 text-sm text-yellow-800 dark:text-yellow-200">
+          <p className="mt-1 text-sm text-muted-foreground">
             請先上傳 CSV 數據並初始化霸業權重配置。
           </p>
         </AlertDescription>

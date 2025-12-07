@@ -85,15 +85,15 @@ const Overview: React.FC = () => {
           <p className="text-muted-foreground mt-1">盟友表現數據總覽</p>
         </div>
 
-        <Card className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+        <Card className="border-muted-foreground/50 bg-muted/50">
           <CardHeader>
             <div className="flex items-start gap-4">
-              <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-500 mt-1" />
+              <AlertCircle className="h-6 w-6 text-muted-foreground mt-1" />
               <div className="flex-1">
-                <CardTitle className="text-yellow-900 dark:text-yellow-100">
+                <CardTitle className="text-foreground">
                   尚未設定同盟
                 </CardTitle>
-                <CardDescription className="text-yellow-800 dark:text-yellow-200 mt-2">
+                <CardDescription className="text-muted-foreground mt-2">
                   在開始使用系統功能之前，請先前往設定頁面建立你的同盟資訊
                 </CardDescription>
               </div>
@@ -256,9 +256,9 @@ const Overview: React.FC = () => {
         </Card>
 
         {/* Declining Members Warning */}
-        <Card className="border-yellow-500/50">
+        <Card className="border-muted-foreground/50">
           <CardHeader>
-            <CardTitle className="text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
+            <CardTitle className="text-muted-foreground flex items-center gap-2">
               <TrendingDown className="h-5 w-5" />
               戰功下滑成員
             </CardTitle>
@@ -277,7 +277,7 @@ const Overview: React.FC = () => {
                       {member.prev_merit.toLocaleString()} → {member.curr_merit.toLocaleString()}
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-yellow-600 dark:text-yellow-400">
+                  <Badge variant="outline" className="text-muted-foreground">
                     {member.change_rate}%
                   </Badge>
                 </div>
@@ -308,9 +308,9 @@ const Overview: React.FC = () => {
                   建議檢視組內活躍度與策略調整
                 </p>
               </div>
-              <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-500/20 p-3">
-                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                  🟡 146 人未分組
+              <div className="rounded-lg bg-muted/50 border border-muted-foreground/20 p-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  ⚠️ 146 人未分組
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   建議進行組別分配，提升管理效率

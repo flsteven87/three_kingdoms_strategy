@@ -25,24 +25,42 @@ class AnalyticsService:
         self._period_repo = PeriodRepository()
 
     async def get_members_for_analytics(
-        self, alliance_id: UUID, active_only: bool = True
+        self, alliance_id: UUID, active_only: bool = True, season_id: UUID | None = None
     ) -> list[dict]:
         """
-        Get all members for analytics member selector.
+        Get all members for analytics member selector with latest rank and group.
 
         Args:
             alliance_id: Alliance UUID
             active_only: Only return active members
+            season_id: Season UUID to get latest period metrics from
 
         Returns:
-            List of member dicts with id and name
+            List of member dicts with id, name, contribution_rank, and group
         """
         members = await self._member_repo.get_by_alliance(alliance_id, active_only)
+
+        # Build member_id -> metrics map from latest period
+        member_metrics_map: dict[UUID, dict] = {}
+        if season_id:
+            # Get all periods for the season and find the latest one
+            periods = await self._period_repo.get_by_season(season_id)
+            if periods:
+                latest_period = periods[-1]  # Already sorted by period_number
+                metrics = await self._metrics_repo.get_by_period(latest_period.id)
+                for m in metrics:
+                    member_metrics_map[m.member_id] = {
+                        "contribution_rank": m.end_rank,
+                        "group": m.end_group,
+                    }
+
         return [
             {
                 "id": str(m.id),
                 "name": m.name,
                 "is_active": m.is_active,
+                "contribution_rank": member_metrics_map.get(m.id, {}).get("contribution_rank"),
+                "group": member_metrics_map.get(m.id, {}).get("group"),
             }
             for m in members
         ]

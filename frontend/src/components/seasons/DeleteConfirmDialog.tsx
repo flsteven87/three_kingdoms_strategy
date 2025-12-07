@@ -42,11 +42,11 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
         </DialogHeader>
 
         <div className="py-4">
-          <div className="rounded-lg bg-red-50 p-4 border border-red-200">
-            <p className="text-sm text-red-800">
+          <div className="rounded-lg bg-destructive/10 p-4 border border-destructive/30">
+            <p className="text-sm text-destructive">
               ⚠️ 此操作將同時刪除以下資料，且<strong>無法復原</strong>：
             </p>
-            <ul className="mt-2 ml-4 text-sm text-red-700 list-disc space-y-1">
+            <ul className="mt-2 ml-4 text-sm text-destructive/80 list-disc space-y-1">
               <li>所有 CSV 上傳記錄</li>
               <li>所有成員表現快照</li>
               <li>賽季相關的統計數據</li>
@@ -62,7 +62,6 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
             variant="destructive"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="bg-red-600 hover:bg-red-700"
           >
             {isDeleting ? '刪除中...' : '確定刪除'}
           </Button>

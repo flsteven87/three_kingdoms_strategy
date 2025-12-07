@@ -105,10 +105,10 @@ async def get_members(
         active_only: Only return active members (default: True)
 
     Returns:
-        List of members with id and name
+        List of members with id, name, contribution_rank, and group
     """
     alliance_id = await _verify_season_access(user_id, season_id)
-    data = await service.get_members_for_analytics(alliance_id, active_only)
+    data = await service.get_members_for_analytics(alliance_id, active_only, season_id)
     return [MemberListItem(**item) for item in data]
 
 

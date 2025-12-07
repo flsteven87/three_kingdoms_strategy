@@ -146,10 +146,10 @@ export const SeasonFormDialog: React.FC<SeasonFormDialogProps> = ({
                 id="name"
                 placeholder="例如：2025 春季賽"
                 {...register('name')}
-                className={errors.name ? 'border-red-500' : ''}
+                className={errors.name ? 'border-destructive' : ''}
               />
               {errors.name && (
-                <p className="text-sm text-red-600">{errors.name.message}</p>
+                <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
             </div>
 
@@ -160,10 +160,10 @@ export const SeasonFormDialog: React.FC<SeasonFormDialogProps> = ({
                 id="start_date"
                 type="date"
                 {...register('start_date')}
-                className={errors.start_date ? 'border-red-500' : ''}
+                className={errors.start_date ? 'border-destructive' : ''}
               />
               {errors.start_date && (
-                <p className="text-sm text-red-600">{errors.start_date.message}</p>
+                <p className="text-sm text-destructive">{errors.start_date.message}</p>
               )}
             </div>
 
@@ -172,7 +172,7 @@ export const SeasonFormDialog: React.FC<SeasonFormDialogProps> = ({
               <Label htmlFor="end_date">結束日期 (選填)</Label>
               <Input id="end_date" type="date" {...register('end_date')} />
               {errors.end_date && (
-                <p className="text-sm text-red-600">{errors.end_date.message}</p>
+                <p className="text-sm text-destructive">{errors.end_date.message}</p>
               )}
               <p className="text-xs text-gray-500">留空表示賽季進行中</p>
             </div>
@@ -188,7 +188,7 @@ export const SeasonFormDialog: React.FC<SeasonFormDialogProps> = ({
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
               {errors.description && (
-                <p className="text-sm text-red-600">{errors.description.message}</p>
+                <p className="text-sm text-destructive">{errors.description.message}</p>
               )}
             </div>
 

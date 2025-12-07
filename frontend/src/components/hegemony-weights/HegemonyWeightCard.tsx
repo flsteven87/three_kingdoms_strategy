@@ -588,7 +588,7 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
                             <span className="text-xs text-muted-foreground">%</span>
                           </div>
                           {isValid ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                           ) : (
                             <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
                           )}
@@ -614,7 +614,7 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
                         </>
                       ) : (
                         <>
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
                           <span className="text-muted-foreground">已同步</span>
                         </>
                       )}
@@ -678,11 +678,11 @@ export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }
 
               {/* Empty State */}
               {!isLoadingPreview && (!chartData || chartData.length === 0) && (
-                <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
-                  <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                  <AlertDescription className="text-yellow-900 dark:text-yellow-100">
+                <Alert className="border-muted-foreground/50 bg-muted/50">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                  <AlertDescription className="text-foreground">
                     <strong className="font-semibold">尚無數據</strong>
-                    <p className="mt-1 text-sm text-yellow-800 dark:text-yellow-200">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       請先上傳 CSV 數據。如已上傳，請切換回「權重配置」頁籤儲存變更後再查看預覽。
                     </p>
                   </AlertDescription>

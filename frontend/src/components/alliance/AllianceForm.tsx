@@ -101,7 +101,7 @@ export const AllianceForm: React.FC = () => {
           )}
 
           {mutation.isSuccess && (
-            <div className="rounded-md bg-green-50 dark:bg-green-950/30 p-3 text-sm text-green-700 dark:text-green-400">
+            <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
               {isEditing ? '更新成功！' : '建立成功！'}
             </div>
           )}

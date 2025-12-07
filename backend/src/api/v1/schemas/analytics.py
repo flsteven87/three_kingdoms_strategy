@@ -22,6 +22,8 @@ class MemberListItem(BaseModel):
     id: str = Field(..., description="Member UUID as string")
     name: str = Field(..., description="Member display name")
     is_active: bool = Field(..., description="Whether member is currently active")
+    contribution_rank: int | None = Field(None, description="Latest contribution rank")
+    group: str | None = Field(None, description="Current group assignment")
 
 
 class MemberTrendItem(BaseModel):

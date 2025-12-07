@@ -95,7 +95,7 @@ export const AllianceSettings: React.FC = () => {
           )}
 
           {updateAlliance.isSuccess && (
-            <div className="rounded-md bg-green-50 dark:bg-green-950/30 p-3 text-sm text-green-700 dark:text-green-400">
+            <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
               更新成功！
             </div>
           )}

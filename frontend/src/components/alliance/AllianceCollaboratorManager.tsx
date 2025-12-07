@@ -182,7 +182,7 @@ export const AllianceCollaboratorManager: React.FC<AllianceCollaboratorManagerPr
 
           {/* Success/Error Messages */}
           {successMessage && (
-            <div className="rounded-md bg-green-50 dark:bg-green-950/30 p-3 text-sm text-green-700 dark:text-green-400">
+            <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
               {successMessage}
             </div>
           )}

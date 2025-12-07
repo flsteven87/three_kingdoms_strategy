@@ -12,6 +12,8 @@ export interface MemberListItem {
   readonly id: string
   readonly name: string
   readonly is_active: boolean
+  readonly contribution_rank: number | null
+  readonly group: string | null
 }
 
 /**

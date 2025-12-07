@@ -28,17 +28,17 @@ export function WebViewWarning({ platform, suggestion }: WebViewWarningProps) {
   }
 
   return (
-    <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
-      <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+    <Alert className="border-muted-foreground/50 bg-muted/50">
+      <AlertTriangle className="h-4 w-4 text-muted-foreground" />
       <AlertDescription className="space-y-3">
         <div className="space-y-2">
-          <p className="font-medium text-yellow-800 dark:text-yellow-200">
+          <p className="font-medium text-foreground">
             ⚠️ 無法在 {platformNames[platform] || '此瀏覽器'} 中登入
           </p>
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+          <p className="text-sm text-muted-foreground">
             為了安全性，Google 不允許在應用程式內建瀏覽器中進行登入。
           </p>
-          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+          <p className="text-sm font-medium text-foreground">
             {suggestion}
           </p>
         </div>
@@ -48,11 +48,11 @@ export function WebViewWarning({ platform, suggestion }: WebViewWarningProps) {
             size="sm"
             variant="outline"
             onClick={handleCopyUrl}
-            className="flex-1 bg-white dark:bg-gray-800"
+            className="flex-1 bg-background"
           >
             {copied ? (
               <>
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <CheckCircle2 className="h-4 w-4 text-primary" />
                 已複製網址
               </>
             ) : (
@@ -67,14 +67,14 @@ export function WebViewWarning({ platform, suggestion }: WebViewWarningProps) {
             href={`googlechrome://${window.location.host}${window.location.pathname}`}
             className="flex-1"
           >
-            <Button size="sm" variant="outline" className="w-full bg-white dark:bg-gray-800">
+            <Button size="sm" variant="outline" className="w-full bg-background">
               <ExternalLink className="h-4 w-4" />
               用 Chrome 開啟
             </Button>
           </a>
         </div>
 
-        <p className="text-xs text-yellow-600 dark:text-yellow-400">
+        <p className="text-xs text-muted-foreground">
           提示：複製網址後，貼到 Safari 或 Chrome 中開啟即可正常登入
         </p>
       </AlertDescription>
