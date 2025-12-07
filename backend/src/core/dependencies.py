@@ -12,6 +12,7 @@ from src.services.alliance_collaborator_service import AllianceCollaboratorServi
 from src.services.alliance_service import AllianceService
 from src.services.csv_upload_service import CSVUploadService
 from src.services.hegemony_weight_service import HegemonyWeightService
+from src.services.period_metrics_service import PeriodMetricsService
 from src.services.permission_service import PermissionService
 from src.services.season_service import SeasonService
 
@@ -137,3 +138,22 @@ def get_hegemony_weight_service() -> HegemonyWeightService:
     符合 CLAUDE.md 🔴: Provider Pattern for service injection
     """
     return HegemonyWeightService()
+
+
+def get_period_metrics_service() -> PeriodMetricsService:
+    """
+    Get period metrics service instance
+
+    Returns:
+        PeriodMetricsService instance
+
+    Usage:
+        @app.get("/periods")
+        async def get_periods(
+            service: Annotated[PeriodMetricsService, Depends(get_period_metrics_service)]
+        ):
+            pass
+
+    符合 CLAUDE.md 🔴: Provider Pattern for service injection
+    """
+    return PeriodMetricsService()

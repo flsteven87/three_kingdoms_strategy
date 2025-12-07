@@ -9,13 +9,14 @@
  */
 
 import React, { useCallback, useState, useRef } from 'react'
-import { Upload, FileText, Trash2, AlertCircle, CheckCircle2, FileUp } from 'lucide-react'
+import { Upload, FileText, Trash2, AlertCircle, CheckCircle2, FileUp, RefreshCw, Loader2 } from 'lucide-react'
 import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { useCanUploadData } from '@/hooks/use-user-role'
+import { useRecalculateSeasonPeriods } from '@/hooks/use-periods'
 import type { CsvUpload } from '@/types/csv-upload'
 import type { Season } from '@/types/season'
 
@@ -41,8 +42,10 @@ export const CSVUploadCard: React.FC<CSVUploadCardProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false)
   const [uploadToDelete, setUploadToDelete] = useState<CsvUpload | null>(null)
+  const [showRecalculateSuccess, setShowRecalculateSuccess] = useState<boolean>(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canUploadData = useCanUploadData()
+  const recalculateMutation = useRecalculateSeasonPeriods(season.id)
 
   /**
    * Extract date from CSV filename
@@ -212,6 +215,16 @@ export const CSVUploadCard: React.FC<CSVUploadCardProps> = ({
     }
   }, [uploadToDelete, onDelete])
 
+  /**
+   * Handle recalculate periods
+   */
+  const handleRecalculate = useCallback(async () => {
+    setShowRecalculateSuccess(false)
+    await recalculateMutation.mutateAsync()
+    setShowRecalculateSuccess(true)
+    setTimeout(() => setShowRecalculateSuccess(false), 3000)
+  }, [recalculateMutation])
+
   const icon = <FileText className="h-4 w-4" />
 
   const title = season.name
@@ -333,11 +346,49 @@ export const CSVUploadCard: React.FC<CSVUploadCardProps> = ({
         {uploads.length > 0 && (
           <div className="space-y-3 pt-4 border-t border-border/50">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">數據快照記錄</h4>
-              <span className="text-xs text-muted-foreground">
-                共 {uploads.length} 筆
-              </span>
+              <div className="flex items-center gap-3">
+                <h4 className="text-sm font-medium">數據快照記錄</h4>
+                <span className="text-xs text-muted-foreground">
+                  共 {uploads.length} 筆
+                </span>
+              </div>
+              {canUploadData && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRecalculate}
+                  disabled={recalculateMutation.isPending}
+                  className="h-7 text-xs"
+                >
+                  {recalculateMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                  )}
+                  重算期間
+                </Button>
+              )}
             </div>
+
+            {/* Recalculate Success Message */}
+            {showRecalculateSuccess && recalculateMutation.data && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/10 border border-primary/20">
+                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-xs text-primary">
+                  重算完成：建立了 {recalculateMutation.data.periods_created} 個期間
+                </span>
+              </div>
+            )}
+
+            {/* Recalculate Error Message */}
+            {recalculateMutation.isError && (
+              <Alert variant="destructive" className="py-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  重算失敗：{recalculateMutation.error?.message || '未知錯誤'}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid gap-3">
               {[...uploads]
                 .sort((a, b) =>

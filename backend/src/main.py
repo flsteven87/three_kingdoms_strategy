@@ -13,6 +13,7 @@ from src.api.v1.endpoints import (
     alliance_collaborators,
     alliances,
     hegemony_weights,
+    periods,
     seasons,
     uploads,
 )
@@ -45,6 +46,7 @@ app.include_router(alliance_collaborators.router, prefix="/api/v1")
 app.include_router(seasons.router, prefix="/api/v1")
 app.include_router(uploads.router, prefix="/api/v1")
 app.include_router(hegemony_weights.router, prefix="/api/v1")
+app.include_router(periods.router, prefix="/api/v1")
 
 # Health check endpoint (public)
 @app.get("/health")

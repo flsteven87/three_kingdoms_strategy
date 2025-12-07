@@ -21,6 +21,7 @@ from src.repositories.member_repository import MemberRepository
 from src.repositories.member_snapshot_repository import MemberSnapshotRepository
 from src.repositories.season_repository import SeasonRepository
 from src.services.csv_parser_service import CSVParserService
+from src.services.period_metrics_service import PeriodMetricsService
 from src.services.permission_service import PermissionService
 
 
@@ -36,6 +37,7 @@ class CSVUploadService:
         self._alliance_repo = AllianceRepository()
         self._collaborator_repo = AllianceCollaboratorRepository()
         self._permission_service = PermissionService()
+        self._period_metrics_service = PeriodMetricsService()
         self._parser = CSVParserService()
 
     async def upload_csv(
@@ -181,7 +183,10 @@ class CSVUploadService:
 
         snapshots = await self._snapshot_repo.create_batch(snapshots_data)
 
-        # Step 8: Return result
+        # Step 8: Calculate period metrics (handles first upload and middle insert)
+        periods = await self._period_metrics_service.calculate_periods_for_season(season_id)
+
+        # Step 9: Return result
         return {
             "upload_id": csv_upload.id,
             "season_id": season_id,
@@ -190,6 +195,7 @@ class CSVUploadService:
             "filename": filename,
             "total_members": len(members_data),
             "total_snapshots": len(snapshots),
+            "total_periods": len(periods),
             "replaced_existing": existing_upload is not None,
         }
 

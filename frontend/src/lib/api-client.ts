@@ -24,6 +24,7 @@ import type {
   HegemonyScorePreview,
   SnapshotWeightsSummary
 } from '@/types/hegemony-weight'
+import type { RecalculateSeasonPeriodsResponse } from '@/types/period'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087'
 
@@ -352,6 +353,18 @@ class ApiClient {
           limit
         }
       }
+    )
+    return response.data
+  }
+
+  // ==================== Period Metrics API ====================
+
+  /**
+   * Recalculate all periods for a specific season
+   */
+  async recalculateSeasonPeriods(seasonId: string): Promise<RecalculateSeasonPeriodsResponse> {
+    const response = await this.client.post<RecalculateSeasonPeriodsResponse>(
+      `/api/v1/periods/seasons/${seasonId}/recalculate`
     )
     return response.data
   }
