@@ -5,7 +5,7 @@
  * - Group selector dropdown
  * - Tab-based navigation:
  *   1. Overview: Group summary stats + Capability Radar (4 dimensions)
- *   2. Merit Distribution: Box plot + Tier breakdown + Trends
+ *   2. Merit Distribution: Box plot + Strip plot + Dynamic range histogram + Trends
  *   3. Contribution Rank: Rank distribution + Trends
  *   4. Member Rankings: Sortable member table within group
  *
@@ -79,17 +79,6 @@ import type {
 } from '@/types/analytics'
 
 // ============================================================================
-// Types
-// ============================================================================
-
-interface TierBreakdown {
-  readonly tier: string
-  readonly count: number
-  readonly percentage: number
-  readonly avg_merit: number
-}
-
-// ============================================================================
 // Chart Configurations
 // ============================================================================
 
@@ -107,13 +96,6 @@ const capabilityRadarConfig = {
 const meritBarConfig = {
   merit: {
     label: '人日均戰功',
-    color: 'var(--primary)',
-  },
-} satisfies ChartConfig
-
-const tierBarConfig = {
-  count: {
-    label: '人數',
     color: 'var(--primary)',
   },
 } satisfies ChartConfig
@@ -144,20 +126,8 @@ const rankDistributionConfig = {
 } satisfies ChartConfig
 
 // ============================================================================
-// Tier colors (consistent with MemberPerformance)
+// Tier Utilities (used by MembersTab)
 // ============================================================================
-
-const TIER_COLORS = {
-  top: 'var(--chart-2)',
-  mid: 'var(--primary)',
-  bottom: 'var(--destructive)',
-} as const
-
-function getTierBgClass(tierIndex: number): string {
-  if (tierIndex === 0) return 'bg-chart-2/10' // Top
-  if (tierIndex === 2) return 'bg-destructive/10' // Bottom
-  return '' // Mid
-}
 
 function getMemberTier(member: GroupMember, members: readonly GroupMember[]): 'top' | 'mid' | 'bottom' {
   const sorted = [...members].sort((a, b) => b.daily_merit - a.daily_merit)
@@ -179,35 +149,6 @@ function getTierBgColor(tier: 'top' | 'mid' | 'bottom'): string {
     default:
       return ''
   }
-}
-
-// Generate tier breakdown from group stats
-function generateTierBreakdown(stats: GroupStats): TierBreakdown[] {
-  const count = stats.member_count
-  const topCount = Math.round(count * 0.2)
-  const botCount = Math.round(count * 0.2)
-  const midCount = count - topCount - botCount
-
-  return [
-    {
-      tier: 'Top 20%',
-      count: topCount,
-      percentage: Math.round((topCount / count) * 100),
-      avg_merit: Math.round(stats.merit_q3 + (stats.merit_max - stats.merit_q3) * 0.5),
-    },
-    {
-      tier: 'Mid 60%',
-      count: midCount,
-      percentage: Math.round((midCount / count) * 100),
-      avg_merit: stats.merit_median,
-    },
-    {
-      tier: 'Bot 20%',
-      count: botCount,
-      percentage: Math.round((botCount / count) * 100),
-      avg_merit: Math.round(stats.merit_q1 - (stats.merit_q1 - stats.merit_min) * 0.3),
-    },
-  ]
 }
 
 // ============================================================================
@@ -464,13 +405,31 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
 // Tab 2: Merit Distribution
 // ============================================================================
 
+interface MeritBin {
+  readonly range: string
+  readonly label: string
+  readonly min: number
+  readonly max: number
+  readonly count: number
+  readonly percentage: number
+}
+
+const meritDistributionConfig = {
+  count: {
+    label: '人數',
+    color: 'var(--primary)',
+  },
+} satisfies ChartConfig
+
 interface MeritDistributionTabProps {
   readonly groupStats: GroupStats
-  readonly tierBreakdown: TierBreakdown[]
+  readonly members: readonly GroupMember[]
   readonly periodTrends: readonly GroupTrendItem[]
 }
 
-function MeritDistributionTab({ groupStats, tierBreakdown, periodTrends }: MeritDistributionTabProps) {
+function MeritDistributionTab({ groupStats, members, periodTrends }: MeritDistributionTabProps) {
+  const [hoveredMember, setHoveredMember] = useState<GroupMember | null>(null)
+
   // Expand periods to daily data for date-based X-axis
   const dailyData = useMemo(
     () =>
@@ -483,176 +442,220 @@ function MeritDistributionTab({ groupStats, tierBreakdown, periodTrends }: Merit
   )
   const xAxisTicks = useMemo(() => getPeriodBoundaryTicks(periodTrends), [periodTrends])
 
-  // Calculate growth
-  const meritGrowth =
-    periodTrends.length >= 2
-      ? ((periodTrends[periodTrends.length - 1].avg_merit - periodTrends[0].avg_merit) / periodTrends[0].avg_merit) * 100
-      : 0
+  // Calculate dynamic merit distribution bins
+  // Uses "nice" step sizes based on max value for clean integer boundaries
+  const meritBins = useMemo((): MeritBin[] => {
+    if (members.length === 0) return []
 
-  // IQR
-  const iqr = groupStats.merit_q3 - groupStats.merit_q1
+    const merits = members.map((m) => m.daily_merit)
+    const maxMerit = Math.max(...merits, 0)
+
+    // All members are inactive (0 merit)
+    if (maxMerit === 0) {
+      return [{ range: '0', label: '0', min: 0, max: Infinity, count: members.length, percentage: 100 }]
+    }
+
+    // Select a "nice" step size that produces 5-8 bins
+    // Prefer round numbers in 萬 (10000) units for readability
+    const selectStep = (max: number): number => {
+      const niceSteps = [5000, 10000, 20000, 50000, 100000, 200000]
+      const targetBins = 6
+
+      // Find step that produces closest to target bin count
+      for (const step of niceSteps) {
+        const binCount = Math.ceil(max / step)
+        if (binCount >= 4 && binCount <= 8) return step
+      }
+
+      // Fallback: calculate based on magnitude
+      const rawStep = max / targetBins
+      const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
+      const normalized = rawStep / magnitude
+      const niceNormalized = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
+      return niceNormalized * magnitude
+    }
+
+    const step = selectStep(maxMerit)
+    const numRanges = Math.ceil(maxMerit / step)
+
+    // Format number as 萬 for readability
+    const formatWan = (v: number): string => {
+      if (v === 0) return '0'
+      if (v >= 10000) {
+        const wan = v / 10000
+        return Number.isInteger(wan) ? `${wan}萬` : `${wan.toFixed(1)}萬`
+      }
+      return v.toLocaleString()
+    }
+
+    // Build bin definitions: first bin is always "0" (inactive members)
+    type BinDef = { min: number; max: number; label: string }
+    const binDefs: BinDef[] = [{ min: 0, max: 0.01, label: '0' }]
+
+    for (let i = 0; i < numRanges; i++) {
+      const rangeMin = i * step + (i === 0 ? 0.01 : 0)
+      const rangeMax = (i + 1) * step
+      const isLast = i === numRanges - 1
+
+      let label: string
+      if (i === 0) {
+        label = `0-${formatWan(step)}`
+      } else if (isLast) {
+        label = `${formatWan(i * step)}+`
+      } else {
+        label = `${formatWan(i * step)}-${formatWan(rangeMax)}`
+      }
+
+      binDefs.push({
+        min: rangeMin,
+        max: isLast ? Infinity : rangeMax,
+        label,
+      })
+    }
+
+    // Count members in each bin (single pass for O(n) performance)
+    const total = members.length
+    const counts = new Array<number>(binDefs.length).fill(0)
+
+    for (const member of members) {
+      const merit = member.daily_merit
+      for (let i = 0; i < binDefs.length; i++) {
+        if (merit >= binDefs[i].min && merit < binDefs[i].max) {
+          counts[i]++
+          break
+        }
+      }
+    }
+
+    return binDefs.map((def, i) => ({
+      range: def.label,
+      label: def.label,
+      min: def.min,
+      max: def.max,
+      count: counts[i],
+      percentage: total > 0 ? Math.round((counts[i] / total) * 100) : 0,
+    }))
+  }, [members])
+
+  // Calculate position for strip plot (handle edge case when min === max)
+  const getStripPosition = (merit: number): number => {
+    const range = groupStats.merit_max - groupStats.merit_min
+    if (range === 0) return 50
+    return ((merit - groupStats.merit_min) / range) * 100
+  }
 
   return (
     <div className="space-y-6">
-      {/* Distribution Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-primary/50">
-          <CardHeader className="pb-2">
-            <CardDescription>人日均戰功（平均）</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tabular-nums">{formatNumber(groupStats.avg_daily_merit)}</div>
-            <div className="flex items-center gap-1 mt-1">
-              {meritGrowth >= 0 ? (
-                <TrendingUp className="h-3 w-3 text-primary" />
-              ) : (
-                <TrendingDown className="h-3 w-3 text-destructive" />
-              )}
-              <span className={`text-xs ${meritGrowth >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                {meritGrowth >= 0 ? '+' : ''}
-                {meritGrowth.toFixed(1)}% 成長
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>中位數</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tabular-nums">{formatNumber(groupStats.merit_median)}</div>
-            <p className="text-xs text-muted-foreground mt-1">50% 成員高於此值</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>四分位距 (IQR)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tabular-nums">{formatNumber(iqr)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Q3 - Q1</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>變異係數 (CV)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold tabular-nums ${groupStats.merit_cv > 0.3 ? 'text-muted-foreground' : 'text-primary'}`}>
-              {(groupStats.merit_cv * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{groupStats.merit_cv > 0.3 ? '分散度較高' : '分散度良好'}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Box Plot Visual Representation */}
+      {/* Box Plot with Strip Plot */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">戰功分佈概覽</CardTitle>
-          <CardDescription>箱型圖統計（Min / Q1 / Median / Q3 / Max）</CardDescription>
+          <CardDescription>
+            箱型圖統計 · 每個圓點代表一位成員
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{formatNumber(groupStats.merit_min)}</span>
-                <span>{formatNumber(groupStats.merit_median)}</span>
-                <span>{formatNumber(groupStats.merit_max)}</span>
-              </div>
-              <div className="relative h-8">
-                {/* Full range bar */}
-                <div className="absolute inset-y-2 left-0 right-0 bg-muted rounded" />
-                {/* IQR box */}
-                <div
-                  className="absolute inset-y-1 bg-primary/30 border-2 border-primary rounded"
-                  style={{
-                    left: `${((groupStats.merit_q1 - groupStats.merit_min) / (groupStats.merit_max - groupStats.merit_min)) * 100}%`,
-                    right: `${((groupStats.merit_max - groupStats.merit_q3) / (groupStats.merit_max - groupStats.merit_min)) * 100}%`,
-                  }}
-                />
-                {/* Median line */}
-                <div
-                  className="absolute inset-y-0 w-0.5 bg-primary"
-                  style={{
-                    left: `${((groupStats.merit_median - groupStats.merit_min) / (groupStats.merit_max - groupStats.merit_min)) * 100}%`,
-                  }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Min</span>
-                <span>Q1: {formatNumber(groupStats.merit_q1)}</span>
-                <span>Q3: {formatNumber(groupStats.merit_q3)}</span>
-                <span>Max</span>
-              </div>
+          <div className="space-y-2">
+            {/* Top labels */}
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>{formatNumber(groupStats.merit_min)}</span>
+              <span>{formatNumber(groupStats.merit_median)}</span>
+              <span>{formatNumber(groupStats.merit_max)}</span>
+            </div>
+
+            {/* Box Plot */}
+            <div className="relative h-8">
+              {/* Full range bar */}
+              <div className="absolute inset-y-2 left-0 right-0 bg-muted rounded" />
+              {/* IQR box */}
+              <div
+                className="absolute inset-y-1 bg-primary/30 border-2 border-primary rounded"
+                style={{
+                  left: `${getStripPosition(groupStats.merit_q1)}%`,
+                  right: `${100 - getStripPosition(groupStats.merit_q3)}%`,
+                }}
+              />
+              {/* Median line */}
+              <div
+                className="absolute inset-y-0 w-0.5 bg-primary"
+                style={{ left: `${getStripPosition(groupStats.merit_median)}%` }}
+              />
+            </div>
+
+            {/* Strip Plot - Individual member data points */}
+            <div className="relative h-6">
+              {members.map((member) => {
+                const position = getStripPosition(member.daily_merit)
+                const isHovered = hoveredMember?.id === member.id
+                return (
+                  <div
+                    key={member.id}
+                    className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-primary/70 hover:bg-primary hover:scale-150 cursor-pointer transition-transform z-10"
+                    style={{ left: `calc(${position}% - 5px)` }}
+                    onMouseEnter={() => setHoveredMember(member)}
+                    onMouseLeave={() => setHoveredMember(null)}
+                  >
+                    {isHovered && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded bg-popover border shadow-md text-xs whitespace-nowrap z-20">
+                        <div className="font-medium">{member.name}</div>
+                        <div className="text-muted-foreground">
+                          日均戰功: {formatNumber(member.daily_merit)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Bottom labels */}
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Min</span>
+              <span>Q1: {formatNumber(groupStats.merit_q1)}</span>
+              <span>Q3: {formatNumber(groupStats.merit_q3)}</span>
+              <span>Max</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Tier Breakdown */}
+        {/* Merit Distribution by Range */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">組內階層分布</CardTitle>
-            <CardDescription>按組內相對戰功位置劃分</CardDescription>
+            <CardTitle className="text-base">戰功區間分佈</CardTitle>
+            <CardDescription>成員日均戰功區間人數分佈</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={tierBarConfig} className="h-[200px] w-full">
-              <BarChart data={tierBreakdown} margin={{ left: 20, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="tier" tickLine={false} axisLine={false} className="text-xs" />
+            <ChartContainer config={meritDistributionConfig} className="h-[220px] w-full">
+              <BarChart data={meritBins} margin={{ left: 10, right: 10, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  className="text-xs"
+                  angle={-30}
+                  textAnchor="end"
+                  height={50}
+                  interval={0}
+                />
                 <YAxis tickLine={false} axisLine={false} className="text-xs" />
                 <ChartTooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null
-                    const data = payload[0].payload as TierBreakdown
+                    const data = payload[0].payload as MeritBin
                     return (
                       <div className="rounded-lg border bg-background p-2 shadow-sm">
-                        <div className="font-medium">{data.tier}</div>
+                        <div className="font-medium">日均戰功: {data.label}</div>
                         <div className="text-sm">人數: {data.count} ({data.percentage}%)</div>
-                        <div className="text-sm">平均戰功: {formatNumber(data.avg_merit)}</div>
                       </div>
                     )
                   }}
                 />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {tierBreakdown.map((_, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={index === 0 ? TIER_COLORS.top : index === 2 ? TIER_COLORS.bottom : TIER_COLORS.mid}
-                    />
-                  ))}
-                </Bar>
+                <Bar dataKey="count" fill="var(--primary)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
-
-            {/* Tier Details Table */}
-            <div className="mt-4 pt-4 border-t">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-muted-foreground">
-                    <th className="text-left py-1">階層</th>
-                    <th className="text-right py-1">人數</th>
-                    <th className="text-right py-1">平均戰功</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tierBreakdown.map((tier, index) => (
-                    <tr key={tier.tier} className={`border-t ${getTierBgClass(index)}`}>
-                      <td className="py-2">{tier.tier}</td>
-                      <td className="text-right tabular-nums">
-                        {tier.count} ({tier.percentage}%)
-                      </td>
-                      <td className="text-right tabular-nums">{formatNumber(tier.avg_merit)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </CardContent>
         </Card>
 
@@ -663,7 +666,7 @@ function MeritDistributionTab({ groupStats, tierBreakdown, periodTrends }: Merit
             <CardDescription>組別人日均戰功/助攻變化</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={meritTrendConfig} className="h-[200px] w-full">
+            <ChartContainer config={meritTrendConfig} className="h-[220px] w-full">
               <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
@@ -1149,7 +1152,6 @@ function GroupAnalytics() {
   const groupMembers = groupData?.members ?? []
   const periodTrends = groupData?.trends ?? []
   const allianceAverages = groupData?.alliance_averages
-  const tierBreakdown = groupStats ? generateTierBreakdown(groupStats) : []
 
   // Loading state
   const isLoading = isSeasonLoading || isGroupsLoading || isGroupLoading
@@ -1263,7 +1265,7 @@ function GroupAnalytics() {
             <TabsContent value="distribution">
               <MeritDistributionTab
                 groupStats={groupStats}
-                tierBreakdown={tierBreakdown}
+                members={groupMembers}
                 periodTrends={periodTrends}
               />
             </TabsContent>
