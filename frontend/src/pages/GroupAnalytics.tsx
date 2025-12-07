@@ -91,6 +91,10 @@ const capabilityRadarConfig = {
     label: '同盟平均',
     color: 'var(--muted-foreground)',
   },
+  median: {
+    label: '同盟中位數',
+    color: 'hsl(215 20% 55%)',
+  },
 } satisfies ChartConfig
 
 const meritBarConfig = {
@@ -126,30 +130,14 @@ const rankDistributionConfig = {
 } satisfies ChartConfig
 
 // ============================================================================
-// Tier Utilities (used by MembersTab)
+// Types
 // ============================================================================
 
-function getMemberTier(member: GroupMember, members: readonly GroupMember[]): 'top' | 'mid' | 'bottom' {
-  const sorted = [...members].sort((a, b) => b.daily_merit - a.daily_merit)
-  const index = sorted.findIndex((m) => m.id === member.id)
-  const topThreshold = Math.floor(members.length * 0.2)
-  const bottomThreshold = Math.floor(members.length * 0.8)
+/** View mode for data display: latest period or season-to-date */
+type ViewMode = 'latest' | 'season'
 
-  if (index < topThreshold) return 'top'
-  if (index >= bottomThreshold) return 'bottom'
-  return 'mid'
-}
-
-function getTierBgColor(tier: 'top' | 'mid' | 'bottom'): string {
-  switch (tier) {
-    case 'top':
-      return 'bg-primary/10'
-    case 'bottom':
-      return 'bg-destructive/10'
-    default:
-      return ''
-  }
-}
+// Subtle blue-gray for median lines (distinct from muted-foreground but still muted)
+const MEDIAN_LINE_COLOR = 'hsl(215 20% 55%)'
 
 // ============================================================================
 // Tab 1: Overview
@@ -159,47 +147,110 @@ interface OverviewTabProps {
   readonly groupStats: GroupStats
   readonly allianceAverages: AllianceAveragesResponse
   readonly allGroupsData: readonly GroupComparisonItem[]
+  readonly periodTrends: readonly GroupTrendItem[]
+  readonly members: readonly GroupMember[]
+  readonly viewMode: ViewMode
 }
 
-function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTabProps) {
+function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends, members, viewMode }: OverviewTabProps) {
+
+  // Calculate season averages from period trends (for 'season' view mode)
+  const seasonGroupAverages = useMemo(() => {
+    if (periodTrends.length === 0) {
+      return {
+        avg_daily_merit: 0,
+        avg_daily_assist: 0,
+        avg_daily_donation: 0,
+        avg_power: 0,
+        avg_rank: 0,
+      }
+    }
+
+    // Calculate weighted average based on member count per period
+    let totalMerit = 0
+    let totalAssist = 0
+    let totalRank = 0
+    let totalMemberPeriods = 0
+
+    for (const period of periodTrends) {
+      totalMerit += period.avg_merit * period.member_count
+      totalAssist += period.avg_assist * period.member_count
+      totalRank += period.avg_rank * period.member_count
+      totalMemberPeriods += period.member_count
+    }
+
+    // Donation is not in trends, calculate from current members
+    const totalDonation = members.reduce((sum, m) => sum + m.daily_donation, 0)
+    const totalPower = members.reduce((sum, m) => sum + m.power, 0)
+    const memberCount = members.length || 1
+
+    return {
+      avg_daily_merit: totalMemberPeriods > 0 ? totalMerit / totalMemberPeriods : 0,
+      avg_daily_assist: totalMemberPeriods > 0 ? totalAssist / totalMemberPeriods : 0,
+      avg_daily_donation: totalDonation / memberCount,
+      avg_power: totalPower / memberCount,
+      avg_rank: totalMemberPeriods > 0 ? totalRank / totalMemberPeriods : 0,
+    }
+  }, [periodTrends, members])
+
   // Capability radar data: normalized to alliance average (100 = alliance average)
+  // Uses viewMode for toggle between latest period and season average
   const radarData = useMemo(() => {
     const normalize = (value: number, avg: number) => (avg > 0 ? Math.round((value / avg) * 100) : 0)
+
+    // Select group values based on view mode
+    const groupMerit = viewMode === 'latest' ? groupStats.avg_daily_merit : seasonGroupAverages.avg_daily_merit
+    const groupAssist = viewMode === 'latest' ? groupStats.avg_daily_assist : seasonGroupAverages.avg_daily_assist
+    const groupDonation = viewMode === 'latest' ? groupStats.avg_daily_donation : seasonGroupAverages.avg_daily_donation
+    const groupPower = viewMode === 'latest' ? groupStats.avg_power : seasonGroupAverages.avg_power
 
     return [
       {
         metric: '戰功',
-        group: normalize(groupStats.avg_daily_merit, allianceAverages.avg_daily_merit),
-        groupRaw: groupStats.avg_daily_merit,
+        group: normalize(groupMerit, allianceAverages.avg_daily_merit),
+        groupRaw: groupMerit,
         alliance: 100,
         allianceRaw: allianceAverages.avg_daily_merit,
-      },
-      {
-        metric: '助攻',
-        group: normalize(groupStats.avg_daily_assist, allianceAverages.avg_daily_assist),
-        groupRaw: groupStats.avg_daily_assist,
-        alliance: 100,
-        allianceRaw: allianceAverages.avg_daily_assist,
-      },
-      {
-        metric: '捐獻',
-        group: normalize(groupStats.avg_daily_donation, allianceAverages.avg_daily_donation),
-        groupRaw: groupStats.avg_daily_donation,
-        alliance: 100,
-        allianceRaw: allianceAverages.avg_daily_donation,
+        median: normalize(allianceAverages.median_daily_merit, allianceAverages.avg_daily_merit),
+        medianRaw: allianceAverages.median_daily_merit,
       },
       {
         metric: '勢力值',
-        group: normalize(groupStats.avg_power, allianceAverages.avg_daily_contribution * 100), // Use contribution as power proxy
-        groupRaw: groupStats.avg_power,
+        group: normalize(groupPower, allianceAverages.avg_power),
+        groupRaw: groupPower,
         alliance: 100,
-        allianceRaw: allianceAverages.avg_daily_contribution * 100,
+        allianceRaw: allianceAverages.avg_power,
+        median: normalize(allianceAverages.median_power, allianceAverages.avg_power),
+        medianRaw: allianceAverages.median_power,
+      },
+      {
+        metric: '助攻',
+        group: normalize(groupAssist, allianceAverages.avg_daily_assist),
+        groupRaw: groupAssist,
+        alliance: 100,
+        allianceRaw: allianceAverages.avg_daily_assist,
+        median: normalize(allianceAverages.median_daily_assist, allianceAverages.avg_daily_assist),
+        medianRaw: allianceAverages.median_daily_assist,
+      },
+      {
+        metric: '捐獻',
+        group: normalize(groupDonation, allianceAverages.avg_daily_donation),
+        groupRaw: groupDonation,
+        alliance: 100,
+        allianceRaw: allianceAverages.avg_daily_donation,
+        median: normalize(allianceAverages.median_daily_donation, allianceAverages.avg_daily_donation),
+        medianRaw: allianceAverages.median_daily_donation,
       },
     ]
-  }, [groupStats, allianceAverages])
+  }, [viewMode, groupStats, seasonGroupAverages, allianceAverages])
 
-  const meritDiff = calculatePercentDiff(groupStats.avg_daily_merit, allianceAverages.avg_daily_merit)
-  const assistDiff = calculatePercentDiff(groupStats.avg_daily_assist, allianceAverages.avg_daily_assist)
+  // Displayed values based on view mode
+  const displayMerit = viewMode === 'latest' ? groupStats.avg_daily_merit : seasonGroupAverages.avg_daily_merit
+  const displayAssist = viewMode === 'latest' ? groupStats.avg_daily_assist : seasonGroupAverages.avg_daily_assist
+  const displayRank = viewMode === 'latest' ? groupStats.avg_rank : seasonGroupAverages.avg_rank
+
+  const meritDiff = calculatePercentDiff(displayMerit, allianceAverages.avg_daily_merit)
+  const assistDiff = calculatePercentDiff(displayAssist, allianceAverages.avg_daily_assist)
 
   // Transform comparison data for chart
   const chartData = useMemo(() =>
@@ -234,12 +285,14 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold tabular-nums">
-              #{Math.round(groupStats.avg_rank)}
+              #{Math.round(displayRank)}
               <span className="text-base font-normal text-muted-foreground ml-1">/ {allianceAverages.member_count}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              最佳 #{groupStats.best_rank} · 最差 #{groupStats.worst_rank}
-            </p>
+            {viewMode === 'latest' && (
+              <p className="text-xs text-muted-foreground mt-1">
+                最佳 #{groupStats.best_rank} · 最差 #{groupStats.worst_rank}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -249,7 +302,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
             <CardDescription>人日均戰功</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tabular-nums">{formatNumber(groupStats.avg_daily_merit)}</div>
+            <div className="text-2xl font-bold tabular-nums">{formatNumber(displayMerit)}</div>
             <div className="flex items-center gap-1 mt-1">
               {meritDiff >= 0 ? (
                 <TrendingUp className="h-3 w-3 text-primary" />
@@ -270,7 +323,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
             <CardDescription>人日均助攻</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tabular-nums">{formatNumber(groupStats.avg_daily_assist)}</div>
+            <div className="text-2xl font-bold tabular-nums">{formatNumber(displayAssist)}</div>
             <div className="flex items-center gap-1 mt-1">
               {assistDiff >= 0 ? (
                 <TrendingUp className="h-3 w-3 text-primary" />
@@ -292,7 +345,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
         <Card>
           <CardHeader>
             <CardTitle className="text-base">四維能力圖</CardTitle>
-            <CardDescription>組別人日均表現 vs 同盟平均（100% = 同盟平均）</CardDescription>
+            <CardDescription>組別人日均表現 vs 同盟平均/中位數（100% = 同盟平均）</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={capabilityRadarConfig} className="mx-auto aspect-square max-h-[280px]">
@@ -301,7 +354,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
                 <PolarAngleAxis dataKey="metric" className="text-xs" tick={{ fill: 'var(--foreground)', fontSize: 12 }} />
                 <PolarRadiusAxis
                   angle={90}
-                  domain={[0, Math.max(150, ...radarData.map((d) => d.group))]}
+                  domain={[0, Math.max(150, ...radarData.map((d) => Math.max(d.group, d.median)))]}
                   tick={{ fontSize: 10 }}
                   tickFormatter={(value) => `${value}%`}
                 />
@@ -310,9 +363,18 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
                   dataKey="alliance"
                   stroke="var(--muted-foreground)"
                   fill="var(--muted-foreground)"
-                  fillOpacity={0.15}
+                  fillOpacity={0.1}
                   strokeWidth={1}
                   strokeDasharray="4 4"
+                />
+                <Radar
+                  name="同盟中位數"
+                  dataKey="median"
+                  stroke={MEDIAN_LINE_COLOR}
+                  fill={MEDIAN_LINE_COLOR}
+                  fillOpacity={0.08}
+                  strokeWidth={1}
+                  strokeDasharray="2 2"
                 />
                 <Radar
                   name={groupStats.group_name}
@@ -334,6 +396,9 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
                         </div>
                         <div className="text-sm text-muted-foreground">
                           同盟平均：{formatNumberCompact(data.allianceRaw)} ({data.alliance}%)
+                        </div>
+                        <div className="text-sm" style={{ color: MEDIAN_LINE_COLOR }}>
+                          同盟中位數：{formatNumberCompact(data.medianRaw)} ({data.median}%)
                         </div>
                       </div>
                     )
@@ -1010,62 +1075,13 @@ function MembersTab({ members }: MembersTabProps) {
     }
   }
 
-  // Tier counts based on within-group merit ranking
-  const tierCounts = useMemo(() => {
-    const counts = { top: 0, mid: 0, bottom: 0 }
-    for (const member of members) {
-      const tier = getMemberTier(member, members)
-      counts[tier]++
-    }
-    return counts
-  }, [members])
-
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Top 20%（高表現）</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tabular-nums text-primary">{tierCounts.top}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {((tierCounts.top / members.length) * 100).toFixed(0)}% of group
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Mid 60%（中等）</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tabular-nums">{tierCounts.mid}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {((tierCounts.mid / members.length) * 100).toFixed(0)}% of group
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Bot 20%（需關注）</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tabular-nums text-destructive">{tierCounts.bottom}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {((tierCounts.bottom / members.length) * 100).toFixed(0)}% of group
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Members Table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">組內成員列表</CardTitle>
-          <CardDescription>點擊欄位標題排序（階層依組內戰功相對位置劃分）</CardDescription>
+          <CardDescription>點擊欄位標題排序</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -1073,42 +1089,57 @@ function MembersTab({ members }: MembersTabProps) {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 px-2 font-medium">成員</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">勢力值</th>
                   <th
                     className="text-right py-2 px-2 font-medium cursor-pointer hover:text-primary"
                     onClick={() => handleSort('rank')}
                   >
                     貢獻排名 {sortBy === 'rank' && (sortDir === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">變化</th>
                   <th
                     className="text-right py-2 px-2 font-medium cursor-pointer hover:text-primary"
                     onClick={() => handleSort('merit')}
                   >
                     日均戰功 {sortBy === 'merit' && (sortDir === 'desc' ? '↓' : '↑')}
                   </th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">變化</th>
                   <th
                     className="text-right py-2 px-2 font-medium cursor-pointer hover:text-primary"
                     onClick={() => handleSort('assist')}
                   >
                     日均助攻 {sortBy === 'assist' && (sortDir === 'desc' ? '↓' : '↑')}
                   </th>
-                  <th className="text-right py-2 px-2 font-medium">排名變化</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedMembers.map((member) => {
-                  const tier = getMemberTier(member, members)
-                  return (
-                    <tr key={member.id} className={`border-b last:border-0 ${getTierBgColor(tier)}`}>
-                      <td className="py-2 px-2 font-medium">{member.name}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">#{member.contribution_rank}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">{formatNumber(member.daily_merit)}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">{Math.round(member.daily_assist)}</td>
-                      <td className="py-2 px-2 text-right">
-                        <RankChangeIndicator change={member.rank_change} showNewLabel={false} />
-                      </td>
-                    </tr>
-                  )
-                })}
+                {sortedMembers.map((member) => (
+                  <tr key={member.id} className="border-b last:border-0">
+                    <td className="py-2 px-2 font-medium">{member.name}</td>
+                    <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                      {formatNumberCompact(member.power)}
+                    </td>
+                    <td className="py-2 px-2 text-right tabular-nums">#{member.contribution_rank}</td>
+                    <td className="py-2 px-2">
+                      <div className="flex justify-end">
+                        <RankChangeIndicator change={member.rank_change} showNewLabel={false} size="sm" />
+                      </div>
+                    </td>
+                    <td className="py-2 px-2 text-right tabular-nums">{formatNumber(member.daily_merit)}</td>
+                    <td className="py-2 px-2 text-right text-xs tabular-nums">
+                      {member.merit_change === null ? (
+                        <span className="text-muted-foreground">新</span>
+                      ) : member.merit_change > 0 ? (
+                        <span className="text-primary">+{formatNumberCompact(member.merit_change)}</span>
+                      ) : member.merit_change < 0 ? (
+                        <span className="text-destructive">{formatNumberCompact(member.merit_change)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 text-right tabular-nums">{Math.round(member.daily_assist)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -1125,6 +1156,7 @@ function MembersTab({ members }: MembersTabProps) {
 function GroupAnalytics() {
   const [selectedGroupName, setSelectedGroupName] = useState<string>('')
   const [activeTab, setActiveTab] = useState('overview')
+  const [viewMode, setViewMode] = useState<ViewMode>('latest')
 
   // Get active season
   const { data: activeSeason, isLoading: isSeasonLoading } = useActiveSeason()
@@ -1137,15 +1169,15 @@ function GroupAnalytics() {
   const firstGroupName = groups?.[0]?.name
   const effectiveGroupName = selectedGroupName || firstGroupName || ''
 
-  // Fetch group analytics (only when group and season are available)
+  // Fetch group analytics (responds to viewMode)
   const {
     data: groupData,
     isLoading: isGroupLoading,
     error: groupError,
-  } = useGroupAnalytics(effectiveGroupName || undefined, seasonId)
+  } = useGroupAnalytics(effectiveGroupName || undefined, seasonId, viewMode)
 
-  // Fetch groups comparison
-  const { data: groupsComparison } = useGroupsComparison(seasonId)
+  // Fetch groups comparison (responds to viewMode)
+  const { data: groupsComparison } = useGroupsComparison(seasonId, viewMode)
 
   // Derived data
   const groupStats = groupData?.stats
@@ -1193,6 +1225,13 @@ function GroupAnalytics() {
             <h2 className="text-2xl font-bold tracking-tight">組別分析</h2>
             <p className="text-muted-foreground mt-1">查看各組別的人日均表現與統計數據</p>
           </div>
+          {/* View Mode Toggle */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+            <TabsList className="h-8">
+              <TabsTrigger value="latest" className="text-xs px-3">最新一期</TabsTrigger>
+              <TabsTrigger value="season" className="text-xs px-3">賽季以來</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* Group Selector */}
@@ -1259,6 +1298,9 @@ function GroupAnalytics() {
                 groupStats={groupStats}
                 allianceAverages={allianceAverages}
                 allGroupsData={groupsComparison ?? []}
+                periodTrends={periodTrends}
+                members={groupMembers}
+                viewMode={viewMode}
               />
             </TabsContent>
 

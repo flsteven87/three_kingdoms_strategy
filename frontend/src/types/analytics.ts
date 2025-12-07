@@ -107,11 +107,13 @@ export interface AllianceAveragesResponse {
   readonly avg_daily_merit: number
   readonly avg_daily_assist: number
   readonly avg_daily_donation: number
+  readonly avg_power: number
   // Medians
   readonly median_daily_contribution: number
   readonly median_daily_merit: number
   readonly median_daily_assist: number
   readonly median_daily_donation: number
+  readonly median_power: number
 }
 
 /**
@@ -179,6 +181,7 @@ export interface GroupMember {
   readonly daily_donation: number
   readonly power: number
   readonly rank_change: number | null
+  readonly merit_change: number | null
 }
 
 /**

@@ -457,15 +457,17 @@ class ApiClient {
 
   /**
    * Get complete analytics for a specific group
+   * @param view - 'latest' for latest period, 'season' for season average
    */
   async getGroupAnalytics(
     groupName: string,
-    seasonId: string
+    seasonId: string,
+    view: 'latest' | 'season' = 'latest'
   ): Promise<GroupAnalyticsResponse> {
     const response = await this.client.get<GroupAnalyticsResponse>(
       `/api/v1/analytics/groups/${encodeURIComponent(groupName)}`,
       {
-        params: { season_id: seasonId }
+        params: { season_id: seasonId, view }
       }
     )
     return response.data
@@ -473,12 +475,13 @@ class ApiClient {
 
   /**
    * Get comparison data for all groups
+   * @param view - 'latest' for latest period, 'season' for season average
    */
-  async getGroupsComparison(seasonId: string): Promise<GroupComparisonItem[]> {
+  async getGroupsComparison(seasonId: string, view: 'latest' | 'season' = 'latest'): Promise<GroupComparisonItem[]> {
     const response = await this.client.get<GroupComparisonItem[]>(
       '/api/v1/analytics/groups/comparison',
       {
-        params: { season_id: seasonId }
+        params: { season_id: seasonId, view }
       }
     )
     return response.data

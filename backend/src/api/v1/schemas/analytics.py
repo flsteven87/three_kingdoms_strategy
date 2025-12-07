@@ -120,11 +120,13 @@ class AllianceAveragesResponse(BaseModel):
     avg_daily_merit: float = Field(..., ge=0, description="Average daily merit")
     avg_daily_assist: float = Field(..., ge=0, description="Average daily assist")
     avg_daily_donation: float = Field(..., ge=0, description="Average daily donation")
+    avg_power: float = Field(0, ge=0, description="Average power (latest snapshot)")
     # Medians
     median_daily_contribution: float = Field(0, ge=0, description="Median daily contribution")
     median_daily_merit: float = Field(0, ge=0, description="Median daily merit")
     median_daily_assist: float = Field(0, ge=0, description="Median daily assist")
     median_daily_donation: float = Field(0, ge=0, description="Median daily donation")
+    median_power: float = Field(0, ge=0, description="Median power (latest snapshot)")
 
 
 class AllianceTrendItem(BaseModel):
@@ -246,6 +248,7 @@ class GroupMember(BaseModel):
     daily_donation: float = Field(..., ge=0, description="Daily average donation")
     power: int = Field(..., ge=0, description="Current power value")
     rank_change: int | None = Field(None, description="Rank change from previous period")
+    merit_change: float | None = Field(None, description="Daily merit change from previous period")
 
 
 class GroupTrendItem(BaseModel):

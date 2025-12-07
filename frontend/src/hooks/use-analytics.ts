@@ -40,10 +40,10 @@ export const analyticsKeys = {
   // Group analytics
   groups: () => [...analyticsKeys.all, 'groups'] as const,
   groupsList: (seasonId: string) => [...analyticsKeys.groups(), 'list', seasonId] as const,
-  groupAnalytics: (groupName: string, seasonId: string) =>
-    [...analyticsKeys.groups(), 'detail', groupName, seasonId] as const,
-  groupsComparison: (seasonId: string) =>
-    [...analyticsKeys.groups(), 'comparison', seasonId] as const
+  groupAnalytics: (groupName: string, seasonId: string, view: 'latest' | 'season' = 'latest') =>
+    [...analyticsKeys.groups(), 'detail', groupName, seasonId, view] as const,
+  groupsComparison: (seasonId: string, view: 'latest' | 'season' = 'latest') =>
+    [...analyticsKeys.groups(), 'comparison', seasonId, view] as const
 }
 
 /**
@@ -127,11 +127,12 @@ export function useGroups(seasonId: string | undefined) {
  */
 export function useGroupAnalytics(
   groupName: string | undefined,
-  seasonId: string | undefined
+  seasonId: string | undefined,
+  view: 'latest' | 'season' = 'latest'
 ) {
   return useQuery({
-    queryKey: analyticsKeys.groupAnalytics(groupName ?? '', seasonId ?? ''),
-    queryFn: () => apiClient.getGroupAnalytics(groupName!, seasonId!),
+    queryKey: analyticsKeys.groupAnalytics(groupName ?? '', seasonId ?? '', view),
+    queryFn: () => apiClient.getGroupAnalytics(groupName!, seasonId!, view),
     enabled: !!groupName && !!seasonId,
     staleTime: 2 * 60 * 1000 // 2 minutes - group data may change frequently
   })
@@ -140,10 +141,10 @@ export function useGroupAnalytics(
 /**
  * Hook to fetch comparison data for all groups
  */
-export function useGroupsComparison(seasonId: string | undefined) {
+export function useGroupsComparison(seasonId: string | undefined, view: 'latest' | 'season' = 'latest') {
   return useQuery({
-    queryKey: analyticsKeys.groupsComparison(seasonId ?? ''),
-    queryFn: () => apiClient.getGroupsComparison(seasonId!),
+    queryKey: analyticsKeys.groupsComparison(seasonId ?? '', view),
+    queryFn: () => apiClient.getGroupsComparison(seasonId!, view),
     enabled: !!seasonId,
     staleTime: 5 * 60 * 1000
   })

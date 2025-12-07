@@ -293,6 +293,7 @@ async def get_groups_comparison(
     season_id: UUID,
     user_id: CurrentUserIdDep,
     service: AnalyticsServiceDep,
+    view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
 ) -> list[GroupComparisonItem]:
     """
     Get comparison data for all groups in a season.
@@ -301,12 +302,13 @@ async def get_groups_comparison(
 
     Query Parameters:
         season_id: Season UUID (required)
+        view: View mode - 'latest' (default) or 'season'
 
     Returns:
         List of group comparison items sorted by avg_daily_merit descending
     """
     await _verify_season_access(user_id, season_id)
-    data = await service.get_groups_comparison(season_id)
+    data = await service.get_groups_comparison(season_id, view=view)
     return [GroupComparisonItem(**item) for item in data]
 
 
@@ -316,6 +318,7 @@ async def get_group_analytics(
     season_id: UUID,
     user_id: CurrentUserIdDep,
     service: AnalyticsServiceDep,
+    view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
 ) -> GroupAnalyticsResponse:
     """
     Get complete analytics for a specific group.
@@ -327,6 +330,7 @@ async def get_group_analytics(
 
     Query Parameters:
         season_id: Season UUID (required)
+        view: View mode - 'latest' (default) or 'season'
 
     Returns:
         Complete group analytics response
@@ -338,7 +342,7 @@ async def get_group_analytics(
     # Decode URL-encoded group name
     decoded_group_name = unquote(group_name)
 
-    data = await service.get_group_analytics(season_id, decoded_group_name)
+    data = await service.get_group_analytics(season_id, decoded_group_name, view=view)
 
     if not data["members"]:
         raise HTTPException(

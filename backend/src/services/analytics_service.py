@@ -17,6 +17,25 @@ from src.repositories.member_repository import MemberRepository
 from src.repositories.period_repository import PeriodRepository
 
 
+def _percentile(data: list[float], p: float) -> float:
+    """
+    Calculate percentile using linear interpolation.
+
+    Args:
+        data: Sorted list of values
+        p: Percentile (0.0 to 1.0)
+
+    Returns:
+        Interpolated percentile value
+    """
+    if not data:
+        return 0.0
+    k = (len(data) - 1) * p
+    f = int(k)
+    c = f + 1 if f + 1 < len(data) else f
+    return data[f] + (data[c] - data[f]) * (k - f)
+
+
 def _build_period_label(period: Period) -> str:
     """
     Build display label for a period.
@@ -187,7 +206,7 @@ class AnalyticsService:
             period_id: Period UUID
 
         Returns:
-            Dict with average and median daily metrics and member count
+            Dict with average and median daily metrics, power, and member count
         """
         from statistics import median
 
@@ -200,10 +219,12 @@ class AnalyticsService:
                 "avg_daily_merit": 0,
                 "avg_daily_assist": 0,
                 "avg_daily_donation": 0,
+                "avg_power": 0,
                 "median_daily_contribution": 0,
                 "median_daily_merit": 0,
                 "median_daily_assist": 0,
                 "median_daily_donation": 0,
+                "median_power": 0,
             }
 
         count = len(metrics)
@@ -213,6 +234,7 @@ class AnalyticsService:
         merits = [float(m.daily_merit) for m in metrics]
         assists = [float(m.daily_assist) for m in metrics]
         donations = [float(m.daily_donation) for m in metrics]
+        powers = [float(m.end_power) for m in metrics]
 
         return {
             "member_count": count,
@@ -221,11 +243,13 @@ class AnalyticsService:
             "avg_daily_merit": round(sum(merits) / count, 2),
             "avg_daily_assist": round(sum(assists) / count, 2),
             "avg_daily_donation": round(sum(donations) / count, 2),
+            "avg_power": round(sum(powers) / count, 2),
             # Medians
             "median_daily_contribution": round(median(contributions), 2),
             "median_daily_merit": round(median(merits), 2),
             "median_daily_assist": round(median(assists), 2),
             "median_daily_donation": round(median(donations), 2),
+            "median_power": round(median(powers), 2),
         }
 
     async def get_member_with_comparison(
@@ -398,7 +422,7 @@ class AnalyticsService:
         return await self._metrics_repo.get_all_groups_for_period(latest_period.id)
 
     async def get_group_analytics(
-        self, season_id: UUID, group_name: str
+        self, season_id: UUID, group_name: str, view: str = "latest"
     ) -> dict:
         """
         Get complete group analytics including stats, members, trends, and alliance averages.
@@ -406,10 +430,12 @@ class AnalyticsService:
         Args:
             season_id: Season UUID
             group_name: Group name to analyze
+            view: 'latest' for latest period data, 'season' for season-weighted average
 
         Returns:
             Dict with stats, members, trends, and alliance_averages
         """
+        from collections import defaultdict
         from decimal import Decimal
 
         # Get all periods for the season
@@ -424,7 +450,7 @@ class AnalyticsService:
 
         latest_period = periods[-1]
 
-        # Get group members for latest period
+        # Get group members for latest period (defines current group membership)
         group_metrics = await self._metrics_repo.get_metrics_by_group_for_period(
             latest_period.id, group_name
         )
@@ -437,43 +463,24 @@ class AnalyticsService:
                 "alliance_averages": await self.get_period_alliance_averages(latest_period.id),
             }
 
-        # Build members list
-        members = [
-            {
-                "id": str(m["member_id"]),
-                "name": m["member_name"],
-                "contribution_rank": m["end_rank"],
-                "daily_merit": float(Decimal(str(m["daily_merit"]))),
-                "daily_assist": float(Decimal(str(m["daily_assist"]))),
-                "daily_donation": float(Decimal(str(m["daily_donation"]))),
-                "power": m["end_power"],
-                "rank_change": m["rank_change"],
-            }
-            for m in group_metrics
-        ]
-
-        # Calculate group stats
-        stats = self._calculate_group_stats(group_name, group_metrics)
-
-        # Get group trends across all periods
-        # Use current group members to track their historical performance
-        # This ensures Period 1 is included even if members had different groups then
+        # Get current member IDs and period IDs for trend calculation
         member_ids = [m["member_id"] for m in group_metrics]
         period_ids = [str(p.id) for p in periods]
 
+        # Fetch all metrics for these members across all periods (needed for both views)
         trend_data = await self._metrics_repo.get_members_metrics_for_periods(
             member_ids, period_ids
         )
 
-        # Group by period and calculate aggregates
-        from collections import defaultdict
-
+        # Group by period for trend calculation
         period_groups: dict[str, list[dict]] = defaultdict(list)
         for row in trend_data:
             period_groups[row["period_id"]].append(row)
 
         # Build period label map
         period_map = {str(p.id): p for p in periods}
+
+        # Build trends (same for both views - shows history)
         trends = []
         for period_id_str, metrics in period_groups.items():
             period = period_map.get(period_id_str)
@@ -494,11 +501,99 @@ class AnalyticsService:
                     "member_count": count,
                 })
 
-        # Sort by period_number
         trends.sort(key=lambda x: x["period_number"])
 
         # Get alliance averages for comparison
         alliance_averages = await self.get_period_alliance_averages(latest_period.id)
+
+        if view == "season":
+            # Calculate season-weighted averages for each member
+            # Group trend_data by member_id
+            member_all_periods: dict[str, list[dict]] = defaultdict(list)
+            for row in trend_data:
+                member_all_periods[str(row["member_id"])].append(row)
+
+            members = []
+            for m in group_metrics:
+                member_id = str(m["member_id"])
+                member_history = member_all_periods.get(member_id, [])
+
+                if member_history:
+                    # Calculate weighted averages across all periods
+                    total_merit = sum(float(Decimal(str(h["daily_merit"]))) for h in member_history)
+                    total_assist = sum(float(Decimal(str(h["daily_assist"]))) for h in member_history)
+                    total_donation = sum(float(Decimal(str(h["daily_donation"]))) for h in member_history)
+                    total_rank = sum(h["end_rank"] for h in member_history)
+                    period_count = len(member_history)
+
+                    avg_merit = round(total_merit / period_count, 2)
+                    avg_assist = round(total_assist / period_count, 2)
+                    avg_donation = round(total_donation / period_count, 2)
+                    avg_rank = round(total_rank / period_count, 1)
+                else:
+                    # Fallback to latest period data
+                    avg_merit = float(Decimal(str(m["daily_merit"])))
+                    avg_assist = float(Decimal(str(m["daily_assist"])))
+                    avg_donation = float(Decimal(str(m["daily_donation"])))
+                    avg_rank = float(m["end_rank"])
+
+                members.append({
+                    "id": member_id,
+                    "name": m["member_name"],
+                    "contribution_rank": round(avg_rank),  # Season average rank
+                    "daily_merit": avg_merit,
+                    "daily_assist": avg_assist,
+                    "daily_donation": avg_donation,
+                    "power": m["end_power"],  # Power is always latest
+                    "rank_change": None,  # Not applicable for season view
+                    "merit_change": None,  # Not applicable for season view
+                })
+
+            # Calculate season stats from aggregated member data
+            stats = self._calculate_group_stats_from_members(group_name, members)
+
+            return {
+                "stats": stats,
+                "members": members,
+                "trends": trends,
+                "alliance_averages": alliance_averages,
+            }
+
+        # Default: latest period view
+        # Get previous period metrics for merit_change calculation
+        # Use current member_ids to find their previous metrics (regardless of their old group)
+        prev_merit_map: dict[str, float] = {}
+        if len(periods) >= 2:
+            prev_period = periods[-2]
+            current_member_ids = [str(m["member_id"]) for m in group_metrics]
+            prev_metrics = await self._metrics_repo.get_members_metrics_for_periods(
+                current_member_ids, [str(prev_period.id)]
+            )
+            for pm in prev_metrics:
+                prev_merit_map[str(pm["member_id"])] = float(Decimal(str(pm["daily_merit"])))
+
+        # Build members list for latest period
+        members = []
+        for m in group_metrics:
+            member_id = str(m["member_id"])
+            current_merit = float(Decimal(str(m["daily_merit"])))
+            prev_merit = prev_merit_map.get(member_id)
+            merit_change = round(current_merit - prev_merit, 2) if prev_merit is not None else None
+
+            members.append({
+                "id": member_id,
+                "name": m["member_name"],
+                "contribution_rank": m["end_rank"],
+                "daily_merit": current_merit,
+                "daily_assist": float(Decimal(str(m["daily_assist"]))),
+                "daily_donation": float(Decimal(str(m["daily_donation"]))),
+                "power": m["end_power"],
+                "rank_change": m["rank_change"],
+                "merit_change": merit_change,
+            })
+
+        # Calculate group stats from latest period
+        stats = self._calculate_group_stats(group_name, group_metrics)
 
         return {
             "stats": stats,
@@ -507,38 +602,80 @@ class AnalyticsService:
             "alliance_averages": alliance_averages,
         }
 
-    async def get_groups_comparison(self, season_id: UUID) -> list[dict]:
+    async def get_groups_comparison(
+        self, season_id: UUID, view: str = "latest"
+    ) -> list[dict]:
         """
         Get comparison data for all groups in a season.
 
         Args:
             season_id: Season UUID
+            view: 'latest' for latest period data, 'season' for season-weighted average
 
         Returns:
             List of group comparison items sorted by avg_daily_merit descending
         """
-        # Get latest period
+        from collections import defaultdict
+        from decimal import Decimal
+
         periods = await self._period_repo.get_by_season(season_id)
         if not periods:
             return []
 
+        if view == "season":
+            # Calculate season-weighted averages across all periods
+            # group_name -> {total_merit, total_rank, total_member_periods, latest_member_count}
+            group_totals: dict[str, dict] = defaultdict(
+                lambda: {"total_merit": 0.0, "total_rank": 0.0, "total_member_periods": 0, "latest_member_count": 0}
+            )
+
+            for period in periods:
+                metrics = await self._metrics_repo.get_by_period(period.id)
+                # Group metrics by end_group
+                period_groups: dict[str, list] = defaultdict(list)
+                for m in metrics:
+                    group = m.end_group or "未分組"
+                    period_groups[group].append(m)
+
+                for group_name, group_metrics in period_groups.items():
+                    count = len(group_metrics)
+                    avg_merit = sum(float(Decimal(str(m.daily_merit))) for m in group_metrics) / count
+                    avg_rank = sum(m.end_rank for m in group_metrics) / count
+
+                    group_totals[group_name]["total_merit"] += avg_merit * count
+                    group_totals[group_name]["total_rank"] += avg_rank * count
+                    group_totals[group_name]["total_member_periods"] += count
+
+            # Get latest period member counts
+            latest_period = periods[-1]
+            latest_metrics = await self._metrics_repo.get_by_period(latest_period.id)
+            for m in latest_metrics:
+                group = m.end_group or "未分組"
+                group_totals[group]["latest_member_count"] += 1
+
+            # Build result
+            result = []
+            for group_name, totals in group_totals.items():
+                if totals["total_member_periods"] > 0:
+                    result.append({
+                        "name": group_name,
+                        "avg_daily_merit": round(totals["total_merit"] / totals["total_member_periods"], 2),
+                        "avg_rank": round(totals["total_rank"] / totals["total_member_periods"], 1),
+                        "member_count": totals["latest_member_count"],
+                    })
+
+            return sorted(result, key=lambda x: x["avg_daily_merit"], reverse=True)
+
+        # Default: latest period
         latest_period = periods[-1]
-
-        # Get group averages using existing method
         group_averages = await self._metrics_repo.get_group_averages(latest_period.id)
-
-        # Get all metrics for rank calculation
         all_metrics = await self._metrics_repo.get_by_period(latest_period.id)
-
-        # Build group -> avg_rank map
-        from collections import defaultdict
 
         group_ranks: dict[str, list[int]] = defaultdict(list)
         for m in all_metrics:
             group = m.end_group or "未分組"
             group_ranks[group].append(m.end_rank)
 
-        # Build comparison list
         result = []
         for g in group_averages:
             group_name = g["group_name"]
@@ -552,7 +689,6 @@ class AnalyticsService:
                 "member_count": g["member_count"],
             })
 
-        # Sort by avg_daily_merit descending
         return sorted(result, key=lambda x: x["avg_daily_merit"], reverse=True)
 
     def _calculate_group_stats(self, group_name: str, metrics: list[dict]) -> dict:
@@ -587,20 +723,75 @@ class AnalyticsService:
 
         # Calculate quartiles for box plot
         sorted_merits = sorted(merits)
-
-        def percentile(data: list[float], p: float) -> float:
-            """Calculate percentile using linear interpolation"""
-            if not data:
-                return 0.0
-            k = (len(data) - 1) * p
-            f = int(k)
-            c = f + 1 if f + 1 < len(data) else f
-            return data[f] + (data[c] - data[f]) * (k - f)
-
         merit_min = sorted_merits[0] if sorted_merits else 0
-        merit_q1 = percentile(sorted_merits, 0.25)
-        merit_median = percentile(sorted_merits, 0.5)
-        merit_q3 = percentile(sorted_merits, 0.75)
+        merit_q1 = _percentile(sorted_merits, 0.25)
+        merit_median = _percentile(sorted_merits, 0.5)
+        merit_q3 = _percentile(sorted_merits, 0.75)
+        merit_max = sorted_merits[-1] if sorted_merits else 0
+
+        # Coefficient of variation
+        merit_std = stdev(merits) if len(merits) > 1 else 0
+        merit_cv = merit_std / avg_merit if avg_merit > 0 else 0
+
+        return {
+            "group_name": group_name,
+            "member_count": count,
+            "avg_daily_merit": round(avg_merit, 2),
+            "avg_daily_assist": round(avg_assist, 2),
+            "avg_daily_donation": round(avg_donation, 2),
+            "avg_power": round(avg_power, 2),
+            "avg_rank": round(avg_rank, 1),
+            "best_rank": min(ranks),
+            "worst_rank": max(ranks),
+            "merit_min": round(merit_min, 2),
+            "merit_q1": round(merit_q1, 2),
+            "merit_median": round(merit_median, 2),
+            "merit_q3": round(merit_q3, 2),
+            "merit_max": round(merit_max, 2),
+            "merit_cv": round(merit_cv, 3),
+        }
+
+    def _calculate_group_stats_from_members(
+        self, group_name: str, members: list[dict]
+    ) -> dict:
+        """
+        Calculate group statistics from pre-calculated member data.
+
+        Used for season view where members already have aggregated values.
+
+        Args:
+            group_name: Group name
+            members: List of member dicts with daily_merit, daily_assist, etc.
+
+        Returns:
+            GroupStats dict
+        """
+        from statistics import stdev
+
+        count = len(members)
+        if count == 0:
+            return self._empty_group_stats(group_name)
+
+        # Extract values from member dicts
+        merits = [m["daily_merit"] for m in members]
+        assists = [m["daily_assist"] for m in members]
+        donations = [m["daily_donation"] for m in members]
+        powers = [float(m["power"]) for m in members]
+        ranks = [m["contribution_rank"] for m in members]
+
+        # Calculate averages
+        avg_merit = sum(merits) / count
+        avg_assist = sum(assists) / count
+        avg_donation = sum(donations) / count
+        avg_power = sum(powers) / count
+        avg_rank = sum(ranks) / count
+
+        # Calculate quartiles for box plot
+        sorted_merits = sorted(merits)
+        merit_min = sorted_merits[0] if sorted_merits else 0
+        merit_q1 = _percentile(sorted_merits, 0.25)
+        merit_median = _percentile(sorted_merits, 0.5)
+        merit_q3 = _percentile(sorted_merits, 0.75)
         merit_max = sorted_merits[-1] if sorted_merits else 0
 
         # Coefficient of variation
@@ -653,8 +844,10 @@ class AnalyticsService:
             "avg_daily_merit": 0,
             "avg_daily_assist": 0,
             "avg_daily_donation": 0,
+            "avg_power": 0,
             "median_daily_contribution": 0,
             "median_daily_merit": 0,
             "median_daily_assist": 0,
             "median_daily_donation": 0,
+            "median_power": 0,
         }
