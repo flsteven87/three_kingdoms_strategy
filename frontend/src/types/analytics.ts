@@ -127,3 +127,90 @@ export interface AllianceTrendItem {
   readonly avg_daily_assist: number
   readonly avg_daily_donation: number
 }
+
+// =============================================================================
+// Group Analytics Types
+// =============================================================================
+
+/**
+ * Group item for group selector dropdown
+ */
+export interface GroupListItem {
+  readonly name: string
+  readonly member_count: number
+}
+
+/**
+ * Group statistics based on latest period data
+ */
+export interface GroupStats {
+  readonly group_name: string
+  readonly member_count: number
+
+  // Person-day averages (人日均)
+  readonly avg_daily_merit: number
+  readonly avg_daily_assist: number
+  readonly avg_daily_donation: number
+  readonly avg_power: number
+
+  // Rank statistics
+  readonly avg_rank: number
+  readonly best_rank: number
+  readonly worst_rank: number
+
+  // Merit distribution (box plot data)
+  readonly merit_min: number
+  readonly merit_q1: number
+  readonly merit_median: number
+  readonly merit_q3: number
+  readonly merit_max: number
+  readonly merit_cv: number
+}
+
+/**
+ * Member within a group with performance metrics
+ */
+export interface GroupMember {
+  readonly id: string
+  readonly name: string
+  readonly contribution_rank: number
+  readonly daily_merit: number
+  readonly daily_assist: number
+  readonly daily_donation: number
+  readonly power: number
+  readonly rank_change: number | null
+}
+
+/**
+ * Group performance for a single period
+ */
+export interface GroupTrendItem {
+  readonly period_label: string
+  readonly period_number: number
+  readonly start_date: string // ISO date string
+  readonly end_date: string // ISO date string
+  readonly avg_rank: number
+  readonly avg_merit: number
+  readonly avg_assist: number
+  readonly member_count: number
+}
+
+/**
+ * Complete group analytics data (aggregated response)
+ */
+export interface GroupAnalyticsResponse {
+  readonly stats: GroupStats
+  readonly members: readonly GroupMember[]
+  readonly trends: readonly GroupTrendItem[]
+  readonly alliance_averages: AllianceAveragesResponse
+}
+
+/**
+ * Group summary for comparison across all groups
+ */
+export interface GroupComparisonItem {
+  readonly name: string
+  readonly avg_daily_merit: number
+  readonly avg_rank: number
+  readonly member_count: number
+}

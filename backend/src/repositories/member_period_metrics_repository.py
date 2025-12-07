@@ -283,3 +283,137 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
             })
 
         return sorted(averages, key=lambda x: x["avg_daily_contribution"], reverse=True)
+
+    async def get_metrics_by_group_for_period(
+        self, period_id: UUID, group_name: str
+    ) -> list[dict]:
+        """
+        Get all metrics for members in a specific group for a period.
+
+        Args:
+            period_id: Period UUID
+            group_name: Group name to filter by
+
+        Returns:
+            List of metrics with member info
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = (
+            self.client.from_(self.table_name)
+            .select("*, members(id, name)")
+            .eq("period_id", str(period_id))
+            .eq("end_group", group_name)
+            .order("daily_merit", desc=True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Flatten member info
+        for row in data:
+            member_data = row.pop("members", {})
+            row["member_id"] = member_data.get("id", "")
+            row["member_name"] = member_data.get("name", "Unknown")
+
+        return data
+
+    async def get_group_metrics_by_season(
+        self, season_id: UUID, group_name: str
+    ) -> list[dict]:
+        """
+        Get group metrics across all periods in a season.
+
+        Args:
+            season_id: Season UUID
+            group_name: Group name to filter by
+
+        Returns:
+            List of dicts with period info and aggregated group metrics
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        from collections import defaultdict
+        from decimal import Decimal
+
+        # Join with periods to get period info and filter by season
+        result = (
+            self.client.from_(self.table_name)
+            .select(
+                "period_id, end_group, end_rank, daily_merit, daily_assist, "
+                "periods(period_number, start_date, end_date, season_id)"
+            )
+            .eq("end_group", group_name)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Filter by season_id and group by period
+        period_groups: dict[str, list[dict]] = defaultdict(list)
+        period_info: dict[str, dict] = {}
+
+        for row in data:
+            periods_data = row.get("periods", {})
+            if periods_data and str(periods_data.get("season_id")) == str(season_id):
+                period_id = row["period_id"]
+                period_groups[period_id].append(row)
+                if period_id not in period_info:
+                    period_info[period_id] = periods_data
+
+        # Calculate aggregates per period
+        results = []
+        for period_id, metrics in period_groups.items():
+            info = period_info[period_id]
+            count = len(metrics)
+
+            ranks = [m["end_rank"] for m in metrics]
+            merits = [float(Decimal(str(m["daily_merit"]))) for m in metrics]
+            assists = [float(Decimal(str(m["daily_assist"]))) for m in metrics]
+
+            results.append({
+                "period_id": period_id,
+                "period_number": info["period_number"],
+                "start_date": info["start_date"],
+                "end_date": info["end_date"],
+                "member_count": count,
+                "avg_rank": sum(ranks) / count,
+                "avg_merit": sum(merits) / count,
+                "avg_assist": sum(assists) / count,
+            })
+
+        # Sort by period_number
+        return sorted(results, key=lambda x: x["period_number"])
+
+    async def get_all_groups_for_period(self, period_id: UUID) -> list[dict]:
+        """
+        Get unique groups and their member counts for a period.
+
+        Args:
+            period_id: Period UUID
+
+        Returns:
+            List of dicts with group name and member count
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        from collections import Counter
+
+        result = (
+            self.client.from_(self.table_name)
+            .select("end_group")
+            .eq("period_id", str(period_id))
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Count members per group
+        group_counts = Counter(
+            row.get("end_group") or "未分組" for row in data
+        )
+
+        return [
+            {"name": name, "member_count": count}
+            for name, count in sorted(group_counts.items(), key=lambda x: -x[1])
+        ]

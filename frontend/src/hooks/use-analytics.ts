@@ -35,7 +35,15 @@ export const analyticsKeys = {
   periodAverage: (periodId: string) => [...analyticsKeys.periodAverages(), periodId] as const,
 
   // Alliance trend
-  allianceTrend: (seasonId: string) => [...analyticsKeys.all, 'alliance-trend', seasonId] as const
+  allianceTrend: (seasonId: string) => [...analyticsKeys.all, 'alliance-trend', seasonId] as const,
+
+  // Group analytics
+  groups: () => [...analyticsKeys.all, 'groups'] as const,
+  groupsList: (seasonId: string) => [...analyticsKeys.groups(), 'list', seasonId] as const,
+  groupAnalytics: (groupName: string, seasonId: string) =>
+    [...analyticsKeys.groups(), 'detail', groupName, seasonId] as const,
+  groupsComparison: (seasonId: string) =>
+    [...analyticsKeys.groups(), 'comparison', seasonId] as const
 }
 
 /**
@@ -93,6 +101,49 @@ export function useAllianceTrend(seasonId: string | undefined) {
   return useQuery({
     queryKey: analyticsKeys.allianceTrend(seasonId ?? ''),
     queryFn: () => apiClient.getAllianceTrend(seasonId!),
+    enabled: !!seasonId,
+    staleTime: 5 * 60 * 1000
+  })
+}
+
+// =============================================================================
+// Group Analytics Hooks
+// =============================================================================
+
+/**
+ * Hook to fetch list of all groups with member counts
+ */
+export function useGroups(seasonId: string | undefined) {
+  return useQuery({
+    queryKey: analyticsKeys.groupsList(seasonId ?? ''),
+    queryFn: () => apiClient.getGroups(seasonId!),
+    enabled: !!seasonId,
+    staleTime: 5 * 60 * 1000
+  })
+}
+
+/**
+ * Hook to fetch complete analytics for a specific group
+ */
+export function useGroupAnalytics(
+  groupName: string | undefined,
+  seasonId: string | undefined
+) {
+  return useQuery({
+    queryKey: analyticsKeys.groupAnalytics(groupName ?? '', seasonId ?? ''),
+    queryFn: () => apiClient.getGroupAnalytics(groupName!, seasonId!),
+    enabled: !!groupName && !!seasonId,
+    staleTime: 2 * 60 * 1000 // 2 minutes - group data may change frequently
+  })
+}
+
+/**
+ * Hook to fetch comparison data for all groups
+ */
+export function useGroupsComparison(seasonId: string | undefined) {
+  return useQuery({
+    queryKey: analyticsKeys.groupsComparison(seasonId ?? ''),
+    queryFn: () => apiClient.getGroupsComparison(seasonId!),
     enabled: !!seasonId,
     staleTime: 5 * 60 * 1000
   })

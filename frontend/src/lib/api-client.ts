@@ -30,7 +30,10 @@ import type {
   MemberTrendItem,
   SeasonSummaryResponse,
   AllianceAveragesResponse,
-  AllianceTrendItem
+  AllianceTrendItem,
+  GroupListItem,
+  GroupAnalyticsResponse,
+  GroupComparisonItem
 } from '@/types/analytics'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087'
@@ -437,6 +440,47 @@ class ApiClient {
     const response = await this.client.get<AllianceTrendItem[]>('/api/v1/analytics/alliance/trend', {
       params: { season_id: seasonId }
     })
+    return response.data
+  }
+
+  // ==================== Group Analytics API ====================
+
+  /**
+   * Get list of all groups with member counts
+   */
+  async getGroups(seasonId: string): Promise<GroupListItem[]> {
+    const response = await this.client.get<GroupListItem[]>('/api/v1/analytics/groups', {
+      params: { season_id: seasonId }
+    })
+    return response.data
+  }
+
+  /**
+   * Get complete analytics for a specific group
+   */
+  async getGroupAnalytics(
+    groupName: string,
+    seasonId: string
+  ): Promise<GroupAnalyticsResponse> {
+    const response = await this.client.get<GroupAnalyticsResponse>(
+      `/api/v1/analytics/groups/${encodeURIComponent(groupName)}`,
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data
+  }
+
+  /**
+   * Get comparison data for all groups
+   */
+  async getGroupsComparison(seasonId: string): Promise<GroupComparisonItem[]> {
+    const response = await this.client.get<GroupComparisonItem[]>(
+      '/api/v1/analytics/groups/comparison',
+      {
+        params: { season_id: seasonId }
+      }
+    )
     return response.data
   }
 }

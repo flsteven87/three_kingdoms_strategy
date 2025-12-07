@@ -189,3 +189,99 @@ class MemberComparisonResponse(BaseModel):
     alliance_avg: AllianceMetricsAverage = Field(..., description="Alliance averages")
     alliance_median: AllianceMetricsMedian = Field(..., description="Alliance medians")
     total_members: int = Field(..., ge=0, description="Total members in comparison")
+
+
+# ============================================================================
+# Group Analytics Schemas
+# ============================================================================
+
+
+class GroupListItem(BaseModel):
+    """Group item for group selector dropdown"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str = Field(..., description="Group name")
+    member_count: int = Field(..., ge=0, description="Number of members in group")
+
+
+class GroupStats(BaseModel):
+    """Group statistics based on latest period data"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    group_name: str = Field(..., description="Group name")
+    member_count: int = Field(..., ge=0, description="Number of members")
+
+    # Person-day averages (人日均 - core comparison metrics)
+    avg_daily_merit: float = Field(..., ge=0, description="Average daily merit per member")
+    avg_daily_assist: float = Field(..., ge=0, description="Average daily assist per member")
+    avg_daily_donation: float = Field(..., ge=0, description="Average daily donation per member")
+    avg_power: float = Field(..., ge=0, description="Average power per member")
+
+    # Rank statistics
+    avg_rank: float = Field(..., description="Average contribution rank")
+    best_rank: int = Field(..., ge=1, description="Best (lowest) rank in group")
+    worst_rank: int = Field(..., ge=1, description="Worst (highest) rank in group")
+
+    # Merit distribution (box plot data)
+    merit_min: float = Field(..., ge=0, description="Minimum daily merit")
+    merit_q1: float = Field(..., ge=0, description="First quartile (25th percentile)")
+    merit_median: float = Field(..., ge=0, description="Median (50th percentile)")
+    merit_q3: float = Field(..., ge=0, description="Third quartile (75th percentile)")
+    merit_max: float = Field(..., ge=0, description="Maximum daily merit")
+    merit_cv: float = Field(..., ge=0, description="Coefficient of variation (std/mean)")
+
+
+class GroupMember(BaseModel):
+    """Member within a group with performance metrics"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str = Field(..., description="Member UUID as string")
+    name: str = Field(..., description="Member display name")
+    contribution_rank: int = Field(..., ge=1, description="Current contribution rank")
+    daily_merit: float = Field(..., ge=0, description="Daily average merit")
+    daily_assist: float = Field(..., ge=0, description="Daily average assist")
+    daily_donation: float = Field(..., ge=0, description="Daily average donation")
+    power: int = Field(..., ge=0, description="Current power value")
+    rank_change: int | None = Field(None, description="Rank change from previous period")
+
+
+class GroupTrendItem(BaseModel):
+    """Group performance for a single period"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    period_label: str = Field(..., description="Display label (e.g., '10/02-10/09')")
+    period_number: int = Field(..., ge=1, description="Period number within season")
+    start_date: date = Field(..., description="Period start date")
+    end_date: date = Field(..., description="Period end date")
+    avg_rank: float = Field(..., description="Average contribution rank for period")
+    avg_merit: float = Field(..., ge=0, description="Average daily merit for period")
+    avg_assist: float = Field(..., ge=0, description="Average daily assist for period")
+    member_count: int = Field(..., ge=0, description="Number of members in group for period")
+
+
+class GroupAnalyticsResponse(BaseModel):
+    """Complete group analytics data (aggregated response)"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    stats: GroupStats = Field(..., description="Group statistics from latest period")
+    members: list[GroupMember] = Field(..., description="Members in the group")
+    trends: list[GroupTrendItem] = Field(..., description="Performance trend by period")
+    alliance_averages: AllianceAveragesResponse = Field(
+        ..., description="Alliance averages for comparison baseline"
+    )
+
+
+class GroupComparisonItem(BaseModel):
+    """Group summary for comparison across all groups"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str = Field(..., description="Group name")
+    avg_daily_merit: float = Field(..., ge=0, description="Average daily merit")
+    avg_rank: float = Field(..., description="Average contribution rank")
+    member_count: int = Field(..., ge=0, description="Number of members")

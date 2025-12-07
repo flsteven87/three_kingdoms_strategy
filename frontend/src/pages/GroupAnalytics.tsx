@@ -32,6 +32,8 @@ import {
   BarChart3,
   Trophy,
   Users,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import {
   Radar,
@@ -62,279 +64,29 @@ import {
   getPeriodBoundaryTicks,
   formatDateLabel,
 } from '@/lib/chart-utils'
+import { useActiveSeason } from '@/hooks/use-seasons'
+import {
+  useGroups,
+  useGroupAnalytics,
+  useGroupsComparison,
+} from '@/hooks/use-analytics'
+import type {
+  GroupStats,
+  GroupMember,
+  GroupTrendItem,
+  GroupComparisonItem,
+  AllianceAveragesResponse,
+} from '@/types/analytics'
 
 // ============================================================================
-// Types - Based on calculable metrics only
+// Types
 // ============================================================================
-
-interface GroupOption {
-  readonly id: string
-  readonly name: string
-  readonly memberCount: number
-}
-
-/**
- * Group statistics based on actual calculable data.
- * All metrics derived from member_period_metrics aggregation.
- */
-interface GroupStats {
-  readonly group_name: string
-  readonly member_count: number
-
-  // Person-day averages (core comparison metrics)
-  readonly avg_daily_merit: number
-  readonly avg_daily_assist: number
-  readonly avg_daily_donation: number
-  readonly avg_power: number
-
-  // Rank statistics
-  readonly avg_rank: number
-  readonly best_rank: number // min rank (best performing member)
-  readonly worst_rank: number // max rank (lowest performing member)
-
-  // Merit distribution statistics (for box plot)
-  readonly merit_min: number
-  readonly merit_q1: number
-  readonly merit_median: number
-  readonly merit_q3: number
-  readonly merit_max: number
-  readonly merit_cv: number // Coefficient of variation = std / mean
-}
 
 interface TierBreakdown {
   readonly tier: string
   readonly count: number
   readonly percentage: number
   readonly avg_merit: number
-}
-
-interface GroupMember {
-  readonly id: string
-  readonly name: string
-  readonly contribution_rank: number
-  readonly daily_merit: number
-  readonly daily_assist: number
-  readonly daily_donation: number
-  readonly power: number
-  readonly rank_change: number | null
-}
-
-interface PeriodTrend {
-  readonly period_label: string
-  readonly period_number: number
-  readonly start_date: string
-  readonly end_date: string
-  readonly avg_rank: number
-  readonly avg_merit: number
-  readonly avg_assist: number
-  readonly member_count: number
-}
-
-// ============================================================================
-// Mock Data - Realistic values based on actual metrics
-// ============================================================================
-
-const MOCK_GROUPS: readonly GroupOption[] = [
-  { id: '1', name: '狼王特戰', memberCount: 28 },
-  { id: '2', name: '墨組', memberCount: 25 },
-  { id: '3', name: '隼隼組', memberCount: 24 },
-  { id: '4', name: '紅隊', memberCount: 26 },
-  { id: '5', name: '飛鳳營', memberCount: 23 },
-  { id: '6', name: '虎賁軍', memberCount: 27 },
-  { id: '7', name: '青龍隊', memberCount: 22 },
-  { id: '8', name: '玄武組', memberCount: 24 },
-]
-
-// Alliance-wide averages for comparison baseline
-const ALLIANCE_AVG = {
-  avg_rank: 100,
-  daily_merit: 12000,
-  daily_assist: 85,
-  daily_donation: 180000,
-  power: 2500000,
-}
-
-const MOCK_GROUP_STATS: Record<string, GroupStats> = {
-  '1': {
-    group_name: '狼王特戰',
-    member_count: 28,
-    avg_daily_merit: 15200,
-    avg_daily_assist: 98,
-    avg_daily_donation: 195000,
-    avg_power: 2850000,
-    avg_rank: 42,
-    best_rank: 3,
-    worst_rank: 156,
-    merit_min: 5200,
-    merit_q1: 11000,
-    merit_median: 14500,
-    merit_q3: 18500,
-    merit_max: 28000,
-    merit_cv: 0.32,
-  },
-  '2': {
-    group_name: '墨組',
-    member_count: 25,
-    avg_daily_merit: 13100,
-    avg_daily_assist: 82,
-    avg_daily_donation: 175000,
-    avg_power: 2650000,
-    avg_rank: 58,
-    best_rank: 8,
-    worst_rank: 142,
-    merit_min: 4800,
-    merit_q1: 9500,
-    merit_median: 12800,
-    merit_q3: 16200,
-    merit_max: 24000,
-    merit_cv: 0.28,
-  },
-  '3': {
-    group_name: '隼隼組',
-    member_count: 24,
-    avg_daily_merit: 12400,
-    avg_daily_assist: 78,
-    avg_daily_donation: 168000,
-    avg_power: 2450000,
-    avg_rank: 65,
-    best_rank: 12,
-    worst_rank: 168,
-    merit_min: 4200,
-    merit_q1: 8800,
-    merit_median: 11800,
-    merit_q3: 15200,
-    merit_max: 22500,
-    merit_cv: 0.35,
-  },
-}
-
-// Generate default stats for groups without specific data
-function getGroupStats(groupId: string): GroupStats {
-  if (MOCK_GROUP_STATS[groupId]) {
-    return MOCK_GROUP_STATS[groupId]
-  }
-  const group = MOCK_GROUPS.find((g) => g.id === groupId)
-  return {
-    group_name: group?.name ?? '未知組別',
-    member_count: group?.memberCount ?? 20,
-    avg_daily_merit: 10000 + Math.floor(Math.random() * 3000),
-    avg_daily_assist: 70 + Math.floor(Math.random() * 20),
-    avg_daily_donation: 160000 + Math.floor(Math.random() * 30000),
-    avg_power: 2200000 + Math.floor(Math.random() * 400000),
-    avg_rank: 80 + Math.floor(Math.random() * 40),
-    best_rank: 15 + Math.floor(Math.random() * 20),
-    worst_rank: 150 + Math.floor(Math.random() * 40),
-    merit_min: 4000,
-    merit_q1: 8000,
-    merit_median: 11000,
-    merit_q3: 14000,
-    merit_max: 20000,
-    merit_cv: 0.30,
-  }
-}
-
-// Tier breakdown: based on within-group relative position
-function generateTierBreakdown(stats: GroupStats): TierBreakdown[] {
-  const count = stats.member_count
-  const topCount = Math.round(count * 0.2)
-  const botCount = Math.round(count * 0.2)
-  const midCount = count - topCount - botCount
-
-  return [
-    {
-      tier: 'Top 20%',
-      count: topCount,
-      percentage: Math.round((topCount / count) * 100),
-      avg_merit: Math.round(stats.merit_q3 + (stats.merit_max - stats.merit_q3) * 0.5),
-    },
-    {
-      tier: 'Mid 60%',
-      count: midCount,
-      percentage: Math.round((midCount / count) * 100),
-      avg_merit: stats.merit_median,
-    },
-    {
-      tier: 'Bot 20%',
-      count: botCount,
-      percentage: Math.round((botCount / count) * 100),
-      avg_merit: Math.round(stats.merit_q1 - (stats.merit_q1 - stats.merit_min) * 0.3),
-    },
-  ]
-}
-
-// Period trends mock data
-const MOCK_PERIOD_TRENDS: Record<string, PeriodTrend[]> = {
-  '1': [
-    { period_label: '10/02-09', period_number: 1, start_date: '2024-10-02', end_date: '2024-10-09', avg_rank: 48, avg_merit: 14200, avg_assist: 92, member_count: 28 },
-    { period_label: '10/09-16', period_number: 2, start_date: '2024-10-09', end_date: '2024-10-16', avg_rank: 45, avg_merit: 14600, avg_assist: 95, member_count: 28 },
-    { period_label: '10/16-23', period_number: 3, start_date: '2024-10-16', end_date: '2024-10-23', avg_rank: 43, avg_merit: 14900, avg_assist: 96, member_count: 28 },
-    { period_label: '10/23-30', period_number: 4, start_date: '2024-10-23', end_date: '2024-10-30', avg_rank: 42, avg_merit: 15200, avg_assist: 98, member_count: 28 },
-  ],
-  '2': [
-    { period_label: '10/02-09', period_number: 1, start_date: '2024-10-02', end_date: '2024-10-09', avg_rank: 62, avg_merit: 12200, avg_assist: 78, member_count: 25 },
-    { period_label: '10/09-16', period_number: 2, start_date: '2024-10-09', end_date: '2024-10-16', avg_rank: 60, avg_merit: 12600, avg_assist: 80, member_count: 25 },
-    { period_label: '10/16-23', period_number: 3, start_date: '2024-10-16', end_date: '2024-10-23', avg_rank: 59, avg_merit: 12850, avg_assist: 81, member_count: 25 },
-    { period_label: '10/23-30', period_number: 4, start_date: '2024-10-23', end_date: '2024-10-30', avg_rank: 58, avg_merit: 13100, avg_assist: 82, member_count: 25 },
-  ],
-  '3': [
-    { period_label: '10/02-09', period_number: 1, start_date: '2024-10-02', end_date: '2024-10-09', avg_rank: 72, avg_merit: 11500, avg_assist: 72, member_count: 24 },
-    { period_label: '10/09-16', period_number: 2, start_date: '2024-10-09', end_date: '2024-10-16', avg_rank: 69, avg_merit: 11900, avg_assist: 74, member_count: 24 },
-    { period_label: '10/16-23', period_number: 3, start_date: '2024-10-16', end_date: '2024-10-23', avg_rank: 67, avg_merit: 12150, avg_assist: 76, member_count: 24 },
-    { period_label: '10/23-30', period_number: 4, start_date: '2024-10-23', end_date: '2024-10-30', avg_rank: 65, avg_merit: 12400, avg_assist: 78, member_count: 24 },
-  ],
-}
-
-function getPeriodTrends(groupId: string): PeriodTrend[] {
-  return MOCK_PERIOD_TRENDS[groupId] ?? MOCK_PERIOD_TRENDS['1']
-}
-
-// Group members mock data
-const MOCK_GROUP_MEMBERS: Record<string, GroupMember[]> = {
-  '1': [
-    { id: '1', name: '大地英豪', contribution_rank: 3, daily_merit: 28000, daily_assist: 145, daily_donation: 320000, power: 4200000, rank_change: 2 },
-    { id: '2', name: '委皇叔', contribution_rank: 5, daily_merit: 25500, daily_assist: 132, daily_donation: 295000, power: 3950000, rank_change: 1 },
-    { id: '3', name: '小沐沐', contribution_rank: 8, daily_merit: 24200, daily_assist: 128, daily_donation: 280000, power: 3800000, rank_change: null },
-    { id: '4', name: '胖丨噴泡包', contribution_rank: 12, daily_merit: 22100, daily_assist: 118, daily_donation: 265000, power: 3650000, rank_change: -1 },
-    { id: '5', name: '胖丨冬甩', contribution_rank: 18, daily_merit: 19800, daily_assist: 108, daily_donation: 245000, power: 3400000, rank_change: 3 },
-    { id: '6', name: '桃丨筍', contribution_rank: 22, daily_merit: 18200, daily_assist: 102, daily_donation: 228000, power: 3200000, rank_change: 0 },
-    { id: '7', name: '黑衫子龍', contribution_rank: 35, daily_merit: 15100, daily_assist: 95, daily_donation: 205000, power: 2900000, rank_change: 2 },
-    { id: '8', name: '喜馬拉雅星', contribution_rank: 48, daily_merit: 13800, daily_assist: 88, daily_donation: 188000, power: 2650000, rank_change: -2 },
-    { id: '9', name: '戰神阿瑞斯', contribution_rank: 62, daily_merit: 11500, daily_assist: 82, daily_donation: 172000, power: 2400000, rank_change: 1 },
-    { id: '10', name: '夜行者', contribution_rank: 78, daily_merit: 9200, daily_assist: 75, daily_donation: 155000, power: 2150000, rank_change: -3 },
-    { id: '11', name: '風行者', contribution_rank: 125, daily_merit: 6500, daily_assist: 42, daily_donation: 125000, power: 1800000, rank_change: -5 },
-    { id: '12', name: '新手小將', contribution_rank: 156, daily_merit: 5200, daily_assist: 35, daily_donation: 98000, power: 1450000, rank_change: null },
-  ],
-  '2': [
-    { id: '13', name: '墨染天涯', contribution_rank: 8, daily_merit: 24000, daily_assist: 120, daily_donation: 275000, power: 3750000, rank_change: 1 },
-    { id: '14', name: '墨舞', contribution_rank: 15, daily_merit: 21500, daily_assist: 112, daily_donation: 258000, power: 3550000, rank_change: 2 },
-    { id: '15', name: '墨客', contribution_rank: 52, daily_merit: 12800, daily_assist: 85, daily_donation: 178000, power: 2550000, rank_change: 0 },
-    { id: '16', name: '墨魂', contribution_rank: 75, daily_merit: 10500, daily_assist: 78, daily_donation: 162000, power: 2280000, rank_change: -1 },
-    { id: '17', name: '墨香', contribution_rank: 142, daily_merit: 6200, daily_assist: 38, daily_donation: 112000, power: 1680000, rank_change: -3 },
-  ],
-  '3': [
-    { id: '18', name: '隼鷹', contribution_rank: 12, daily_merit: 22500, daily_assist: 115, daily_donation: 262000, power: 3620000, rank_change: 3 },
-    { id: '19', name: '隼風', contribution_rank: 20, daily_merit: 19800, daily_assist: 105, daily_donation: 242000, power: 3380000, rank_change: 1 },
-    { id: '20', name: '隼翔', contribution_rank: 68, daily_merit: 10000, daily_assist: 72, daily_donation: 158000, power: 2350000, rank_change: -2 },
-    { id: '21', name: '隼飛', contribution_rank: 85, daily_merit: 8200, daily_assist: 65, daily_donation: 145000, power: 2080000, rank_change: 0 },
-    { id: '22', name: '隼羽', contribution_rank: 168, daily_merit: 4200, daily_assist: 28, daily_donation: 85000, power: 1320000, rank_change: -4 },
-  ],
-}
-
-function getGroupMembers(groupId: string): GroupMember[] {
-  return MOCK_GROUP_MEMBERS[groupId] ?? MOCK_GROUP_MEMBERS['1']
-}
-
-// All groups comparison data (sorted by merit)
-function getAllGroupsComparison(): Array<{ name: string; merit: number; avgRank: number; memberCount: number }> {
-  return MOCK_GROUPS.map((group) => {
-    const stats = getGroupStats(group.id)
-    return {
-      name: group.name,
-      merit: stats.avg_daily_merit,
-      avgRank: stats.avg_rank,
-      memberCount: stats.member_count,
-    }
-  }).sort((a, b) => b.merit - a.merit)
 }
 
 // ============================================================================
@@ -407,7 +159,7 @@ function getTierBgClass(tierIndex: number): string {
   return '' // Mid
 }
 
-function getMemberTier(member: GroupMember, members: GroupMember[]): 'top' | 'mid' | 'bottom' {
+function getMemberTier(member: GroupMember, members: readonly GroupMember[]): 'top' | 'mid' | 'bottom' {
   const sorted = [...members].sort((a, b) => b.daily_merit - a.daily_merit)
   const index = sorted.findIndex((m) => m.id === member.id)
   const topThreshold = Math.floor(members.length * 0.2)
@@ -429,16 +181,46 @@ function getTierBgColor(tier: 'top' | 'mid' | 'bottom'): string {
   }
 }
 
+// Generate tier breakdown from group stats
+function generateTierBreakdown(stats: GroupStats): TierBreakdown[] {
+  const count = stats.member_count
+  const topCount = Math.round(count * 0.2)
+  const botCount = Math.round(count * 0.2)
+  const midCount = count - topCount - botCount
+
+  return [
+    {
+      tier: 'Top 20%',
+      count: topCount,
+      percentage: Math.round((topCount / count) * 100),
+      avg_merit: Math.round(stats.merit_q3 + (stats.merit_max - stats.merit_q3) * 0.5),
+    },
+    {
+      tier: 'Mid 60%',
+      count: midCount,
+      percentage: Math.round((midCount / count) * 100),
+      avg_merit: stats.merit_median,
+    },
+    {
+      tier: 'Bot 20%',
+      count: botCount,
+      percentage: Math.round((botCount / count) * 100),
+      avg_merit: Math.round(stats.merit_q1 - (stats.merit_q1 - stats.merit_min) * 0.3),
+    },
+  ]
+}
+
 // ============================================================================
 // Tab 1: Overview
 // ============================================================================
 
 interface OverviewTabProps {
   readonly groupStats: GroupStats
-  readonly allGroupsData: ReturnType<typeof getAllGroupsComparison>
+  readonly allianceAverages: AllianceAveragesResponse
+  readonly allGroupsData: readonly GroupComparisonItem[]
 }
 
-function OverviewTab({ groupStats, allGroupsData }: OverviewTabProps) {
+function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTabProps) {
   // Capability radar data: normalized to alliance average (100 = alliance average)
   const radarData = useMemo(() => {
     const normalize = (value: number, avg: number) => (avg > 0 ? Math.round((value / avg) * 100) : 0)
@@ -446,37 +228,48 @@ function OverviewTab({ groupStats, allGroupsData }: OverviewTabProps) {
     return [
       {
         metric: '戰功',
-        group: normalize(groupStats.avg_daily_merit, ALLIANCE_AVG.daily_merit),
+        group: normalize(groupStats.avg_daily_merit, allianceAverages.avg_daily_merit),
         groupRaw: groupStats.avg_daily_merit,
         alliance: 100,
-        allianceRaw: ALLIANCE_AVG.daily_merit,
+        allianceRaw: allianceAverages.avg_daily_merit,
       },
       {
         metric: '助攻',
-        group: normalize(groupStats.avg_daily_assist, ALLIANCE_AVG.daily_assist),
+        group: normalize(groupStats.avg_daily_assist, allianceAverages.avg_daily_assist),
         groupRaw: groupStats.avg_daily_assist,
         alliance: 100,
-        allianceRaw: ALLIANCE_AVG.daily_assist,
+        allianceRaw: allianceAverages.avg_daily_assist,
       },
       {
         metric: '捐獻',
-        group: normalize(groupStats.avg_daily_donation, ALLIANCE_AVG.daily_donation),
+        group: normalize(groupStats.avg_daily_donation, allianceAverages.avg_daily_donation),
         groupRaw: groupStats.avg_daily_donation,
         alliance: 100,
-        allianceRaw: ALLIANCE_AVG.daily_donation,
+        allianceRaw: allianceAverages.avg_daily_donation,
       },
       {
         metric: '勢力值',
-        group: normalize(groupStats.avg_power, ALLIANCE_AVG.power),
+        group: normalize(groupStats.avg_power, allianceAverages.avg_daily_contribution * 100), // Use contribution as power proxy
         groupRaw: groupStats.avg_power,
         alliance: 100,
-        allianceRaw: ALLIANCE_AVG.power,
+        allianceRaw: allianceAverages.avg_daily_contribution * 100,
       },
     ]
-  }, [groupStats])
+  }, [groupStats, allianceAverages])
 
-  const meritDiff = calculatePercentDiff(groupStats.avg_daily_merit, ALLIANCE_AVG.daily_merit)
-  const assistDiff = calculatePercentDiff(groupStats.avg_daily_assist, ALLIANCE_AVG.daily_assist)
+  const meritDiff = calculatePercentDiff(groupStats.avg_daily_merit, allianceAverages.avg_daily_merit)
+  const assistDiff = calculatePercentDiff(groupStats.avg_daily_assist, allianceAverages.avg_daily_assist)
+
+  // Transform comparison data for chart
+  const chartData = useMemo(() =>
+    allGroupsData.map(g => ({
+      name: g.name,
+      merit: g.avg_daily_merit,
+      avgRank: g.avg_rank,
+      memberCount: g.member_count,
+    })),
+    [allGroupsData]
+  )
 
   return (
     <div className="space-y-6">
@@ -500,8 +293,8 @@ function OverviewTab({ groupStats, allGroupsData }: OverviewTabProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold tabular-nums">
-              #{groupStats.avg_rank}
-              <span className="text-base font-normal text-muted-foreground ml-1">/ 201</span>
+              #{Math.round(groupStats.avg_rank)}
+              <span className="text-base font-normal text-muted-foreground ml-1">/ {allianceAverages.member_count}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               最佳 #{groupStats.best_rank} · 最差 #{groupStats.worst_rank}
@@ -619,7 +412,7 @@ function OverviewTab({ groupStats, allGroupsData }: OverviewTabProps) {
           </CardHeader>
           <CardContent>
             <ChartContainer config={meritBarConfig} className="h-[280px] w-full">
-              <BarChart data={allGroupsData} layout="vertical" margin={{ left: 80, right: 20 }}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 80, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
                 <XAxis
                   type="number"
@@ -639,19 +432,19 @@ function OverviewTab({ groupStats, allGroupsData }: OverviewTabProps) {
                 <ChartTooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null
-                    const data = payload[0].payload as (typeof allGroupsData)[0]
+                    const data = payload[0].payload as (typeof chartData)[0]
                     return (
                       <div className="rounded-lg border bg-background p-2 shadow-sm">
                         <div className="font-medium">{data.name}</div>
                         <div className="text-sm">人日均戰功: {formatNumber(data.merit)}</div>
-                        <div className="text-sm text-muted-foreground">平均排名: #{data.avgRank}</div>
+                        <div className="text-sm text-muted-foreground">平均排名: #{Math.round(data.avgRank)}</div>
                         <div className="text-sm text-muted-foreground">成員數: {data.memberCount}</div>
                       </div>
                     )
                   }}
                 />
                 <Bar dataKey="merit" radius={[0, 4, 4, 0]}>
-                  {allGroupsData.map((entry) => (
+                  {chartData.map((entry) => (
                     <Cell
                       key={entry.name}
                       fill={entry.name === groupStats.group_name ? 'var(--primary)' : 'var(--muted)'}
@@ -674,7 +467,7 @@ function OverviewTab({ groupStats, allGroupsData }: OverviewTabProps) {
 interface MeritDistributionTabProps {
   readonly groupStats: GroupStats
   readonly tierBreakdown: TierBreakdown[]
-  readonly periodTrends: PeriodTrend[]
+  readonly periodTrends: readonly GroupTrendItem[]
 }
 
 function MeritDistributionTab({ groupStats, tierBreakdown, periodTrends }: MeritDistributionTabProps) {
@@ -938,8 +731,8 @@ function MeritDistributionTab({ groupStats, tierBreakdown, periodTrends }: Merit
 
 interface ContributionRankTabProps {
   readonly groupStats: GroupStats
-  readonly periodTrends: PeriodTrend[]
-  readonly members: GroupMember[]
+  readonly periodTrends: readonly GroupTrendItem[]
+  readonly members: readonly GroupMember[]
 }
 
 function ContributionRankTab({ groupStats, periodTrends, members }: ContributionRankTabProps) {
@@ -990,8 +783,7 @@ function ContributionRankTab({ groupStats, periodTrends, members }: Contribution
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold tabular-nums">#{groupStats.avg_rank}</span>
-              <span className="text-muted-foreground">/ 201人</span>
+              <span className="text-4xl font-bold tabular-nums">#{Math.round(groupStats.avg_rank)}</span>
             </div>
             <div className="flex items-center gap-4 mt-2">
               <div className="flex items-center gap-1">
@@ -1002,7 +794,7 @@ function ContributionRankTab({ groupStats, periodTrends, members }: Contribution
                 )}
                 <span className={`text-sm ${rankImprovement >= 0 ? 'text-primary' : 'text-destructive'}`}>
                   {rankImprovement >= 0 ? '+' : ''}
-                  {rankImprovement} 名 本賽季
+                  {Math.round(rankImprovement)} 名 本賽季
                 </span>
               </div>
             </div>
@@ -1064,7 +856,7 @@ function ContributionRankTab({ groupStats, periodTrends, members }: Contribution
                     return (
                       <div className="rounded-lg border bg-background p-2 shadow-sm">
                         <div className="font-medium">{data.dateLabel}</div>
-                        <div className="text-sm">平均排名: #{data.avgRank}</div>
+                        <div className="text-sm">平均排名: #{Math.round(data.avgRank)}</div>
                       </div>
                     )
                   }}
@@ -1141,19 +933,19 @@ function ContributionRankTab({ groupStats, periodTrends, members }: Contribution
                   return (
                     <tr key={d.period_number} className="border-b last:border-0">
                       <td className="py-2 px-2 text-muted-foreground">{d.period_label}</td>
-                      <td className="py-2 px-2 text-right tabular-nums font-medium">#{d.avg_rank}</td>
+                      <td className="py-2 px-2 text-right tabular-nums font-medium">#{Math.round(d.avg_rank)}</td>
                       <td className="py-2 px-2 text-right">
                         {rankChange !== null ? (
                           <span className={rankChange >= 0 ? 'text-primary' : 'text-destructive'}>
                             {rankChange >= 0 ? '+' : ''}
-                            {rankChange}
+                            {Math.round(rankChange)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                       <td className="py-2 px-2 text-right tabular-nums">{formatNumber(d.avg_merit)}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">{d.avg_assist}</td>
+                      <td className="py-2 px-2 text-right tabular-nums">{Math.round(d.avg_assist)}</td>
                       <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{d.member_count}</td>
                     </tr>
                   )
@@ -1172,7 +964,7 @@ function ContributionRankTab({ groupStats, periodTrends, members }: Contribution
 // ============================================================================
 
 interface MembersTabProps {
-  readonly members: GroupMember[]
+  readonly members: readonly GroupMember[]
 }
 
 function MembersTab({ members }: MembersTabProps) {
@@ -1307,7 +1099,7 @@ function MembersTab({ members }: MembersTabProps) {
                       <td className="py-2 px-2 font-medium">{member.name}</td>
                       <td className="py-2 px-2 text-right tabular-nums">#{member.contribution_rank}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{formatNumber(member.daily_merit)}</td>
-                      <td className="py-2 px-2 text-right tabular-nums">{member.daily_assist}</td>
+                      <td className="py-2 px-2 text-right tabular-nums">{Math.round(member.daily_assist)}</td>
                       <td className="py-2 px-2 text-right">
                         <RankChangeIndicator change={member.rank_change} showNewLabel={false} />
                       </td>
@@ -1328,18 +1120,67 @@ function MembersTab({ members }: MembersTabProps) {
 // ============================================================================
 
 function GroupAnalytics() {
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(MOCK_GROUPS[0].id)
+  const [selectedGroupName, setSelectedGroupName] = useState<string>('')
   const [activeTab, setActiveTab] = useState('overview')
 
-  const selectedGroup = useMemo(() => {
-    return MOCK_GROUPS.find((g) => g.id === selectedGroupId)
-  }, [selectedGroupId])
+  // Get active season
+  const { data: activeSeason, isLoading: isSeasonLoading } = useActiveSeason()
+  const seasonId = activeSeason?.id
 
-  const groupStats = useMemo(() => getGroupStats(selectedGroupId), [selectedGroupId])
-  const tierBreakdown = useMemo(() => generateTierBreakdown(groupStats), [groupStats])
-  const periodTrends = useMemo(() => getPeriodTrends(selectedGroupId), [selectedGroupId])
-  const groupMembers = useMemo(() => getGroupMembers(selectedGroupId), [selectedGroupId])
-  const allGroupsData = useMemo(() => getAllGroupsComparison(), [])
+  // Fetch groups list
+  const { data: groups, isLoading: isGroupsLoading } = useGroups(seasonId)
+
+  // Auto-select first group when groups load
+  const firstGroupName = groups?.[0]?.name
+  const effectiveGroupName = selectedGroupName || firstGroupName || ''
+
+  // Fetch group analytics (only when group and season are available)
+  const {
+    data: groupData,
+    isLoading: isGroupLoading,
+    error: groupError,
+  } = useGroupAnalytics(effectiveGroupName || undefined, seasonId)
+
+  // Fetch groups comparison
+  const { data: groupsComparison } = useGroupsComparison(seasonId)
+
+  // Derived data
+  const groupStats = groupData?.stats
+  const groupMembers = groupData?.members ?? []
+  const periodTrends = groupData?.trends ?? []
+  const allianceAverages = groupData?.alliance_averages
+  const tierBreakdown = groupStats ? generateTierBreakdown(groupStats) : []
+
+  // Loading state
+  const isLoading = isSeasonLoading || isGroupsLoading || isGroupLoading
+
+  // No season state
+  if (!isSeasonLoading && !activeSeason) {
+    return (
+      <AllianceGuard>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium">尚未設定活躍賽季</h3>
+          <p className="text-sm text-muted-foreground mt-1">請先在設定頁面選擇或建立一個賽季</p>
+        </div>
+      </AllianceGuard>
+    )
+  }
+
+  // No groups state
+  if (!isGroupsLoading && groups && groups.length === 0) {
+    return (
+      <AllianceGuard>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Users className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium">尚無組別資料</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            請先上傳 CSV 資料並確保成員有設定組別 (end_group)
+          </p>
+        </div>
+      </AllianceGuard>
+    )
+  }
 
   return (
     <AllianceGuard>
@@ -1355,60 +1196,91 @@ function GroupAnalytics() {
         {/* Group Selector */}
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">選擇組別:</span>
-          <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="選擇組別" />
-            </SelectTrigger>
-            <SelectContent>
-              {MOCK_GROUPS.map((group) => (
-                <SelectItem key={group.id} value={group.id}>
-                  {group.name} ({group.memberCount}人)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedGroup && (
-            <span className="text-sm text-muted-foreground">{selectedGroup.memberCount} 位成員</span>
+          {isGroupsLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">載入中...</span>
+            </div>
+          ) : (
+            <Select value={effectiveGroupName} onValueChange={setSelectedGroupName}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="選擇組別" />
+              </SelectTrigger>
+              <SelectContent>
+                {groups?.map((group) => (
+                  <SelectItem key={group.name} value={group.name}>
+                    {group.name} ({group.member_count}人)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {groupStats && (
+            <span className="text-sm text-muted-foreground">{groupStats.member_count} 位成員</span>
           )}
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">總覽</span>
-            </TabsTrigger>
-            <TabsTrigger value="distribution" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">戰功分佈</span>
-            </TabsTrigger>
-            <TabsTrigger value="rank" className="flex items-center gap-2">
-              <Trophy className="h-4 w-4" />
-              <span className="hidden sm:inline">貢獻排名</span>
-            </TabsTrigger>
-            <TabsTrigger value="members" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">組內成員</span>
-            </TabsTrigger>
-          </TabsList>
+        {/* Loading / Error / Content */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : groupError ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+            <h3 className="text-lg font-medium">載入失敗</h3>
+            <p className="text-sm text-muted-foreground mt-1">無法載入組別資料，請稍後再試</p>
+          </div>
+        ) : groupStats && allianceAverages ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden sm:inline">總覽</span>
+              </TabsTrigger>
+              <TabsTrigger value="distribution" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">戰功分佈</span>
+              </TabsTrigger>
+              <TabsTrigger value="rank" className="flex items-center gap-2">
+                <Trophy className="h-4 w-4" />
+                <span className="hidden sm:inline">貢獻排名</span>
+              </TabsTrigger>
+              <TabsTrigger value="members" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">組內成員</span>
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="overview">
-            <OverviewTab groupStats={groupStats} allGroupsData={allGroupsData} />
-          </TabsContent>
+            <TabsContent value="overview">
+              <OverviewTab
+                groupStats={groupStats}
+                allianceAverages={allianceAverages}
+                allGroupsData={groupsComparison ?? []}
+              />
+            </TabsContent>
 
-          <TabsContent value="distribution">
-            <MeritDistributionTab groupStats={groupStats} tierBreakdown={tierBreakdown} periodTrends={periodTrends} />
-          </TabsContent>
+            <TabsContent value="distribution">
+              <MeritDistributionTab
+                groupStats={groupStats}
+                tierBreakdown={tierBreakdown}
+                periodTrends={periodTrends}
+              />
+            </TabsContent>
 
-          <TabsContent value="rank">
-            <ContributionRankTab groupStats={groupStats} periodTrends={periodTrends} members={groupMembers} />
-          </TabsContent>
+            <TabsContent value="rank">
+              <ContributionRankTab
+                groupStats={groupStats}
+                periodTrends={periodTrends}
+                members={groupMembers}
+              />
+            </TabsContent>
 
-          <TabsContent value="members">
-            <MembersTab members={groupMembers} />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="members">
+              <MembersTab members={groupMembers} />
+            </TabsContent>
+          </Tabs>
+        ) : null}
       </div>
     </AllianceGuard>
   )

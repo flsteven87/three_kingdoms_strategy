@@ -18,6 +18,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.api.v1.schemas.analytics import (
     AllianceAveragesResponse,
     AllianceTrendItem,
+    GroupAnalyticsResponse,
+    GroupComparisonItem,
+    GroupListItem,
     MemberComparisonResponse,
     MemberListItem,
     MemberTrendItem,
@@ -258,3 +261,89 @@ async def get_alliance_trend(
     await _verify_season_access(user_id, season_id)
     data = await service.get_alliance_trend_averages(season_id)
     return [AllianceTrendItem(**item) for item in data]
+
+
+# =============================================================================
+# Group Analytics Endpoints
+# =============================================================================
+
+
+@router.get("/groups", response_model=list[GroupListItem])
+async def get_groups(
+    season_id: UUID,
+    user_id: CurrentUserIdDep,
+    service: AnalyticsServiceDep,
+) -> list[GroupListItem]:
+    """
+    Get list of all groups with member counts for a season.
+
+    Query Parameters:
+        season_id: Season UUID (required)
+
+    Returns:
+        List of groups with name and member_count
+    """
+    await _verify_season_access(user_id, season_id)
+    data = await service.get_groups_list(season_id)
+    return [GroupListItem(**item) for item in data]
+
+
+@router.get("/groups/comparison", response_model=list[GroupComparisonItem])
+async def get_groups_comparison(
+    season_id: UUID,
+    user_id: CurrentUserIdDep,
+    service: AnalyticsServiceDep,
+) -> list[GroupComparisonItem]:
+    """
+    Get comparison data for all groups in a season.
+
+    Used for group ranking and comparison charts.
+
+    Query Parameters:
+        season_id: Season UUID (required)
+
+    Returns:
+        List of group comparison items sorted by avg_daily_merit descending
+    """
+    await _verify_season_access(user_id, season_id)
+    data = await service.get_groups_comparison(season_id)
+    return [GroupComparisonItem(**item) for item in data]
+
+
+@router.get("/groups/{group_name}", response_model=GroupAnalyticsResponse)
+async def get_group_analytics(
+    group_name: str,
+    season_id: UUID,
+    user_id: CurrentUserIdDep,
+    service: AnalyticsServiceDep,
+) -> GroupAnalyticsResponse:
+    """
+    Get complete analytics for a specific group.
+
+    Includes stats, members list, trend data, and alliance averages for comparison.
+
+    Path Parameters:
+        group_name: Group name (URL encoded for special characters)
+
+    Query Parameters:
+        season_id: Season UUID (required)
+
+    Returns:
+        Complete group analytics response
+    """
+    from urllib.parse import unquote
+
+    await _verify_season_access(user_id, season_id)
+
+    # Decode URL-encoded group name
+    decoded_group_name = unquote(group_name)
+
+    data = await service.get_group_analytics(season_id, decoded_group_name)
+
+    if not data["members"]:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Group '{decoded_group_name}' not found or has no members in this season",
+        )
+
+    return GroupAnalyticsResponse(**data)
