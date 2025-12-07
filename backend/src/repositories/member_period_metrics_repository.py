@@ -184,7 +184,7 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         # Query all metrics for these periods
         result = (
             self.client.from_(self.table_name)
-            .select("period_id, daily_contribution, daily_merit, daily_assist, daily_donation")
+            .select("period_id, daily_contribution, daily_merit, daily_assist, daily_donation, end_power")
             .in_("period_id", [str(pid) for pid in period_ids])
             .execute()
         )
@@ -216,6 +216,9 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
                 ),
                 "avg_daily_donation": float(
                     sum(Decimal(str(m["daily_donation"])) for m in metrics_list) / count
+                ),
+                "avg_power": float(
+                    sum(Decimal(str(m["end_power"])) for m in metrics_list) / count
                 ),
             }
 

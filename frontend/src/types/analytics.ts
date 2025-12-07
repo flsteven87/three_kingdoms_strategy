@@ -57,6 +57,7 @@ export interface MemberTrendItem {
   readonly alliance_avg_merit: number
   readonly alliance_avg_assist: number
   readonly alliance_avg_donation: number
+  readonly alliance_avg_power: number
   readonly alliance_member_count: number
 }
 

@@ -280,8 +280,8 @@ class PeriodMetricsService:
         daily_assist = Decimal(assist_diff) / Decimal(days)
         daily_donation = Decimal(donation_diff) / Decimal(days)
 
-        # Calculate rank change (negative = improved)
-        rank_change = end_snapshot.contribution_rank - start_snapshot.contribution_rank
+        # Calculate rank change (positive = improved, lower rank is better)
+        rank_change = start_snapshot.contribution_rank - end_snapshot.contribution_rank
 
         return {
             "period_id": str(period_id),

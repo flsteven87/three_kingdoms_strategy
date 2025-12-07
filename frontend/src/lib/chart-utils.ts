@@ -62,6 +62,11 @@ export interface PeriodData {
  * Generic function to expand period data into daily data points.
  * Each day within a period will have the same values.
  *
+ * Period date logic:
+ * - Period 1: start_date (season start) to end_date (first snapshot) inclusive
+ * - Period 2+: (start_date + 1 day) to end_date inclusive
+ *   The start_date is the previous snapshot which belongs to the prior period
+ *
  * @param periods - Array of period data
  * @param mapPeriod - Function to map period data to additional fields
  * @returns Array of daily data points with date, dateLabel, periodNumber, and mapped fields
@@ -77,8 +82,15 @@ export function expandPeriodsToDaily<T extends PeriodData, R>(
     const endDate = new Date(period.end_date)
     const mappedData = mapPeriod(period)
 
+    // For periods after the first, start from day after start_date
+    // because start_date is the previous snapshot which belongs to prior period
     const currentDate = new Date(startDate)
-    while (currentDate < endDate) {
+    if (period.period_number > 1) {
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+
+    // Include end_date (the snapshot date belongs to this period)
+    while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split('T')[0]
 
       dailyData.push({
@@ -97,18 +109,25 @@ export function expandPeriodsToDaily<T extends PeriodData, R>(
 
 /**
  * Get tick values for X axis showing period boundaries.
- * Returns array of date labels at period start/end boundaries.
+ * Returns array of date strings at period boundaries for Recharts ticks prop.
+ *
+ * Tick logic:
+ * - First tick: Period 1's start_date (season start)
+ * - Subsequent ticks: Each period's end_date (snapshot dates)
+ *
+ * This shows boundaries where data "steps" to new period values.
  */
 export function getPeriodBoundaryTicks<T extends PeriodData>(periods: readonly T[]): string[] {
+  if (periods.length === 0) return []
+
   const ticks: string[] = []
 
-  for (const period of periods) {
-    ticks.push(formatDateLabel(period.start_date))
-  }
+  // First period's start date (season start)
+  ticks.push(periods[0].start_date)
 
-  // Add end date of last period
-  if (periods.length > 0) {
-    ticks.push(formatDateLabel(periods[periods.length - 1].end_date))
+  // All periods' end dates (snapshot dates where data changes)
+  for (const period of periods) {
+    ticks.push(period.end_date)
   }
 
   return ticks

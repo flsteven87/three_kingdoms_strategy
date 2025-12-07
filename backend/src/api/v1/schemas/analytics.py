@@ -68,6 +68,7 @@ class MemberTrendItem(BaseModel):
     alliance_avg_merit: float = Field(0, description="Alliance avg daily merit")
     alliance_avg_assist: float = Field(0, description="Alliance avg daily assist")
     alliance_avg_donation: float = Field(0, description="Alliance avg daily donation")
+    alliance_avg_power: float = Field(0, description="Alliance avg power")
     alliance_member_count: int = Field(0, description="Total members in alliance for this period")
 
 

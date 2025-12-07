@@ -34,7 +34,7 @@ class MemberPeriodMetricsBase(BaseModel):
     # Ranking data
     start_rank: int | None = Field(None, ge=1, description="Rank at period start (None for new members)")
     end_rank: int = Field(..., ge=1, description="Rank at period end")
-    rank_change: int | None = Field(None, description="Rank change (negative = improved)")
+    rank_change: int | None = Field(None, description="Rank change (positive = improved)")
 
     # End state snapshot
     end_power: int = Field(0, ge=0, description="Power value at period end")

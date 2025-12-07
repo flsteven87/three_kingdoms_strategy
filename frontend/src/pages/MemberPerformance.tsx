@@ -80,7 +80,6 @@ interface DailyDataPoint {
   readonly periodNumber: number
   readonly dailyMerit: number
   readonly dailyAssist: number
-  readonly dailyContribution: number
   readonly dailyDonation: number
   readonly endRank: number
   readonly endPower: number
@@ -90,10 +89,10 @@ interface DailyDataPoint {
 
 // Alliance average derived from trend data
 interface AllianceAverage {
-  readonly daily_contribution: number
   readonly daily_merit: number
   readonly daily_assist: number
   readonly daily_donation: number
+  readonly power: number
 }
 
 type ViewMode = 'latest' | 'season'
@@ -166,9 +165,10 @@ interface OverviewTabProps {
   readonly allianceAvg: AllianceAverage
   readonly viewMode: ViewMode
   readonly totalMembers: number
+  readonly memberName: string
 }
 
-function OverviewTab({ periodData, seasonSummary, allianceAvg, viewMode, totalMembers }: OverviewTabProps) {
+function OverviewTab({ periodData, seasonSummary, allianceAvg, viewMode, totalMembers, memberName }: OverviewTabProps) {
   const latestPeriod = periodData[periodData.length - 1]
 
   // Expand period data to daily for date-based X axis
@@ -177,7 +177,6 @@ function OverviewTab({ periodData, seasonSummary, allianceAvg, viewMode, totalMe
       expandPeriodsToDaily(periodData, (p) => ({
         dailyMerit: p.daily_merit,
         dailyAssist: p.daily_assist,
-        dailyContribution: p.daily_contribution,
         dailyDonation: p.daily_donation,
         endRank: p.end_rank,
         endPower: p.end_power,
@@ -195,45 +194,49 @@ function OverviewTab({ periodData, seasonSummary, allianceAvg, viewMode, totalMe
   const padding = Math.max(3, Math.ceil((maxRank - minRank) * 0.3))
   const yAxisDomain = [Math.max(1, minRank - padding), maxRank + padding]
 
-  // Radar chart data (normalized to percentages vs alliance avg)
-  const radarData = [
-    {
-      metric: '貢獻',
-      member: viewMode === 'latest' ? latestPeriod.daily_contribution : seasonSummary.avg_daily_contribution,
-      alliance: allianceAvg.daily_contribution,
-      fullMark: Math.max(
-        viewMode === 'latest' ? latestPeriod.daily_contribution : seasonSummary.avg_daily_contribution,
-        allianceAvg.daily_contribution
-      ) * 1.2,
-    },
-    {
-      metric: '戰功',
-      member: viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit,
-      alliance: allianceAvg.daily_merit,
-      fullMark: Math.max(
-        viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit,
-        allianceAvg.daily_merit
-      ) * 1.2,
-    },
-    {
-      metric: '助攻',
-      member: viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist,
-      alliance: allianceAvg.daily_assist,
-      fullMark: Math.max(
-        viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist,
-        allianceAvg.daily_assist
-      ) * 1.2,
-    },
-    {
-      metric: '捐獻',
-      member: viewMode === 'latest' ? latestPeriod.daily_donation : seasonSummary.avg_daily_donation,
-      alliance: allianceAvg.daily_donation,
-      fullMark: Math.max(
-        viewMode === 'latest' ? latestPeriod.daily_donation : seasonSummary.avg_daily_donation,
-        allianceAvg.daily_donation
-      ) * 1.2,
-    },
-  ]
+  // Radar chart data - normalized as percentage of alliance average (100 = alliance avg)
+  // This ensures all dimensions are comparable regardless of absolute value differences
+  // Also stores raw values for tooltip display
+  const radarData = useMemo(() => {
+    const memberPower = viewMode === 'latest' ? latestPeriod.end_power : seasonSummary.current_power
+    const memberMerit = viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit
+    const memberAssist = viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist
+    const memberDonation = viewMode === 'latest' ? latestPeriod.daily_donation : seasonSummary.avg_daily_donation
+
+    // Calculate percentage relative to alliance average (avoid division by zero)
+    const normalize = (value: number, avg: number) => avg > 0 ? Math.round((value / avg) * 100) : 0
+
+    return [
+      {
+        metric: '勢力值',
+        member: normalize(memberPower, allianceAvg.power),
+        memberRaw: memberPower,
+        alliance: 100,
+        allianceRaw: allianceAvg.power,
+      },
+      {
+        metric: '戰功',
+        member: normalize(memberMerit, allianceAvg.daily_merit),
+        memberRaw: memberMerit,
+        alliance: 100,
+        allianceRaw: allianceAvg.daily_merit,
+      },
+      {
+        metric: '助攻',
+        member: normalize(memberAssist, allianceAvg.daily_assist),
+        memberRaw: memberAssist,
+        alliance: 100,
+        allianceRaw: allianceAvg.daily_assist,
+      },
+      {
+        metric: '捐獻',
+        member: normalize(memberDonation, allianceAvg.daily_donation),
+        memberRaw: memberDonation,
+        alliance: 100,
+        allianceRaw: allianceAvg.daily_donation,
+      },
+    ]
+  }, [viewMode, latestPeriod, seasonSummary, allianceAvg])
 
   // Rank statistics
   const rankStats = useMemo(() => {
@@ -415,27 +418,58 @@ function OverviewTab({ periodData, seasonSummary, allianceAvg, viewMode, totalMe
         <Card>
           <CardHeader>
             <CardTitle className="text-base">四維能力圖</CardTitle>
-            <CardDescription>成員日均表現 vs 同盟平均</CardDescription>
+            <CardDescription>成員日均表現 vs 同盟平均（100% = 同盟平均）</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={radarChartConfig} className="mx-auto aspect-square max-h-[280px]">
               <RadarChart data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="metric" className="text-xs" />
-                <PolarRadiusAxis angle={30} domain={[0, 'dataMax']} className="text-xs" tick={false} />
-                <Radar
-                  name="成員"
-                  dataKey="member"
-                  stroke="var(--primary)"
-                  fill="var(--primary)"
-                  fillOpacity={0.3}
+                <PolarGrid gridType="polygon" />
+                <PolarAngleAxis dataKey="metric" className="text-xs" tick={{ fill: 'var(--foreground)', fontSize: 12 }} />
+                <PolarRadiusAxis
+                  angle={90}
+                  domain={[0, Math.max(150, ...radarData.map((d) => d.member))]}
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(value) => `${value}%`}
                 />
                 <Radar
                   name="同盟平均"
                   dataKey="alliance"
                   stroke="var(--muted-foreground)"
                   fill="var(--muted-foreground)"
-                  fillOpacity={0.1}
+                  fillOpacity={0.15}
+                  strokeWidth={1}
+                  strokeDasharray="4 4"
+                />
+                <Radar
+                  name={memberName}
+                  dataKey="member"
+                  stroke="var(--primary)"
+                  fill="var(--primary)"
+                  fillOpacity={0.4}
+                  strokeWidth={2}
+                />
+                <ChartTooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    const data = payload[0].payload as {
+                      metric: string
+                      member: number
+                      memberRaw: number
+                      alliance: number
+                      allianceRaw: number
+                    }
+                    return (
+                      <div className="rounded-lg border bg-background p-2 shadow-sm">
+                        <div className="font-medium mb-1">{data.metric}</div>
+                        <div className="text-sm">
+                          {memberName}：{formatNumberCompact(data.memberRaw)} ({data.member}%)
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          同盟平均：{formatNumberCompact(data.allianceRaw)} ({data.alliance}%)
+                        </div>
+                      </div>
+                    )
+                  }}
                 />
                 <Legend />
               </RadarChart>
@@ -467,7 +501,6 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
       expandPeriodsToDaily(periodData, (p) => ({
         dailyMerit: p.daily_merit,
         dailyAssist: p.daily_assist,
-        dailyContribution: p.daily_contribution,
         dailyDonation: p.daily_donation,
         endRank: p.end_rank,
         endPower: p.end_power,
@@ -478,236 +511,252 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
   )
   const xAxisTicks = useMemo(() => getPeriodBoundaryTicks(periodData), [periodData])
 
-  // Calculate merit growth
-  const meritGrowth = periodData.length >= 2
-    ? ((periodData[periodData.length - 1].daily_merit - periodData[0].daily_merit) / periodData[0].daily_merit) * 100
-    : 0
+  // Get values based on view mode
+  const meritValue = viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit
+  const assistValue = viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist
+  const meritDiff = calculatePercentDiff(meritValue, allianceAvg.daily_merit)
+  const assistDiff = calculatePercentDiff(assistValue, allianceAvg.daily_assist)
 
   return (
-    <div className="space-y-6">
-      {/* Merit Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-primary/50">
-          <CardHeader className="pb-2">
-            <CardDescription>日均戰功</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold tabular-nums">
-                {formatNumber(viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit)}
-              </span>
-              <span className="text-muted-foreground">/日</span>
-            </div>
-            <div className="flex items-center gap-4 mt-2">
-              <div className="flex items-center gap-1">
-                {calculatePercentDiff(
-                  viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit,
-                  allianceAvg.daily_merit
-                ) >= 0 ? (
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 text-destructive" />
-                )}
-                <span className={`text-sm ${
-                  calculatePercentDiff(
-                    viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit,
-                    allianceAvg.daily_merit
-                  ) >= 0
-                    ? 'text-primary'
-                    : 'text-destructive'
-                }`}>
-                  {calculatePercentDiff(
-                    viewMode === 'latest' ? latestPeriod.daily_merit : seasonSummary.avg_daily_merit,
-                    allianceAvg.daily_merit
-                  ).toFixed(1)}% vs 盟均
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Left Column: Merit */}
+        <div className="space-y-4">
+          <Card className="border-primary/50">
+            <CardHeader className="pb-2">
+              <CardDescription>日均戰功</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums">
+                  {formatNumber(meritValue)}
+                </span>
+                <span className="text-muted-foreground text-sm">/日</span>
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-1">
+                  {meritDiff >= 0 ? (
+                    <TrendingUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-destructive" />
+                  )}
+                  <span className={`text-xs ${meritDiff >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                    {meritDiff >= 0 ? '+' : ''}{meritDiff.toFixed(1)}% vs 盟均
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  盟均: {formatNumber(allianceAvg.daily_merit)}
                 </span>
               </div>
-              <span className="text-sm text-muted-foreground">
-                同盟平均: {formatNumber(allianceAvg.daily_merit)}/日
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>賽季成長率</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-3xl font-bold tabular-nums ${meritGrowth >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                {meritGrowth >= 0 ? '+' : ''}{meritGrowth.toFixed(1)}%
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              首期 → 最新期 戰功變化
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">戰功趨勢</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ChartContainer config={meritChartConfig} className="h-[200px] w-full">
+                <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    className="text-xs"
+                    ticks={xAxisTicks}
+                    tickFormatter={formatDateLabel}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={4}
+                    className="text-xs"
+                    width={45}
+                    tickFormatter={(value) => formatNumberCompact(value)}
+                  />
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const data = payload[0].payload as DailyDataPoint
+                      return (
+                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                          <div className="font-medium">{data.dateLabel}</div>
+                          <div className="text-sm">日均戰功: {formatNumber(data.dailyMerit)}</div>
+                          <div className="text-sm text-muted-foreground">同盟平均: {formatNumber(data.allianceAvgMerit)}</div>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Line
+                    type="stepAfter"
+                    dataKey="dailyMerit"
+                    name="日均戰功"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="allianceAvgMerit"
+                    name="同盟平均"
+                    stroke="var(--muted-foreground)"
+                    strokeWidth={1}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Assist */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>日均助攻</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums">
+                  {formatNumber(assistValue)}
+                </span>
+                <span className="text-muted-foreground text-sm">/日</span>
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-1">
+                  {assistDiff >= 0 ? (
+                    <TrendingUp className="h-3 w-3 text-primary" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-destructive" />
+                  )}
+                  <span className={`text-xs ${assistDiff >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                    {assistDiff >= 0 ? '+' : ''}{assistDiff.toFixed(1)}% vs 盟均
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  盟均: {formatNumber(allianceAvg.daily_assist)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">助攻趨勢</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ChartContainer config={assistChartConfig} className="h-[200px] w-full">
+                <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    className="text-xs"
+                    ticks={xAxisTicks}
+                    tickFormatter={formatDateLabel}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={4}
+                    className="text-xs"
+                    width={45}
+                  />
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const data = payload[0].payload as DailyDataPoint
+                      return (
+                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                          <div className="font-medium">{data.dateLabel}</div>
+                          <div className="text-sm">日均助攻: {formatNumber(data.dailyAssist)}</div>
+                          <div className="text-sm text-muted-foreground">同盟平均: {formatNumber(data.allianceAvgAssist)}</div>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Line
+                    type="stepAfter"
+                    dataKey="dailyAssist"
+                    name="日均助攻"
+                    stroke="var(--chart-2)"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="allianceAvgAssist"
+                    name="同盟平均"
+                    stroke="var(--muted-foreground)"
+                    strokeWidth={1}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Merit Trend Chart - Primary */}
+      {/* Period Detail Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">戰功趨勢</CardTitle>
-          <CardDescription>日均戰功變化（每日數據為該期間平均值）</CardDescription>
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm">期間明細</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ChartContainer config={meritChartConfig} className="h-[300px] w-full">
-            <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                ticks={xAxisTicks}
-                tickFormatter={formatDateLabel}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                tickFormatter={(value) => formatNumberCompact(value)}
-              />
-              <ChartTooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null
-                  const data = payload[0].payload as DailyDataPoint
+        <CardContent className="pt-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-1.5 px-2 font-medium text-xs">期間</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">日均戰功</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">變化</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">日均助攻</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">變化</th>
+                </tr>
+              </thead>
+              <tbody>
+                {periodData.map((d, index) => {
+                  const prevMerit = index > 0 ? periodData[index - 1].daily_merit : null
+                  const prevAssist = index > 0 ? periodData[index - 1].daily_assist : null
+                  const meritChange = prevMerit !== null ? d.daily_merit - prevMerit : null
+                  const assistChange = prevAssist !== null ? d.daily_assist - prevAssist : null
+
                   return (
-                    <div className="rounded-lg border bg-background p-2 shadow-sm">
-                      <div className="font-medium">{data.dateLabel}</div>
-                      <div className="text-xs text-muted-foreground mb-1">Period {data.periodNumber}</div>
-                      <div className="text-sm">日均戰功: {formatNumber(data.dailyMerit)}</div>
-                      <div className="text-sm text-muted-foreground">同盟平均: {formatNumber(data.allianceAvgMerit)}</div>
-                    </div>
+                    <tr key={d.period_number} className="border-b last:border-0">
+                      <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
+                      <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.daily_merit)}</td>
+                      <td className={`py-1.5 px-2 text-right text-xs tabular-nums ${
+                        meritChange === null ? 'text-muted-foreground' :
+                        meritChange >= 0 ? 'text-primary' : 'text-destructive'
+                      }`}>
+                        {meritChange === null ? '-' : `${meritChange >= 0 ? '+' : ''}${formatNumber(meritChange)}`}
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.daily_assist)}</td>
+                      <td className={`py-1.5 px-2 text-right text-xs tabular-nums ${
+                        assistChange === null ? 'text-muted-foreground' :
+                        assistChange >= 0 ? 'text-primary' : 'text-destructive'
+                      }`}>
+                        {assistChange === null ? '-' : `${assistChange >= 0 ? '+' : ''}${formatNumber(assistChange)}`}
+                      </td>
+                    </tr>
                   )
-                }}
-              />
-              <Legend />
-              <Line
-                type="stepAfter"
-                dataKey="dailyMerit"
-                name="日均戰功"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 5 }}
-              />
-              <Line
-                type="stepAfter"
-                dataKey="allianceAvgMerit"
-                name="同盟平均"
-                stroke="var(--muted-foreground)"
-                strokeWidth={1}
-                strokeDasharray="5 5"
-                dot={false}
-              />
-            </LineChart>
-          </ChartContainer>
+                })}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Assist Section */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>日均助攻</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {formatNumber(viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist)}
-              <span className="text-base font-normal text-muted-foreground ml-1">/日</span>
-            </div>
-            <div className="flex items-center gap-1 mt-2">
-              {calculatePercentDiff(
-                viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist,
-                allianceAvg.daily_assist
-              ) >= 0 ? (
-                <TrendingUp className="h-3 w-3 text-primary" />
-              ) : (
-                <TrendingDown className="h-3 w-3 text-destructive" />
-              )}
-              <span className={`text-xs ${
-                calculatePercentDiff(
-                  viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist,
-                  allianceAvg.daily_assist
-                ) >= 0
-                  ? 'text-primary'
-                  : 'text-destructive'
-              }`}>
-                {calculatePercentDiff(
-                  viewMode === 'latest' ? latestPeriod.daily_assist : seasonSummary.avg_daily_assist,
-                  allianceAvg.daily_assist
-                ).toFixed(1)}% vs 盟均
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">助攻趨勢</CardTitle>
-            <CardDescription>次要指標追蹤</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={assistChartConfig} className="h-[180px] w-full">
-              <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  className="text-xs"
-                  ticks={xAxisTicks}
-                  tickFormatter={formatDateLabel}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  className="text-xs"
-                />
-                <ChartTooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null
-                    const data = payload[0].payload as DailyDataPoint
-                    return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
-                        <div className="font-medium">{data.dateLabel}</div>
-                        <div className="text-xs text-muted-foreground mb-1">Period {data.periodNumber}</div>
-                        <div className="text-sm">日均助攻: {data.dailyAssist}</div>
-                        <div className="text-sm text-muted-foreground">同盟平均: {data.allianceAvgAssist}</div>
-                      </div>
-                    )
-                  }}
-                />
-                <Line
-                  type="stepAfter"
-                  dataKey="dailyAssist"
-                  name="日均助攻"
-                  stroke="var(--chart-2)"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  type="stepAfter"
-                  dataKey="allianceAvgAssist"
-                  name="同盟平均"
-                  stroke="var(--muted-foreground)"
-                  strokeWidth={1}
-                  strokeDasharray="5 5"
-                  dot={false}
-                />
-              </LineChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }
@@ -728,188 +777,197 @@ function PowerDonationTab({ periodData, seasonSummary }: PowerDonationTabProps) 
   const dailyData = useMemo(
     () =>
       expandPeriodsToDaily(periodData, (p) => ({
-        dailyMerit: p.daily_merit,
-        dailyAssist: p.daily_assist,
-        dailyContribution: p.daily_contribution,
         dailyDonation: p.daily_donation,
-        endRank: p.end_rank,
         endPower: p.end_power,
-        allianceAvgMerit: p.alliance_avg_merit,
-        allianceAvgAssist: p.alliance_avg_assist,
       })),
     [periodData]
   )
   const xAxisTicks = useMemo(() => getPeriodBoundaryTicks(periodData), [periodData])
 
+  // Calculate totals
+  const totalDonation = periodData.reduce((sum, d) => sum + d.donation_diff, 0)
+  const powerChange = seasonSummary.total_power_change
+
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>當前勢力值</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">{formatNumber(latestPeriod.end_power)}</div>
-            <div className="flex items-center gap-2 mt-2">
-              {seasonSummary.total_power_change >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-primary" />
-              ) : (
-                <TrendingDown className="h-4 w-4 text-destructive" />
-              )}
-              <span className={`text-sm ${seasonSummary.total_power_change >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                {seasonSummary.total_power_change >= 0 ? '+' : ''}{formatNumber(seasonSummary.total_power_change)} 賽季累計
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Left Column: Power */}
+        <div className="space-y-4">
+          <Card className="border-primary/50">
+            <CardHeader className="pb-2">
+              <CardDescription>當前勢力值</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums">
+                  {formatNumber(latestPeriod.end_power)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 mt-2">
+                {powerChange >= 0 ? (
+                  <TrendingUp className="h-3 w-3 text-primary" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-destructive" />
+                )}
+                <span className={`text-xs ${powerChange >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                  {powerChange >= 0 ? '+' : ''}{formatNumber(powerChange)} 賽季累計
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>賽季總捐獻</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {formatNumber(periodData.reduce((sum, d) => sum + d.donation_diff, 0))}
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              日均: {formatNumber(seasonSummary.avg_daily_donation)}/日
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">勢力值趨勢</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ChartContainer config={powerChartConfig} className="h-[200px] w-full">
+                <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    className="text-xs"
+                    ticks={xAxisTicks}
+                    tickFormatter={formatDateLabel}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={4}
+                    className="text-xs"
+                    width={50}
+                    tickFormatter={(value) => formatNumberCompact(value)}
+                  />
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const data = payload[0].payload as DailyDataPoint
+                      return (
+                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                          <div className="font-medium">{data.dateLabel}</div>
+                          <div className="text-sm">勢力值: {formatNumber(data.endPower)}</div>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="endPower"
+                    name="勢力值"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Donation */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>賽季總捐獻</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums">
+                  {formatNumber(totalDonation)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 mt-2">
+                <span className="text-xs text-muted-foreground">
+                  日均: {formatNumber(seasonSummary.avg_daily_donation)}/日
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">捐獻趨勢</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ChartContainer config={donationChartConfig} className="h-[200px] w-full">
+                <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    className="text-xs"
+                    ticks={xAxisTicks}
+                    tickFormatter={formatDateLabel}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={4}
+                    className="text-xs"
+                    width={50}
+                    tickFormatter={(value) => formatNumberCompact(value)}
+                  />
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const data = payload[0].payload as DailyDataPoint
+                      return (
+                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                          <div className="font-medium">{data.dateLabel}</div>
+                          <div className="text-sm">日均捐獻: {formatNumber(data.dailyDonation)}</div>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="dailyDonation"
+                    name="日均捐獻"
+                    stroke="var(--chart-3)"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {/* Power Trend */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">勢力值變化</CardTitle>
-          <CardDescription>各期間勢力值追蹤</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={powerChartConfig} className="h-[250px] w-full">
-            <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                ticks={xAxisTicks}
-                tickFormatter={formatDateLabel}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                tickFormatter={(value) => formatNumberCompact(value)}
-              />
-              <ChartTooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null
-                  const data = payload[0].payload as DailyDataPoint
-                  return (
-                    <div className="rounded-lg border bg-background p-2 shadow-sm">
-                      <div className="font-medium">{data.dateLabel}</div>
-                      <div className="text-xs text-muted-foreground mb-1">Period {data.periodNumber}</div>
-                      <div className="text-sm">勢力值: {formatNumber(data.endPower)}</div>
-                    </div>
-                  )
-                }}
-              />
-              <Line
-                type="stepAfter"
-                dataKey="endPower"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Donation Records - Area Chart showing daily donation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">捐獻記錄</CardTitle>
-          <CardDescription>日均捐獻變化</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={donationChartConfig} className="h-[200px] w-full">
-            <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                ticks={xAxisTicks}
-                tickFormatter={formatDateLabel}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                className="text-xs"
-                tickFormatter={(value) => formatNumberCompact(value)}
-              />
-              <ChartTooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null
-                  const data = payload[0].payload as DailyDataPoint
-                  return (
-                    <div className="rounded-lg border bg-background p-2 shadow-sm">
-                      <div className="font-medium">{data.dateLabel}</div>
-                      <div className="text-xs text-muted-foreground mb-1">Period {data.periodNumber}</div>
-                      <div className="text-sm">日均捐獻: {formatNumber(data.dailyDonation)}</div>
-                    </div>
-                  )
-                }}
-              />
-              <Line
-                type="stepAfter"
-                dataKey="dailyDonation"
-                stroke="var(--chart-3)"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
 
       {/* Period Detail Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">期間明細</CardTitle>
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm">期間明細</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-2 font-medium">期間</th>
-                  <th className="text-right py-2 px-2 font-medium">勢力值</th>
-                  <th className="text-right py-2 px-2 font-medium">變化</th>
-                  <th className="text-right py-2 px-2 font-medium">捐獻</th>
-                  <th className="text-right py-2 px-2 font-medium">日均</th>
+                  <th className="text-left py-1.5 px-2 font-medium text-xs">期間</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">勢力值</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">變化</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">捐獻</th>
+                  <th className="text-right py-1.5 px-2 font-medium text-xs">日均</th>
                 </tr>
               </thead>
               <tbody>
                 {periodData.map((d) => (
                   <tr key={d.period_number} className="border-b last:border-0">
-                    <td className="py-2 px-2 text-muted-foreground">{d.period_label}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{formatNumber(d.end_power)}</td>
-                    <td className={`py-2 px-2 text-right tabular-nums ${d.power_diff >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                    <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
+                    <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.end_power)}</td>
+                    <td className={`py-1.5 px-2 text-right text-xs tabular-nums ${d.power_diff >= 0 ? 'text-primary' : 'text-destructive'}`}>
                       {d.power_diff >= 0 ? '+' : ''}{formatNumber(d.power_diff)}
                     </td>
-                    <td className="py-2 px-2 text-right tabular-nums">{formatNumber(d.donation_diff)}</td>
-                    <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                    <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.donation_diff)}</td>
+                    <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
                       {formatNumber(d.daily_donation)}
                     </td>
                   </tr>
@@ -1012,18 +1070,18 @@ function MemberPerformance() {
   const allianceAvg: AllianceAverage = useMemo(() => {
     if (!trendData || trendData.length === 0) {
       return {
-        daily_contribution: 0,
         daily_merit: 0,
         daily_assist: 0,
         daily_donation: 0,
+        power: 0,
       }
     }
     const latest = trendData[trendData.length - 1]
     return {
-      daily_contribution: latest.alliance_avg_contribution,
       daily_merit: latest.alliance_avg_merit,
       daily_assist: latest.alliance_avg_assist,
       daily_donation: latest.alliance_avg_donation,
+      power: latest.alliance_avg_power,
     }
   }, [trendData])
 
@@ -1167,6 +1225,7 @@ function MemberPerformance() {
                 allianceAvg={allianceAvg}
                 viewMode={viewMode}
                 totalMembers={totalMembers}
+                memberName={selectedMember?.name ?? '成員'}
               />
             </TabsContent>
 

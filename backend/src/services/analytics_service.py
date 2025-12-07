@@ -8,11 +8,36 @@ Follows CLAUDE.md:
 - NO direct database calls (delegates to repositories)
 """
 
+from datetime import timedelta
 from uuid import UUID
 
+from src.models.period import Period
 from src.repositories.member_period_metrics_repository import MemberPeriodMetricsRepository
 from src.repositories.member_repository import MemberRepository
 from src.repositories.period_repository import PeriodRepository
+
+
+def _build_period_label(period: Period) -> str:
+    """
+    Build display label for a period.
+
+    For period_number == 1: shows start_date to end_date (season start to first snapshot)
+    For period_number > 1: shows (start_date + 1 day) to end_date
+        because start_date is the previous snapshot date which belongs to prior period
+
+    Args:
+        period: Period model instance
+
+    Returns:
+        Label string in format "MM/DD-MM/DD"
+    """
+    if period.period_number == 1:
+        display_start = period.start_date
+    else:
+        # For subsequent periods, start from day after the start snapshot
+        display_start = period.start_date + timedelta(days=1)
+
+    return f"{display_start.strftime('%m/%d')}-{period.end_date.strftime('%m/%d')}"
 
 
 class AnalyticsService:
@@ -111,7 +136,7 @@ class AnalyticsService:
             result.append({
                 "period_id": str(m.period_id),
                 "period_number": period.period_number,
-                "period_label": f"{period.start_date.strftime('%m/%d')}-{period.end_date.strftime('%m/%d')}",
+                "period_label": _build_period_label(period),
                 "start_date": period.start_date.isoformat(),
                 "end_date": period.end_date.isoformat(),
                 "days": period.days,
@@ -140,6 +165,7 @@ class AnalyticsService:
                 "alliance_avg_merit": period_avg.get("avg_daily_merit", 0),
                 "alliance_avg_assist": period_avg.get("avg_daily_assist", 0),
                 "alliance_avg_donation": period_avg.get("avg_daily_donation", 0),
+                "alliance_avg_power": period_avg.get("avg_power", 0),
                 "alliance_member_count": period_avg.get("member_count", 0),
             })
 
@@ -315,7 +341,7 @@ class AnalyticsService:
             result.append({
                 "period_id": str(period.id),
                 "period_number": period.period_number,
-                "period_label": f"{period.start_date.strftime('%m/%d')}-{period.end_date.strftime('%m/%d')}",
+                "period_label": _build_period_label(period),
                 **avg,
             })
 
