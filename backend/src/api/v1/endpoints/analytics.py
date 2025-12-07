@@ -16,6 +16,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.v1.schemas.analytics import (
+    AllianceAnalyticsResponse,
     AllianceAveragesResponse,
     AllianceTrendItem,
     GroupAnalyticsResponse,
@@ -284,6 +285,36 @@ async def get_season_averages(
     await _verify_season_access(user_id, season_id)
     result = await service.get_season_alliance_averages(season_id)
     return AllianceAveragesResponse(**result)
+
+
+# =============================================================================
+# Alliance Analytics Endpoints
+# =============================================================================
+
+
+@router.get("/alliance", response_model=AllianceAnalyticsResponse)
+async def get_alliance_analytics(
+    season_id: UUID,
+    user_id: CurrentUserIdDep,
+    service: AnalyticsServiceDep,
+    view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
+) -> AllianceAnalyticsResponse:
+    """
+    Get complete alliance analytics for AllianceAnalytics page.
+
+    Includes summary KPIs, trends with medians, distribution histograms,
+    group stats with box plots, top/bottom performers, and needs attention list.
+
+    Query Parameters:
+        season_id: Season UUID (required)
+        view: View mode - 'latest' (default) or 'season'
+
+    Returns:
+        Complete alliance analytics response
+    """
+    await _verify_season_access(user_id, season_id)
+    data = await service.get_alliance_analytics(season_id, view=view)
+    return AllianceAnalyticsResponse(**data)
 
 
 # =============================================================================

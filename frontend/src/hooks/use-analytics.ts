@@ -46,7 +46,11 @@ export const analyticsKeys = {
   groupAnalytics: (groupName: string, seasonId: string, view: 'latest' | 'season' = 'latest') =>
     [...analyticsKeys.groups(), 'detail', groupName, seasonId, view] as const,
   groupsComparison: (seasonId: string, view: 'latest' | 'season' = 'latest') =>
-    [...analyticsKeys.groups(), 'comparison', seasonId, view] as const
+    [...analyticsKeys.groups(), 'comparison', seasonId, view] as const,
+
+  // Alliance analytics
+  allianceAnalytics: (seasonId: string, view: 'latest' | 'season' = 'latest') =>
+    [...analyticsKeys.all, 'alliance-analytics', seasonId, view] as const
 }
 
 /**
@@ -163,5 +167,24 @@ export function useGroupsComparison(seasonId: string | undefined, view: 'latest'
     queryFn: () => apiClient.getGroupsComparison(seasonId!, view),
     enabled: !!seasonId,
     staleTime: 5 * 60 * 1000
+  })
+}
+
+// =============================================================================
+// Alliance Analytics Hooks
+// =============================================================================
+
+/**
+ * Hook to fetch complete alliance analytics for AllianceAnalytics page
+ */
+export function useAllianceAnalytics(
+  seasonId: string | undefined,
+  view: 'latest' | 'season' = 'latest'
+) {
+  return useQuery({
+    queryKey: analyticsKeys.allianceAnalytics(seasonId ?? '', view),
+    queryFn: () => apiClient.getAllianceAnalytics(seasonId!, view),
+    enabled: !!seasonId,
+    staleTime: 2 * 60 * 1000 // 2 minutes - alliance data may change frequently
   })
 }

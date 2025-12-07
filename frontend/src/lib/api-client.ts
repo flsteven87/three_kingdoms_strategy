@@ -33,7 +33,8 @@ import type {
   AllianceTrendItem,
   GroupListItem,
   GroupAnalyticsResponse,
-  GroupComparisonItem
+  GroupComparisonItem,
+  AllianceAnalyticsResponse
 } from '@/types/analytics'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087'
@@ -491,6 +492,25 @@ class ApiClient {
   async getGroupsComparison(seasonId: string, view: 'latest' | 'season' = 'latest'): Promise<GroupComparisonItem[]> {
     const response = await this.client.get<GroupComparisonItem[]>(
       '/api/v1/analytics/groups/comparison',
+      {
+        params: { season_id: seasonId, view }
+      }
+    )
+    return response.data
+  }
+
+  // ==================== Alliance Analytics API ====================
+
+  /**
+   * Get complete alliance analytics for AllianceAnalytics page
+   * @param view - 'latest' for latest period, 'season' for season average
+   */
+  async getAllianceAnalytics(
+    seasonId: string,
+    view: 'latest' | 'season' = 'latest'
+  ): Promise<AllianceAnalyticsResponse> {
+    const response = await this.client.get<AllianceAnalyticsResponse>(
+      '/api/v1/analytics/alliance',
       {
         params: { season_id: seasonId, view }
       }

@@ -304,3 +304,169 @@ class GroupComparisonItem(BaseModel):
     avg_daily_merit: float = Field(..., ge=0, description="Average daily merit")
     avg_rank: float = Field(..., description="Average contribution rank")
     member_count: int = Field(..., ge=0, description="Number of members")
+
+
+# ============================================================================
+# Alliance Analytics Schemas
+# ============================================================================
+
+
+class AllianceSummary(BaseModel):
+    """Alliance-wide metrics summary for KPI cards"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    member_count: int = Field(..., ge=0, description="Number of active members")
+    avg_daily_contribution: float = Field(..., ge=0)
+    avg_daily_merit: float = Field(..., ge=0)
+    avg_daily_assist: float = Field(..., ge=0)
+    avg_daily_donation: float = Field(..., ge=0)
+    avg_power: float = Field(..., ge=0)
+    median_daily_contribution: float = Field(..., ge=0)
+    median_daily_merit: float = Field(..., ge=0)
+    # Change percentages vs previous period (None for season view)
+    contribution_change_pct: float | None = Field(None, description="Contribution change % vs previous period")
+    merit_change_pct: float | None = Field(None, description="Merit change % vs previous period")
+    power_change_pct: float | None = Field(None, description="Power change % vs previous period")
+
+
+class AllianceTrendWithMedian(BaseModel):
+    """Enhanced trend item with median values for charts"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    period_id: str = Field(..., description="Period UUID as string")
+    period_number: int = Field(..., ge=1)
+    period_label: str = Field(..., description="Display label (e.g., '10/02-10/09')")
+    start_date: str = Field(..., description="ISO date string")
+    end_date: str = Field(..., description="ISO date string")
+    days: int = Field(..., ge=1)
+    member_count: int = Field(..., ge=0)
+    # Averages
+    avg_daily_contribution: float = Field(..., ge=0)
+    avg_daily_merit: float = Field(..., ge=0)
+    avg_daily_assist: float = Field(..., ge=0)
+    avg_daily_donation: float = Field(..., ge=0)
+    avg_power: float = Field(..., ge=0)
+    # Medians
+    median_daily_contribution: float = Field(..., ge=0)
+    median_daily_merit: float = Field(..., ge=0)
+    median_daily_assist: float = Field(..., ge=0)
+    median_daily_donation: float = Field(..., ge=0)
+
+
+class DistributionBin(BaseModel):
+    """Histogram bin for distribution charts"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    range: str = Field(..., description="Display range label (e.g., '0-5K', '5K-10K')")
+    min_value: float = Field(..., ge=0, description="Bin minimum value (inclusive)")
+    max_value: float = Field(..., description="Bin maximum value (exclusive, except last bin)")
+    count: int = Field(..., ge=0, description="Number of members in this bin")
+
+
+class DistributionData(BaseModel):
+    """Distribution histograms for contribution and merit"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    contribution: list[DistributionBin] = Field(..., description="Contribution distribution bins")
+    merit: list[DistributionBin] = Field(..., description="Merit distribution bins")
+
+
+class GroupStatsWithBoxPlot(BaseModel):
+    """Group stats with box plot data for alliance analytics"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str = Field(..., description="Group name")
+    member_count: int = Field(..., ge=0)
+    avg_daily_contribution: float = Field(..., ge=0)
+    avg_daily_merit: float = Field(..., ge=0)
+    avg_rank: float = Field(...)
+    avg_power: float = Field(..., ge=0)
+    contribution_cv: float = Field(..., ge=0, description="Coefficient of variation")
+    # Contribution box plot
+    contribution_min: float = Field(..., ge=0)
+    contribution_q1: float = Field(..., ge=0)
+    contribution_median: float = Field(..., ge=0)
+    contribution_q3: float = Field(..., ge=0)
+    contribution_max: float = Field(..., ge=0)
+    # Merit box plot
+    merit_min: float = Field(..., ge=0)
+    merit_q1: float = Field(..., ge=0)
+    merit_median: float = Field(..., ge=0)
+    merit_q3: float = Field(..., ge=0)
+    merit_max: float = Field(..., ge=0)
+
+
+class PerformerItem(BaseModel):
+    """Top/Bottom performer member item"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    member_id: str = Field(..., description="Member UUID as string")
+    name: str = Field(..., description="Member display name")
+    group: str | None = Field(None, description="Group assignment")
+    daily_contribution: float = Field(..., ge=0)
+    daily_merit: float = Field(..., ge=0)
+    rank: int = Field(..., ge=1)
+    rank_change: int | None = Field(None, description="Rank change (positive = improved)")
+
+
+class AttentionItem(BaseModel):
+    """Member needing attention"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    member_id: str = Field(..., description="Member UUID as string")
+    name: str = Field(..., description="Member display name")
+    group: str | None = Field(None, description="Group assignment")
+    daily_contribution: float = Field(..., ge=0)
+    rank: int = Field(..., ge=1)
+    rank_change: int | None = Field(None)
+    reason: str = Field(..., description="Reason for attention (e.g., '排名下滑 15 名')")
+
+
+class PeriodInfo(BaseModel):
+    """Current period metadata"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    period_id: str = Field(..., description="Period UUID as string")
+    period_number: int = Field(..., ge=1)
+    period_label: str = Field(..., description="Display label")
+    start_date: str = Field(..., description="ISO date string")
+    end_date: str = Field(..., description="ISO date string")
+    days: int = Field(..., ge=1)
+
+
+class AllianceAnalyticsResponse(BaseModel):
+    """Complete alliance analytics data for AllianceAnalytics page"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    # Overview KPIs
+    summary: AllianceSummary = Field(..., description="Alliance-wide metrics summary")
+
+    # Trend across all periods (with medians)
+    trends: list[AllianceTrendWithMedian] = Field(..., description="Period-by-period trend data")
+
+    # Distribution histogram bins
+    distributions: DistributionData = Field(..., description="Contribution and merit distributions")
+
+    # Groups with box plot stats
+    groups: list[GroupStatsWithBoxPlot] = Field(..., description="All groups with box plot data")
+
+    # Top performers (top 10 by contribution)
+    top_performers: list[PerformerItem] = Field(..., description="Top 10 performers by contribution")
+
+    # Bottom performers (bottom 5 by contribution)
+    bottom_performers: list[PerformerItem] = Field(..., description="Bottom 5 performers by contribution")
+
+    # Needs attention members
+    needs_attention: list[AttentionItem] = Field(..., description="Members needing attention")
+
+    # Current period metadata
+    current_period: PeriodInfo = Field(..., description="Latest period info")

@@ -233,3 +233,143 @@ export interface GroupComparisonItem {
   readonly avg_rank: number
   readonly member_count: number
 }
+
+// =============================================================================
+// Alliance Analytics Types
+// =============================================================================
+
+/**
+ * Alliance-wide metrics summary for KPI cards
+ */
+export interface AllianceSummary {
+  readonly member_count: number
+  readonly avg_daily_contribution: number
+  readonly avg_daily_merit: number
+  readonly avg_daily_assist: number
+  readonly avg_daily_donation: number
+  readonly avg_power: number
+  readonly median_daily_contribution: number
+  readonly median_daily_merit: number
+  readonly contribution_change_pct: number | null
+  readonly merit_change_pct: number | null
+  readonly power_change_pct: number | null
+}
+
+/**
+ * Enhanced trend item with median values for charts
+ */
+export interface AllianceTrendWithMedian {
+  readonly period_id: string
+  readonly period_number: number
+  readonly period_label: string
+  readonly start_date: string
+  readonly end_date: string
+  readonly days: number
+  readonly member_count: number
+  // Averages
+  readonly avg_daily_contribution: number
+  readonly avg_daily_merit: number
+  readonly avg_daily_assist: number
+  readonly avg_daily_donation: number
+  readonly avg_power: number
+  // Medians
+  readonly median_daily_contribution: number
+  readonly median_daily_merit: number
+  readonly median_daily_assist: number
+  readonly median_daily_donation: number
+}
+
+/**
+ * Histogram bin for distribution charts
+ */
+export interface DistributionBin {
+  readonly range: string
+  readonly min_value: number
+  readonly max_value: number
+  readonly count: number
+}
+
+/**
+ * Distribution histograms for contribution and merit
+ */
+export interface DistributionData {
+  readonly contribution: readonly DistributionBin[]
+  readonly merit: readonly DistributionBin[]
+}
+
+/**
+ * Group stats with box plot data for alliance analytics
+ */
+export interface GroupStatsWithBoxPlot {
+  readonly name: string
+  readonly member_count: number
+  readonly avg_daily_contribution: number
+  readonly avg_daily_merit: number
+  readonly avg_rank: number
+  readonly avg_power: number
+  readonly contribution_cv: number
+  // Contribution box plot
+  readonly contribution_min: number
+  readonly contribution_q1: number
+  readonly contribution_median: number
+  readonly contribution_q3: number
+  readonly contribution_max: number
+  // Merit box plot
+  readonly merit_min: number
+  readonly merit_q1: number
+  readonly merit_median: number
+  readonly merit_q3: number
+  readonly merit_max: number
+}
+
+/**
+ * Top/Bottom performer member item
+ */
+export interface PerformerItem {
+  readonly member_id: string
+  readonly name: string
+  readonly group: string | null
+  readonly daily_contribution: number
+  readonly daily_merit: number
+  readonly rank: number
+  readonly rank_change: number | null
+}
+
+/**
+ * Member needing attention
+ */
+export interface AttentionItem {
+  readonly member_id: string
+  readonly name: string
+  readonly group: string | null
+  readonly daily_contribution: number
+  readonly rank: number
+  readonly rank_change: number | null
+  readonly reason: string
+}
+
+/**
+ * Current period metadata
+ */
+export interface PeriodInfo {
+  readonly period_id: string
+  readonly period_number: number
+  readonly period_label: string
+  readonly start_date: string
+  readonly end_date: string
+  readonly days: number
+}
+
+/**
+ * Complete alliance analytics data for AllianceAnalytics page
+ */
+export interface AllianceAnalyticsResponse {
+  readonly summary: AllianceSummary
+  readonly trends: readonly AllianceTrendWithMedian[]
+  readonly distributions: DistributionData
+  readonly groups: readonly GroupStatsWithBoxPlot[]
+  readonly top_performers: readonly PerformerItem[]
+  readonly bottom_performers: readonly PerformerItem[]
+  readonly needs_attention: readonly AttentionItem[]
+  readonly current_period: PeriodInfo
+}

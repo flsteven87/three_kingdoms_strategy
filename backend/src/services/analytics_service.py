@@ -8,7 +8,11 @@ Follows CLAUDE.md:
 - NO direct database calls (delegates to repositories)
 """
 
+from collections import defaultdict
 from datetime import timedelta
+from decimal import Decimal
+from statistics import median as calc_median
+from statistics import stdev
 from uuid import UUID
 
 from src.models.period import Period
@@ -210,8 +214,6 @@ class AnalyticsService:
         Returns:
             Dict with average and median daily metrics, power, and member count
         """
-        from statistics import median
-
         metrics = await self._metrics_repo.get_by_period(period_id)
 
         if not metrics:
@@ -247,11 +249,11 @@ class AnalyticsService:
             "avg_daily_donation": round(sum(donations) / count, 2),
             "avg_power": round(sum(powers) / count, 2),
             # Medians
-            "median_daily_contribution": round(median(contributions), 2),
-            "median_daily_merit": round(median(merits), 2),
-            "median_daily_assist": round(median(assists), 2),
-            "median_daily_donation": round(median(donations), 2),
-            "median_power": round(median(powers), 2),
+            "median_daily_contribution": round(calc_median(contributions), 2),
+            "median_daily_merit": round(calc_median(merits), 2),
+            "median_daily_assist": round(calc_median(assists), 2),
+            "median_daily_donation": round(calc_median(donations), 2),
+            "median_power": round(calc_median(powers), 2),
         }
 
     async def get_season_alliance_averages(self, season_id: UUID) -> dict:
@@ -267,8 +269,6 @@ class AnalyticsService:
         Returns:
             Dict with average and median daily metrics, power, and member count
         """
-        from statistics import median as calc_median
-
         # Get season info for start_date
         season = await self._season_repo.get_by_id(season_id)
         if not season:
@@ -340,8 +340,6 @@ class AnalyticsService:
         Returns:
             Dict with member metrics, alliance averages, and medians, or None if not found
         """
-        from statistics import median
-
         # Get all metrics for this period
         all_metrics = await self._metrics_repo.get_by_period(period_id)
 
@@ -384,10 +382,10 @@ class AnalyticsService:
                 "daily_donation": round(sum(donations) / count, 2),
             },
             "alliance_median": {
-                "daily_contribution": round(median(contributions), 2),
-                "daily_merit": round(median(merits), 2),
-                "daily_assist": round(median(assists), 2),
-                "daily_donation": round(median(donations), 2),
+                "daily_contribution": round(calc_median(contributions), 2),
+                "daily_merit": round(calc_median(merits), 2),
+                "daily_assist": round(calc_median(assists), 2),
+                "daily_donation": round(calc_median(donations), 2),
             },
             "total_members": count,
         }
@@ -511,9 +509,6 @@ class AnalyticsService:
         Returns:
             Dict with stats, members, trends, and alliance_averages
         """
-        from collections import defaultdict
-        from decimal import Decimal
-
         # Get all periods for the season
         periods = await self._period_repo.get_by_season(season_id)
         if not periods:
@@ -677,8 +672,10 @@ class AnalyticsService:
         members = []
         for m in group_metrics:
             member_id = str(m["member_id"])
-            current_contribution = float(Decimal(str(m["daily_contribution"])))
-            current_merit = float(Decimal(str(m["daily_merit"])))
+            current_contribution = round(float(Decimal(str(m["daily_contribution"]))), 2)
+            current_merit = round(float(Decimal(str(m["daily_merit"]))), 2)
+            current_assist = round(float(Decimal(str(m["daily_assist"]))), 2)
+            current_donation = round(float(Decimal(str(m["daily_donation"]))), 2)
             prev_data = prev_metrics_map.get(member_id)
             contribution_change = round(current_contribution - prev_data["daily_contribution"], 2) if prev_data else None
             merit_change = round(current_merit - prev_data["daily_merit"], 2) if prev_data else None
@@ -689,8 +686,8 @@ class AnalyticsService:
                 "contribution_rank": m["end_rank"],
                 "daily_contribution": current_contribution,
                 "daily_merit": current_merit,
-                "daily_assist": float(Decimal(str(m["daily_assist"]))),
-                "daily_donation": float(Decimal(str(m["daily_donation"]))),
+                "daily_assist": current_assist,
+                "daily_donation": current_donation,
                 "power": m["end_power"],
                 "rank_change": m["rank_change"],
                 "contribution_change": contribution_change,
@@ -720,8 +717,6 @@ class AnalyticsService:
         Returns:
             List of group comparison items sorted by avg_daily_merit descending
         """
-        from collections import defaultdict
-
         periods = await self._period_repo.get_by_season(season_id)
         if not periods:
             return []
@@ -809,9 +804,6 @@ class AnalyticsService:
         Returns:
             GroupStats dict
         """
-        from decimal import Decimal
-        from statistics import stdev
-
         count = len(metrics)
 
         # Extract values
@@ -894,8 +886,6 @@ class AnalyticsService:
         Returns:
             GroupStats dict
         """
-        from statistics import stdev
-
         count = len(members)
         if count == 0:
             return self._empty_group_stats(group_name)
@@ -1006,4 +996,522 @@ class AnalyticsService:
             "median_daily_assist": 0,
             "median_daily_donation": 0,
             "median_power": 0,
+        }
+
+    # =========================================================================
+    # Alliance Analytics Methods
+    # =========================================================================
+
+    async def get_alliance_analytics(
+        self, season_id: UUID, view: str = "latest"
+    ) -> dict:
+        """
+        Get complete alliance analytics for AllianceAnalytics page.
+
+        Args:
+            season_id: Season UUID
+            view: 'latest' for latest period, 'season' for season-to-date
+
+        Returns:
+            Complete analytics response dict matching AllianceAnalyticsResponse schema
+        """
+        # Get season and periods
+        season = await self._season_repo.get_by_id(season_id)
+        if not season:
+            return self._empty_alliance_analytics()
+
+        periods = await self._period_repo.get_by_season(season_id)
+        if not periods:
+            return self._empty_alliance_analytics()
+
+        latest_period = periods[-1]
+        prev_period = periods[-2] if len(periods) >= 2 else None
+
+        # Get all metrics for latest period (with member names)
+        latest_metrics_raw = await self._metrics_repo.get_by_period_with_member(latest_period.id)
+        if not latest_metrics_raw:
+            return self._empty_alliance_analytics()
+
+        # Get previous period metrics for change calculations
+        prev_metrics_map: dict[UUID, dict] = {}
+        if prev_period:
+            prev_metrics_raw = await self._metrics_repo.get_by_period_with_member(prev_period.id)
+            for m in prev_metrics_raw:
+                prev_metrics_map[UUID(m["member_id"])] = {
+                    "daily_contribution": float(m["daily_contribution"]),
+                    "daily_merit": float(m["daily_merit"]),
+                    "end_power": m["end_power"],
+                }
+
+        # Calculate season days for season view
+        season_days = (latest_period.end_date - season.start_date).days
+        if season_days <= 0:
+            season_days = 1
+
+        # Get metrics with snapshot totals for season view
+        metrics_with_totals = None
+        if view == "season":
+            metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
+                latest_period.id
+            )
+
+        # Build member data based on view
+        member_data = self._build_member_data(
+            latest_metrics_raw, metrics_with_totals, season_days, view
+        )
+
+        # Calculate summary
+        summary = self._calculate_alliance_summary(
+            member_data, prev_metrics_map, view
+        )
+
+        # Calculate trends with medians
+        trends = await self._calculate_alliance_trends_with_medians(periods)
+
+        # Calculate distributions
+        distributions = self._calculate_distributions(member_data)
+
+        # Calculate groups with box plot
+        groups = self._calculate_groups_with_boxplot(member_data)
+
+        # Calculate performers
+        top_performers, bottom_performers = self._calculate_performers(member_data)
+
+        # Calculate needs attention
+        needs_attention = self._calculate_needs_attention(
+            member_data, summary["median_daily_contribution"], view
+        )
+
+        # Build period info
+        current_period = {
+            "period_id": str(latest_period.id),
+            "period_number": latest_period.period_number,
+            "period_label": _build_period_label(latest_period),
+            "start_date": latest_period.start_date.isoformat(),
+            "end_date": latest_period.end_date.isoformat(),
+            "days": latest_period.days,
+        }
+
+        return {
+            "summary": summary,
+            "trends": trends,
+            "distributions": distributions,
+            "groups": groups,
+            "top_performers": top_performers,
+            "bottom_performers": bottom_performers,
+            "needs_attention": needs_attention,
+            "current_period": current_period,
+        }
+
+    def _build_member_data(
+        self,
+        latest_metrics_raw: list[dict],
+        metrics_with_totals: list[dict] | None,
+        season_days: int,
+        view: str,
+    ) -> list[dict]:
+        """
+        Build unified member data list based on view mode.
+
+        Args:
+            latest_metrics_raw: Latest period metrics (raw dicts from get_by_period_with_member)
+            metrics_with_totals: Metrics with snapshot totals (for season view)
+            season_days: Number of days in season
+            view: 'latest' or 'season'
+
+        Returns:
+            List of member data dicts with consistent structure
+        """
+        if view == "season" and metrics_with_totals:
+            # Build member_id -> totals map
+            totals_map = {str(m["member_id"]): m for m in metrics_with_totals}
+
+            result = []
+            for m in latest_metrics_raw:
+                member_id = str(m["member_id"])
+                totals = totals_map.get(member_id)
+                if not totals:
+                    continue
+
+                result.append({
+                    "member_id": member_id,
+                    "name": totals["member_name"],
+                    "group": m["end_group"],
+                    "daily_contribution": round(totals["total_contribution"] / season_days, 2),
+                    "daily_merit": round(totals["total_merit"] / season_days, 2),
+                    "daily_assist": round(totals["total_assist"] / season_days, 2),
+                    "daily_donation": round(totals["total_donation"] / season_days, 2),
+                    "power": m["end_power"],
+                    "rank": m["end_rank"],
+                    "rank_change": None,  # Not applicable for season view
+                })
+            return result
+
+        # Latest view - metrics_raw is list of dicts from get_by_period_with_member
+        return [
+            {
+                "member_id": str(m["member_id"]),
+                "name": m.get("member_name", ""),
+                "group": m["end_group"],
+                "daily_contribution": float(Decimal(str(m["daily_contribution"]))),
+                "daily_merit": float(Decimal(str(m["daily_merit"]))),
+                "daily_assist": float(Decimal(str(m["daily_assist"]))),
+                "daily_donation": float(Decimal(str(m["daily_donation"]))),
+                "power": m["end_power"],
+                "rank": m["end_rank"],
+                "rank_change": m.get("rank_change"),
+            }
+            for m in latest_metrics_raw
+        ]
+
+    def _calculate_alliance_summary(
+        self,
+        member_data: list[dict],
+        prev_metrics_map: dict[UUID, dict],
+        view: str,
+    ) -> dict:
+        """Calculate alliance-wide summary metrics."""
+        if not member_data:
+            return {
+                "member_count": 0,
+                "avg_daily_contribution": 0,
+                "avg_daily_merit": 0,
+                "avg_daily_assist": 0,
+                "avg_daily_donation": 0,
+                "avg_power": 0,
+                "median_daily_contribution": 0,
+                "median_daily_merit": 0,
+                "contribution_change_pct": None,
+                "merit_change_pct": None,
+                "power_change_pct": None,
+            }
+
+        count = len(member_data)
+        contributions = [m["daily_contribution"] for m in member_data]
+        merits = [m["daily_merit"] for m in member_data]
+        assists = [m["daily_assist"] for m in member_data]
+        donations = [m["daily_donation"] for m in member_data]
+        powers = [float(m["power"]) for m in member_data]
+
+        avg_contribution = sum(contributions) / count
+        avg_merit = sum(merits) / count
+        avg_power = sum(powers) / count
+
+        # Calculate change percentages (only for latest view)
+        contribution_change_pct = None
+        merit_change_pct = None
+        power_change_pct = None
+
+        if view == "latest" and prev_metrics_map:
+            prev_contributions = [
+                prev_metrics_map[UUID(m["member_id"])]["daily_contribution"]
+                for m in member_data
+                if UUID(m["member_id"]) in prev_metrics_map
+            ]
+            prev_merits = [
+                prev_metrics_map[UUID(m["member_id"])]["daily_merit"]
+                for m in member_data
+                if UUID(m["member_id"]) in prev_metrics_map
+            ]
+            prev_powers = [
+                prev_metrics_map[UUID(m["member_id"])]["end_power"]
+                for m in member_data
+                if UUID(m["member_id"]) in prev_metrics_map
+            ]
+
+            if prev_contributions:
+                prev_avg_contribution = sum(prev_contributions) / len(prev_contributions)
+                if prev_avg_contribution > 0:
+                    contribution_change_pct = round(
+                        (avg_contribution - prev_avg_contribution) / prev_avg_contribution * 100, 1
+                    )
+
+            if prev_merits:
+                prev_avg_merit = sum(prev_merits) / len(prev_merits)
+                if prev_avg_merit > 0:
+                    merit_change_pct = round(
+                        (avg_merit - prev_avg_merit) / prev_avg_merit * 100, 1
+                    )
+
+            if prev_powers:
+                prev_avg_power = sum(prev_powers) / len(prev_powers)
+                if prev_avg_power > 0:
+                    power_change_pct = round(
+                        (avg_power - prev_avg_power) / prev_avg_power * 100, 1
+                    )
+
+        return {
+            "member_count": count,
+            "avg_daily_contribution": round(avg_contribution, 2),
+            "avg_daily_merit": round(avg_merit, 2),
+            "avg_daily_assist": round(sum(assists) / count, 2),
+            "avg_daily_donation": round(sum(donations) / count, 2),
+            "avg_power": round(avg_power, 2),
+            "median_daily_contribution": round(calc_median(contributions), 2),
+            "median_daily_merit": round(calc_median(merits), 2),
+            "contribution_change_pct": contribution_change_pct,
+            "merit_change_pct": merit_change_pct,
+            "power_change_pct": power_change_pct,
+        }
+
+    async def _calculate_alliance_trends_with_medians(
+        self, periods: list[Period]
+    ) -> list[dict]:
+        """Calculate alliance trend data with median values for each period."""
+        result = []
+        for period in periods:
+            metrics = await self._metrics_repo.get_by_period(period.id)
+            if not metrics:
+                continue
+
+            count = len(metrics)
+            contributions = [float(m.daily_contribution) for m in metrics]
+            merits = [float(m.daily_merit) for m in metrics]
+            assists = [float(m.daily_assist) for m in metrics]
+            donations = [float(m.daily_donation) for m in metrics]
+            powers = [float(m.end_power) for m in metrics]
+
+            result.append({
+                "period_id": str(period.id),
+                "period_number": period.period_number,
+                "period_label": _build_period_label(period),
+                "start_date": period.start_date.isoformat(),
+                "end_date": period.end_date.isoformat(),
+                "days": period.days,
+                "member_count": count,
+                # Averages
+                "avg_daily_contribution": round(sum(contributions) / count, 2),
+                "avg_daily_merit": round(sum(merits) / count, 2),
+                "avg_daily_assist": round(sum(assists) / count, 2),
+                "avg_daily_donation": round(sum(donations) / count, 2),
+                "avg_power": round(sum(powers) / count, 2),
+                # Medians
+                "median_daily_contribution": round(calc_median(contributions), 2),
+                "median_daily_merit": round(calc_median(merits), 2),
+                "median_daily_assist": round(calc_median(assists), 2),
+                "median_daily_donation": round(calc_median(donations), 2),
+            })
+
+        return result
+
+    def _calculate_distributions(self, member_data: list[dict]) -> dict:
+        """Calculate distribution histogram bins for contribution and merit."""
+        # Contribution bins: 0-5K, 5K-10K, 10K-15K, 15K-20K, 20K+
+        contribution_bins = [
+            {"range": "0-5K", "min_value": 0, "max_value": 5000, "count": 0},
+            {"range": "5K-10K", "min_value": 5000, "max_value": 10000, "count": 0},
+            {"range": "10K-15K", "min_value": 10000, "max_value": 15000, "count": 0},
+            {"range": "15K-20K", "min_value": 15000, "max_value": 20000, "count": 0},
+            {"range": "20K+", "min_value": 20000, "max_value": float("inf"), "count": 0},
+        ]
+
+        # Merit bins: 0-30K, 30K-60K, 60K-90K, 90K-120K, 120K+
+        merit_bins = [
+            {"range": "0-30K", "min_value": 0, "max_value": 30000, "count": 0},
+            {"range": "30K-60K", "min_value": 30000, "max_value": 60000, "count": 0},
+            {"range": "60K-90K", "min_value": 60000, "max_value": 90000, "count": 0},
+            {"range": "90K-120K", "min_value": 90000, "max_value": 120000, "count": 0},
+            {"range": "120K+", "min_value": 120000, "max_value": float("inf"), "count": 0},
+        ]
+
+        for m in member_data:
+            contribution = m["daily_contribution"]
+            merit = m["daily_merit"]
+
+            # Count contribution bin
+            for bin_data in contribution_bins:
+                if bin_data["min_value"] <= contribution < bin_data["max_value"]:
+                    bin_data["count"] += 1
+                    break
+
+            # Count merit bin
+            for bin_data in merit_bins:
+                if bin_data["min_value"] <= merit < bin_data["max_value"]:
+                    bin_data["count"] += 1
+                    break
+
+        # Convert infinity to large number for JSON serialization
+        for bin_data in contribution_bins:
+            if bin_data["max_value"] == float("inf"):
+                bin_data["max_value"] = 999999999
+
+        for bin_data in merit_bins:
+            if bin_data["max_value"] == float("inf"):
+                bin_data["max_value"] = 999999999
+
+        return {
+            "contribution": contribution_bins,
+            "merit": merit_bins,
+        }
+
+    def _calculate_groups_with_boxplot(self, member_data: list[dict]) -> list[dict]:
+        """Calculate group stats with box plot data for all groups."""
+        # Group members by group name
+        groups: dict[str, list[dict]] = defaultdict(list)
+        for m in member_data:
+            group = m["group"] or "未分組"
+            groups[group].append(m)
+
+        result = []
+        for group_name, members in groups.items():
+            count = len(members)
+            if count == 0:
+                continue
+
+            contributions = [m["daily_contribution"] for m in members]
+            merits = [m["daily_merit"] for m in members]
+            powers = [float(m["power"]) for m in members]
+            ranks = [m["rank"] for m in members]
+
+            # Sort for percentile calculations
+            sorted_contributions = sorted(contributions)
+            sorted_merits = sorted(merits)
+
+            avg_contribution = sum(contributions) / count
+            contribution_std = stdev(contributions) if count > 1 else 0
+            contribution_cv = contribution_std / avg_contribution if avg_contribution > 0 else 0
+
+            result.append({
+                "name": group_name,
+                "member_count": count,
+                "avg_daily_contribution": round(avg_contribution, 2),
+                "avg_daily_merit": round(sum(merits) / count, 2),
+                "avg_rank": round(sum(ranks) / count, 1),
+                "avg_power": round(sum(powers) / count, 2),
+                "contribution_cv": round(contribution_cv, 3),
+                # Contribution box plot
+                "contribution_min": round(sorted_contributions[0], 2),
+                "contribution_q1": round(_percentile(sorted_contributions, 0.25), 2),
+                "contribution_median": round(_percentile(sorted_contributions, 0.5), 2),
+                "contribution_q3": round(_percentile(sorted_contributions, 0.75), 2),
+                "contribution_max": round(sorted_contributions[-1], 2),
+                # Merit box plot
+                "merit_min": round(sorted_merits[0], 2),
+                "merit_q1": round(_percentile(sorted_merits, 0.25), 2),
+                "merit_median": round(_percentile(sorted_merits, 0.5), 2),
+                "merit_q3": round(_percentile(sorted_merits, 0.75), 2),
+                "merit_max": round(sorted_merits[-1], 2),
+            })
+
+        # Sort by avg_daily_merit descending
+        result.sort(key=lambda x: x["avg_daily_merit"], reverse=True)
+        return result
+
+    def _calculate_performers(
+        self, member_data: list[dict]
+    ) -> tuple[list[dict], list[dict]]:
+        """Calculate top and bottom performers."""
+        # Sort by daily_contribution descending
+        sorted_data = sorted(
+            member_data, key=lambda x: x["daily_contribution"], reverse=True
+        )
+
+        def to_performer(m: dict) -> dict:
+            return {
+                "member_id": m["member_id"],
+                "name": m["name"],
+                "group": m["group"],
+                "daily_contribution": m["daily_contribution"],
+                "daily_merit": m["daily_merit"],
+                "rank": m["rank"],
+                "rank_change": m["rank_change"],
+            }
+
+        top_performers = [to_performer(m) for m in sorted_data[:10]]
+        bottom_performers = [to_performer(m) for m in sorted_data[-5:]]
+
+        return top_performers, bottom_performers
+
+    def _calculate_needs_attention(
+        self,
+        member_data: list[dict],
+        median_contribution: float,
+        view: str,
+    ) -> list[dict]:
+        """
+        Calculate members needing attention.
+
+        Rules:
+        1. Rank dropped > 10 positions (highest priority)
+        2. Contribution < 50% of median
+        3. Rank in bottom 10% and dropped > 5 positions
+        """
+        result = []
+        member_count = len(member_data)
+        bottom_threshold = member_count * 0.9
+
+        for m in member_data:
+            reason = None
+
+            # Rule 1: Significant rank drop (only for latest view)
+            if view == "latest" and m["rank_change"] is not None and m["rank_change"] < -10:
+                reason = f"排名下滑 {abs(m['rank_change'])} 名"
+
+            # Rule 2: Contribution below 50% of median
+            elif median_contribution > 0 and m["daily_contribution"] < median_contribution * 0.5:
+                reason = "貢獻低於同盟中位數 50%"
+
+            # Rule 3: Bottom rank and still dropping
+            elif (
+                view == "latest"
+                and m["rank"] > bottom_threshold
+                and m["rank_change"] is not None
+                and m["rank_change"] < -5
+            ):
+                reason = "排名接近底部且持續下滑"
+
+            if reason:
+                result.append({
+                    "member_id": m["member_id"],
+                    "name": m["name"],
+                    "group": m["group"],
+                    "daily_contribution": m["daily_contribution"],
+                    "rank": m["rank"],
+                    "rank_change": m["rank_change"],
+                    "reason": reason,
+                })
+
+        # Sort by severity (rank drop first, then contribution)
+        result.sort(
+            key=lambda x: (
+                0 if "排名下滑" in x["reason"] else 1,
+                x["daily_contribution"],
+            )
+        )
+
+        return result[:10]  # Limit to 10
+
+    def _empty_alliance_analytics(self) -> dict:
+        """Return empty alliance analytics structure."""
+        return {
+            "summary": {
+                "member_count": 0,
+                "avg_daily_contribution": 0,
+                "avg_daily_merit": 0,
+                "avg_daily_assist": 0,
+                "avg_daily_donation": 0,
+                "avg_power": 0,
+                "median_daily_contribution": 0,
+                "median_daily_merit": 0,
+                "contribution_change_pct": None,
+                "merit_change_pct": None,
+                "power_change_pct": None,
+            },
+            "trends": [],
+            "distributions": {
+                "contribution": [],
+                "merit": [],
+            },
+            "groups": [],
+            "top_performers": [],
+            "bottom_performers": [],
+            "needs_attention": [],
+            "current_period": {
+                "period_id": "",
+                "period_number": 0,
+                "period_label": "",
+                "start_date": "",
+                "end_date": "",
+                "days": 0,
+            },
         }
