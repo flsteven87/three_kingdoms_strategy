@@ -345,7 +345,7 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
             self.client.from_(self.table_name)
             .select(
                 "period_id, member_id, end_rank, "
-                "daily_merit, daily_assist, daily_donation, end_power"
+                "daily_contribution, daily_merit, daily_assist, daily_donation, end_power"
             )
             .in_("period_id", period_ids)
             .in_("member_id", member_ids)
@@ -386,3 +386,52 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
             {"name": name, "member_count": count}
             for name, count in sorted(group_counts.items(), key=lambda x: -x[1])
         ]
+
+    async def get_metrics_with_snapshot_totals(
+        self, period_id: UUID
+    ) -> list[dict]:
+        """
+        Get all metrics for a period with snapshot total_* values.
+
+        Used for season view calculations where we need cumulative totals
+        to compute season-to-date daily averages.
+
+        Args:
+            period_id: Period UUID
+
+        Returns:
+            List of dicts with metrics fields plus total_* from snapshot
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = (
+            self.client.from_(self.table_name)
+            .select(
+                "member_id, end_group, end_rank, end_power, rank_change, "
+                "daily_contribution, daily_merit, daily_assist, daily_donation, "
+                "member_snapshots!end_snapshot_id("
+                "total_contribution, total_merit, total_assist, total_donation"
+                "), "
+                "members(name)"
+            )
+            .eq("period_id", str(period_id))
+            .order("daily_merit", desc=True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Flatten nested data
+        for row in data:
+            # Extract snapshot totals
+            snapshot_data = row.pop("member_snapshots", {}) or {}
+            row["total_contribution"] = snapshot_data.get("total_contribution", 0)
+            row["total_merit"] = snapshot_data.get("total_merit", 0)
+            row["total_assist"] = snapshot_data.get("total_assist", 0)
+            row["total_donation"] = snapshot_data.get("total_donation", 0)
+
+            # Extract member name
+            member_data = row.pop("members", {}) or {}
+            row["member_name"] = member_data.get("name", "Unknown")
+
+        return data

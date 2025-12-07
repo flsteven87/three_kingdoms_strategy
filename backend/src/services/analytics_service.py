@@ -15,6 +15,7 @@ from src.models.period import Period
 from src.repositories.member_period_metrics_repository import MemberPeriodMetricsRepository
 from src.repositories.member_repository import MemberRepository
 from src.repositories.period_repository import PeriodRepository
+from src.repositories.season_repository import SeasonRepository
 
 
 def _percentile(data: list[float], p: float) -> float:
@@ -67,6 +68,7 @@ class AnalyticsService:
         self._member_repo = MemberRepository()
         self._metrics_repo = MemberPeriodMetricsRepository()
         self._period_repo = PeriodRepository()
+        self._season_repo = SeasonRepository()
 
     async def get_members_for_analytics(
         self, alliance_id: UUID, active_only: bool = True, season_id: UUID | None = None
@@ -254,10 +256,10 @@ class AnalyticsService:
 
     async def get_season_alliance_averages(self, season_id: UUID) -> dict:
         """
-        Calculate alliance average and median metrics across all periods in a season.
+        Calculate alliance average and median metrics for season-to-date.
 
-        Uses member-day weighted averages: each member's daily metrics are weighted
-        by the number of days in each period they participated.
+        Uses snapshot totals / season_days for accurate season daily averages.
+        This is more accurate than averaging daily_* values across periods.
 
         Args:
             season_id: Season UUID
@@ -267,75 +269,62 @@ class AnalyticsService:
         """
         from statistics import median as calc_median
 
+        # Get season info for start_date
+        season = await self._season_repo.get_by_id(season_id)
+        if not season:
+            return self._empty_alliance_averages()
+
+        # Get all periods to find latest
         periods = await self._period_repo.get_by_season(season_id)
         if not periods:
             return self._empty_alliance_averages()
 
-        # Collect all member metrics across all periods with day weighting
-        # Structure: member_id -> {total_weighted_metric, total_days}
-        member_totals: dict[UUID, dict] = {}
+        latest_period = periods[-1]
 
-        for period in periods:
-            metrics = await self._metrics_repo.get_by_period(period.id)
-            days = period.days
+        # Calculate season days
+        season_days = (latest_period.end_date - season.start_date).days
+        if season_days <= 0:
+            season_days = 1
 
-            for m in metrics:
-                if m.member_id not in member_totals:
-                    member_totals[m.member_id] = {
-                        "contribution": 0.0,
-                        "merit": 0.0,
-                        "assist": 0.0,
-                        "donation": 0.0,
-                        "power_sum": 0.0,
-                        "power_count": 0,
-                        "days": 0,
-                    }
+        # Get metrics with snapshot totals for latest period
+        metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
+            latest_period.id
+        )
 
-                totals = member_totals[m.member_id]
-                # Weight daily averages by days in period
-                totals["contribution"] += float(m.daily_contribution) * days
-                totals["merit"] += float(m.daily_merit) * days
-                totals["assist"] += float(m.daily_assist) * days
-                totals["donation"] += float(m.daily_donation) * days
-                totals["power_sum"] += float(m.end_power)
-                totals["power_count"] += 1
-                totals["days"] += days
-
-        if not member_totals:
+        if not metrics_with_totals:
             return self._empty_alliance_averages()
 
-        # Calculate each member's season daily average (total weighted / total days)
+        # Calculate season daily averages for each member
         contributions = []
         merits = []
         assists = []
         donations = []
         powers = []
 
-        for totals in member_totals.values():
-            if totals["days"] > 0:
-                contributions.append(totals["contribution"] / totals["days"])
-                merits.append(totals["merit"] / totals["days"])
-                assists.append(totals["assist"] / totals["days"])
-                donations.append(totals["donation"] / totals["days"])
-            if totals["power_count"] > 0:
-                powers.append(totals["power_sum"] / totals["power_count"])
+        for m in metrics_with_totals:
+            # Season daily = total / season_days
+            contributions.append(m["total_contribution"] / season_days)
+            merits.append(m["total_merit"] / season_days)
+            assists.append(m["total_assist"] / season_days)
+            donations.append(m["total_donation"] / season_days)
+            powers.append(float(m["end_power"]))
 
-        count = len(member_totals)
+        count = len(metrics_with_totals)
 
         return {
             "member_count": count,
             # Averages across all members
-            "avg_daily_contribution": round(sum(contributions) / count, 2) if contributions else 0,
-            "avg_daily_merit": round(sum(merits) / count, 2) if merits else 0,
-            "avg_daily_assist": round(sum(assists) / count, 2) if assists else 0,
-            "avg_daily_donation": round(sum(donations) / count, 2) if donations else 0,
-            "avg_power": round(sum(powers) / count, 2) if powers else 0,
+            "avg_daily_contribution": round(sum(contributions) / count, 2),
+            "avg_daily_merit": round(sum(merits) / count, 2),
+            "avg_daily_assist": round(sum(assists) / count, 2),
+            "avg_daily_donation": round(sum(donations) / count, 2),
+            "avg_power": round(sum(powers) / count, 2),
             # Medians
-            "median_daily_contribution": round(calc_median(contributions), 2) if contributions else 0,
-            "median_daily_merit": round(calc_median(merits), 2) if merits else 0,
-            "median_daily_assist": round(calc_median(assists), 2) if assists else 0,
-            "median_daily_donation": round(calc_median(donations), 2) if donations else 0,
-            "median_power": round(calc_median(powers), 2) if powers else 0,
+            "median_daily_contribution": round(calc_median(contributions), 2),
+            "median_daily_merit": round(calc_median(merits), 2),
+            "median_daily_assist": round(calc_median(assists), 2),
+            "median_daily_donation": round(calc_median(donations), 2),
+            "median_power": round(calc_median(powers), 2),
         }
 
     async def get_member_with_comparison(
@@ -604,47 +593,54 @@ class AnalyticsService:
             alliance_averages = await self.get_period_alliance_averages(latest_period.id)
 
         if view == "season":
-            # Calculate season-weighted averages for each member
-            # Group trend_data by member_id
-            member_all_periods: dict[str, list[dict]] = defaultdict(list)
-            for row in trend_data:
-                member_all_periods[str(row["member_id"])].append(row)
+            # Season view: use snapshot totals / season_days for accurate daily averages
+            # This is more accurate than averaging daily_* values across periods
 
+            # Get season info for start_date
+            season = await self._season_repo.get_by_id(season_id)
+            if not season:
+                return {
+                    "stats": self._empty_group_stats(group_name),
+                    "members": [],
+                    "trends": trends,
+                    "alliance_averages": alliance_averages,
+                }
+
+            # Get metrics with snapshot totals for latest period
+            metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
+                latest_period.id
+            )
+
+            # Filter to group members
+            group_member_ids = {str(m["member_id"]) for m in group_metrics}
+            group_metrics_with_totals = [
+                m for m in metrics_with_totals if str(m["member_id"]) in group_member_ids
+            ]
+
+            # Calculate season days: from season start to latest snapshot date
+            season_days = (latest_period.end_date - season.start_date).days
+            if season_days <= 0:
+                season_days = 1  # Prevent division by zero
+
+            # Calculate season daily averages using snapshot totals
             members = []
-            for m in group_metrics:
+            for m in group_metrics_with_totals:
                 member_id = str(m["member_id"])
-                member_history = member_all_periods.get(member_id, [])
 
-                if member_history:
-                    # Calculate weighted averages across all periods
-                    total_contribution = sum(float(Decimal(str(h["daily_contribution"]))) for h in member_history)
-                    total_merit = sum(float(Decimal(str(h["daily_merit"]))) for h in member_history)
-                    total_assist = sum(float(Decimal(str(h["daily_assist"]))) for h in member_history)
-                    total_donation = sum(float(Decimal(str(h["daily_donation"]))) for h in member_history)
-                    total_rank = sum(h["end_rank"] for h in member_history)
-                    period_count = len(member_history)
-
-                    avg_contribution = round(total_contribution / period_count, 2)
-                    avg_merit = round(total_merit / period_count, 2)
-                    avg_assist = round(total_assist / period_count, 2)
-                    avg_donation = round(total_donation / period_count, 2)
-                    avg_rank = round(total_rank / period_count, 1)
-                else:
-                    # Fallback to latest period data
-                    avg_contribution = float(Decimal(str(m["daily_contribution"])))
-                    avg_merit = float(Decimal(str(m["daily_merit"])))
-                    avg_assist = float(Decimal(str(m["daily_assist"])))
-                    avg_donation = float(Decimal(str(m["daily_donation"])))
-                    avg_rank = float(m["end_rank"])
+                # Season daily = total / season_days
+                season_daily_contribution = round(m["total_contribution"] / season_days, 2)
+                season_daily_merit = round(m["total_merit"] / season_days, 2)
+                season_daily_assist = round(m["total_assist"] / season_days, 2)
+                season_daily_donation = round(m["total_donation"] / season_days, 2)
 
                 members.append({
                     "id": member_id,
                     "name": m["member_name"],
-                    "contribution_rank": round(avg_rank),  # Season average rank
-                    "daily_contribution": avg_contribution,
-                    "daily_merit": avg_merit,
-                    "daily_assist": avg_assist,
-                    "daily_donation": avg_donation,
+                    "contribution_rank": m["end_rank"],  # Latest rank
+                    "daily_contribution": season_daily_contribution,
+                    "daily_merit": season_daily_merit,
+                    "daily_assist": season_daily_assist,
+                    "daily_donation": season_daily_donation,
                     "power": m["end_power"],  # Power is always latest
                     "rank_change": None,  # Not applicable for season view
                     "contribution_change": None,  # Not applicable for season view
@@ -725,53 +721,55 @@ class AnalyticsService:
             List of group comparison items sorted by avg_daily_merit descending
         """
         from collections import defaultdict
-        from decimal import Decimal
 
         periods = await self._period_repo.get_by_season(season_id)
         if not periods:
             return []
 
         if view == "season":
-            # Calculate season-weighted averages across all periods
-            # group_name -> {total_merit, total_rank, total_member_periods, latest_member_count}
-            group_totals: dict[str, dict] = defaultdict(
-                lambda: {"total_merit": 0.0, "total_rank": 0.0, "total_member_periods": 0, "latest_member_count": 0}
+            # Season view: use snapshot totals / season_days for accurate daily averages
+            # This is more accurate than averaging daily_* values across periods
+
+            # Get season info for start_date
+            season = await self._season_repo.get_by_id(season_id)
+            if not season:
+                return []
+
+            latest_period = periods[-1]
+
+            # Calculate season days
+            season_days = (latest_period.end_date - season.start_date).days
+            if season_days <= 0:
+                season_days = 1
+
+            # Get metrics with snapshot totals for latest period
+            metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
+                latest_period.id
             )
 
-            for period in periods:
-                metrics = await self._metrics_repo.get_by_period(period.id)
-                # Group metrics by end_group
-                period_groups: dict[str, list] = defaultdict(list)
-                for m in metrics:
-                    group = m.end_group or "未分組"
-                    period_groups[group].append(m)
-
-                for group_name, group_metrics in period_groups.items():
-                    count = len(group_metrics)
-                    avg_merit = sum(float(Decimal(str(m.daily_merit))) for m in group_metrics) / count
-                    avg_rank = sum(m.end_rank for m in group_metrics) / count
-
-                    group_totals[group_name]["total_merit"] += avg_merit * count
-                    group_totals[group_name]["total_rank"] += avg_rank * count
-                    group_totals[group_name]["total_member_periods"] += count
-
-            # Get latest period member counts
-            latest_period = periods[-1]
-            latest_metrics = await self._metrics_repo.get_by_period(latest_period.id)
-            for m in latest_metrics:
-                group = m.end_group or "未分組"
-                group_totals[group]["latest_member_count"] += 1
+            # Group by end_group and calculate season daily averages
+            group_data: dict[str, list[dict]] = defaultdict(list)
+            for m in metrics_with_totals:
+                group = m["end_group"] or "未分組"
+                season_daily_merit = m["total_merit"] / season_days
+                group_data[group].append({
+                    "season_daily_merit": season_daily_merit,
+                    "end_rank": m["end_rank"],
+                })
 
             # Build result
             result = []
-            for group_name, totals in group_totals.items():
-                if totals["total_member_periods"] > 0:
-                    result.append({
-                        "name": group_name,
-                        "avg_daily_merit": round(totals["total_merit"] / totals["total_member_periods"], 2),
-                        "avg_rank": round(totals["total_rank"] / totals["total_member_periods"], 1),
-                        "member_count": totals["latest_member_count"],
-                    })
+            for group_name, members in group_data.items():
+                count = len(members)
+                avg_merit = sum(m["season_daily_merit"] for m in members) / count
+                avg_rank = sum(m["end_rank"] for m in members) / count
+
+                result.append({
+                    "name": group_name,
+                    "avg_daily_merit": round(avg_merit, 2),
+                    "avg_rank": round(avg_rank, 1),
+                    "member_count": count,
+                })
 
             return sorted(result, key=lambda x: x["avg_daily_merit"], reverse=True)
 

@@ -37,6 +37,9 @@ export const analyticsKeys = {
   // Alliance trend
   allianceTrend: (seasonId: string) => [...analyticsKeys.all, 'alliance-trend', seasonId] as const,
 
+  // Season averages (for "賽季以來" view comparison)
+  seasonAverages: (seasonId: string) => [...analyticsKeys.all, 'season-averages', seasonId] as const,
+
   // Group analytics
   groups: () => [...analyticsKeys.all, 'groups'] as const,
   groupsList: (seasonId: string) => [...analyticsKeys.groups(), 'list', seasonId] as const,
@@ -101,6 +104,19 @@ export function useAllianceTrend(seasonId: string | undefined) {
   return useQuery({
     queryKey: analyticsKeys.allianceTrend(seasonId ?? ''),
     queryFn: () => apiClient.getAllianceTrend(seasonId!),
+    enabled: !!seasonId,
+    staleTime: 5 * 60 * 1000
+  })
+}
+
+/**
+ * Hook to fetch season-to-date alliance averages and medians.
+ * Used for "賽季以來" view mode comparison baseline.
+ */
+export function useSeasonAverages(seasonId: string | undefined) {
+  return useQuery({
+    queryKey: analyticsKeys.seasonAverages(seasonId ?? ''),
+    queryFn: () => apiClient.getSeasonAverages(seasonId!),
     enabled: !!seasonId,
     staleTime: 5 * 60 * 1000
   })

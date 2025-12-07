@@ -55,6 +55,7 @@ import {
   useAnalyticsMembers,
   useMemberTrend,
   useMemberSeasonSummary,
+  useSeasonAverages,
 } from '@/hooks/use-analytics'
 import type {
   MemberTrendItem,
@@ -1527,13 +1528,33 @@ function MemberPerformance() {
     error: summaryError,
   } = useMemberSeasonSummary(selectedMemberId, seasonId)
 
+  // Fetch season alliance averages (for "賽季以來" view comparison)
+  const {
+    data: seasonAllianceAverages,
+    isLoading: isLoadingSeasonAvg,
+  } = useSeasonAverages(seasonId)
+
   // Find selected member info
   const selectedMember = useMemo(() => {
     return members?.find((m) => m.id === selectedMemberId)
   }, [members, selectedMemberId])
 
-  // Calculate alliance averages from latest trend period
+  // Calculate alliance averages based on viewMode:
+  // - 'latest': use latest period's alliance averages (from trend data)
+  // - 'season': use season-to-date alliance averages (from dedicated API)
   const allianceAvg: AllianceAverage = useMemo(() => {
+    // For season view, use season averages if available
+    if (viewMode === 'season' && seasonAllianceAverages) {
+      return {
+        daily_contribution: seasonAllianceAverages.avg_daily_contribution,
+        daily_merit: seasonAllianceAverages.avg_daily_merit,
+        daily_assist: seasonAllianceAverages.avg_daily_assist,
+        daily_donation: seasonAllianceAverages.avg_daily_donation,
+        power: seasonAllianceAverages.avg_power,
+      }
+    }
+
+    // For latest view or fallback, use latest period from trend data
     if (!trendData || trendData.length === 0) {
       return {
         daily_contribution: 0,
@@ -1551,10 +1572,24 @@ function MemberPerformance() {
       daily_donation: latest.alliance_avg_donation,
       power: latest.alliance_avg_power,
     }
-  }, [trendData])
+  }, [viewMode, seasonAllianceAverages, trendData])
 
-  // Calculate alliance medians from latest trend period
+  // Calculate alliance medians based on viewMode:
+  // - 'latest': use latest period's alliance medians (from trend data)
+  // - 'season': use season-to-date alliance medians (from dedicated API)
   const allianceMedian: AllianceMedian = useMemo(() => {
+    // For season view, use season medians if available
+    if (viewMode === 'season' && seasonAllianceAverages) {
+      return {
+        daily_contribution: seasonAllianceAverages.median_daily_contribution,
+        daily_merit: seasonAllianceAverages.median_daily_merit,
+        daily_assist: seasonAllianceAverages.median_daily_assist,
+        daily_donation: seasonAllianceAverages.median_daily_donation,
+        power: seasonAllianceAverages.median_power,
+      }
+    }
+
+    // For latest view or fallback, use latest period from trend data
     if (!trendData || trendData.length === 0) {
       return {
         daily_contribution: 0,
@@ -1572,7 +1607,7 @@ function MemberPerformance() {
       daily_donation: latest.alliance_median_donation,
       power: latest.alliance_median_power,
     }
-  }, [trendData])
+  }, [viewMode, seasonAllianceAverages, trendData])
 
   // Get total members from latest trend data
   const totalMembers = useMemo(() => {
@@ -1580,8 +1615,9 @@ function MemberPerformance() {
     return trendData[trendData.length - 1].alliance_member_count
   }, [trendData])
 
-  // Loading state
-  const isLoading = isLoadingSeason || isLoadingMembers || isLoadingTrend || isLoadingSummary
+  // Loading state (include season averages only when in season view)
+  const isLoading = isLoadingSeason || isLoadingMembers || isLoadingTrend || isLoadingSummary ||
+    (viewMode === 'season' && isLoadingSeasonAvg)
 
   // Error state
   const hasError = membersError || trendError || summaryError

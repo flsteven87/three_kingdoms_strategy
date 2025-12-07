@@ -443,6 +443,17 @@ class ApiClient {
     return response.data
   }
 
+  /**
+   * Get alliance average and median metrics for season-to-date
+   * Used for "賽季以來" view mode comparison baseline
+   */
+  async getSeasonAverages(seasonId: string): Promise<AllianceAveragesResponse> {
+    const response = await this.client.get<AllianceAveragesResponse>(
+      `/api/v1/analytics/seasons/${seasonId}/averages`
+    )
+    return response.data
+  }
+
   // ==================== Group Analytics API ====================
 
   /**

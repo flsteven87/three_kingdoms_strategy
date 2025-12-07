@@ -158,6 +158,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
   const seasonGroupAverages = useMemo(() => {
     if (periodTrends.length === 0) {
       return {
+        avg_daily_contribution: 0,
         avg_daily_merit: 0,
         avg_daily_assist: 0,
         avg_daily_donation: 0,
@@ -167,6 +168,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
     }
 
     // Calculate weighted average based on member-days per period
+    let totalContribution = 0
     let totalMerit = 0
     let totalAssist = 0
     let totalDonation = 0
@@ -176,6 +178,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
 
     for (const period of periodTrends) {
       const memberDays = period.member_count * period.days
+      totalContribution += period.avg_contribution * memberDays
       totalMerit += period.avg_merit * memberDays
       totalAssist += period.avg_assist * memberDays
       totalDonation += period.avg_donation * memberDays
@@ -185,6 +188,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
     }
 
     return {
+      avg_daily_contribution: totalMemberDays > 0 ? totalContribution / totalMemberDays : 0,
       avg_daily_merit: totalMemberDays > 0 ? totalMerit / totalMemberDays : 0,
       avg_daily_assist: totalMemberDays > 0 ? totalAssist / totalMemberDays : 0,
       avg_daily_donation: totalMemberDays > 0 ? totalDonation / totalMemberDays : 0,
@@ -199,12 +203,22 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
     const normalize = (value: number, avg: number) => (avg > 0 ? Math.round((value / avg) * 100) : 0)
 
     // Select group values based on view mode
+    const groupContribution = viewMode === 'latest' ? groupStats.avg_daily_contribution : seasonGroupAverages.avg_daily_contribution
     const groupMerit = viewMode === 'latest' ? groupStats.avg_daily_merit : seasonGroupAverages.avg_daily_merit
     const groupAssist = viewMode === 'latest' ? groupStats.avg_daily_assist : seasonGroupAverages.avg_daily_assist
     const groupDonation = viewMode === 'latest' ? groupStats.avg_daily_donation : seasonGroupAverages.avg_daily_donation
     const groupPower = viewMode === 'latest' ? groupStats.avg_power : seasonGroupAverages.avg_power
 
     return [
+      {
+        metric: '貢獻',
+        group: normalize(groupContribution, allianceAverages.avg_daily_contribution),
+        groupRaw: groupContribution,
+        alliance: 100,
+        allianceRaw: allianceAverages.avg_daily_contribution,
+        median: normalize(allianceAverages.median_daily_contribution, allianceAverages.avg_daily_contribution),
+        medianRaw: allianceAverages.median_daily_contribution,
+      },
       {
         metric: '戰功',
         group: normalize(groupMerit, allianceAverages.avg_daily_merit),
@@ -245,10 +259,11 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
   }, [viewMode, groupStats, seasonGroupAverages, allianceAverages])
 
   // Displayed values based on view mode
+  const displayContribution = viewMode === 'latest' ? groupStats.avg_daily_contribution : seasonGroupAverages.avg_daily_contribution
   const displayMerit = viewMode === 'latest' ? groupStats.avg_daily_merit : seasonGroupAverages.avg_daily_merit
   const displayAssist = viewMode === 'latest' ? groupStats.avg_daily_assist : seasonGroupAverages.avg_daily_assist
-  const displayRank = viewMode === 'latest' ? groupStats.avg_rank : seasonGroupAverages.avg_rank
 
+  const contributionDiff = calculatePercentDiff(displayContribution, allianceAverages.avg_daily_contribution)
   const meritDiff = calculatePercentDiff(displayMerit, allianceAverages.avg_daily_merit)
   const assistDiff = calculatePercentDiff(displayAssist, allianceAverages.avg_daily_assist)
 
@@ -274,25 +289,27 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold tabular-nums">{groupStats.member_count}</div>
-            <p className="text-xs text-muted-foreground mt-1">活躍成員</p>
           </CardContent>
         </Card>
 
-        {/* Average Rank */}
+        {/* Daily Contribution */}
         <Card className="border-primary/50">
           <CardHeader className="pb-2">
-            <CardDescription>組別平均排名</CardDescription>
+            <CardDescription>人日均貢獻</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold tabular-nums">
-              #{Math.round(displayRank)}
-              <span className="text-base font-normal text-muted-foreground ml-1">/ {allianceAverages.member_count}</span>
+            <div className="text-2xl font-bold tabular-nums">{formatNumber(displayContribution)}</div>
+            <div className="flex items-center gap-1 mt-1">
+              {contributionDiff >= 0 ? (
+                <TrendingUp className="h-3 w-3 text-primary" />
+              ) : (
+                <TrendingDown className="h-3 w-3 text-destructive" />
+              )}
+              <span className={`text-xs ${contributionDiff >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                {contributionDiff >= 0 ? '+' : ''}
+                {contributionDiff.toFixed(1)}% vs 盟均
+              </span>
             </div>
-            {viewMode === 'latest' && (
-              <p className="text-xs text-muted-foreground mt-1">
-                最佳 #{groupStats.best_rank} · 最差 #{groupStats.worst_rank}
-              </p>
-            )}
           </CardContent>
         </Card>
 
@@ -341,10 +358,10 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Capability Radar (4 dimensions) */}
+        {/* Capability Radar (5 dimensions) */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">四維能力圖</CardTitle>
+            <CardTitle className="text-base">五維能力圖</CardTitle>
             <CardDescription>組別人日均表現 vs 同盟平均/中位數（100% = 同盟平均）</CardDescription>
           </CardHeader>
           <CardContent>
@@ -417,8 +434,8 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
             <CardDescription>人日均戰功排名</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={meritBarConfig} className="h-[280px] w-full">
-              <BarChart data={chartData} layout="vertical" margin={{ left: 80, right: 20 }}>
+            <ChartContainer config={meritBarConfig} className="h-[320px] w-full">
+              <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
                 <XAxis
                   type="number"
@@ -433,7 +450,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData, periodTrends
                   tickLine={false}
                   axisLine={false}
                   className="text-xs"
-                  width={75}
+                  width={70}
                 />
                 <ChartTooltip
                   content={({ active, payload }) => {
@@ -1350,13 +1367,13 @@ function GroupAnalytics() {
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">總覽</span>
               </TabsTrigger>
-              <TabsTrigger value="distribution" className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">戰功分佈</span>
-              </TabsTrigger>
               <TabsTrigger value="contribution" className="flex items-center gap-2">
                 <Trophy className="h-4 w-4" />
                 <span className="hidden sm:inline">貢獻分佈</span>
+              </TabsTrigger>
+              <TabsTrigger value="distribution" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">戰功分佈</span>
               </TabsTrigger>
               <TabsTrigger value="members" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -1374,16 +1391,16 @@ function GroupAnalytics() {
               />
             </TabsContent>
 
-            <TabsContent value="distribution">
-              <MeritDistributionTab
+            <TabsContent value="contribution">
+              <ContributionDistributionTab
                 groupStats={groupStats}
                 members={groupMembers}
                 periodTrends={periodTrends}
               />
             </TabsContent>
 
-            <TabsContent value="contribution">
-              <ContributionDistributionTab
+            <TabsContent value="distribution">
+              <MeritDistributionTab
                 groupStats={groupStats}
                 members={groupMembers}
                 periodTrends={periodTrends}

@@ -263,6 +263,29 @@ async def get_alliance_trend(
     return [AllianceTrendItem(**item) for item in data]
 
 
+@router.get("/seasons/{season_id}/averages", response_model=AllianceAveragesResponse)
+async def get_season_averages(
+    season_id: UUID,
+    user_id: CurrentUserIdDep,
+    service: AnalyticsServiceDep,
+) -> AllianceAveragesResponse:
+    """
+    Get alliance average and median metrics for season-to-date.
+
+    Uses snapshot totals / season_days for accurate season daily averages.
+    This is the correct comparison baseline for "賽季以來" view mode.
+
+    Path Parameters:
+        season_id: Season UUID
+
+    Returns:
+        Alliance averages and medians for daily metrics
+    """
+    await _verify_season_access(user_id, season_id)
+    result = await service.get_season_alliance_averages(season_id)
+    return AllianceAveragesResponse(**result)
+
+
 # =============================================================================
 # Group Analytics Endpoints
 # =============================================================================
