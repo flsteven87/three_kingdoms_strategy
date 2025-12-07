@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Calendar, Database, Trophy, Users, BarChart3, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Calendar, Database, Trophy, Users, BarChart3, Settings, LogOut, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,11 @@ const navigation: readonly NavigationItem[] = [
     name: '同盟分析',
     href: '/analytics',
     icon: BarChart3,
+  },
+  {
+    name: '組別分析',
+    href: '/groups',
+    icon: Layers,
   },
   {
     name: '成員表現',

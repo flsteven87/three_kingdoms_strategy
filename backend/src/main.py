@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.v1.endpoints import (
     alliance_collaborators,
     alliances,
+    analytics,
     hegemony_weights,
     periods,
     seasons,
@@ -47,6 +48,7 @@ app.include_router(seasons.router, prefix="/api/v1")
 app.include_router(uploads.router, prefix="/api/v1")
 app.include_router(hegemony_weights.router, prefix="/api/v1")
 app.include_router(periods.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
 
 # Health check endpoint (public)
 @app.get("/health")

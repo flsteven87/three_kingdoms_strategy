@@ -25,6 +25,13 @@ import type {
   SnapshotWeightsSummary
 } from '@/types/hegemony-weight'
 import type { RecalculateSeasonPeriodsResponse } from '@/types/period'
+import type {
+  MemberListItem,
+  MemberTrendItem,
+  SeasonSummaryResponse,
+  AllianceAveragesResponse,
+  AllianceTrendItem
+} from '@/types/analytics'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087'
 
@@ -366,6 +373,70 @@ class ApiClient {
     const response = await this.client.post<RecalculateSeasonPeriodsResponse>(
       `/api/v1/periods/seasons/${seasonId}/recalculate`
     )
+    return response.data
+  }
+
+  // ==================== Analytics API ====================
+
+  /**
+   * Get all members for analytics member selector
+   */
+  async getAnalyticsMembers(
+    seasonId: string,
+    activeOnly: boolean = true
+  ): Promise<MemberListItem[]> {
+    const response = await this.client.get<MemberListItem[]>('/api/v1/analytics/members', {
+      params: { season_id: seasonId, active_only: activeOnly }
+    })
+    return response.data
+  }
+
+  /**
+   * Get member's performance trend across all periods in a season
+   */
+  async getMemberTrend(memberId: string, seasonId: string): Promise<MemberTrendItem[]> {
+    const response = await this.client.get<MemberTrendItem[]>(
+      `/api/v1/analytics/members/${memberId}/trend`,
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data
+  }
+
+  /**
+   * Get member's season-to-date summary
+   */
+  async getMemberSeasonSummary(
+    memberId: string,
+    seasonId: string
+  ): Promise<SeasonSummaryResponse> {
+    const response = await this.client.get<SeasonSummaryResponse>(
+      `/api/v1/analytics/members/${memberId}/summary`,
+      {
+        params: { season_id: seasonId }
+      }
+    )
+    return response.data
+  }
+
+  /**
+   * Get alliance average metrics for a specific period
+   */
+  async getPeriodAverages(periodId: string): Promise<AllianceAveragesResponse> {
+    const response = await this.client.get<AllianceAveragesResponse>(
+      `/api/v1/analytics/periods/${periodId}/averages`
+    )
+    return response.data
+  }
+
+  /**
+   * Get alliance averages for each period in a season
+   */
+  async getAllianceTrend(seasonId: string): Promise<AllianceTrendItem[]> {
+    const response = await this.client.get<AllianceTrendItem[]>('/api/v1/analytics/alliance/trend', {
+      params: { season_id: seasonId }
+    })
     return response.data
   }
 }

@@ -10,6 +10,7 @@ import DataManagement from './pages/DataManagement'
 import HegemonyWeights from './pages/HegemonyWeights'
 import MemberPerformance from './pages/MemberPerformance'
 import AllianceAnalytics from './pages/AllianceAnalytics'
+import GroupAnalytics from './pages/GroupAnalytics'
 import Settings from './pages/Settings'
 
 // Protected Route Component
@@ -101,6 +102,16 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <AllianceAnalytics />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/groups"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <GroupAnalytics />
                 </DashboardLayout>
               </ProtectedRoute>
             }

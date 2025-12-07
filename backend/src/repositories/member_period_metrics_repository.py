@@ -161,6 +161,66 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         self._handle_supabase_result(result, allow_empty=True)
         return True
 
+    async def get_periods_averages_batch(
+        self, period_ids: list[UUID]
+    ) -> dict[UUID, dict]:
+        """
+        Get alliance average metrics for multiple periods in one query.
+
+        Args:
+            period_ids: List of Period UUIDs
+
+        Returns:
+            Dict mapping period_id to average metrics
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        if not period_ids:
+            return {}
+
+        from collections import defaultdict
+        from decimal import Decimal
+
+        # Query all metrics for these periods
+        result = (
+            self.client.from_(self.table_name)
+            .select("period_id, daily_contribution, daily_merit, daily_assist, daily_donation")
+            .in_("period_id", [str(pid) for pid in period_ids])
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Group by period_id and calculate averages
+        period_metrics: dict[str, list[dict]] = defaultdict(list)
+        for row in data:
+            period_metrics[row["period_id"]].append(row)
+
+        averages: dict[UUID, dict] = {}
+        for period_id_str, metrics_list in period_metrics.items():
+            count = len(metrics_list)
+            if count == 0:
+                continue
+
+            period_uuid = UUID(period_id_str)
+            averages[period_uuid] = {
+                "member_count": count,
+                "avg_daily_contribution": float(
+                    sum(Decimal(str(m["daily_contribution"])) for m in metrics_list) / count
+                ),
+                "avg_daily_merit": float(
+                    sum(Decimal(str(m["daily_merit"])) for m in metrics_list) / count
+                ),
+                "avg_daily_assist": float(
+                    sum(Decimal(str(m["daily_assist"])) for m in metrics_list) / count
+                ),
+                "avg_daily_donation": float(
+                    sum(Decimal(str(m["daily_donation"])) for m in metrics_list) / count
+                ),
+            }
+
+        return averages
+
     async def get_group_averages(self, period_id: UUID) -> list[dict]:
         """
         Get average metrics by group for a period
