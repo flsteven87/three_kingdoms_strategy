@@ -1040,6 +1040,7 @@ class AnalyticsService:
                 prev_metrics_map[UUID(m["member_id"])] = {
                     "daily_contribution": float(m["daily_contribution"]),
                     "daily_merit": float(m["daily_merit"]),
+                    "daily_assist": float(m["daily_assist"]),
                     "end_power": m["end_power"],
                 }
 
