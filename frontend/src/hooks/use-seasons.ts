@@ -70,13 +70,13 @@ export function useCreateSeason() {
   return useMutation({
     mutationFn: (data: SeasonCreate) => apiClient.createSeason(data),
     onSuccess: (newSeason) => {
-      // Invalidate all season lists to refetch
       queryClient.invalidateQueries({ queryKey: seasonKeys.lists() })
-
-      // If new season is active, invalidate active season query
       if (newSeason.is_active) {
         queryClient.invalidateQueries({ queryKey: seasonKeys.active() })
       }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: seasonKeys.all })
     }
   })
 }

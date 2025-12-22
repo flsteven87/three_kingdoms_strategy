@@ -41,8 +41,10 @@ export function useCreateAlliance() {
   return useMutation({
     mutationFn: (data: AllianceCreate) => apiClient.createAlliance(data),
     onSuccess: (newAlliance) => {
-      // Update cache with new alliance
       queryClient.setQueryData(allianceKeys.detail(), newAlliance)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: allianceKeys.all })
     }
   })
 }
@@ -96,8 +98,10 @@ export function useDeleteAlliance() {
   return useMutation({
     mutationFn: () => apiClient.deleteAlliance(),
     onSuccess: () => {
-      // Clear alliance from cache
       queryClient.setQueryData(allianceKeys.detail(), null)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: allianceKeys.all })
     }
   })
 }

@@ -186,7 +186,7 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 | **Hegemony** | GET | `/hegemony-weights?season_id={id}` | 取得權重設定 |
 | | POST | `/hegemony-weights/initialize` | 初始化權重 |
 
-**完整 API 文件**: [docs/API.md](docs/API.md)
+**API 文件**: 啟動 Backend 後訪問 http://localhost:8087/docs (Swagger UI)
 
 ---
 

@@ -1,14 +1,15 @@
 import { useState } from 'react'
+import { Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { ThemeToggle } from '../theme-toggle'
 import { cn } from '@/lib/utils'
 
 interface DashboardLayoutProps {
-  readonly children: React.ReactNode
+  readonly children?: React.ReactNode
 }
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -67,7 +68,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
           <div className="container mx-auto p-6 max-w-7xl">
-            {children}
+            {children ?? <Outlet />}
           </div>
         </main>
       </div>

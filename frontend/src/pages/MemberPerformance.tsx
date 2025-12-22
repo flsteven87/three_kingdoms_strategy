@@ -46,7 +46,6 @@ import {
   Legend,
 } from 'recharts'
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
 } from '@/components/ui/chart'
@@ -69,13 +68,8 @@ import {
   getPeriodBoundaryTicks,
   formatDateLabel,
 } from '@/lib/chart-utils'
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-// Subtle blue-gray for median lines (distinct from muted-foreground but still muted)
-const MEDIAN_LINE_COLOR = 'hsl(215 20% 55%)'
+import { memberChartConfigs, MEDIAN_LINE_COLOR } from '@/lib/chart-configs'
+import type { ChartConfig } from '@/components/ui/chart'
 
 // ============================================================================
 // Types

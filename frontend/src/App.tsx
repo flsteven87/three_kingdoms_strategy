@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './hooks/use-auth'
 import { DashboardLayout } from './components/layout/DashboardLayout'
@@ -12,8 +12,7 @@ import AllianceAnalytics from './pages/AllianceAnalytics'
 import GroupAnalytics from './pages/GroupAnalytics'
 import Settings from './pages/Settings'
 
-// Protected Route Component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute() {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -30,7 +29,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/landing" replace />
   }
 
-  return <>{children}</>
+  return <Outlet />
 }
 
 function App() {
@@ -38,85 +37,22 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public Routes */}
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
-          {/* Protected Routes */}
-          {/* Redirect old dashboard to analytics */}
-          <Route path="/dashboard" element={<Navigate to="/analytics" replace />} />
-          {/* Redirect root to analytics */}
-          <Route path="/" element={<Navigate to="/analytics" replace />} />
-          <Route
-            path="/seasons"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Seasons />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/data"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <DataManagement />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/hegemony"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <HegemonyWeights />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/members"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <MemberPerformance />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <AllianceAnalytics />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/groups"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <GroupAnalytics />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Settings />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<DashboardLayout />}>
+              <Route index element={<Navigate to="/analytics" replace />} />
+              <Route path="dashboard" element={<Navigate to="/analytics" replace />} />
+              <Route path="seasons" element={<Seasons />} />
+              <Route path="data" element={<DataManagement />} />
+              <Route path="hegemony" element={<HegemonyWeights />} />
+              <Route path="members" element={<MemberPerformance />} />
+              <Route path="analytics" element={<AllianceAnalytics />} />
+              <Route path="groups" element={<GroupAnalytics />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+          </Route>
         </Routes>
       </AuthProvider>
     </BrowserRouter>
