@@ -7,7 +7,7 @@
  * - snake_case field naming
  */
 
-import axios, { type AxiosInstance } from 'axios'
+import axios, { type AxiosInstance, type AxiosError } from 'axios'
 import type { Alliance, AllianceCreate, AllianceUpdate } from '@/types/alliance'
 import type {
   AllianceCollaborator,
@@ -50,6 +50,28 @@ class ApiClient {
       },
       withCredentials: true
     })
+
+    this.setupInterceptors()
+  }
+
+  private setupInterceptors() {
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error: AxiosError) => {
+        // Handle 401 Unauthorized - clear auth state
+        if (error.response?.status === 401) {
+          this.setAuthToken(null)
+          // Redirect to landing handled by AuthContext
+        }
+
+        // Handle network errors
+        if (!error.response) {
+          console.error('Network error:', error.message)
+        }
+
+        return Promise.reject(error)
+      }
+    )
   }
 
   /**

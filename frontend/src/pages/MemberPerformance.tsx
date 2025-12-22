@@ -69,7 +69,6 @@ import {
   formatDateLabel,
 } from '@/lib/chart-utils'
 import { memberChartConfigs, MEDIAN_LINE_COLOR } from '@/lib/chart-configs'
-import type { ChartConfig } from '@/components/ui/chart'
 
 // ============================================================================
 // Types
@@ -148,111 +147,6 @@ function createDailyChartData(periodData: readonly MemberTrendItem[]): DailyData
     allianceMedianPower: p.alliance_median_power,
   }))
 }
-
-// ============================================================================
-// Chart Configurations
-// ============================================================================
-
-const contributionMeritChartConfig = {
-  contribution: {
-    label: '日均貢獻',
-    color: 'var(--chart-4)',
-  },
-  merit: {
-    label: '日均戰功',
-    color: 'var(--primary)',
-  },
-} satisfies ChartConfig
-
-const radarChartConfig = {
-  member: {
-    label: '成員',
-    color: 'var(--primary)',
-  },
-  alliance: {
-    label: '同盟平均',
-    color: 'var(--muted-foreground)',
-  },
-  median: {
-    label: '同盟中位數',
-    color: MEDIAN_LINE_COLOR,
-  },
-} satisfies ChartConfig
-
-const meritChartConfig = {
-  merit: {
-    label: '日均戰功',
-    color: 'var(--primary)',
-  },
-  alliance_avg_merit: {
-    label: '同盟平均',
-    color: 'var(--muted-foreground)',
-  },
-  alliance_median_merit: {
-    label: '同盟中位數',
-    color: MEDIAN_LINE_COLOR,
-  },
-} satisfies ChartConfig
-
-const assistChartConfig = {
-  assist: {
-    label: '日均助攻',
-    color: 'var(--chart-2)',
-  },
-  alliance_avg_assist: {
-    label: '同盟平均',
-    color: 'var(--muted-foreground)',
-  },
-  alliance_median_assist: {
-    label: '同盟中位數',
-    color: MEDIAN_LINE_COLOR,
-  },
-} satisfies ChartConfig
-
-const powerChartConfig = {
-  power: {
-    label: '勢力值',
-    color: 'var(--primary)',
-  },
-  alliance_avg_power: {
-    label: '同盟平均',
-    color: 'var(--muted-foreground)',
-  },
-  alliance_median_power: {
-    label: '同盟中位數',
-    color: MEDIAN_LINE_COLOR,
-  },
-} satisfies ChartConfig
-
-const donationChartConfig = {
-  donation: {
-    label: '捐獻',
-    color: 'var(--chart-3)',
-  },
-  alliance_avg_donation: {
-    label: '同盟平均',
-    color: 'var(--muted-foreground)',
-  },
-  alliance_median_donation: {
-    label: '同盟中位數',
-    color: MEDIAN_LINE_COLOR,
-  },
-} satisfies ChartConfig
-
-const contributionChartConfig = {
-  contribution: {
-    label: '日均貢獻',
-    color: 'var(--chart-4)',
-  },
-  alliance_avg_contribution: {
-    label: '同盟平均',
-    color: 'var(--muted-foreground)',
-  },
-  alliance_median_contribution: {
-    label: '同盟中位數',
-    color: MEDIAN_LINE_COLOR,
-  },
-} satisfies ChartConfig
 
 // ============================================================================
 // Tab 1: Overview (Contribution Rank Focus)
@@ -487,7 +381,7 @@ function OverviewTab({ periodData, seasonSummary, allianceAvg, allianceMedian, m
             <CardDescription>日均貢獻（左軸）與日均戰功（右軸）</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={contributionMeritChartConfig} className="h-[280px] w-full">
+            <ChartContainer config={memberChartConfigs.contributionMerit} className="h-[280px] w-full">
               <LineChart data={dailyData} margin={{ left: 12, right: 12, top: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
@@ -570,7 +464,7 @@ function OverviewTab({ periodData, seasonSummary, allianceAvg, allianceMedian, m
             <CardDescription>成員日均表現 vs 同盟平均/中位數（100% = 同盟平均）</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ChartContainer config={radarChartConfig} className="mx-auto aspect-square max-h-[280px]">
+            <ChartContainer config={memberChartConfigs.radar} className="mx-auto aspect-square max-h-[280px]">
               <RadarChart data={radarData}>
                 <PolarGrid gridType="polygon" />
                 <PolarAngleAxis dataKey="metric" className="text-xs" tick={{ fill: 'var(--foreground)', fontSize: 12 }} />
@@ -707,7 +601,7 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
               <CardTitle className="text-sm">戰功趨勢</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <ChartContainer config={meritChartConfig} className="h-[200px] w-full">
+              <ChartContainer config={memberChartConfigs.merit} className="h-[200px] w-full">
                 <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
@@ -811,7 +705,7 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
               <CardTitle className="text-sm">助攻趨勢</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <ChartContainer config={assistChartConfig} className="h-[200px] w-full">
+              <ChartContainer config={memberChartConfigs.assist} className="h-[200px] w-full">
                 <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
@@ -1039,7 +933,7 @@ function ContributionTab({ periodData, seasonSummary, allianceAvg, totalMembers 
           <CardDescription>日均貢獻與同盟對比</CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
-          <ChartContainer config={contributionChartConfig} className="h-[280px] w-full">
+          <ChartContainer config={memberChartConfigs.contribution} className="h-[280px] w-full">
             <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
@@ -1232,7 +1126,7 @@ function PowerDonationTab({ periodData, seasonSummary, allianceAvg }: PowerDonat
               <CardTitle className="text-sm">勢力值趨勢</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <ChartContainer config={powerChartConfig} className="h-[200px] w-full">
+              <ChartContainer config={memberChartConfigs.power} className="h-[200px] w-full">
                 <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
@@ -1335,7 +1229,7 @@ function PowerDonationTab({ periodData, seasonSummary, allianceAvg }: PowerDonat
               <CardTitle className="text-sm">捐獻趨勢</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <ChartContainer config={donationChartConfig} className="h-[200px] w-full">
+              <ChartContainer config={memberChartConfigs.donation} className="h-[200px] w-full">
                 <LineChart data={dailyData} margin={{ left: 8, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis

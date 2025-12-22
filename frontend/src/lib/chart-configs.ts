@@ -153,6 +153,13 @@ export const groupChartConfigs = {
       color: 'var(--chart-3)',
     },
   } satisfies ChartConfig,
+
+  meritDistribution: {
+    count: {
+      label: '人數',
+      color: 'var(--primary)',
+    },
+  } satisfies ChartConfig,
 }
 
 // =============================================================================

@@ -57,7 +57,6 @@ import {
   ReferenceLine,
 } from 'recharts'
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
 } from '@/components/ui/chart'
@@ -69,30 +68,13 @@ import {
   getPeriodBoundaryTicks,
   formatDateLabel,
 } from '@/lib/chart-utils'
+import { allianceChartConfigs } from '@/lib/chart-configs'
 
 // ============================================================================
 // Types
 // ============================================================================
 
 type ViewMode = 'latest' | 'season'
-
-// ============================================================================
-// Chart Configurations
-// ============================================================================
-
-const trendChartConfig = {
-  contribution: { label: '人日均貢獻', color: 'var(--primary)' },
-  merit: { label: '人日均戰功', color: 'var(--chart-2)' },
-  median: { label: '中位數', color: 'var(--muted-foreground)' },
-} satisfies ChartConfig
-
-const groupBarConfig = {
-  value: { label: '數值', color: 'var(--primary)' },
-} satisfies ChartConfig
-
-const distributionConfig = {
-  count: { label: '人數', color: 'var(--primary)' },
-} satisfies ChartConfig
 
 // ============================================================================
 // Helper Components
@@ -210,7 +192,7 @@ function OverviewTab({ viewMode, data }: OverviewTabProps) {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Trend Line */}
-            <ChartContainer config={trendChartConfig} className="h-[200px] w-full">
+            <ChartContainer config={allianceChartConfigs.trend} className="h-[200px] w-full">
               <LineChart data={dailyTrendData} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
@@ -265,7 +247,7 @@ function OverviewTab({ viewMode, data }: OverviewTabProps) {
             {/* Distribution Bar */}
             <div className="border-t pt-4">
               <div className="text-sm font-medium mb-2">區間分佈</div>
-              <ChartContainer config={distributionConfig} className="h-[140px] w-full">
+              <ChartContainer config={allianceChartConfigs.distribution} className="h-[140px] w-full">
                 <BarChart data={[...distributions.contribution]} margin={{ left: 12, right: 12 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="range" tickLine={false} axisLine={false} className="text-xs" />
@@ -300,7 +282,7 @@ function OverviewTab({ viewMode, data }: OverviewTabProps) {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Trend Line */}
-            <ChartContainer config={trendChartConfig} className="h-[200px] w-full">
+            <ChartContainer config={allianceChartConfigs.trend} className="h-[200px] w-full">
               <LineChart data={dailyTrendData} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
@@ -355,7 +337,7 @@ function OverviewTab({ viewMode, data }: OverviewTabProps) {
             {/* Distribution Bar */}
             <div className="border-t pt-4">
               <div className="text-sm font-medium mb-2">區間分佈</div>
-              <ChartContainer config={distributionConfig} className="h-[140px] w-full">
+              <ChartContainer config={allianceChartConfigs.distribution} className="h-[140px] w-full">
                 <BarChart data={[...distributions.merit]} margin={{ left: 12, right: 12 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="range" tickLine={false} axisLine={false} className="text-xs" />
@@ -472,7 +454,7 @@ function GroupComparisonTab({ data }: GroupComparisonTabProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={groupBarConfig} className="h-[320px] w-full">
+          <ChartContainer config={allianceChartConfigs.groupBar} className="h-[320px] w-full">
             <BarChart
               data={chartData}
               layout="vertical"
@@ -678,7 +660,7 @@ function MemberDistributionTab({ viewMode, data }: MemberDistributionTabProps) {
             <CardDescription>人日均貢獻區間分佈</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={distributionConfig} className="h-[240px] w-full">
+            <ChartContainer config={allianceChartConfigs.distribution} className="h-[240px] w-full">
               <BarChart data={[...distributions.contribution]} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="range" tickLine={false} axisLine={false} className="text-xs" />
@@ -711,7 +693,7 @@ function MemberDistributionTab({ viewMode, data }: MemberDistributionTabProps) {
             <CardDescription>人日均戰功區間分佈</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={distributionConfig} className="h-[240px] w-full">
+            <ChartContainer config={allianceChartConfigs.distribution} className="h-[240px] w-full">
               <BarChart data={[...distributions.merit]} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="range" tickLine={false} axisLine={false} className="text-xs" />

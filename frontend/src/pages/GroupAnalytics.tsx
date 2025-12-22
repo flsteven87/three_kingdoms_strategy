@@ -53,7 +53,6 @@ import {
   Cell,
 } from 'recharts'
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
 } from '@/components/ui/chart'
@@ -67,6 +66,7 @@ import {
   calculateDistributionBins,
   type DistributionBin,
 } from '@/lib/chart-utils'
+import { groupChartConfigs, MEDIAN_LINE_COLOR } from '@/lib/chart-configs'
 import { useActiveSeason } from '@/hooks/use-seasons'
 import {
   useGroups,
@@ -82,65 +82,11 @@ import type {
 } from '@/types/analytics'
 
 // ============================================================================
-// Chart Configurations
-// ============================================================================
-
-const capabilityRadarConfig = {
-  group: {
-    label: '組別',
-    color: 'var(--primary)',
-  },
-  alliance: {
-    label: '同盟平均',
-    color: 'var(--muted-foreground)',
-  },
-  median: {
-    label: '同盟中位數',
-    color: 'hsl(215 20% 55%)',
-  },
-} satisfies ChartConfig
-
-const meritBarConfig = {
-  merit: {
-    label: '人日均戰功',
-    color: 'var(--primary)',
-  },
-} satisfies ChartConfig
-
-const meritTrendConfig = {
-  merit: {
-    label: '人日均戰功',
-    color: 'var(--primary)',
-  },
-  assist: {
-    label: '人日均助攻',
-    color: 'var(--chart-2)',
-  },
-} satisfies ChartConfig
-
-const contributionDistributionConfig = {
-  count: {
-    label: '人數',
-    color: 'var(--chart-3)',
-  },
-} satisfies ChartConfig
-
-const contributionTrendConfig = {
-  contribution: {
-    label: '人日均貢獻',
-    color: 'var(--chart-3)',
-  },
-} satisfies ChartConfig
-
-// ============================================================================
 // Types
 // ============================================================================
 
 /** View mode for data display: latest period or season-to-date */
 type ViewMode = 'latest' | 'season'
-
-// Subtle blue-gray for median lines (distinct from muted-foreground but still muted)
-const MEDIAN_LINE_COLOR = 'hsl(215 20% 55%)'
 
 // ============================================================================
 // Tab 1: Overview
@@ -312,7 +258,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
             <CardDescription>組別人日均表現 vs 同盟平均/中位數（100% = 同盟平均）</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={capabilityRadarConfig} className="mx-auto aspect-square max-h-[280px]">
+            <ChartContainer config={groupChartConfigs.capabilityRadar} className="mx-auto aspect-square max-h-[280px]">
               <RadarChart data={radarData}>
                 <PolarGrid gridType="polygon" />
                 <PolarAngleAxis dataKey="metric" className="text-xs" tick={{ fill: 'var(--foreground)', fontSize: 12 }} />
@@ -381,7 +327,7 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
             <CardDescription>人日均戰功排名</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={meritBarConfig} className="h-[320px] w-full">
+            <ChartContainer config={groupChartConfigs.meritBar} className="h-[320px] w-full">
               <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
                 <XAxis
@@ -433,13 +379,6 @@ function OverviewTab({ groupStats, allianceAverages, allGroupsData }: OverviewTa
 // ============================================================================
 // Tab 2: Merit Distribution
 // ============================================================================
-
-const meritDistributionConfig = {
-  count: {
-    label: '人數',
-    color: 'var(--primary)',
-  },
-} satisfies ChartConfig
 
 interface MeritDistributionTabProps {
   readonly groupStats: GroupStats
@@ -512,7 +451,7 @@ function MeritDistributionTab({ groupStats, members, periodTrends }: MeritDistri
             <CardDescription>成員日均戰功區間人數分佈</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={meritDistributionConfig} className="h-[220px] w-full">
+            <ChartContainer config={groupChartConfigs.meritDistribution} className="h-[220px] w-full">
               <BarChart data={meritBins} margin={{ left: 10, right: 10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                 <XAxis
@@ -551,7 +490,7 @@ function MeritDistributionTab({ groupStats, members, periodTrends }: MeritDistri
             <CardDescription>組別人日均戰功/助攻變化</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={meritTrendConfig} className="h-[220px] w-full">
+            <ChartContainer config={groupChartConfigs.meritTrend} className="h-[220px] w-full">
               <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
@@ -688,7 +627,7 @@ function ContributionDistributionTab({ groupStats, members, periodTrends }: Cont
             <CardDescription>成員日均貢獻區間人數分佈</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={contributionDistributionConfig} className="h-[220px] w-full">
+            <ChartContainer config={groupChartConfigs.contributionDistribution} className="h-[220px] w-full">
               <BarChart data={contributionBins} margin={{ left: 10, right: 10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                 <XAxis
@@ -727,7 +666,7 @@ function ContributionDistributionTab({ groupStats, members, periodTrends }: Cont
             <CardDescription>組別人日均貢獻變化</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={contributionTrendConfig} className="h-[220px] w-full">
+            <ChartContainer config={groupChartConfigs.contributionTrend} className="h-[220px] w-full">
               <LineChart data={dailyData} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis

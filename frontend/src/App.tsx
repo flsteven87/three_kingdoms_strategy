@@ -10,6 +10,7 @@ import HegemonyWeights from './pages/HegemonyWeights'
 import MemberPerformance from './pages/MemberPerformance'
 import AllianceAnalytics from './pages/AllianceAnalytics'
 import GroupAnalytics from './pages/GroupAnalytics'
+import EventAnalytics from './pages/EventAnalytics'
 import Settings from './pages/Settings'
 
 function ProtectedRoute() {
@@ -50,6 +51,7 @@ function App() {
               <Route path="members" element={<MemberPerformance />} />
               <Route path="analytics" element={<AllianceAnalytics />} />
               <Route path="groups" element={<GroupAnalytics />} />
+              <Route path="events" element={<EventAnalytics />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
