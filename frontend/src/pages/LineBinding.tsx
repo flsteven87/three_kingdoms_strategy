@@ -39,6 +39,9 @@ import {
 import { useAlliance } from '@/hooks/use-alliance'
 import { useCanUpdateAlliance } from '@/hooks/use-user-role'
 
+const LINE_BOT_ID = import.meta.env.VITE_LINE_BOT_ID || '@977nncax'
+const ADD_FRIEND_URL = `https://line.me/R/ti/p/${LINE_BOT_ID}`
+
 export function LineBinding() {
   const { data: alliance } = useAlliance()
   const allianceId = alliance?.id
@@ -352,11 +355,11 @@ export function LineBinding() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium">LINE 三國小幫手</p>
-                <p className="text-sm text-muted-foreground">Bot ID: @three-kingdoms-helper</p>
+                <p className="text-sm text-muted-foreground">Bot ID: {LINE_BOT_ID}</p>
               </div>
               <Button variant="outline" asChild>
                 <a
-                  href="https://line.me/R/ti/p/@three-kingdoms-helper"
+                  href={ADD_FRIEND_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
