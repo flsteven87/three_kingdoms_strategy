@@ -8,18 +8,19 @@ Alliance Collaborators API Endpoints
 """
 
 import logging
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, status
 
-from src.core.auth import get_current_user_id
-from src.core.dependencies import get_alliance_collaborator_service
+from src.core.dependencies import (
+    AllianceCollaboratorServiceDep,
+    PermissionServiceDep,
+    UserIdDep,
+)
 from src.models.alliance_collaborator import (
     AllianceCollaboratorCreate,
     AllianceCollaboratorListResponse,
 )
-from src.services.alliance_collaborator_service import AllianceCollaboratorService
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +35,8 @@ router = APIRouter(tags=["alliance-collaborators"])
 async def add_alliance_collaborator(
     alliance_id: UUID,
     data: AllianceCollaboratorCreate,
-    current_user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[
-        AllianceCollaboratorService, Depends(get_alliance_collaborator_service)
-    ],
+    current_user_id: UserIdDep,
+    service: AllianceCollaboratorServiceDep,
 ):
     """
     Add a collaborator to alliance by email.
@@ -68,10 +67,8 @@ async def add_alliance_collaborator(
 )
 async def get_alliance_collaborators(
     alliance_id: UUID,
-    current_user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[
-        AllianceCollaboratorService, Depends(get_alliance_collaborator_service)
-    ],
+    current_user_id: UserIdDep,
+    service: AllianceCollaboratorServiceDep,
 ):
     """
     Get all collaborators of an alliance.
@@ -98,10 +95,8 @@ async def get_alliance_collaborators(
 async def remove_alliance_collaborator(
     alliance_id: UUID,
     user_id: UUID,
-    current_user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[
-        AllianceCollaboratorService, Depends(get_alliance_collaborator_service)
-    ],
+    current_user_id: UserIdDep,
+    service: AllianceCollaboratorServiceDep,
 ):
     """
     Remove a collaborator from alliance.
@@ -127,10 +122,8 @@ async def remove_alliance_collaborator(
     summary="Process pending invitations for current user",
 )
 async def process_pending_invitations(
-    current_user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[
-        AllianceCollaboratorService, Depends(get_alliance_collaborator_service)
-    ],
+    current_user_id: UserIdDep,
+    service: AllianceCollaboratorServiceDep,
 ):
     """
     Process all pending invitations for the authenticated user.
@@ -143,29 +136,22 @@ async def process_pending_invitations(
     - 401: Not authenticated
 
     符合 CLAUDE.md 🔴: API layer delegates to service
+    符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
     """
-    try:
-        # Get user email from Service layer
-        email = await service.get_user_email(current_user_id)
+    # Get user email from Service layer
+    email = await service.get_user_email(current_user_id)
 
-        if not email:
-            logger.warning(f"User email not found for user_id: {current_user_id}")
-            return {"processed_count": 0, "message": "User email not found"}
+    if not email:
+        logger.warning(f"User email not found for user_id: {current_user_id}")
+        return {"processed_count": 0, "message": "User email not found"}
 
-        # Process pending invitations
-        processed_count = await service.process_pending_invitations(current_user_id, email)
+    # Process pending invitations
+    processed_count = await service.process_pending_invitations(current_user_id, email)
 
-        return {
-            "processed_count": processed_count,
-            "message": f"Processed {processed_count} pending invitations",
-        }
-
-    except Exception as e:
-        logger.error(f"Error processing invitations for user {current_user_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process invitations",
-        ) from e
+    return {
+        "processed_count": processed_count,
+        "message": f"Processed {processed_count} pending invitations",
+    }
 
 
 @router.patch(
@@ -177,10 +163,8 @@ async def update_collaborator_role(
     alliance_id: UUID,
     user_id: UUID,
     new_role: str,
-    current_user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[
-        AllianceCollaboratorService, Depends(get_alliance_collaborator_service)
-    ],
+    current_user_id: UserIdDep,
+    service: AllianceCollaboratorServiceDep,
 ):
     """
     Update a collaborator's role in alliance.
@@ -210,30 +194,24 @@ async def update_collaborator_role(
 )
 async def get_my_role(
     alliance_id: UUID,
-    current_user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[
-        AllianceCollaboratorService, Depends(get_alliance_collaborator_service)
-    ],
+    current_user_id: UserIdDep,
+    permission_service: PermissionServiceDep,
 ):
     """
     Get current user's role in alliance.
 
     Returns:
     - 200: {"role": "owner|collaborator|member"}
-    - 404: User is not a member of this alliance
+
+    Raises:
+    - ValueError: User is not a member of this alliance
 
     符合 CLAUDE.md 🔴: API layer delegates to service
+    符合 CLAUDE.md 🟡: Exception chaining with 'from e'
     """
-    # Use PermissionService to get role
-    from src.core.dependencies import get_permission_service
-
-    permission_service = get_permission_service()
     role = await permission_service.get_user_role(current_user_id, alliance_id)
 
     if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You are not a member of this alliance",
-        )
+        raise ValueError("You are not a member of this alliance")
 
     return {"role": role}

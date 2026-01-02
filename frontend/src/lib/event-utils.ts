@@ -3,7 +3,7 @@
  *
  * Centralized utilities to avoid DRY violations across:
  * - EventCard.tsx
- * - EventDetailSheet.tsx
+ * - EventDetail.tsx
  * - EventAnalytics.tsx
  */
 

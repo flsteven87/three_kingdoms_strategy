@@ -30,7 +30,6 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react'
-import { EventDetailSheet } from '@/components/events/EventDetailSheet'
 import { EventCard } from '@/components/events/EventCard'
 import type { EventListItem } from '@/types/event'
 
@@ -186,10 +185,9 @@ function CsvUploadArea({ label, description, file, onFileChange, inputId }: CsvU
 interface EventCardWithDataProps {
   readonly eventId: string
   readonly event: EventListItem
-  readonly onViewDetail: (eventId: string) => void
 }
 
-function EventCardWithData({ eventId, event, onViewDetail }: EventCardWithDataProps) {
+function EventCardWithData({ eventId, event }: EventCardWithDataProps) {
   const shouldFetch = event.status === 'completed'
   const { data: eventAnalytics } = useEventAnalytics(shouldFetch ? eventId : undefined)
 
@@ -201,13 +199,7 @@ function EventCardWithData({ eventId, event, onViewDetail }: EventCardWithDataPr
       }
     : null
 
-  return (
-    <EventCard
-      event={event}
-      eventDetail={eventDetail}
-      onViewDetail={onViewDetail}
-    />
-  )
+  return <EventCard event={event} eventDetail={eventDetail} />
 }
 
 // ============================================================================
@@ -217,7 +209,6 @@ function EventCardWithData({ eventId, event, onViewDetail }: EventCardWithDataPr
 function EventAnalytics() {
   // UI State
   const [isCreating, setIsCreating] = useState(false)
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [formData, setFormData] = useState<CreateFormData>({
     name: '',
     eventType: '',
@@ -231,7 +222,6 @@ function EventAnalytics() {
   const { data: seasons, isLoading: seasonsLoading } = useSeasons()
   const activeSeason = seasons?.find((s) => s.is_active)
   const { data: events, isLoading: eventsLoading } = useEvents(activeSeason?.id)
-  const { data: selectedEventDetail } = useEventAnalytics(selectedEventId ?? undefined)
 
   // Mutations
   const uploadCsv = useUploadCsv()
@@ -257,14 +247,6 @@ function EventAnalytics() {
     !isProcessing
 
   // Handlers
-  const handleViewDetail = useCallback((eventId: string) => {
-    setSelectedEventId(eventId)
-  }, [])
-
-  const handleCloseDetail = useCallback(() => {
-    setSelectedEventId(null)
-  }, [])
-
   const handleStartCreate = useCallback(() => {
     setIsCreating(true)
     setError(null)
@@ -457,25 +439,13 @@ function EventAnalytics() {
         {!isLoading && sortedEvents.length > 0 && (
           <div className="space-y-4">
             {sortedEvents.map((event) => (
-              <EventCardWithData
-                key={event.id}
-                eventId={event.id}
-                event={event}
-                onViewDetail={handleViewDetail}
-              />
+              <EventCardWithData key={event.id} eventId={event.id} event={event} />
             ))}
           </div>
         )}
-
-        {/* Event Detail Sheet */}
-        <EventDetailSheet
-          open={selectedEventId !== null}
-          onOpenChange={(open) => !open && handleCloseDetail()}
-          eventDetail={selectedEventDetail ?? null}
-        />
       </div>
     </AllianceGuard>
   )
 }
 
-export default EventAnalytics
+export { EventAnalytics }

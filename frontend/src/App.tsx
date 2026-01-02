@@ -4,14 +4,15 @@ import { useAuth } from './hooks/use-auth'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { Landing } from './pages/Landing'
 import { AuthCallback } from './pages/AuthCallback'
-import Seasons from './pages/Seasons'
-import DataManagement from './pages/DataManagement'
-import HegemonyWeights from './pages/HegemonyWeights'
-import MemberPerformance from './pages/MemberPerformance'
-import AllianceAnalytics from './pages/AllianceAnalytics'
-import GroupAnalytics from './pages/GroupAnalytics'
-import EventAnalytics from './pages/EventAnalytics'
-import Settings from './pages/Settings'
+import { Seasons } from './pages/Seasons'
+import { DataManagement } from './pages/DataManagement'
+import { HegemonyWeights } from './pages/HegemonyWeights'
+import { MemberPerformance } from './pages/MemberPerformance'
+import { AllianceAnalytics } from './pages/AllianceAnalytics'
+import { GroupAnalytics } from './pages/GroupAnalytics'
+import { EventAnalytics } from './pages/EventAnalytics'
+import { EventDetail } from './pages/EventDetail'
+import { Settings } from './pages/Settings'
 
 function ProtectedRoute() {
   const { user, loading } = useAuth()
@@ -52,6 +53,7 @@ function App() {
               <Route path="analytics" element={<AllianceAnalytics />} />
               <Route path="groups" element={<GroupAnalytics />} />
               <Route path="events" element={<EventAnalytics />} />
+              <Route path="events/:eventId" element={<EventDetail />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>

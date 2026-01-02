@@ -4,6 +4,8 @@ Application configuration
 符合 CLAUDE.md: Pydantic BaseSettings for environment variables
 """
 
+from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +18,9 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    # Application Version (from pyproject.toml)
+    version: str = "0.3.0"
 
     # Supabase Configuration
     supabase_url: str
@@ -49,5 +54,15 @@ class Settings(BaseSettings):
         return self.environment == "production"
 
 
+@lru_cache
+def get_settings() -> Settings:
+    """
+    Get cached settings instance (singleton pattern)
+
+    符合 CLAUDE.md 🟡: Settings via pydantic-settings with @lru_cache
+    """
+    return Settings()
+
+
 # Global settings instance
-settings = Settings()
+settings = get_settings()

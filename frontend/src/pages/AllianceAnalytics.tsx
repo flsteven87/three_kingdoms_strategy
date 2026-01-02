@@ -976,4 +976,4 @@ function AllianceAnalytics() {
   )
 }
 
-export default AllianceAnalytics
+export { AllianceAnalytics }

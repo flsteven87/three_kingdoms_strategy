@@ -1679,4 +1679,4 @@ function MemberPerformance() {
   )
 }
 
-export default MemberPerformance
+export { MemberPerformance }

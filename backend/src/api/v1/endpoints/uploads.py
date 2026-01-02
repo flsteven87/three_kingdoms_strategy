@@ -11,19 +11,17 @@ CSV Upload API Endpoints
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, UploadFile
 
-from src.core.auth import get_current_user_id
-from src.core.dependencies import get_csv_upload_service
-from src.services.csv_upload_service import CSVUploadService
+from src.core.dependencies import CSVUploadServiceDep, UserIdDep
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 
 @router.post("")
 async def upload_csv(
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
+    user_id: UserIdDep,
+    service: CSVUploadServiceDep,
     season_id: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
     snapshot_date: Annotated[str | None, Form()] = None,
@@ -42,48 +40,34 @@ async def upload_csv(
         Upload result with statistics
 
     符合 CLAUDE.md 🔴: API layer delegates to service
+    符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
     """
     # Parse season_id string to UUID
-    try:
-        season_uuid = UUID(season_id)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid season_id format: {season_id}"
-        ) from e
+    season_uuid = UUID(season_id)
 
     # Validate file type
     if not file.filename or not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="File must be a CSV file")
+        raise ValueError("File must be a CSV file")
 
     # Read file content
-    try:
-        content = await file.read()
-        csv_content = content.decode("utf-8")
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to read CSV file: {str(e)}"
-        ) from e
+    content = await file.read()
+    csv_content = content.decode("utf-8")
 
     # Upload CSV
-    try:
-        result = await service.upload_csv(
-            user_id=user_id,
-            season_id=season_uuid,
-            filename=file.filename,
-            csv_content=csv_content,
-            custom_snapshot_date=snapshot_date,
-        )
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e)) from e
+    result = await service.upload_csv(
+        user_id=user_id,
+        season_id=season_uuid,
+        filename=file.filename,
+        csv_content=csv_content,
+        custom_snapshot_date=snapshot_date,
+    )
+    return result
 
 
 @router.get("")
 async def list_uploads(
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
+    user_id: UserIdDep,
+    service: CSVUploadServiceDep,
     season_id: UUID,
 ):
     """
@@ -106,8 +90,8 @@ async def list_uploads(
 
 @router.delete("/{upload_id}")
 async def delete_upload(
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
-    service: Annotated[CSVUploadService, Depends(get_csv_upload_service)],
+    user_id: UserIdDep,
+    service: CSVUploadServiceDep,
     upload_id: UUID,
 ):
     """
@@ -125,7 +109,7 @@ async def delete_upload(
     """
     success = await service.delete_upload(user_id=user_id, upload_id=upload_id)
 
-    if success:
-        return {"message": "Upload deleted successfully", "upload_id": upload_id}
+    if not success:
+        raise ValueError("Failed to delete upload")
 
-    raise HTTPException(status_code=500, detail="Failed to delete upload")
+    return {"message": "Upload deleted successfully", "upload_id": upload_id}

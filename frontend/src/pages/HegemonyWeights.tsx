@@ -127,4 +127,4 @@ function HegemonyWeights() {
   )
 }
 
-export default HegemonyWeights
+export { HegemonyWeights }

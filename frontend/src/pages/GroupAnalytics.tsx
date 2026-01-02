@@ -1023,4 +1023,4 @@ function GroupAnalytics() {
   )
 }
 
-export default GroupAnalytics
+export { GroupAnalytics }

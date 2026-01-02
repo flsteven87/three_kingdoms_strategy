@@ -4,10 +4,12 @@ Three Kingdoms Strategy Manager FastAPI Application
 符合 CLAUDE.md:
 - redirect_slashes=False (cloud deployment requirement)
 - Proper CORS configuration
+- Global exception handlers (CLAUDE.md 🟡)
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.api.v1.endpoints import (
     alliance_collaborators,
@@ -26,7 +28,7 @@ from src.core.config import settings
 app = FastAPI(
     title="Three Kingdoms Strategy Manager API",
     description="Alliance Member Performance Tracking System",
-    version="0.1.0",
+    version=settings.version,
     redirect_slashes=False,
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
@@ -52,6 +54,49 @@ app.include_router(periods.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(events.router, prefix="/api/v1")
 
+
+# Global Exception Handlers
+# 符合 CLAUDE.md 🟡: Domain exceptions → Global handler converts to HTTP responses
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    """
+    Handle ValueError exceptions globally
+
+    Converts ValueError (domain exceptions) to HTTP 400 Bad Request
+    This eliminates the need for repetitive try/except blocks in endpoints
+    """
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)}
+    )
+
+
+@app.exception_handler(FileNotFoundError)
+async def file_not_found_handler(request: Request, exc: FileNotFoundError) -> JSONResponse:
+    """
+    Handle FileNotFoundError exceptions globally
+
+    Converts FileNotFoundError to HTTP 404 Not Found
+    """
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": str(exc)}
+    )
+
+
+@app.exception_handler(PermissionError)
+async def permission_error_handler(request: Request, exc: PermissionError) -> JSONResponse:
+    """
+    Handle PermissionError exceptions globally
+
+    Converts PermissionError to HTTP 403 Forbidden
+    """
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={"detail": str(exc)}
+    )
+
+
 # Health check endpoint (public)
 @app.get("/health")
 async def health_check():
@@ -59,8 +104,9 @@ async def health_check():
     return {
         "status": "healthy",
         "environment": settings.environment,
-        "version": "0.1.0"
+        "version": settings.version
     }
+
 
 # Root endpoint
 @app.get("")
@@ -69,7 +115,7 @@ async def root():
     return {
         "message": "Three Kingdoms Strategy Manager API",
         "docs": "/docs" if settings.debug else "disabled",
-        "version": "0.1.0"
+        "version": settings.version
     }
 
 

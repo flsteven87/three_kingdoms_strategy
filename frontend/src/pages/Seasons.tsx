@@ -256,4 +256,4 @@ const Seasons: React.FC = () => {
   )
 }
 
-export default Seasons
+export { Seasons }

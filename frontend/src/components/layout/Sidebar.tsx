@@ -157,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         )}
 
         <div className="text-xs text-muted-foreground px-2">
-          <p className="font-medium">Version 0.1.0</p>
+          <p className="font-medium">Version {import.meta.env.VITE_APP_VERSION || '0.3.0'}</p>
         </div>
       </div>
     </div>

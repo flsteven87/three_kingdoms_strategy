@@ -35,14 +35,16 @@
 ### 已完成 ✅
 
 - **使用者認證** - Google OAuth + JWT 驗證
-- **同盟管理** - CRUD + 協作者系統（Owner/Collaborator/Member 角色）
+- **同盟管理** - CRUD + 協作者系統（Owner/Collaborator/Member 角色）+ 邀請機制
 - **賽季管理** - 賽季 CRUD + 活躍切換
 - **CSV 數據上傳** - Drag & Drop 介面 + 智能日期驗證 + 自動解析
 - **霸業積分權重** - 權重設定 + 積分預覽計算
 - **成員管理** - 自動 Upsert + 生命週期追蹤
 - **Period 系統** - 自動期間劃分 + 指標計算
+- **戰役事件管理** - 戰役 CRUD + 成員指標追蹤 + 分佈統計
 - **成員表現分析** - 個人趨勢圖、雷達圖、排名歷史、同盟對比
 - **組別分析** - 組別對比、成員排行、Box Plot、趨勢圖
+- **戰役分析** - 事件時間軸、成員表現、指標分佈、統計摘要
 
 ### 優化中 🔧
 
@@ -179,12 +181,22 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 |------|--------|----------|------|
 | **Alliance** | GET | `/alliances` | 取得同盟 |
 | | POST | `/alliances` | 建立同盟 |
+| | GET | `/alliances/{id}/collaborators` | 取得協作者 |
+| | POST | `/alliances/{id}/collaborators` | 邀請協作者 |
 | **Season** | GET | `/seasons` | 列出賽季 |
 | | POST | `/seasons` | 建立賽季 |
+| | PATCH | `/seasons/{id}/activate` | 設為活躍賽季 |
 | **CSV Upload** | POST | `/uploads` | 上傳 CSV |
 | | GET | `/uploads?season_id={id}` | 列出上傳記錄 |
 | **Hegemony** | GET | `/hegemony-weights?season_id={id}` | 取得權重設定 |
 | | POST | `/hegemony-weights/initialize` | 初始化權重 |
+| **Events** | GET | `/events?season_id={id}` | 列出戰役事件 |
+| | POST | `/events` | 建立戰役事件 |
+| | GET | `/events/{id}/analytics` | 戰役分析數據 |
+| **Periods** | GET | `/periods?season_id={id}` | 列出期間 |
+| **Analytics** | GET | `/analytics/members/{id}/trends` | 成員趨勢分析 |
+| | GET | `/analytics/groups` | 組別對比分析 |
+| | GET | `/analytics/alliance/summary` | 同盟摘要統計 |
 
 **API 文件**: 啟動 Backend 後訪問 http://localhost:8087/docs (Swagger UI)
 
@@ -192,21 +204,42 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ## 🗄️ 資料庫架構
 
-### 核心表格 (5 tables)
+### 核心表格 (12+ tables)
 
 ```
 auth.users (Supabase Auth)
     ↓ (1:1)
 alliances (同盟)
-    ↓ (1:many)
-seasons (賽季) ←──────┐
-    ↓ (1:many)        │
-csv_uploads (上傳記錄) │
-    ↓ (1:many)        │
-member_snapshots (快照)│
-    ↓ (many:1)        │
-members (成員) ────────┘
+    ├─→ alliance_collaborators (協作者)
+    ├─→ pending_invitations (待處理邀請)
+    └─→ seasons (賽季) ←─────────────────────┐
+            ├─→ csv_uploads (CSV 上傳記錄)    │
+            ├─→ hegemony_weights (霸業權重)   │
+            ├─→ battle_events (戰役事件)      │
+            │       └─→ battle_event_metrics (戰役成員指標)
+            ├─→ periods (期間)                │
+            │       └─→ member_period_metrics (成員期間指標)
+            ├─→ member_snapshots (成員快照)   │
+            │       └─→ members (成員資料) ───┘
+            └──────────────────────────────────┘
 ```
+
+### 表格說明
+
+| 表格 | 用途 | 關鍵欄位 |
+|------|------|----------|
+| `alliances` | 同盟基本資訊 | name, owner_id |
+| `alliance_collaborators` | 協作者關聯 | alliance_id, user_id, role |
+| `pending_invitations` | 待處理邀請 | alliance_id, email, status |
+| `seasons` | 賽季管理 | alliance_id, name, is_active |
+| `members` | 成員基本資料 | name, alliance_id, first_seen_season |
+| `csv_uploads` | 上傳記錄 | season_id, filename, upload_date |
+| `member_snapshots` | 成員數據快照 | member_id, upload_id, 各項指標 |
+| `hegemony_weights` | 霸業積分權重 | season_id, event_type, weight |
+| `periods` | 期間劃分 | season_id, start_date, end_date |
+| `member_period_metrics` | 期間指標 | member_id, period_id, 計算後指標 |
+| `battle_events` | 戰役事件 | season_id, name, event_date |
+| `battle_event_metrics` | 戰役成員指標 | event_id, member_id, 表現指標 |
 
 ### CSV 檔案格式
 
@@ -251,16 +284,17 @@ members (成員) ────────┘
 
 ### 完成度評估
 
-| 類別 | 完成度 | 狀態 |
-|------|--------|------|
-| Backend 基礎設施 | 100% | ✅ |
-| 認證與安全 | 100% | ✅ |
-| 核心功能 API | 100% | ✅ |
-| Analytics API | 90% | ✅ |
-| Frontend 基礎設施 | 100% | ✅ |
-| 功能 UI | 95% | ✅ 10/10 頁面完成 |
-| 數據分析圖表 | 85% | ✅ |
-| **整體專案** | **90%** | 🚀 |
+| 類別 | 完成度 | 狀態 | 備註 |
+|------|--------|------|------|
+| Backend 基礎設施 | 100% | ✅ | 4-Layer Architecture 完整 |
+| 認證與安全 | 100% | ✅ | Google OAuth + RLS 完整 |
+| 核心功能 API | 100% | ✅ | 9 個 endpoint modules |
+| Analytics API | 95% | ✅ | 成員/組別/同盟/戰役分析 |
+| Events API | 100% | ✅ | 戰役 CRUD + 分析完整 |
+| Frontend 基礎設施 | 100% | ✅ | React 19 + TanStack Query |
+| 功能 UI | 95% | ✅ | 10/10 頁面完成 |
+| 數據分析圖表 | 90% | ✅ | Recharts 整合完整 |
+| **整體專案** | **92%** | 🚀 | Phase 4 完成 |
 
 ### 下一步優先級
 
@@ -289,9 +323,9 @@ three_kingdoms_strategy/
 │
 ├── frontend/                   # React TypeScript Frontend
 │   ├── src/
-│   │   ├── components/        # UI 組件 (ui/, layout/, alliance/, uploads/)
-│   │   ├── pages/             # 路由頁面 (8 pages)
-│   │   ├── hooks/             # Custom Hooks (TanStack Query)
+│   │   ├── components/        # UI 組件 (9 dirs: ui/, layout/, alliance/, analytics/, events/, hegemony-weights/, overview/, seasons/, uploads/)
+│   │   ├── pages/             # 路由頁面 (10 pages: Landing, AuthCallback, AllianceAnalytics, Seasons, DataManagement, HegemonyWeights, MemberPerformance, GroupAnalytics, EventAnalytics, Settings)
+│   │   ├── hooks/             # Custom Hooks (11 hooks: alliance, analytics, auth, csv-uploads, events, hegemony-weights, periods, seasons, theme, user-role, alliance-collaborators)
 │   │   ├── lib/               # api-client, supabase
 │   │   ├── contexts/          # AuthContext, ThemeContext
 │   │   └── types/             # TypeScript 類型定義
@@ -385,7 +419,7 @@ Database (Supabase)        ← 資料持久化、RLS 安全
 
 ## 🎉 版本更新記錄
 
-### v0.3.0 (2025-12-07) - Phase 4 Analytics Complete
+### v0.3.0 (2024-12-22) - Phase 4 Analytics Complete
 
 **新增功能**:
 - ✅ Period 系統 - 自動期間劃分與指標計算
@@ -400,8 +434,8 @@ Database (Supabase)        ← 資料持久化、RLS 安全
 - ✅ API 路由效能優化
 - ✅ 圖表組件提取與重用
 
-**已完成模組**: 認證、同盟、賽季、CSV 上傳、霸業積分權重、成員分析、組別分析
-**優化中模組**: Overview Dashboard 整合
+**已完成模組**: 認證、同盟、賽季、CSV 上傳、霸業積分權重、成員分析、組別分析、戰役分析
+**優化中模組**: Overview Dashboard 整合、進階互動功能
 
 ### v0.2.0 (2025-10-10) - Phase 3 Major Update
 
@@ -426,9 +460,9 @@ MIT License - 詳見 [LICENSE](LICENSE) 檔案
 
 ---
 
-**Last Updated:** 2025-12-07
+**Last Updated:** 2026-01-01
 **Version:** 0.3.0
 **Status:** 🚀 Active Development (Phase 4 完成)
 **Python Version:** 3.13+
 **Database:** PostgreSQL 17 (Supabase)
-**Overall Completion:** 90%
+**Overall Completion:** 92%

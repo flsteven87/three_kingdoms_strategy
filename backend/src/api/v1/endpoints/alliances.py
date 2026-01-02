@@ -3,28 +3,26 @@ Alliance API Endpoints
 
 符合 CLAUDE.md 🔴:
 - API Layer delegates to Service Layer
-- Uses Provider Pattern for dependency injection
+- Uses 2025 Standard Annotated dependency injection pattern
 - Returns proper HTTP status codes
 - JWT authentication required
+符合 CLAUDE.md 🟡:
+- Global exception handlers eliminate try/except boilerplate
+- Type-safe dependency injection with reusable aliases
 """
 
-from typing import Annotated
-from uuid import UUID
+from fastapi import APIRouter
 
-from fastapi import APIRouter, Depends, HTTPException
-
-from src.core.auth import get_current_user_id
-from src.core.dependencies import get_alliance_service
+from src.core.dependencies import AllianceServiceDep, UserIdDep
 from src.models.alliance import Alliance, AllianceCreate, AllianceUpdate
-from src.services.alliance_service import AllianceService
 
 router = APIRouter(prefix="/alliances", tags=["alliances"])
 
 
 @router.get("", response_model=Alliance | None)
 async def get_user_alliance(
-    service: Annotated[AllianceService, Depends(get_alliance_service)],
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: AllianceServiceDep,
+    user_id: UserIdDep,
 ):
     """
     Get current user's alliance
@@ -44,8 +42,8 @@ async def get_user_alliance(
 @router.post("", response_model=Alliance, status_code=201)
 async def create_alliance(
     alliance_data: AllianceCreate,
-    service: Annotated[AllianceService, Depends(get_alliance_service)],
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: AllianceServiceDep,
+    user_id: UserIdDep,
 ):
     """
     Create new alliance for current user
@@ -59,22 +57,20 @@ async def create_alliance(
         Created alliance instance
 
     Raises:
-        HTTPException 400: If user already has an alliance
+        ValueError: If user already has an alliance (handled by global exception handler)
 
     符合 CLAUDE.md 🔴: API layer delegates to service
+    符合 CLAUDE.md 🟡: No try/except needed - global handler converts exceptions
     """
-    try:
-        # user_id comes from JWT token (符合 CLAUDE.md 🔴: Security - never trust client)
-        return await service.create_alliance(user_id, alliance_data)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    # user_id comes from JWT token (符合 CLAUDE.md 🔴: Security - never trust client)
+    return await service.create_alliance(user_id, alliance_data)
 
 
 @router.patch("", response_model=Alliance)
 async def update_alliance(
     alliance_data: AllianceUpdate,
-    service: Annotated[AllianceService, Depends(get_alliance_service)],
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: AllianceServiceDep,
+    user_id: UserIdDep,
 ):
     """
     Update current user's alliance
@@ -88,21 +84,18 @@ async def update_alliance(
         Updated alliance instance
 
     Raises:
-        HTTPException 404: If user has no alliance
+        ValueError: If user has no alliance (handled by global exception handler)
 
     符合 CLAUDE.md 🔴: API layer delegates to service
-    符合 CLAUDE.md 🟡: Exception chaining with 'from e'
+    符合 CLAUDE.md 🟡: No try/except needed - global handler converts exceptions
     """
-    try:
-        return await service.update_alliance(user_id, alliance_data)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+    return await service.update_alliance(user_id, alliance_data)
 
 
 @router.delete("", status_code=204)
 async def delete_alliance(
-    service: Annotated[AllianceService, Depends(get_alliance_service)],
-    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: AllianceServiceDep,
+    user_id: UserIdDep,
 ):
     """
     Delete current user's alliance
@@ -112,11 +105,9 @@ async def delete_alliance(
         user_id: User UUID (from JWT token)
 
     Raises:
-        HTTPException 404: If user has no alliance
+        ValueError: If user has no alliance (handled by global exception handler)
 
     符合 CLAUDE.md 🔴: API layer delegates to service
+    符合 CLAUDE.md 🟡: No try/except needed - global handler converts exceptions
     """
-    try:
-        await service.delete_alliance(user_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+    await service.delete_alliance(user_id)

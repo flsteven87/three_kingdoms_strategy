@@ -129,4 +129,4 @@ const SeasonUploadCard: React.FC<SeasonUploadCardProps> = ({ season, onUpload })
   )
 }
 
-export default DataManagement
+export { DataManagement }
