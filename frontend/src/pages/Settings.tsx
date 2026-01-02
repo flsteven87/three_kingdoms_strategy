@@ -7,7 +7,7 @@
  * - Tab-based navigation for different settings
  */
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Settings as SettingsIcon, User, Shield } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -30,7 +30,7 @@ import { useAlliance } from '@/hooks/use-alliance'
 import { AllianceForm } from '@/components/alliance/AllianceForm'
 import { AllianceCollaboratorManager } from '@/components/alliance/AllianceCollaboratorManager'
 
-const Settings: React.FC = () => {
+function Settings() {
   const { data: alliance } = useAlliance()
   const [activeTab, setActiveTab] = useState('alliance')
 

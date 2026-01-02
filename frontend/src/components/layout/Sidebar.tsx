@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Database, Trophy, Users, BarChart3, Settings, LogOut, Layers, Swords } from 'lucide-react'
+import { Calendar, Database, Trophy, Users, BarChart3, Settings, LogOut, Layers, Swords, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,11 @@ const navigation: readonly NavigationItem[] = [
     name: '成員表現',
     href: '/members',
     icon: Users,
+  },
+  {
+    name: 'LINE 三國小幫手',
+    href: '/line-binding',
+    icon: MessageSquare,
   },
   {
     name: '設定',

@@ -13,6 +13,7 @@ import { GroupAnalytics } from './pages/GroupAnalytics'
 import { EventAnalytics } from './pages/EventAnalytics'
 import { EventDetail } from './pages/EventDetail'
 import { Settings } from './pages/Settings'
+import { LineBinding } from './pages/LineBinding'
 
 function ProtectedRoute() {
   const { user, loading } = useAuth()
@@ -54,6 +55,7 @@ function App() {
               <Route path="groups" element={<GroupAnalytics />} />
               <Route path="events" element={<EventAnalytics />} />
               <Route path="events/:eventId" element={<EventDetail />} />
+              <Route path="line-binding" element={<LineBinding />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>

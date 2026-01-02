@@ -1,0 +1,54 @@
+/**
+ * LINE Binding TypeScript Types
+ *
+ * Types for LINE Bot integration feature
+ */
+
+// =============================================================================
+// Binding Code Types
+// =============================================================================
+
+export interface LineBindingCode {
+  readonly code: string
+  readonly expires_at: string
+  readonly created_at: string
+}
+
+// =============================================================================
+// Group Binding Types
+// =============================================================================
+
+export interface LineGroupBinding {
+  readonly id: string
+  readonly alliance_id: string
+  readonly line_group_id: string
+  readonly group_name: string | null
+  readonly bound_at: string
+  readonly is_active: boolean
+  readonly member_count: number
+}
+
+// =============================================================================
+// Member LINE Binding Types
+// =============================================================================
+
+export interface MemberLineBinding {
+  readonly id: string
+  readonly alliance_id: string
+  readonly member_id: string | null
+  readonly line_user_id: string
+  readonly line_display_name: string
+  readonly game_id: string
+  readonly is_verified: boolean
+  readonly bound_at: string
+}
+
+// =============================================================================
+// API Response Types
+// =============================================================================
+
+export interface LineBindingStatusResponse {
+  readonly is_bound: boolean
+  readonly binding: LineGroupBinding | null
+  readonly pending_code: LineBindingCode | null
+}
