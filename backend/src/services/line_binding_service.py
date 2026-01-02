@@ -471,6 +471,18 @@ class LineBindingService:
         """
         await self.repository.upsert_group_reminder_cooldown(line_group_id)
 
+    async def is_user_registered_anywhere(self, line_user_id: str) -> bool:
+        """
+        Check if a LINE user has registered any game ID in any alliance
+
+        Args:
+            line_user_id: LINE user ID
+
+        Returns:
+            True if user has at least one registration
+        """
+        return await self.repository.is_user_registered_anywhere(line_user_id)
+
     # =========================================================================
     # Performance Analytics Operations (LIFF)
     # =========================================================================
@@ -535,7 +547,7 @@ class LineBindingService:
 
         # Get active season
         season_repo = SeasonRepository()
-        active_season = await season_repo.get_active_by_alliance(alliance_id)
+        active_season = await season_repo.get_active_season(alliance_id)
 
         if not active_season:
             return MemberPerformanceResponse(

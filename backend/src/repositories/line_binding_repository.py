@@ -367,3 +367,16 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             line_user_id=line_user_id
         )
         return len(bindings) > 0
+
+    async def is_user_registered_anywhere(self, line_user_id: str) -> bool:
+        """Check if a LINE user has any registered game IDs in any alliance"""
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("member_line_bindings")
+            .select("id", count="exact")
+            .eq("line_user_id", line_user_id)
+            .limit(1)
+            .execute()
+        )
+
+        return (result.count or 0) > 0

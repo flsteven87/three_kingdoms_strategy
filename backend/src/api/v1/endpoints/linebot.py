@@ -365,6 +365,19 @@ async def _handle_event(
     settings: Settings,
 ) -> None:
     """Handle a single LINE event"""
+    source = event.source
+    source_type = source.get("type")
+    reply_token = event.reply_token
+
+    # Handle follow event (user adds bot as friend)
+    if event.type == "follow":
+        await _handle_follow_event(
+            event=event,
+            service=service,
+        )
+        return
+
+    # Only handle message events from here
     if event.type != "message":
         return
 
@@ -372,14 +385,19 @@ async def _handle_event(
     if message.get("type") != "text":
         return
 
-    text = message.get("text", "").strip()
-    source = event.source
-    reply_token = event.reply_token
-
-    # Only handle group messages
-    if source.get("type") != "group":
+    # Handle private messages (1-on-1 chat)
+    if source_type == "user":
+        await _handle_private_message(
+            event=event,
+            service=service,
+        )
         return
 
+    # Handle group messages
+    if source_type != "group":
+        return
+
+    text = message.get("text", "").strip()
     line_group_id = source.get("groupId")
     line_user_id = source.get("userId")
 
@@ -414,6 +432,92 @@ async def _handle_event(
             service=service,
             settings=settings,
         )
+
+
+async def _handle_follow_event(
+    event: LineWebhookEvent,
+    service: LineBindingService,
+) -> None:
+    """Handle follow event - when user adds bot as friend"""
+    reply_token = event.reply_token
+    line_user_id = event.source.get("userId")
+
+    if not reply_token or not line_user_id:
+        return
+
+    # Check if user is registered in any alliance
+    is_registered = await service.is_user_registered_anywhere(line_user_id)
+
+    if is_registered:
+        await _reply_text(
+            reply_token,
+            "歡迎回來！👋\n\n"
+            "您已是同盟成員，可在群組中查看數據或使用功能。"
+        )
+    else:
+        await _reply_text(
+            reply_token,
+            "歡迎使用【三國志戰略版】同盟管理 Bot！👋\n\n"
+            "本 Bot 專為 LINE 群組設計。\n\n"
+            "📌 使用方式：\n"
+            "1. 盟主在 Web App 建立同盟\n"
+            "2. 將本 Bot 加入同盟 LINE 群組\n"
+            "3. 在群組中發送「/綁定 <綁定碼>」\n\n"
+            "如您是盟友，請在群組中完成註冊！"
+        )
+
+
+async def _handle_private_message(
+    event: LineWebhookEvent,
+    service: LineBindingService,
+) -> None:
+    """Handle 1-on-1 private message"""
+    message = event.message or {}
+    text = message.get("text", "").strip()
+    reply_token = event.reply_token
+    line_user_id = event.source.get("userId")
+
+    if not reply_token or not line_user_id:
+        return
+
+    # Handle private help command
+    if text in ("/幫助", "/帮助", "/help"):
+        await _handle_private_help_command(reply_token)
+        return
+
+    # Default response based on registration status
+    is_registered = await service.is_user_registered_anywhere(line_user_id)
+
+    if is_registered:
+        await _reply_text(
+            reply_token,
+            "💡 此 Bot 主要在群組中使用。\n\n"
+            "請在已綁定的同盟群組中操作，\n"
+            "即可查看您的表現數據！"
+        )
+    else:
+        await _reply_text(
+            reply_token,
+            "👋 您好！\n\n"
+            "本 Bot 專為同盟 LINE 群組設計。\n"
+            "請在已綁定的群組中完成註冊後使用。\n\n"
+            "發送 /幫助 了解更多"
+        )
+
+
+async def _handle_private_help_command(reply_token: str) -> None:
+    """Handle /幫助 command in private chat"""
+    await _reply_text(
+        reply_token,
+        "📖 使用說明\n\n"
+        "本 Bot 專為同盟 LINE 群組設計。\n\n"
+        "📌 如何開始：\n"
+        "1. 盟主在 Web App 建立同盟\n"
+        "2. 將本 Bot 加入群組\n"
+        "3. 在群組發送「/綁定 <綁定碼>」\n"
+        "4. 盟友在群組中註冊遊戲 ID\n\n"
+        "💡 所有功能請在群組中使用"
+    )
 
 
 async def _handle_bind_command(
