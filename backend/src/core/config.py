@@ -43,6 +43,22 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # LINE Bot Configuration
+    line_channel_id: str | None = None
+    line_channel_secret: str | None = None
+    line_access_token: str | None = None
+    liff_id: str | None = None
+
+    @property
+    def line_bot_enabled(self) -> bool:
+        """Check if LINE Bot is configured"""
+        return all([
+            self.line_channel_id,
+            self.line_channel_secret,
+            self.line_access_token,
+            self.liff_id
+        ])
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins from comma-separated string"""

@@ -34,8 +34,7 @@ import {
   useGenerateBindingCode,
   useUnbindLineGroup,
   useCountdown,
-  useCopyToClipboard,
-  simulateSuccessfulBinding
+  useCopyToClipboard
 } from '@/hooks/use-line-binding'
 import { useAlliance } from '@/hooks/use-alliance'
 import { useCanUpdateAlliance } from '@/hooks/use-user-role'
@@ -44,7 +43,7 @@ export function LineBinding() {
   const { data: alliance } = useAlliance()
   const allianceId = alliance?.id
   const canUpdate = useCanUpdateAlliance()
-  const { data: status, isLoading, refetch } = useLineBindingStatus(allianceId)
+  const { data: status, isLoading } = useLineBindingStatus(allianceId)
   const generateCode = useGenerateBindingCode()
   const unbindGroup = useUnbindLineGroup()
   const { copied, copy } = useCopyToClipboard()
@@ -218,7 +217,7 @@ export function LineBinding() {
               <Button
                 variant="destructive"
                 onClick={async () => {
-                  await unbindGroup.mutateAsync(allianceId)
+                  await unbindGroup.mutateAsync()
                   setShowUnbindDialog(false)
                 }}
                 disabled={unbindGroup.isPending}
@@ -297,23 +296,12 @@ export function LineBinding() {
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   variant="outline"
-                  onClick={() => generateCode.mutate(allianceId)}
+                  onClick={() => generateCode.mutate()}
                   disabled={generateCode.isPending}
                   className="flex-1"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${generateCode.isPending ? 'animate-spin' : ''}`} />
                   重新生成
-                </Button>
-                {/* Demo button - remove in production */}
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    simulateSuccessfulBinding()
-                    refetch()
-                  }}
-                  className="flex-1"
-                >
-                  模擬綁定成功
                 </Button>
               </div>
             )}
@@ -393,7 +381,7 @@ export function LineBinding() {
 
             {canUpdate ? (
               <Button
-                onClick={() => generateCode.mutate(allianceId)}
+                onClick={() => generateCode.mutate()}
                 disabled={generateCode.isPending}
                 size="lg"
                 className="w-full"

@@ -33,6 +33,7 @@ from src.services.analytics_service import AnalyticsService
 from src.services.battle_event_service import BattleEventService
 from src.services.csv_upload_service import CSVUploadService
 from src.services.hegemony_weight_service import HegemonyWeightService
+from src.services.line_binding_service import LineBindingService
 from src.services.period_metrics_service import PeriodMetricsService
 from src.services.permission_service import PermissionService
 from src.services.season_service import SeasonService
@@ -91,6 +92,11 @@ def get_battle_event_service() -> BattleEventService:
     return BattleEventService()
 
 
+def get_line_binding_service() -> LineBindingService:
+    """Get LINE binding service instance"""
+    return LineBindingService()
+
+
 # ============================================================================
 # Type Aliases for Dependency Injection (2025 Standard)
 # 符合 CLAUDE.md 🟡: Annotated[Type, Depends()] pattern
@@ -121,3 +127,4 @@ PeriodMetricsServiceDep = Annotated[
 ]
 AnalyticsServiceDep = Annotated[AnalyticsService, Depends(get_analytics_service)]
 BattleEventServiceDep = Annotated[BattleEventService, Depends(get_battle_event_service)]
+LineBindingServiceDep = Annotated[LineBindingService, Depends(get_line_binding_service)]

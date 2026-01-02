@@ -43,6 +43,10 @@ import type {
   CreateEventRequest,
   EventUploadResponse,
 } from '@/types/event'
+import type {
+  LineBindingCode,
+  LineBindingStatusResponse
+} from '@/types/line-binding'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8087'
 
@@ -642,6 +646,35 @@ class ApiClient {
    */
   async deleteEvent(eventId: string): Promise<void> {
     await this.client.delete(`/api/v1/events/${eventId}`)
+  }
+
+  // ==================== LINE Binding API ====================
+
+  /**
+   * Get LINE binding status for current user's alliance
+   */
+  async getLineBindingStatus(): Promise<LineBindingStatusResponse> {
+    const response = await this.client.get<LineBindingStatusResponse>(
+      '/api/v1/linebot/binding'
+    )
+    return response.data
+  }
+
+  /**
+   * Generate a new binding code for linking LINE group
+   */
+  async generateLineBindingCode(): Promise<LineBindingCode> {
+    const response = await this.client.post<LineBindingCode>(
+      '/api/v1/linebot/codes'
+    )
+    return response.data
+  }
+
+  /**
+   * Unbind LINE group from alliance
+   */
+  async unbindLineGroup(): Promise<void> {
+    await this.client.delete('/api/v1/linebot/binding')
   }
 }
 
