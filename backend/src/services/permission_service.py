@@ -5,12 +5,11 @@ Permission Service
 - 🔴 Service Layer: Business logic for permission checking
 - 🔴 NO direct database calls (use Repository)
 - 🟡 Exception chaining with 'from e'
+- 🟡 Use native exceptions, not HTTPException
 """
 
 import logging
 from uuid import UUID
-
-from fastapi import HTTPException, status
 
 from src.repositories.alliance_collaborator_repository import (
     AllianceCollaboratorRepository,
@@ -43,25 +42,20 @@ class PermissionService:
             str | None: User's role ('owner', 'collaborator', 'member') or None if not a member
 
         Raises:
-            HTTPException: If repository operation fails
+            RuntimeError: If repository operation fails
         """
         try:
             role = await self._collaborator_repo.get_collaborator_role(alliance_id, user_id)
             return role
         except ValueError:
             return None
-        except HTTPException:
-            raise
         except Exception as e:
             logger.error(
                 f"Failed to get user role - user_id={user_id}, alliance_id={alliance_id}, "
                 f"error={type(e).__name__}: {str(e)}",
                 exc_info=True
             )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to get user role: {type(e).__name__}"
-            ) from e
+            raise RuntimeError(f"Failed to get user role: {type(e).__name__}") from e
 
     async def check_permission(
         self,
@@ -98,7 +92,7 @@ class PermissionService:
         action: str = "perform this action"
     ) -> None:
         """
-        Require user to have one of the specified roles, raise 403 if not
+        Require user to have one of the specified roles
 
         Args:
             user_id: User UUID
@@ -107,8 +101,8 @@ class PermissionService:
             action: Description of the action being performed (for error message)
 
         Raises:
-            HTTPException 403: If user doesn't have required permission
-            HTTPException 404: If user is not a member of the alliance
+            ValueError: If user is not a member of the alliance
+            PermissionError: If user doesn't have required permission
 
         Example:
             >>> await permission_service.require_permission(
@@ -121,19 +115,16 @@ class PermissionService:
         role = await self.get_user_role(user_id, alliance_id)
 
         if role is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="You are not a member of this alliance"
-            )
+            raise ValueError("You are not a member of this alliance")
 
         if role not in required_roles:
             logger.warning(
                 f"Permission denied - user_id={user_id}, role={role}, "
                 f"required={required_roles}, action={action}"
             )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You don't have permission to {action}. Required role: {' or '.join(required_roles)}, your role: {role}"
+            raise PermissionError(
+                f"You don't have permission to {action}. "
+                f"Required role: {' or '.join(required_roles)}, your role: {role}"
             )
 
     async def require_owner(
@@ -153,7 +144,8 @@ class PermissionService:
             action: Description of the action
 
         Raises:
-            HTTPException 403: If user is not owner
+            ValueError: If user is not a member
+            PermissionError: If user is not owner
         """
         await self.require_permission(user_id, alliance_id, ['owner'], action)
 
@@ -174,7 +166,8 @@ class PermissionService:
             action: Description of the action
 
         Raises:
-            HTTPException 403: If user is only a member
+            ValueError: If user is not a member
+            PermissionError: If user is only a member (not owner/collaborator)
         """
         await self.require_permission(
             user_id,

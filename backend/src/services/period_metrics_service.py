@@ -25,6 +25,7 @@ from src.repositories.member_period_metrics_repository import MemberPeriodMetric
 from src.repositories.member_snapshot_repository import MemberSnapshotRepository
 from src.repositories.period_repository import PeriodRepository
 from src.repositories.season_repository import SeasonRepository
+from src.services.permission_service import PermissionService
 
 
 class PeriodMetricsService:
@@ -37,6 +38,34 @@ class PeriodMetricsService:
         self._upload_repo = CsvUploadRepository()
         self._snapshot_repo = MemberSnapshotRepository()
         self._season_repo = SeasonRepository()
+        self._permission_service = PermissionService()
+
+    async def verify_user_access(self, user_id: UUID, period_id: UUID) -> UUID:
+        """
+        Verify user has access to period and return alliance_id
+
+        This is a utility method for API endpoints to verify access before operations.
+
+        Args:
+            user_id: User UUID
+            period_id: Period UUID
+
+        Returns:
+            UUID: The alliance_id if access is granted
+
+        Raises:
+            ValueError: If period not found
+            PermissionError: If user is not a member of the alliance
+        """
+        period = await self._period_repo.get_by_id(period_id)
+        if not period:
+            raise ValueError("Period not found")
+
+        role = await self._permission_service.get_user_role(user_id, period.alliance_id)
+        if role is None:
+            raise PermissionError("You are not a member of this alliance")
+
+        return period.alliance_id
 
     async def calculate_periods_for_season(self, season_id: UUID) -> list[Period]:
         """

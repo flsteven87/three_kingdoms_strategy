@@ -30,6 +30,7 @@ from src.models.battle_event_metrics import (
 from src.repositories.battle_event_metrics_repository import BattleEventMetricsRepository
 from src.repositories.battle_event_repository import BattleEventRepository
 from src.repositories.member_snapshot_repository import MemberSnapshotRepository
+from src.services.permission_service import PermissionService
 
 
 class BattleEventService:
@@ -40,6 +41,34 @@ class BattleEventService:
         self._event_repo = BattleEventRepository()
         self._metrics_repo = BattleEventMetricsRepository()
         self._snapshot_repo = MemberSnapshotRepository()
+        self._permission_service = PermissionService()
+
+    async def verify_user_access(self, user_id: UUID, event_id: UUID) -> UUID:
+        """
+        Verify user has access to event and return alliance_id
+
+        This is a utility method for API endpoints to verify access before operations.
+
+        Args:
+            user_id: User UUID
+            event_id: Event UUID
+
+        Returns:
+            UUID: The alliance_id if access is granted
+
+        Raises:
+            ValueError: If event not found
+            PermissionError: If user is not a member of the alliance
+        """
+        event = await self._event_repo.get_by_id(event_id)
+        if not event:
+            raise ValueError("Event not found")
+
+        role = await self._permission_service.get_user_role(user_id, event.alliance_id)
+        if role is None:
+            raise PermissionError("You are not a member of this alliance")
+
+        return event.alliance_id
 
     async def create_event(self, event_data: BattleEventCreate) -> BattleEvent:
         """

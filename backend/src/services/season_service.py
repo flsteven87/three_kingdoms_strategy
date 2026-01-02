@@ -28,6 +28,33 @@ class SeasonService:
         self._alliance_repo = AllianceRepository()
         self._permission_service = PermissionService()
 
+    async def verify_user_access(self, user_id: UUID, season_id: UUID) -> UUID:
+        """
+        Verify user has access to season and return alliance_id
+
+        This is a utility method for API endpoints to verify access before operations.
+
+        Args:
+            user_id: User UUID
+            season_id: Season UUID
+
+        Returns:
+            UUID: The alliance_id if access is granted
+
+        Raises:
+            ValueError: If season not found
+            PermissionError: If user is not a member of the alliance
+        """
+        season = await self._repo.get_by_id(season_id)
+        if not season:
+            raise ValueError("Season not found")
+
+        role = await self._permission_service.get_user_role(user_id, season.alliance_id)
+        if role is None:
+            raise PermissionError("You are not a member of this alliance")
+
+        return season.alliance_id
+
     async def get_seasons(self, user_id: UUID, active_only: bool = False) -> list[Season]:
         """
         Get all seasons for user's alliance

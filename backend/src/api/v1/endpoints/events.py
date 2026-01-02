@@ -10,10 +10,9 @@ Follows CLAUDE.md:
 - Typed response models for OpenAPI docs
 """
 
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter
 
 from src.api.v1.schemas.events import (
     CreateEventRequest,
@@ -25,78 +24,18 @@ from src.api.v1.schemas.events import (
     EventSummaryResponse,
     ProcessEventRequest,
 )
-from src.core.auth import get_current_user_id
+from src.core.dependencies import BattleEventServiceDep, SeasonServiceDep, UserIdDep
 from src.models.battle_event import BattleEventCreate
-from src.repositories.battle_event_repository import BattleEventRepository
-from src.repositories.season_repository import SeasonRepository
-from src.services.battle_event_service import BattleEventService
-from src.services.permission_service import PermissionService
 
 router = APIRouter(prefix="/events", tags=["events"])
-
-# Type aliases for dependency injection
-CurrentUserIdDep = Annotated[UUID, Depends(get_current_user_id)]
-
-
-def get_event_service() -> BattleEventService:
-    """Get battle event service instance"""
-    return BattleEventService()
-
-
-EventServiceDep = Annotated[BattleEventService, Depends(get_event_service)]
-
-
-async def _verify_season_access(user_id: UUID, season_id: UUID) -> UUID:
-    """
-    Verify user has access to the season and return alliance_id.
-    Raises HTTPException if not authorized.
-    """
-    season_repo = SeasonRepository()
-    season = await season_repo.get_by_id(season_id)
-
-    if not season:
-        raise HTTPException(status_code=404, detail="Season not found")
-
-    permission_service = PermissionService()
-    role = await permission_service.get_user_role(user_id, season.alliance_id)
-
-    if role is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not a member of this alliance",
-        )
-
-    return season.alliance_id
-
-
-async def _verify_event_access(user_id: UUID, event_id: UUID) -> UUID:
-    """
-    Verify user has access to the event and return alliance_id.
-    Raises HTTPException if not authorized.
-    """
-    event_repo = BattleEventRepository()
-    event = await event_repo.get_by_id(event_id)
-
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-
-    permission_service = PermissionService()
-    role = await permission_service.get_user_role(user_id, event.alliance_id)
-
-    if role is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not a member of this alliance",
-        )
-
-    return event.alliance_id
 
 
 @router.get("", response_model=list[EventListItemResponse])
 async def list_events(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
+    season_service: SeasonServiceDep,
 ) -> list[EventListItemResponse]:
     """
     Get all events for a season.
@@ -107,7 +46,7 @@ async def list_events(
     Returns:
         List of events with basic info and computed stats
     """
-    await _verify_season_access(user_id, season_id)
+    await season_service.verify_user_access(user_id, season_id)
     events = await service.get_events_by_season(season_id)
     return [EventListItemResponse.model_validate(e) for e in events]
 
@@ -116,8 +55,9 @@ async def list_events(
 async def create_event(
     season_id: UUID,
     body: CreateEventRequest,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
+    season_service: SeasonServiceDep,
 ) -> EventDetailResponse:
     """
     Create a new battle event.
@@ -133,7 +73,7 @@ async def create_event(
     Returns:
         Created event details
     """
-    alliance_id = await _verify_season_access(user_id, season_id)
+    alliance_id = await season_service.verify_user_access(user_id, season_id)
 
     event_data = BattleEventCreate(
         season_id=season_id,
@@ -151,8 +91,8 @@ async def create_event(
 @router.get("/{event_id}", response_model=EventDetailResponse)
 async def get_event(
     event_id: UUID,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
 ) -> EventDetailResponse:
     """
     Get event details by ID.
@@ -162,12 +102,15 @@ async def get_event(
 
     Returns:
         Event details
+
+    Raises:
+        ValueError: Event not found
     """
-    await _verify_event_access(user_id, event_id)
+    await service.verify_user_access(user_id, event_id)
     event = await service.get_event(event_id)
 
     if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
+        raise ValueError("Event not found")
 
     return EventDetailResponse.model_validate(event)
 
@@ -176,8 +119,8 @@ async def get_event(
 async def process_event(
     event_id: UUID,
     body: ProcessEventRequest,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
 ) -> EventDetailResponse:
     """
     Process event snapshots and calculate metrics.
@@ -194,23 +137,22 @@ async def process_event(
 
     Returns:
         Updated event details with completed status
-    """
-    await _verify_event_access(user_id, event_id)
 
-    try:
-        event = await service.process_event_snapshots(
-            event_id, body.before_upload_id, body.after_upload_id
-        )
-        return EventDetailResponse.model_validate(event)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
+    """
+    await service.verify_user_access(user_id, event_id)
+
+    event = await service.process_event_snapshots(
+        event_id, body.before_upload_id, body.after_upload_id
+    )
+    return EventDetailResponse.model_validate(event)
 
 
 @router.get("/{event_id}/summary", response_model=EventSummaryResponse)
 async def get_event_summary(
     event_id: UUID,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
 ) -> EventSummaryResponse:
     """
     Get event summary statistics.
@@ -221,7 +163,7 @@ async def get_event_summary(
     Returns:
         Event summary with participation stats and aggregates
     """
-    await _verify_event_access(user_id, event_id)
+    await service.verify_user_access(user_id, event_id)
     summary = await service.get_event_summary(event_id)
     return EventSummaryResponse.model_validate(summary)
 
@@ -229,8 +171,8 @@ async def get_event_summary(
 @router.get("/{event_id}/metrics", response_model=list[EventMemberMetricResponse])
 async def get_event_metrics(
     event_id: UUID,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
 ) -> list[EventMemberMetricResponse]:
     """
     Get all member metrics for an event.
@@ -241,7 +183,7 @@ async def get_event_metrics(
     Returns:
         List of member metrics ordered by merit_diff descending
     """
-    await _verify_event_access(user_id, event_id)
+    await service.verify_user_access(user_id, event_id)
     metrics = await service.get_event_metrics(event_id)
     return [EventMemberMetricResponse.model_validate(m) for m in metrics]
 
@@ -249,8 +191,8 @@ async def get_event_metrics(
 @router.get("/{event_id}/analytics", response_model=EventAnalyticsResponse)
 async def get_event_analytics(
     event_id: UUID,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
 ) -> EventAnalyticsResponse:
     """
     Get complete event analytics.
@@ -260,12 +202,15 @@ async def get_event_analytics(
 
     Returns:
         Complete analytics with event, summary, metrics, and distribution
+
+    Raises:
+        ValueError: Event not found
     """
-    await _verify_event_access(user_id, event_id)
+    await service.verify_user_access(user_id, event_id)
 
     event = await service.get_event(event_id)
     if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
+        raise ValueError("Event not found")
 
     summary = await service.get_event_summary(event_id)
     metrics = await service.get_event_metrics(event_id)
@@ -284,8 +229,8 @@ async def get_event_analytics(
 @router.delete("/{event_id}", status_code=204)
 async def delete_event(
     event_id: UUID,
-    user_id: CurrentUserIdDep,
-    service: EventServiceDep,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
 ) -> None:
     """
     Delete an event.
@@ -293,7 +238,7 @@ async def delete_event(
     Path Parameters:
         event_id: Event UUID
     """
-    await _verify_event_access(user_id, event_id)
+    await service.verify_user_access(user_id, event_id)
     await service.delete_event(event_id)
 
 

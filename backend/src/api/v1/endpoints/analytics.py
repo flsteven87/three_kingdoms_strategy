@@ -10,10 +10,9 @@ Follows CLAUDE.md:
 - Typed response models for OpenAPI docs
 """
 
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from src.api.v1.schemas.analytics import (
     AllianceAnalyticsResponse,
@@ -27,78 +26,22 @@ from src.api.v1.schemas.analytics import (
     MemberTrendItem,
     SeasonSummaryResponse,
 )
-from src.core.auth import get_current_user_id
-from src.repositories.member_repository import MemberRepository
-from src.repositories.period_repository import PeriodRepository
-from src.repositories.season_repository import SeasonRepository
-from src.services.analytics_service import AnalyticsService
-from src.services.permission_service import PermissionService
+from src.core.dependencies import (
+    AnalyticsServiceDep,
+    PeriodMetricsServiceDep,
+    SeasonServiceDep,
+    UserIdDep,
+)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
-
-# Type aliases for dependency injection
-CurrentUserIdDep = Annotated[UUID, Depends(get_current_user_id)]
-
-
-def get_analytics_service() -> AnalyticsService:
-    """Get analytics service instance"""
-    return AnalyticsService()
-
-
-AnalyticsServiceDep = Annotated[AnalyticsService, Depends(get_analytics_service)]
-
-
-async def _verify_season_access(user_id: UUID, season_id: UUID) -> UUID:
-    """
-    Verify user has access to the season and return alliance_id.
-    Raises HTTPException if not authorized.
-    """
-    season_repo = SeasonRepository()
-    season = await season_repo.get_by_id(season_id)
-
-    if not season:
-        raise HTTPException(status_code=404, detail="Season not found")
-
-    permission_service = PermissionService()
-    role = await permission_service.get_user_role(user_id, season.alliance_id)
-
-    if role is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not a member of this alliance",
-        )
-
-    return season.alliance_id
-
-
-async def _verify_period_access(user_id: UUID, period_id: UUID) -> UUID:
-    """
-    Verify user has access to the period and return alliance_id.
-    Raises HTTPException if not authorized.
-    """
-    period_repo = PeriodRepository()
-    period = await period_repo.get_by_id(period_id)
-
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
-
-    permission_service = PermissionService()
-    role = await permission_service.get_user_role(user_id, period.alliance_id)
-
-    if role is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not a member of this alliance",
-        )
-
-    return period.alliance_id
 
 
 @router.get("/members", response_model=list[MemberListItem])
 async def get_members(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
     active_only: bool = Query(True, description="Only return active members"),
 ) -> list[MemberListItem]:
     """
@@ -111,7 +54,7 @@ async def get_members(
     Returns:
         List of members with id, name, contribution_rank, and group
     """
-    alliance_id = await _verify_season_access(user_id, season_id)
+    alliance_id = await season_service.verify_user_access(user_id, season_id)
     data = await service.get_members_for_analytics(alliance_id, active_only, season_id)
     return [MemberListItem(**item) for item in data]
 
@@ -120,8 +63,9 @@ async def get_members(
 async def get_member_trend(
     member_id: UUID,
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
 ) -> list[MemberTrendItem]:
     """
     Get member's performance trend across all periods in a season.
@@ -139,15 +83,7 @@ async def get_member_trend(
         List of period metrics with daily averages, diffs, rank info,
         and alliance averages for comparison
     """
-    alliance_id = await _verify_season_access(user_id, season_id)
-
-    # Verify member belongs to this alliance
-    member_repo = MemberRepository()
-    member = await member_repo.get_by_id(member_id)
-
-    if not member or member.alliance_id != alliance_id:
-        raise HTTPException(status_code=404, detail="Member not found")
-
+    await season_service.verify_user_access(user_id, season_id)
     data = await service.get_member_trend(member_id, season_id)
     return [MemberTrendItem(**item) for item in data]
 
@@ -156,8 +92,9 @@ async def get_member_trend(
 async def get_member_season_summary(
     member_id: UUID,
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
 ) -> SeasonSummaryResponse:
     """
     Get member's season-to-date summary (aggregated across all periods).
@@ -171,19 +108,11 @@ async def get_member_season_summary(
     Returns:
         Season summary with totals and averages
     """
-    alliance_id = await _verify_season_access(user_id, season_id)
-
-    # Verify member belongs to this alliance
-    member_repo = MemberRepository()
-    member = await member_repo.get_by_id(member_id)
-
-    if not member or member.alliance_id != alliance_id:
-        raise HTTPException(status_code=404, detail="Member not found")
-
+    await season_service.verify_user_access(user_id, season_id)
     summary = await service.get_season_summary(member_id, season_id)
 
     if not summary:
-        raise HTTPException(
+        raise ValueError(
             status_code=404,
             detail="No metrics data available for this member in this season",
         )
@@ -195,8 +124,9 @@ async def get_member_season_summary(
 async def get_member_comparison(
     member_id: UUID,
     period_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    period_service: PeriodMetricsServiceDep,
 ) -> MemberComparisonResponse:
     """
     Get member metrics for a period with alliance averages for comparison.
@@ -210,12 +140,12 @@ async def get_member_comparison(
     Returns:
         Member metrics and alliance averages for comparison
     """
-    await _verify_period_access(user_id, period_id)
+    await period_service.verify_user_access(user_id, period_id)
 
     result = await service.get_member_with_comparison(member_id, period_id)
 
     if not result:
-        raise HTTPException(
+        raise ValueError(
             status_code=404,
             detail="Member metrics not found for this period",
         )
@@ -226,8 +156,9 @@ async def get_member_comparison(
 @router.get("/periods/{period_id}/averages", response_model=AllianceAveragesResponse)
 async def get_period_averages(
     period_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    period_service: PeriodMetricsServiceDep,
 ) -> AllianceAveragesResponse:
     """
     Get alliance average metrics for a specific period.
@@ -238,7 +169,7 @@ async def get_period_averages(
     Returns:
         Alliance averages for daily metrics
     """
-    await _verify_period_access(user_id, period_id)
+    await period_service.verify_user_access(user_id, period_id)
 
     result = await service.get_period_alliance_averages(period_id)
     return AllianceAveragesResponse(**result)
@@ -247,8 +178,9 @@ async def get_period_averages(
 @router.get("/alliance/trend", response_model=list[AllianceTrendItem])
 async def get_alliance_trend(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
 ) -> list[AllianceTrendItem]:
     """
     Get alliance averages for each period in a season.
@@ -259,7 +191,7 @@ async def get_alliance_trend(
     Returns:
         List of period averages with member counts
     """
-    await _verify_season_access(user_id, season_id)
+    await season_service.verify_user_access(user_id, season_id)
     data = await service.get_alliance_trend_averages(season_id)
     return [AllianceTrendItem(**item) for item in data]
 
@@ -267,8 +199,9 @@ async def get_alliance_trend(
 @router.get("/seasons/{season_id}/averages", response_model=AllianceAveragesResponse)
 async def get_season_averages(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
 ) -> AllianceAveragesResponse:
     """
     Get alliance average and median metrics for season-to-date.
@@ -282,7 +215,7 @@ async def get_season_averages(
     Returns:
         Alliance averages and medians for daily metrics
     """
-    await _verify_season_access(user_id, season_id)
+    await season_service.verify_user_access(user_id, season_id)
     result = await service.get_season_alliance_averages(season_id)
     return AllianceAveragesResponse(**result)
 
@@ -295,8 +228,9 @@ async def get_season_averages(
 @router.get("/alliance", response_model=AllianceAnalyticsResponse)
 async def get_alliance_analytics(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
     view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
 ) -> AllianceAnalyticsResponse:
     """
@@ -312,7 +246,7 @@ async def get_alliance_analytics(
     Returns:
         Complete alliance analytics response
     """
-    await _verify_season_access(user_id, season_id)
+    await season_service.verify_user_access(user_id, season_id)
     data = await service.get_alliance_analytics(season_id, view=view)
     return AllianceAnalyticsResponse(**data)
 
@@ -325,8 +259,9 @@ async def get_alliance_analytics(
 @router.get("/groups", response_model=list[GroupListItem])
 async def get_groups(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
 ) -> list[GroupListItem]:
     """
     Get list of all groups with member counts for a season.
@@ -337,7 +272,7 @@ async def get_groups(
     Returns:
         List of groups with name and member_count
     """
-    await _verify_season_access(user_id, season_id)
+    await season_service.verify_user_access(user_id, season_id)
     data = await service.get_groups_list(season_id)
     return [GroupListItem(**item) for item in data]
 
@@ -345,8 +280,9 @@ async def get_groups(
 @router.get("/groups/comparison", response_model=list[GroupComparisonItem])
 async def get_groups_comparison(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
     view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
 ) -> list[GroupComparisonItem]:
     """
@@ -361,7 +297,7 @@ async def get_groups_comparison(
     Returns:
         List of group comparison items sorted by avg_daily_merit descending
     """
-    await _verify_season_access(user_id, season_id)
+    await season_service.verify_user_access(user_id, season_id)
     data = await service.get_groups_comparison(season_id, view=view)
     return [GroupComparisonItem(**item) for item in data]
 
@@ -370,8 +306,9 @@ async def get_groups_comparison(
 async def get_group_analytics(
     group_name: str,
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: AnalyticsServiceDep,
+    season_service: SeasonServiceDep,
     view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
 ) -> GroupAnalyticsResponse:
     """
@@ -391,7 +328,7 @@ async def get_group_analytics(
     """
     from urllib.parse import unquote
 
-    await _verify_season_access(user_id, season_id)
+    await season_service.verify_user_access(user_id, season_id)
 
     # Decode URL-encoded group name
     decoded_group_name = unquote(group_name)
@@ -399,7 +336,7 @@ async def get_group_analytics(
     data = await service.get_group_analytics(season_id, decoded_group_name, view=view)
 
     if not data["members"]:
-        raise HTTPException(
+        raise ValueError(
             status_code=404,
             detail=f"Group '{decoded_group_name}' not found or has no members in this season",
         )

@@ -7,28 +7,27 @@ Period Metrics API Endpoints
 - Proper error handling with exception chaining
 """
 
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter
 
-from src.core.auth import get_current_user_id
-from src.core.dependencies import get_period_metrics_service
-from src.services.period_metrics_service import PeriodMetricsService
-from src.services.permission_service import PermissionService
+from src.core.dependencies import (
+    PeriodMetricsServiceDep,
+    PermissionServiceDep,
+    SeasonServiceDep,
+    UserIdDep,
+)
 
 router = APIRouter(prefix="/periods", tags=["periods"])
-
-# Type aliases for dependency injection
-CurrentUserIdDep = Annotated[UUID, Depends(get_current_user_id)]
-PeriodMetricsServiceDep = Annotated[PeriodMetricsService, Depends(get_period_metrics_service)]
 
 
 @router.post("/seasons/{season_id}/recalculate")
 async def recalculate_season_periods(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: PeriodMetricsServiceDep,
+    season_service: SeasonServiceDep,
+    permission_service: PermissionServiceDep,
 ) -> dict:
     """
     Recalculate all periods for a specific season.
@@ -42,42 +41,29 @@ async def recalculate_season_periods(
     Returns:
         Recalculation summary with period and metric counts
     """
-    from src.repositories.season_repository import SeasonRepository
-
-    # Get season to verify it exists and get alliance_id
-    season_repo = SeasonRepository()
-    season = await season_repo.get_by_id(season_id)
-
-    if not season:
-        raise HTTPException(status_code=404, detail="Season not found")
+    # Verify access and get alliance_id
+    alliance_id = await season_service.verify_user_access(user_id, season_id)
 
     # Verify permission: owner or collaborator can recalculate
-    permission_service = PermissionService()
     await permission_service.require_owner_or_collaborator(
-        user_id, season.alliance_id, "recalculate period metrics"
+        user_id, alliance_id, "recalculate period metrics"
     )
 
     # Perform recalculation for this specific season
-    try:
-        periods = await service.calculate_periods_for_season(season_id)
-        return {
-            "success": True,
-            "season_id": str(season_id),
-            "season_name": season.name,
-            "periods_created": len(periods),
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to recalculate periods: {str(e)}",
-        ) from e
+    periods = await service.calculate_periods_for_season(season_id)
+    return {
+        "success": True,
+        "season_id": str(season_id),
+        "periods_created": len(periods),
+    }
 
 
 @router.get("")
 async def get_periods_by_season(
     season_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: PeriodMetricsServiceDep,
+    season_service: SeasonServiceDep,
 ) -> list[dict]:
     """
     Get all periods for a season.
@@ -88,23 +74,8 @@ async def get_periods_by_season(
     Returns:
         List of periods ordered by period_number
     """
-    # Verify user has access to this season's alliance
-    from src.repositories.season_repository import SeasonRepository
-
-    season_repo = SeasonRepository()
-    season = await season_repo.get_by_id(season_id)
-
-    if not season:
-        raise HTTPException(status_code=404, detail="Season not found")
-
-    permission_service = PermissionService()
-    role = await permission_service.get_user_role(user_id, season.alliance_id)
-
-    if role is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not a member of this alliance",
-        )
+    # Verify user has access to this season
+    await season_service.verify_user_access(user_id, season_id)
 
     periods = await service.get_periods_by_season(season_id)
     return [
@@ -125,7 +96,7 @@ async def get_periods_by_season(
 @router.get("/{period_id}/metrics")
 async def get_period_metrics(
     period_id: UUID,
-    user_id: CurrentUserIdDep,
+    user_id: UserIdDep,
     service: PeriodMetricsServiceDep,
 ) -> list[dict]:
     """
@@ -137,22 +108,7 @@ async def get_period_metrics(
     Returns:
         List of member metrics with rankings and daily averages
     """
-    # Get period to verify access
-    from src.repositories.period_repository import PeriodRepository
-
-    period_repo = PeriodRepository()
-    period = await period_repo.get_by_id(period_id)
-
-    if not period:
-        raise HTTPException(status_code=404, detail="Period not found")
-
-    permission_service = PermissionService()
-    role = await permission_service.get_user_role(user_id, period.alliance_id)
-
-    if role is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You are not a member of this alliance",
-        )
+    # Verify user has access to this period
+    await service.verify_user_access(user_id, period_id)
 
     return await service.get_period_metrics(period_id)
