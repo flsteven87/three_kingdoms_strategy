@@ -14,6 +14,8 @@ import { EventAnalytics } from './pages/EventAnalytics'
 import { EventDetail } from './pages/EventDetail'
 import { Settings } from './pages/Settings'
 import { LineBinding } from './pages/LineBinding'
+import { LiffLayout } from './liff/components/LiffLayout'
+import { LiffHome } from './liff/pages/LiffHome'
 
 function ProtectedRoute() {
   const { user, loading } = useAuth()
@@ -42,6 +44,11 @@ function App() {
         <Routes>
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+
+          {/* LIFF Routes - No Supabase auth required */}
+          <Route path="/liff" element={<LiffLayout />}>
+            <Route index element={<LiffHome />} />
+          </Route>
 
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>

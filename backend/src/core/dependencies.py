@@ -31,6 +31,7 @@ from src.services.alliance_collaborator_service import AllianceCollaboratorServi
 from src.services.alliance_service import AllianceService
 from src.services.analytics_service import AnalyticsService
 from src.services.battle_event_service import BattleEventService
+from src.services.copper_mine_service import CopperMineService
 from src.services.csv_upload_service import CSVUploadService
 from src.services.hegemony_weight_service import HegemonyWeightService
 from src.services.line_binding_service import LineBindingService
@@ -97,6 +98,11 @@ def get_line_binding_service() -> LineBindingService:
     return LineBindingService()
 
 
+def get_copper_mine_service() -> CopperMineService:
+    """Get copper mine service instance"""
+    return CopperMineService()
+
+
 # ============================================================================
 # Type Aliases for Dependency Injection (2025 Standard)
 # 符合 CLAUDE.md 🟡: Annotated[Type, Depends()] pattern
@@ -128,3 +134,4 @@ PeriodMetricsServiceDep = Annotated[
 AnalyticsServiceDep = Annotated[AnalyticsService, Depends(get_analytics_service)]
 BattleEventServiceDep = Annotated[BattleEventService, Depends(get_battle_event_service)]
 LineBindingServiceDep = Annotated[LineBindingService, Depends(get_line_binding_service)]
+CopperMineServiceDep = Annotated[CopperMineService, Depends(get_copper_mine_service)]

@@ -21,11 +21,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from src.core.config import Settings, get_settings
 from src.core.dependencies import (
     AllianceServiceDep,
+    CopperMineServiceDep,
     LineBindingServiceDep,
     PermissionServiceDep,
     UserIdDep,
 )
 from src.core.line_auth import WebhookBodyDep, create_liff_url, get_line_bot_api
+from src.models.copper_mine import (
+    CopperMineCreate,
+    CopperMineListResponse,
+    RegisterCopperResponse,
+)
 from src.models.line_binding import (
     LineBindingCodeResponse,
     LineBindingStatusResponse,
@@ -199,6 +205,91 @@ async def register_game_id(
         line_display_name=data.line_display_name,
         game_id=data.game_id
     )
+
+
+# =============================================================================
+# Copper Mine LIFF Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/copper/list",
+    response_model=CopperMineListResponse,
+    summary="Get copper mines list",
+    description="Get copper mines for LIFF display"
+)
+async def get_copper_mines(
+    service: CopperMineServiceDep,
+    u: Annotated[str, Query(description="LINE user ID")],
+    g: Annotated[str, Query(description="LINE group ID")],
+) -> CopperMineListResponse:
+    """
+    Get copper mines list for LIFF page
+
+    Query params:
+    - u: LINE user ID
+    - g: LINE group ID
+    """
+    return await service.get_mines_list(
+        line_group_id=g,
+        line_user_id=u
+    )
+
+
+@router.post(
+    "/copper/register",
+    response_model=RegisterCopperResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register copper mine",
+    description="Register a new copper mine location"
+)
+async def register_copper_mine(
+    service: CopperMineServiceDep,
+    data: CopperMineCreate,
+) -> RegisterCopperResponse:
+    """
+    Register a copper mine location
+
+    - Coordinates must be unique within alliance
+    - Returns 409 if mine already exists at coordinates
+    """
+    return await service.register_mine(
+        line_group_id=data.line_group_id,
+        line_user_id=data.line_user_id,
+        game_id=data.game_id,
+        coord_x=data.coord_x,
+        coord_y=data.coord_y,
+        level=data.level,
+        notes=data.notes
+    )
+
+
+@router.delete(
+    "/copper/{mine_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete copper mine",
+    description="Remove a copper mine record"
+)
+async def delete_copper_mine(
+    mine_id: str,
+    service: CopperMineServiceDep,
+    u: Annotated[str, Query(description="LINE user ID")],
+    g: Annotated[str, Query(description="LINE group ID")],
+) -> Response:
+    """
+    Delete a copper mine by ID
+
+    Query params:
+    - u: LINE user ID
+    - g: LINE group ID
+    """
+    from uuid import UUID
+    await service.delete_mine(
+        mine_id=UUID(mine_id),
+        line_group_id=g,
+        line_user_id=u
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # =============================================================================
