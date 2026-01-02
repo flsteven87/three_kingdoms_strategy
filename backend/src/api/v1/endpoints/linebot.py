@@ -39,6 +39,7 @@ from src.models.line_binding import (
     LineWebhookRequest,
     MemberInfoResponse,
     MemberLineBindingCreate,
+    MemberPerformanceResponse,
     RegisterMemberResponse,
 )
 from src.services.line_binding_service import LineBindingService
@@ -184,6 +185,33 @@ async def get_member_info(
     return await service.get_member_info(
         line_user_id=u,
         line_group_id=g
+    )
+
+
+@router.get(
+    "/member/performance",
+    response_model=MemberPerformanceResponse,
+    summary="Get member performance",
+    description="Get member performance analytics for LIFF display"
+)
+async def get_member_performance(
+    service: LineBindingServiceDep,
+    u: Annotated[str, Query(description="LINE user ID")],
+    g: Annotated[str, Query(description="LINE group ID")],
+    game_id: Annotated[str, Query(description="Game ID to get performance for")],
+) -> MemberPerformanceResponse:
+    """
+    Get member performance analytics for LIFF page
+
+    Query params:
+    - u: LINE user ID
+    - g: LINE group ID
+    - game_id: Game ID to get performance for
+    """
+    return await service.get_member_performance(
+        line_group_id=g,
+        line_user_id=u,
+        game_id=game_id
     )
 
 

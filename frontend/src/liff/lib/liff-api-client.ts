@@ -148,3 +148,65 @@ export async function deleteCopperMine(
     throw new Error(error.detail || 'Delete failed')
   }
 }
+
+// Performance API
+
+export interface PerformanceRank {
+  current: number
+  total: number
+  change: number | null
+}
+
+export interface PerformanceMetrics {
+  daily_contribution: number
+  daily_merit: number
+  daily_assist: number
+  daily_donation: number
+  power: number
+}
+
+export interface PerformanceTrendItem {
+  period_label: string
+  date: string
+  daily_contribution: number
+  daily_merit: number
+}
+
+export interface PerformanceSeasonTotal {
+  contribution: number
+  donation: number
+  power: number
+  power_change: number
+}
+
+export interface MemberPerformanceResponse {
+  has_data: boolean
+  game_id: string | null
+  season_name: string | null
+  rank: PerformanceRank | null
+  latest: PerformanceMetrics | null
+  alliance_avg: PerformanceMetrics | null
+  alliance_median: PerformanceMetrics | null
+  trend: PerformanceTrendItem[]
+  season_total: PerformanceSeasonTotal | null
+}
+
+export async function getMemberPerformance(
+  options: LiffApiOptions & { gameId: string }
+): Promise<MemberPerformanceResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/linebot/member/performance`)
+  url.searchParams.set('u', options.lineUserId)
+  url.searchParams.set('g', options.lineGroupId)
+  url.searchParams.set('game_id', options.gameId)
+
+  const response = await fetch(url.toString(), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }))
+    throw new Error(error.detail || 'Request failed')
+  }
+
+  return response.json()
+}

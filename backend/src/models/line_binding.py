@@ -179,3 +179,59 @@ class LineWebhookRequest(BaseModel):
 
     events: list[LineWebhookEvent]
     destination: str | None = None
+
+
+# =============================================================================
+# Performance Analytics Models (LIFF)
+# =============================================================================
+
+
+class PerformanceRank(BaseModel):
+    """Rank information for performance display"""
+
+    current: int
+    total: int
+    change: int | None = None
+
+
+class PerformanceMetrics(BaseModel):
+    """Daily metrics snapshot"""
+
+    daily_contribution: float
+    daily_merit: float
+    daily_assist: float
+    daily_donation: float
+    power: int
+
+
+class PerformanceTrendItem(BaseModel):
+    """Single trend data point"""
+
+    period_label: str
+    date: str
+    daily_contribution: float
+    daily_merit: float
+
+
+class PerformanceSeasonTotal(BaseModel):
+    """Season accumulated totals"""
+
+    contribution: int
+    donation: int
+    power: int
+    power_change: int
+
+
+class MemberPerformanceResponse(BaseModel):
+    """Response for LIFF member performance analytics"""
+
+    has_data: bool
+    game_id: str | None = None
+    season_name: str | None = None
+
+    rank: PerformanceRank | None = None
+    latest: PerformanceMetrics | None = None
+    alliance_avg: PerformanceMetrics | None = None
+    alliance_median: PerformanceMetrics | None = None
+    trend: list[PerformanceTrendItem] = []
+    season_total: PerformanceSeasonTotal | None = None

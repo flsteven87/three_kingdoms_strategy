@@ -23,6 +23,11 @@ from src.models.line_binding import (
     LineBindingStatusResponse,
     LineGroupBindingResponse,
     MemberInfoResponse,
+    MemberPerformanceResponse,
+    PerformanceMetrics,
+    PerformanceRank,
+    PerformanceSeasonTotal,
+    PerformanceTrendItem,
     RegisteredAccount,
     RegisterMemberResponse,
 )
@@ -465,3 +470,167 @@ class LineBindingService:
             line_group_id: LINE group ID
         """
         await self.repository.upsert_group_reminder_cooldown(line_group_id)
+
+    # =========================================================================
+    # Performance Analytics Operations (LIFF)
+    # =========================================================================
+
+    async def get_member_performance(
+        self,
+        line_group_id: str,
+        line_user_id: str,
+        game_id: str
+    ) -> MemberPerformanceResponse:
+        """
+        Get member performance analytics for LIFF display
+
+        Args:
+            line_group_id: LINE group ID
+            line_user_id: LINE user ID
+            game_id: Game ID to get performance for
+
+        Returns:
+            MemberPerformanceResponse with analytics data
+
+        Raises:
+            HTTPException 404: If group not bound or game_id not found
+        """
+        # Lazy import to avoid circular dependency
+        from src.repositories.season_repository import SeasonRepository
+        from src.services.analytics_service import AnalyticsService
+
+        # Find alliance by group ID
+        group_binding = await self.repository.get_group_binding_by_line_group_id(
+            line_group_id
+        )
+
+        if not group_binding:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Group not bound to any alliance"
+            )
+
+        alliance_id = group_binding.alliance_id
+
+        # Verify user owns this game_id
+        member_binding = await self.repository.get_member_binding_by_game_id(
+            alliance_id=alliance_id,
+            game_id=game_id
+        )
+
+        if not member_binding or member_binding.line_user_id != line_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Game ID not registered by this user"
+            )
+
+        # Get member_id from binding
+        member_id = member_binding.member_id
+        if not member_id:
+            # Game ID registered but not matched to member yet
+            return MemberPerformanceResponse(
+                has_data=False,
+                game_id=game_id
+            )
+
+        # Get active season
+        season_repo = SeasonRepository()
+        active_season = await season_repo.get_active_by_alliance(alliance_id)
+
+        if not active_season:
+            return MemberPerformanceResponse(
+                has_data=False,
+                game_id=game_id
+            )
+
+        # Get analytics data
+        analytics_service = AnalyticsService()
+
+        # Get member trend data
+        trend_data = await analytics_service.get_member_trend(
+            member_id=member_id,
+            season_id=active_season.id
+        )
+
+        if not trend_data:
+            return MemberPerformanceResponse(
+                has_data=False,
+                game_id=game_id,
+                season_name=active_season.name
+            )
+
+        # Get season summary
+        season_summary = await analytics_service.get_season_summary(
+            member_id=member_id,
+            season_id=active_season.id
+        )
+
+        # Get latest period data
+        latest = trend_data[-1]
+
+        # Build rank info
+        rank = PerformanceRank(
+            current=latest["end_rank"],
+            total=latest["alliance_member_count"],
+            change=latest["rank_change"]
+        )
+
+        # Build latest metrics
+        latest_metrics = PerformanceMetrics(
+            daily_contribution=latest["daily_contribution"],
+            daily_merit=latest["daily_merit"],
+            daily_assist=latest["daily_assist"],
+            daily_donation=latest["daily_donation"],
+            power=latest["end_power"]
+        )
+
+        # Build alliance average metrics
+        alliance_avg = PerformanceMetrics(
+            daily_contribution=latest["alliance_avg_contribution"],
+            daily_merit=latest["alliance_avg_merit"],
+            daily_assist=latest["alliance_avg_assist"],
+            daily_donation=latest["alliance_avg_donation"],
+            power=int(latest["alliance_avg_power"])
+        )
+
+        # Build alliance median metrics
+        alliance_median = PerformanceMetrics(
+            daily_contribution=latest["alliance_median_contribution"],
+            daily_merit=latest["alliance_median_merit"],
+            daily_assist=latest["alliance_median_assist"],
+            daily_donation=latest["alliance_median_donation"],
+            power=int(latest["alliance_median_power"])
+        )
+
+        # Build trend items (limit to 10 most recent)
+        trend_items = [
+            PerformanceTrendItem(
+                period_label=item["period_label"],
+                date=item["start_date"],
+                daily_contribution=item["daily_contribution"],
+                daily_merit=item["daily_merit"]
+            )
+            for item in trend_data[-10:]
+        ]
+
+        # Build season totals
+        season_total = None
+        if season_summary:
+            season_total = PerformanceSeasonTotal(
+                contribution=season_summary["total_contribution"],
+                donation=season_summary["total_donation"],
+                power=season_summary["current_power"],
+                power_change=season_summary["total_power_change"]
+            )
+
+        return MemberPerformanceResponse(
+            has_data=True,
+            game_id=game_id,
+            season_name=active_season.name,
+            rank=rank,
+            latest=latest_metrics,
+            alliance_avg=alliance_avg,
+            alliance_median=alliance_median,
+            trend=trend_items,
+            season_total=season_total
+        )
