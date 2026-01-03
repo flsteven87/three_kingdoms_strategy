@@ -20,21 +20,17 @@ import {
   useLiffRegisterCopper,
   useLiffDeleteCopper,
 } from '../hooks/use-liff-copper'
+import { useLiffMemberInfo } from '../hooks/use-liff-member'
 import type { LiffSession } from '../hooks/use-liff-session'
 
 interface Props {
   readonly session: LiffSession
 }
 
-function parseCoordinate(coord: string): { x: number; y: number } | null {
-  const match = coord.match(/^(\d+)[,，\s]+(\d+)$/)
-  if (!match) return null
-  return { x: parseInt(match[1], 10), y: parseInt(match[2], 10) }
-}
-
 export function CopperTab({ session }: Props) {
-  const [gameId, setGameId] = useState('')
-  const [coordinate, setCoordinate] = useState('')
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null)
+  const [coordX, setCoordX] = useState('')
+  const [coordY, setCoordY] = useState('')
   const [level, setLevel] = useState('9')
   const [formError, setFormError] = useState('')
 
@@ -43,29 +39,45 @@ export function CopperTab({ session }: Props) {
     lineGroupId: session.lineGroupId!,
   }
 
+  const memberContext = {
+    ...context,
+    lineDisplayName: session.lineDisplayName,
+  }
+
+  // Get registered accounts
+  const { data: memberInfo, isLoading: isLoadingMember } = useLiffMemberInfo(memberContext)
+  const accounts = memberInfo?.registered_ids || []
+  const effectiveGameId = selectedGameId || accounts[0]?.game_id || null
+
   const { data, isLoading, error } = useLiffCopperMines(context)
   const registerMutation = useLiffRegisterCopper(context)
   const deleteMutation = useLiffDeleteCopper(context)
 
   const handleRegister = async () => {
-    if (!gameId.trim() || !coordinate.trim()) return
+    if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return
 
-    const parsed = parseCoordinate(coordinate)
-    if (!parsed) {
-      setFormError('座標格式錯誤')
+    const x = parseInt(coordX, 10)
+    const y = parseInt(coordY, 10)
+
+    if (isNaN(x) || x < 0) {
+      setFormError('X 座標格式錯誤')
+      return
+    }
+    if (isNaN(y) || y < 0) {
+      setFormError('Y 座標格式錯誤')
       return
     }
 
     setFormError('')
     try {
       await registerMutation.mutateAsync({
-        gameId: gameId.trim(),
-        coordX: parsed.x,
-        coordY: parsed.y,
+        gameId: effectiveGameId,
+        coordX: x,
+        coordY: y,
         level: parseInt(level, 10),
       })
-      setGameId('')
-      setCoordinate('')
+      setCoordX('')
+      setCoordY('')
     } catch {
       // Error handled by mutation
     }
@@ -76,10 +88,21 @@ export function CopperTab({ session }: Props) {
     await deleteMutation.mutateAsync({ mineId })
   }
 
-  if (isLoading) {
+  if (isLoadingMember || isLoading) {
     return (
       <div className="py-6 text-center">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
+      </div>
+    )
+  }
+
+  // No registered accounts - prompt to register first
+  if (accounts.length === 0) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-sm text-muted-foreground">
+          請先至「遊戲 ID」頁面註冊帳號
+        </p>
       </div>
     )
   }
@@ -99,12 +122,28 @@ export function CopperTab({ session }: Props) {
       {/* Compact form */}
       <div className="space-y-2">
         <div className="flex gap-2">
-          <Input
-            value={gameId}
-            onChange={(e) => setGameId(e.target.value)}
-            placeholder="遊戲 ID"
-            className="h-10 flex-1"
-          />
+          {/* Account selector */}
+          {accounts.length === 1 ? (
+            <div className="h-10 flex-1 flex items-center px-3 bg-muted/50 rounded-md text-sm">
+              {effectiveGameId}
+            </div>
+          ) : (
+            <Select
+              value={effectiveGameId || ''}
+              onValueChange={setSelectedGameId}
+            >
+              <SelectTrigger className="h-10 flex-1">
+                <SelectValue placeholder="選擇帳號" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((acc) => (
+                  <SelectItem key={acc.game_id} value={acc.game_id}>
+                    {acc.game_id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={level} onValueChange={setLevel}>
             <SelectTrigger className="h-10 w-20">
               <SelectValue />
@@ -120,16 +159,25 @@ export function CopperTab({ session }: Props) {
         </div>
         <div className="flex gap-2">
           <Input
-            value={coordinate}
-            onChange={(e) => setCoordinate(e.target.value)}
-            placeholder="座標 123,456"
+            value={coordX}
+            onChange={(e) => setCoordX(e.target.value)}
+            placeholder="X"
             className="h-10 flex-1"
             inputMode="numeric"
+            pattern="[0-9]*"
+          />
+          <Input
+            value={coordY}
+            onChange={(e) => setCoordY(e.target.value)}
+            placeholder="Y"
+            className="h-10 flex-1"
+            inputMode="numeric"
+            pattern="[0-9]*"
             onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
           />
           <Button
             onClick={handleRegister}
-            disabled={!gameId.trim() || !coordinate.trim() || registerMutation.isPending}
+            disabled={!effectiveGameId || !coordX.trim() || !coordY.trim() || registerMutation.isPending}
             size="icon"
             className="h-10 w-10 shrink-0"
           >
