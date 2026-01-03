@@ -149,32 +149,35 @@ export function CopperTab({ session }: Props) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {[...Array(10)].map((_, i) => (
-                <SelectItem key={i + 1} value={String(i + 1)}>
-                  {i + 1} 級
-                </SelectItem>
-              ))}
+              <SelectItem value="10">10 級</SelectItem>
+              <SelectItem value="9">9 級</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="flex gap-2">
-          <Input
-            value={coordX}
-            onChange={(e) => setCoordX(e.target.value)}
-            placeholder="X"
-            className="h-10 flex-1"
-            inputMode="numeric"
-            pattern="[0-9]*"
-          />
-          <Input
-            value={coordY}
-            onChange={(e) => setCoordY(e.target.value)}
-            placeholder="Y"
-            className="h-10 flex-1"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
-          />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-1">
+            <span className="text-sm text-muted-foreground shrink-0">X</span>
+            <Input
+              value={coordX}
+              onChange={(e) => setCoordX(e.target.value)}
+              placeholder="123"
+              className="h-10"
+              inputMode="numeric"
+              pattern="[0-9]*"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 flex-1">
+            <span className="text-sm text-muted-foreground shrink-0">Y</span>
+            <Input
+              value={coordY}
+              onChange={(e) => setCoordY(e.target.value)}
+              placeholder="456"
+              className="h-10"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+            />
+          </div>
           <Button
             onClick={handleRegister}
             disabled={!effectiveGameId || !coordX.trim() || !coordY.trim() || registerMutation.isPending}
