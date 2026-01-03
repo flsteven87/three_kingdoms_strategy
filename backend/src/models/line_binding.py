@@ -147,6 +147,23 @@ class RegisterMemberResponse(BaseModel):
     registered_ids: list[RegisteredAccount] = []
 
 
+class RegisteredMemberItem(BaseModel):
+    """Registered member item for admin list view"""
+
+    line_user_id: str
+    line_display_name: str
+    game_id: str
+    is_verified: bool
+    registered_at: datetime
+
+
+class RegisteredMembersResponse(BaseModel):
+    """Response for registered members list"""
+
+    members: list[RegisteredMemberItem]
+    total: int
+
+
 # =============================================================================
 # Binding Status Response (for Web App)
 # =============================================================================

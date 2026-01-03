@@ -34,13 +34,235 @@ import {
   useGenerateBindingCode,
   useUnbindLineGroup,
   useCountdown,
-  useCopyToClipboard
+  useCopyToClipboard,
+  useRegisteredMembers
 } from '@/hooks/use-line-binding'
 import { useAlliance } from '@/hooks/use-alliance'
 import { useCanUpdateAlliance } from '@/hooks/use-user-role'
+import type { LineBindingStatusResponse } from '@/types/line-binding'
 
 const LINE_BOT_ID = import.meta.env.VITE_LINE_BOT_ID || '@977nncax'
 const ADD_FRIEND_URL = `https://line.me/R/ti/p/${LINE_BOT_ID}`
+
+// =============================================================================
+// BoundState Component
+// =============================================================================
+
+interface BoundStateProps {
+  readonly binding: NonNullable<LineBindingStatusResponse['binding']>
+  readonly canUpdate: boolean
+  readonly showUnbindDialog: boolean
+  readonly setShowUnbindDialog: (open: boolean) => void
+  readonly unbindGroup: {
+    readonly mutateAsync: () => Promise<void>
+    readonly isPending: boolean
+  }
+}
+
+function BoundState({
+  binding,
+  canUpdate,
+  showUnbindDialog,
+  setShowUnbindDialog,
+  unbindGroup
+}: BoundStateProps) {
+  const { data: membersData, isLoading: membersLoading } = useRegisteredMembers(true)
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">LINE 三國小幫手</h2>
+          <p className="text-muted-foreground mt-1">
+            連結 LINE 群組，讓盟友直接綁定遊戲 ID
+          </p>
+        </div>
+        <Badge variant="default" className="bg-green-600">已連結</Badge>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>已綁定群組</CardTitle>
+          <CardDescription>你的同盟已連結以下 LINE 群組</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Bound Group Info */}
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              {binding.group_picture_url ? (
+                <img
+                  src={binding.group_picture_url}
+                  alt={binding.group_name || '群組'}
+                  className="h-12 w-12 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 shrink-0">
+                  <MessageSquare className="h-6 w-6 text-green-600" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-lg truncate">
+                  {binding.group_name || '未命名群組'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  綁定於 {new Date(binding.bound_at).toLocaleDateString('zh-TW', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Users className="h-5 w-5" />
+                <span className="text-lg font-medium">{binding.member_count}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bot behavior & member usage */}
+          <div className="space-y-3">
+            <h4 className="font-medium">Bot 運作說明</h4>
+            <div className="rounded-lg border p-4 bg-muted/20 space-y-4">
+              {/* When bot shows up */}
+              <div>
+                <p className="text-sm font-medium mb-2">Bot 何時推送功能入口</p>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>在群組中 @三國小幫手</li>
+                  <li>新成員加入群組時（自動歡迎）</li>
+                  <li>未註冊者首次發言時（自動提醒）</li>
+                </ul>
+              </div>
+              {/* Available features */}
+              <div>
+                <p className="text-sm font-medium mb-2">盟友可用功能</p>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>註冊遊戲 ID — 綁定角色名稱</li>
+                  <li>登記銅礦位置 — 記錄座標與等級</li>
+                  <li>查看個人表現 — 排名、趨勢、五維圖</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Unbind button */}
+          {canUpdate && (
+            <>
+              <Separator />
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowUnbindDialog(true)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Unlink className="h-4 w-4 mr-2" />
+                  解除連結
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Registered Members List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>已註冊成員</CardTitle>
+          <CardDescription>透過 LINE 註冊遊戲 ID 的盟友名單</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {membersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span>載入中...</span>
+              </div>
+            </div>
+          ) : !membersData?.members.length ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Users className="h-12 w-12 text-muted-foreground/50 mb-3" />
+              <p className="text-muted-foreground">尚無成員註冊</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                盟友可透過 LINE 群組註冊遊戲 ID
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b text-left text-sm text-muted-foreground">
+                    <th className="pb-3 font-medium">LINE 名稱</th>
+                    <th className="pb-3 font-medium">遊戲 ID</th>
+                    <th className="pb-3 font-medium">狀態</th>
+                    <th className="pb-3 font-medium text-right">註冊日期</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {membersData.members.map((member) => (
+                    <tr key={`${member.line_user_id}-${member.game_id}`} className="border-b last:border-0">
+                      <td className="py-3">{member.line_display_name}</td>
+                      <td className="py-3 font-medium">{member.game_id}</td>
+                      <td className="py-3">
+                        {member.is_verified ? (
+                          <Badge variant="default" className="bg-green-600 text-xs">已驗證</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">待驗證</Badge>
+                        )}
+                      </td>
+                      <td className="py-3 text-right tabular-nums text-muted-foreground">
+                        {new Date(member.registered_at).toLocaleDateString('zh-TW', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit'
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Unbind Confirmation Dialog */}
+      <Dialog open={showUnbindDialog} onOpenChange={setShowUnbindDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>確認解除連結？</DialogTitle>
+            <DialogDescription>
+              解除連結後，盟友將無法再透過此群組進行新的 ID 綁定。
+              已綁定的成員資料會保留。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowUnbindDialog(false)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                await unbindGroup.mutateAsync()
+                setShowUnbindDialog(false)
+              }}
+              disabled={unbindGroup.isPending}
+            >
+              {unbindGroup.isPending ? '處理中...' : '確認解除'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// =============================================================================
+// Main Component
+// =============================================================================
 
 export function LineBinding() {
   const { data: alliance } = useAlliance()
@@ -115,130 +337,13 @@ export function LineBinding() {
   // Already bound
   if (status?.is_bound && status.binding) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">LINE 三國小幫手</h2>
-            <p className="text-muted-foreground mt-1">
-              連結 LINE 群組，讓盟友直接綁定遊戲 ID
-            </p>
-          </div>
-          <Badge variant="default" className="bg-green-600">已連結</Badge>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>已綁定群組</CardTitle>
-            <CardDescription>你的同盟已連結以下 LINE 群組</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Bound Group Info */}
-            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                {status.binding.group_picture_url ? (
-                  <img
-                    src={status.binding.group_picture_url}
-                    alt={status.binding.group_name || '群組'}
-                    className="h-12 w-12 rounded-full object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 shrink-0">
-                    <MessageSquare className="h-6 w-6 text-green-600" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-lg truncate">
-                    {status.binding.group_name || '未命名群組'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    綁定於 {new Date(status.binding.bound_at).toLocaleDateString('zh-TW', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Users className="h-5 w-5" />
-                  <span className="text-lg font-medium">{status.binding.member_count}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Instructions for members */}
-            <div className="space-y-3">
-              <h4 className="font-medium">盟友綁定說明</h4>
-              <div className="rounded-lg border p-4 bg-muted/20">
-                <p className="text-sm text-muted-foreground">
-                  盟友在 LINE 群組中發送以下指令即可開始綁定遊戲帳號：
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <code className="flex-1 px-3 py-2 bg-background rounded text-sm font-mono border">
-                    /綁定ID
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copy('/綁定ID')}
-                  >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Unbind button */}
-            {canUpdate && (
-              <>
-                <Separator />
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowUnbindDialog(true)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Unlink className="h-4 w-4 mr-2" />
-                    解除連結
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Unbind Confirmation Dialog */}
-        <Dialog open={showUnbindDialog} onOpenChange={setShowUnbindDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>確認解除連結？</DialogTitle>
-              <DialogDescription>
-                解除連結後，盟友將無法再透過此群組進行新的 ID 綁定。
-                已綁定的成員資料會保留。
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowUnbindDialog(false)}
-              >
-                取消
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={async () => {
-                  await unbindGroup.mutateAsync()
-                  setShowUnbindDialog(false)
-                }}
-                disabled={unbindGroup.isPending}
-              >
-                {unbindGroup.isPending ? '處理中...' : '確認解除'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+      <BoundState
+        binding={status.binding}
+        canUpdate={canUpdate}
+        showUnbindDialog={showUnbindDialog}
+        setShowUnbindDialog={setShowUnbindDialog}
+        unbindGroup={unbindGroup}
+      />
     )
   }
 

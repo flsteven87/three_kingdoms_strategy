@@ -45,6 +45,23 @@ export interface MemberLineBinding {
 }
 
 // =============================================================================
+// Registered Members Types (Admin View)
+// =============================================================================
+
+export interface RegisteredMemberItem {
+  readonly line_user_id: string
+  readonly line_display_name: string
+  readonly game_id: string
+  readonly is_verified: boolean
+  readonly registered_at: string
+}
+
+export interface RegisteredMembersResponse {
+  readonly members: RegisteredMemberItem[]
+  readonly total: number
+}
+
+// =============================================================================
 // API Response Types
 // =============================================================================
 

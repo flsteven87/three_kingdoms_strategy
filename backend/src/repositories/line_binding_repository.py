@@ -357,6 +357,23 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
         return result.count or 0
 
+    async def get_all_member_bindings_by_alliance(
+        self,
+        alliance_id: UUID
+    ) -> list[MemberLineBinding]:
+        """Get all member LINE bindings for an alliance (for admin view)"""
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("member_line_bindings")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return [MemberLineBinding(**row) for row in data]
+
     async def find_member_by_name(
         self,
         alliance_id: UUID,

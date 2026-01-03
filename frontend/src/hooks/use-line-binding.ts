@@ -12,7 +12,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '@/lib/api-client'
-import type { LineBindingStatusResponse, LineBindingCode } from '@/types/line-binding'
+import type { LineBindingStatusResponse, LineBindingCode, RegisteredMembersResponse } from '@/types/line-binding'
 
 // =============================================================================
 // Query Keys
@@ -20,7 +20,8 @@ import type { LineBindingStatusResponse, LineBindingCode } from '@/types/line-bi
 
 export const lineBindingKeys = {
   all: ['line-binding'] as const,
-  status: () => [...lineBindingKeys.all, 'status'] as const
+  status: () => [...lineBindingKeys.all, 'status'] as const,
+  members: () => [...lineBindingKeys.all, 'members'] as const
 }
 
 // =============================================================================
@@ -75,6 +76,17 @@ export function useUnbindLineGroup() {
         queryKey: lineBindingKeys.status()
       })
     }
+  })
+}
+
+/**
+ * Hook to fetch registered members list
+ */
+export function useRegisteredMembers(enabled: boolean = true) {
+  return useQuery({
+    queryKey: lineBindingKeys.members(),
+    queryFn: (): Promise<RegisteredMembersResponse> => apiClient.getRegisteredMembers(),
+    enabled
   })
 }
 

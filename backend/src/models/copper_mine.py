@@ -88,6 +88,9 @@ class CopperMineListResponse(BaseModel):
 
     mines: list[CopperMineResponse] = []
     total: int = 0
+    # P0 修復: 新增用戶銅礦申請狀態
+    my_count: int = 0  # 用戶已申請的銅礦數量
+    max_allowed: int = 0  # 最大允許數量（規則數量）
 
 
 class RegisterCopperResponse(BaseModel):

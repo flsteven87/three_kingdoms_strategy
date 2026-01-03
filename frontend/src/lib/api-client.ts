@@ -45,7 +45,8 @@ import type {
 } from '@/types/event'
 import type {
   LineBindingCode,
-  LineBindingStatusResponse
+  LineBindingStatusResponse,
+  RegisteredMembersResponse
 } from '@/types/line-binding'
 import type {
   CopperMineRule,
@@ -683,6 +684,16 @@ class ApiClient {
    */
   async unbindLineGroup(): Promise<void> {
     await this.client.delete('/api/v1/linebot/binding')
+  }
+
+  /**
+   * Get registered members list for LINE binding
+   */
+  async getRegisteredMembers(): Promise<RegisteredMembersResponse> {
+    const response = await this.client.get<RegisteredMembersResponse>(
+      '/api/v1/linebot/binding/members'
+    )
+    return response.data
   }
 
   // ==================== Copper Mine API ====================

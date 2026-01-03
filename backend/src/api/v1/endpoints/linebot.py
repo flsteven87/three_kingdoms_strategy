@@ -42,6 +42,7 @@ from src.models.line_binding import (
     MemberInfoResponse,
     MemberLineBindingCreate,
     MemberPerformanceResponse,
+    RegisteredMembersResponse,
     RegisterMemberResponse,
 )
 from src.services.line_binding_service import LineBindingService
@@ -166,6 +167,28 @@ async def refresh_group_info(
     )
 
     return await service.refresh_group_info(alliance.id)
+
+
+@router.get(
+    "/binding/members",
+    response_model=RegisteredMembersResponse,
+    summary="Get registered members",
+    description="Get list of LINE users who registered game IDs"
+)
+async def get_registered_members(
+    user_id: UserIdDep,
+    service: LineBindingServiceDep,
+    alliance_service: AllianceServiceDep,
+) -> RegisteredMembersResponse:
+    """Get registered members list for alliance admin view"""
+    alliance = await alliance_service.get_user_alliance(user_id)
+    if not alliance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User has no alliance"
+        )
+
+    return await service.get_registered_members(alliance.id)
 
 
 # =============================================================================

@@ -254,6 +254,41 @@ class LineBindingService:
             member_count=member_count
         )
 
+    async def get_registered_members(
+        self,
+        alliance_id: UUID
+    ):
+        """
+        Get all registered LINE members for an alliance (admin view)
+
+        Args:
+            alliance_id: Alliance UUID
+
+        Returns:
+            RegisteredMembersResponse with member list
+        """
+        from src.models.line_binding import RegisteredMemberItem, RegisteredMembersResponse
+
+        bindings = await self.repository.get_all_member_bindings_by_alliance(
+            alliance_id
+        )
+
+        members = [
+            RegisteredMemberItem(
+                line_user_id=b.line_user_id,
+                line_display_name=b.line_display_name,
+                game_id=b.game_id,
+                is_verified=b.is_verified,
+                registered_at=b.created_at
+            )
+            for b in bindings
+        ]
+
+        return RegisteredMembersResponse(
+            members=members,
+            total=len(members)
+        )
+
     # =========================================================================
     # Group Binding Operations (Webhook)
     # =========================================================================

@@ -213,13 +213,14 @@ class CopperMineService:
         """
         Validate copper mine registration against alliance rules.
 
-        P1 修復: LIFF 銅礦註冊加入規則驗證
+        P0 修復: 銅礦上限驗證邏輯
 
         Rules validation:
-        1. Check member's current mine count in the season
-        2. Get rule for the next tier (count + 1)
-        3. Validate member's total_merit >= rule.required_merit
-        4. Validate level matches rule.allowed_level
+        1. Get all rules to determine max allowed mines
+        2. Check member's current mine count in the season
+        3. Validate not exceeding max allowed
+        4. Validate member's total_merit >= rule.required_merit
+        5. Validate level matches rule.allowed_level
 
         Args:
             alliance_id: Alliance UUID
@@ -228,46 +229,71 @@ class CopperMineService:
             level: Mine level (1-10)
 
         Raises:
-            HTTPException 400: If member not found in system
             HTTPException 403: If rule validation fails
         """
-        # Skip validation if no member_id (can't verify merit without member)
-        if not member_id:
+        # 1. 取得所有規則，規則數量 = 銅礦上限
+        all_rules = await self.rule_repository.get_rules_by_alliance(alliance_id)
+        max_allowed = len(all_rules)
+
+        # 如果沒有設定任何規則，不允許申請銅礦
+        if max_allowed == 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="同盟尚未設定銅礦規則，請聯繫盟主"
+            )
+
+        # 2. 如果無法識別成員身份，仍需檢查規則是否存在
+        # 但無法驗證個人上限，允許申請（由 game_id 追蹤）
+        if not member_id or not season_id:
+            # 至少驗證等級是否符合第一座銅礦的規則
+            first_rule = all_rules[0] if all_rules else None
+            if first_rule and not self._is_level_allowed(level, first_rule.allowed_level):
+                level_text = {
+                    "nine": "9 級",
+                    "ten": "10 級",
+                    "both": "9 或 10 級"
+                }
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"銅礦等級限制：{level_text[first_rule.allowed_level]}"
+                )
             return
 
-        # Skip validation if no season (no rules apply without season context)
-        if not season_id:
-            return
-
-        # Get member's current mine count in this season
+        # 3. 檢查是否已達上限
         current_count = await self.repository.count_member_mines(season_id, member_id)
+
+        if current_count >= max_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"已達銅礦上限（{current_count}/{max_allowed} 座）"
+            )
+
         next_tier = current_count + 1
 
-        # Get rule for the next tier
+        # 4. 取得下一座銅礦的規則（一定存在，因為 current_count < max_allowed）
         rule = await self.rule_repository.get_rule_by_tier(alliance_id, next_tier)
 
-        # If no rule exists for this tier, allow registration (no restriction)
         if not rule:
-            return
+            # 防禦性檢查：理論上不應該發生
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"第 {next_tier} 座銅礦規則未設定"
+            )
 
-        # Get member's latest snapshot to check total_merit
+        # 5. 取得成員快照驗證戰功
         snapshot = await self.snapshot_repository.get_latest_by_member_in_season(
             member_id, season_id
         )
 
-        if not snapshot:
-            # No snapshot means member hasn't been in any CSV upload for this season
-            # Allow registration but warn (they may have 0 merit)
-            return
+        if snapshot:
+            # 驗證戰功要求
+            if snapshot.total_merit < rule.required_merit:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"總戰功不足：需要 {rule.required_merit:,}，目前 {snapshot.total_merit:,}"
+                )
 
-        # Validate merit requirement
-        if snapshot.total_merit < rule.required_merit:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"總戰功不足：需要 {rule.required_merit:,}，目前 {snapshot.total_merit:,}"
-            )
-
-        # Validate level restriction
+        # 6. 驗證等級限制
         if not self._is_level_allowed(level, rule.allowed_level):
             level_text = {
                 "nine": "9 級",
