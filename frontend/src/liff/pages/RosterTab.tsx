@@ -65,15 +65,17 @@ export function RosterTab({ session }: Props) {
   return (
     <div className="p-3 space-y-3">
       {/* Input form */}
-      <div className="flex gap-2">
-        <Input
-          value={newGameId}
-          onChange={(e) => setNewGameId(e.target.value)}
-          placeholder="輸入遊戲 ID"
-          onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
-          className="h-10"
-        />
-        <Button
+      <div className="space-y-1.5">
+        <p className="text-xs text-muted-foreground">角色名稱（非數字編號）</p>
+        <div className="flex gap-2">
+          <Input
+            value={newGameId}
+            onChange={(e) => setNewGameId(e.target.value)}
+            placeholder="曹操丞相"
+            onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+            className="h-10"
+          />
+          <Button
           onClick={handleRegister}
           disabled={!newGameId.trim() || registerMutation.isPending}
           size="icon"
@@ -84,7 +86,8 @@ export function RosterTab({ session }: Props) {
           ) : (
             <Plus className="h-4 w-4" />
           )}
-        </Button>
+          </Button>
+        </div>
       </div>
 
       {registerMutation.error && (
