@@ -122,21 +122,40 @@ class CopperMineService:
         顯示全同盟銅礦位置（設計決策：銅礦位置為公開資訊）
         刪除權限由 delete_mine 單獨控制（只能刪除自己的）
 
+        P0 修復: 新增用戶銅礦申請狀態（my_count, max_allowed）
+
         Args:
             line_group_id: LINE group ID
-            line_user_id: LINE user ID (傳入但不用於過濾，列表顯示全同盟)
+            line_user_id: LINE user ID
 
         Returns:
-            CopperMineListResponse with all alliance mines
+            CopperMineListResponse with all alliance mines and user quota info
         """
         alliance_id = await self._get_alliance_id_from_group(line_group_id)
 
         # 顯示全同盟銅礦（公開資訊）
         mines = await self.repository.get_mines_by_alliance(alliance_id)
 
+        # P0 修復: 計算用戶銅礦申請狀態
+        # 取得規則數量作為上限
+        rules = await self.rule_repository.get_rules_by_alliance(alliance_id)
+        max_allowed = len(rules)
+
+        # 計算用戶已申請的銅礦數量
+        # 需要先取得用戶綁定的 game_ids
+        my_count = 0
+        member_bindings = await self.line_binding_repository.get_member_bindings_by_line_user(
+            alliance_id, line_user_id
+        )
+        if member_bindings:
+            my_game_ids = {b.game_id for b in member_bindings}
+            my_count = sum(1 for mine in mines if mine.game_id in my_game_ids)
+
         return CopperMineListResponse(
             mines=[self._to_response(mine) for mine in mines],
-            total=len(mines)
+            total=len(mines),
+            my_count=my_count,
+            max_allowed=max_allowed
         )
 
     async def _get_active_season(self, alliance_id: UUID) -> UUID | None:
