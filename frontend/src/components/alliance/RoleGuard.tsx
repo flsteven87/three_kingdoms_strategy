@@ -7,7 +7,7 @@
  * - Conditional rendering based on user role
  */
 
-import React from 'react'
+import type { ReactNode } from 'react'
 import type { UserRole } from '@/hooks/use-user-role'
 import { useUserRole } from '@/hooks/use-user-role'
 
@@ -20,12 +20,12 @@ interface RoleGuardProps {
   /**
    * Content to display when user has permission
    */
-  readonly children: React.ReactNode
+  readonly children: ReactNode
 
   /**
    * Optional fallback content when user doesn't have permission
    */
-  readonly fallback?: React.ReactNode
+  readonly fallback?: ReactNode
 }
 
 /**
@@ -38,11 +38,11 @@ interface RoleGuardProps {
  * </RoleGuard>
  * ```
  */
-export const RoleGuard: React.FC<RoleGuardProps> = ({
+export function RoleGuard({
   requiredRoles,
   children,
-  fallback = null
-}) => {
+  fallback = null,
+}: RoleGuardProps) {
   const { data: userRole, isLoading } = useUserRole()
 
   // While loading, show nothing (or could show loading state)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
@@ -6,7 +6,7 @@ import { ThemeToggle } from '../theme-toggle'
 import { cn } from '@/lib/utils'
 
 interface DashboardLayoutProps {
-  readonly children?: React.ReactNode
+  readonly children?: ReactNode
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {

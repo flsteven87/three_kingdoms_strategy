@@ -24,13 +24,13 @@ interface DeleteConfirmDialogProps {
   readonly isDeleting?: boolean
 }
 
-export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
+export function DeleteConfirmDialog({
   open,
   seasonName,
   onClose,
   onConfirm,
-  isDeleting = false
-}) => {
+  isDeleting = false,
+}: DeleteConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[450px]">

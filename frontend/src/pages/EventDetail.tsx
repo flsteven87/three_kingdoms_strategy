@@ -12,7 +12,7 @@
  * 5. Participation Summary - Visual breakdown of participation status
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -110,7 +110,7 @@ interface KpiCardProps {
   readonly title: string
   readonly value: string | number
   readonly subtitle?: string
-  readonly icon: React.ReactNode
+  readonly icon: ReactNode
   readonly highlight?: boolean
 }
 

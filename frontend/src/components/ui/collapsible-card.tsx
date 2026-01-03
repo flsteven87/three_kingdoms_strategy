@@ -5,24 +5,24 @@
  * Adapted from digital-marketer project, following CLAUDE.md standards.
  */
 
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './card'
 import { cn } from '@/lib/utils'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 interface CollapsibleCardProps {
-  readonly icon?: React.ReactNode
-  readonly title: React.ReactNode
-  readonly badge?: React.ReactNode
+  readonly icon?: ReactNode
+  readonly title: ReactNode
+  readonly badge?: ReactNode
   readonly description?: string
-  readonly children: React.ReactNode
-  readonly actions?: React.ReactNode
+  readonly children: ReactNode
+  readonly actions?: ReactNode
   readonly collapsible?: boolean
   readonly defaultExpanded?: boolean
   readonly className?: string
 }
 
-export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
+export function CollapsibleCard({
   icon,
   title,
   badge,
@@ -31,8 +31,8 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
   actions,
   collapsible = false,
   defaultExpanded = false,
-  className
-}) => {
+  className,
+}: CollapsibleCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
 
   const toggleExpanded = useCallback(() => {
@@ -144,4 +144,3 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
   )
 }
 
-export default CollapsibleCard

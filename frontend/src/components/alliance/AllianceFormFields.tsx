@@ -18,15 +18,15 @@ interface AllianceFormFieldsProps {
   readonly serverNameId?: string
 }
 
-export const AllianceFormFields: React.FC<AllianceFormFieldsProps> = ({
+export function AllianceFormFields({
   name,
   serverName,
   onNameChange,
   onServerNameChange,
   disabled = false,
   nameId = 'alliance-name',
-  serverNameId = 'server-name'
-}) => {
+  serverNameId = 'server-name',
+}: AllianceFormFieldsProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">

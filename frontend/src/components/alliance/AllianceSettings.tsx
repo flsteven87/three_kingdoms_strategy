@@ -5,7 +5,7 @@
  * 符合 CLAUDE.md 🟢: Component reusability
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useAlliance, useUpdateAlliance } from '@/hooks/use-alliance'
 import { Button } from '@/components/ui/button'
 import { AllianceFormFields } from './AllianceFormFields'
@@ -17,7 +17,7 @@ import {
   CardTitle
 } from '@/components/ui/card'
 
-export const AllianceSettings: React.FC = () => {
+export function AllianceSettings() {
   const { data: alliance, isLoading } = useAlliance()
   const updateAlliance = useUpdateAlliance()
 
@@ -32,7 +32,7 @@ export const AllianceSettings: React.FC = () => {
     }
   }, [alliance])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
     if (!name.trim()) return

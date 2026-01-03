@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useAlliance, useCreateAlliance, useUpdateAlliance } from '@/hooks/use-alliance'
 import { useCanUpdateAlliance } from '@/hooks/use-user-role'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import {
   CardTitle
 } from '@/components/ui/card'
 
-export const AllianceForm: React.FC = () => {
+export function AllianceForm() {
   const { data: alliance, isLoading } = useAlliance()
   const createAlliance = useCreateAlliance()
   const updateAlliance = useUpdateAlliance()
@@ -27,7 +27,7 @@ export const AllianceForm: React.FC = () => {
     }
   }, [alliance])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
     if (!name.trim()) return

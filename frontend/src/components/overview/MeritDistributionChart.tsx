@@ -4,7 +4,7 @@
  * User can click legend to switch between periods
  */
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
@@ -40,7 +40,7 @@ const chartConfig = {
   },
 }
 
-const MeritDistributionChart: React.FC<MeritDistributionChartProps> = ({ data }) => {
+export function MeritDistributionChart({ data }: MeritDistributionChartProps) {
   const [activePeriod, setActivePeriod] = useState<Period>('current_week')
 
   const handleLegendClick = (period: Period) => {
@@ -120,5 +120,3 @@ const MeritDistributionChart: React.FC<MeritDistributionChartProps> = ({ data })
     </Card>
   )
 }
-
-export default MeritDistributionChart

@@ -7,7 +7,6 @@
  * - Explicit prop interfaces
  */
 
-import React from 'react'
 import { AlertTriangle } from 'lucide-react'
 import {
   Dialog,
@@ -33,7 +32,7 @@ interface DeleteConfirmDialogProps {
   readonly variant?: 'default' | 'destructive'
 }
 
-export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
+export function DeleteConfirmDialog({
   open,
   onOpenChange,
   onConfirm,
@@ -43,8 +42,8 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
   warningMessage,
   isDeleting = false,
   confirmText = '確認刪除',
-  variant = 'destructive'
-}) => {
+  variant = 'destructive',
+}: DeleteConfirmDialogProps) {
   const handleConfirm = async () => {
     await onConfirm()
     onOpenChange(false)
@@ -105,4 +104,3 @@ export const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
   )
 }
 
-export default DeleteConfirmDialog

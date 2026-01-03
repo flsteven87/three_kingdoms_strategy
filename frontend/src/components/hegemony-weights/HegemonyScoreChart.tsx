@@ -8,7 +8,6 @@
  * - Reusable across different contexts (HegemonyWeightCard, Overview Dashboard)
  */
 
-import React from 'react'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import {
   ChartConfig,
@@ -74,13 +73,13 @@ interface HegemonyScoreChartProps {
  *   xAxisMax={1000000}
  * />
  */
-export const HegemonyScoreChart: React.FC<HegemonyScoreChartProps> = ({
+export function HegemonyScoreChart({
   chartData,
   snapshotDates,
   chartConfig,
   chartHeight,
-  xAxisMax
-}) => {
+  xAxisMax,
+}: HegemonyScoreChartProps) {
   return (
     <div className="w-full rounded-lg border bg-card p-6" style={{ height: `${chartHeight + 80}px` }}>
       <ChartContainer config={chartConfig} className="h-full w-full">

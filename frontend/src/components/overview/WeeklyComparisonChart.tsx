@@ -35,7 +35,7 @@ const chartConfig = {
   },
 }
 
-const WeeklyComparisonChart: React.FC<WeeklyComparisonChartProps> = ({ data }) => {
+export function WeeklyComparisonChart({ data }: WeeklyComparisonChartProps) {
   return (
     <Card>
       <CardHeader>
@@ -82,5 +82,3 @@ const WeeklyComparisonChart: React.FC<WeeklyComparisonChartProps> = ({ data }) =
     </Card>
   )
 }
-
-export default WeeklyComparisonChart

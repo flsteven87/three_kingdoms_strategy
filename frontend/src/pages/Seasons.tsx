@@ -9,7 +9,7 @@
  * - Optimistic updates
  */
 
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +28,7 @@ import {
 } from '@/hooks/use-seasons'
 import type { Season } from '@/types/season'
 
-const Seasons: React.FC = () => {
+function Seasons() {
   const [isCreating, setIsCreating] = useState(false)
   const [newSeasonData, setNewSeasonData] = useState({
     name: '',

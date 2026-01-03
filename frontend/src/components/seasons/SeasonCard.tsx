@@ -8,7 +8,7 @@
  * - Optimistic updates
  */
 
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Calendar, Activity, Trash2, Check, X, Edit2 } from 'lucide-react'
 import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { Button } from '@/components/ui/button'
@@ -26,12 +26,12 @@ interface SeasonCardProps {
   readonly onActivate: (seasonId: string) => Promise<void>
 }
 
-export const SeasonCard: React.FC<SeasonCardProps> = ({
+export function SeasonCard({
   season,
   onUpdate,
   onDelete,
-  onActivate
-}) => {
+  onActivate,
+}: SeasonCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [activateDialogOpen, setActivateDialogOpen] = useState(false)

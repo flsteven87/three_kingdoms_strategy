@@ -8,7 +8,7 @@
  * - Use TanStack Query hooks
  */
 
-import React from 'react'
+import { useState, type FormEvent } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,12 +33,12 @@ interface AllianceCollaboratorManagerProps {
   readonly allianceId: string
 }
 
-export const AllianceCollaboratorManager: React.FC<AllianceCollaboratorManagerProps> = ({
-  allianceId
-}) => {
-  const [email, setEmail] = React.useState('')
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+export function AllianceCollaboratorManager({
+  allianceId,
+}: AllianceCollaboratorManagerProps) {
+  const [email, setEmail] = useState('')
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const { data: collaboratorsData, isLoading } = useAllianceCollaborators(allianceId)
   const addCollaborator = useAddAllianceCollaborator()
@@ -46,7 +46,7 @@ export const AllianceCollaboratorManager: React.FC<AllianceCollaboratorManagerPr
   const updateRole = useUpdateCollaboratorRole()
   const canManageCollaborators = useCanManageCollaborators()
 
-  const handleAddCollaborator = async (e: React.FormEvent) => {
+  const handleAddCollaborator = async (e: FormEvent) => {
     e.preventDefault()
     setSuccessMessage(null)
     setErrorMessage(null)

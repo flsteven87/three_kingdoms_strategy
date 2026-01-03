@@ -2,7 +2,7 @@
  * Copper Mines TanStack Query Hooks
  *
  * Hooks for copper mine rules (alliance level) and ownership records (season level).
- * Currently uses mock data for frontend development.
+ * Features optimistic updates for seamless UX.
  *
  * TODO: Connect to real API endpoints when backend is ready
  */
@@ -196,11 +196,11 @@ export function useCopperMineRules(allianceId: string | null) {
 }
 
 // =============================================================================
-// Mutation Hooks - Rules
+// Mutation Hooks - Rules (with Optimistic Updates)
 // =============================================================================
 
 /**
- * Create a new copper mine rule
+ * Create a new copper mine rule with optimistic update
  */
 export function useCreateCopperMineRule() {
   const queryClient = useQueryClient()
@@ -213,16 +213,55 @@ export function useCreateCopperMineRule() {
       allianceId: string
       data: CreateCopperMineRuleRequest
     }) => mockCreateRule(allianceId, data),
-    onSuccess: (_data, variables) => {
+
+    onMutate: async ({ allianceId, data }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: copperMineKeys.rulesByAlliance(allianceId),
+      })
+
+      // Snapshot current data
+      const previousRules = queryClient.getQueryData<CopperMineRule[]>(
+        copperMineKeys.rulesByAlliance(allianceId)
+      )
+
+      // Optimistically add the new rule
+      const optimisticRule: CopperMineRule = {
+        id: `temp-${Date.now()}`,
+        alliance_id: allianceId,
+        ...data,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      queryClient.setQueryData<CopperMineRule[]>(
+        copperMineKeys.rulesByAlliance(allianceId),
+        (old) => [...(old || []), optimisticRule].sort((a, b) => a.tier - b.tier)
+      )
+
+      return { previousRules }
+    },
+
+    onError: (_err, { allianceId }, context) => {
+      // Rollback on error
+      if (context?.previousRules) {
+        queryClient.setQueryData(
+          copperMineKeys.rulesByAlliance(allianceId),
+          context.previousRules
+        )
+      }
+    },
+
+    onSettled: (_data, _error, { allianceId }) => {
       queryClient.invalidateQueries({
-        queryKey: copperMineKeys.rulesByAlliance(variables.allianceId),
+        queryKey: copperMineKeys.rulesByAlliance(allianceId),
       })
     },
   })
 }
 
 /**
- * Update a copper mine rule
+ * Update a copper mine rule with optimistic update
  */
 export function useUpdateCopperMineRule() {
   const queryClient = useQueryClient()
@@ -236,16 +275,49 @@ export function useUpdateCopperMineRule() {
       allianceId: string
       data: UpdateCopperMineRuleRequest
     }) => mockUpdateRule(ruleId, data),
-    onSuccess: (_data, variables) => {
+
+    onMutate: async ({ ruleId, allianceId, data }) => {
+      await queryClient.cancelQueries({
+        queryKey: copperMineKeys.rulesByAlliance(allianceId),
+      })
+
+      const previousRules = queryClient.getQueryData<CopperMineRule[]>(
+        copperMineKeys.rulesByAlliance(allianceId)
+      )
+
+      // Optimistically update the rule
+      queryClient.setQueryData<CopperMineRule[]>(
+        copperMineKeys.rulesByAlliance(allianceId),
+        (old) =>
+          old?.map((rule) =>
+            rule.id === ruleId
+              ? { ...rule, ...data, updated_at: new Date().toISOString() }
+              : rule
+          )
+      )
+
+      return { previousRules }
+    },
+
+    onError: (_err, { allianceId }, context) => {
+      if (context?.previousRules) {
+        queryClient.setQueryData(
+          copperMineKeys.rulesByAlliance(allianceId),
+          context.previousRules
+        )
+      }
+    },
+
+    onSettled: (_data, _error, { allianceId }) => {
       queryClient.invalidateQueries({
-        queryKey: copperMineKeys.rulesByAlliance(variables.allianceId),
+        queryKey: copperMineKeys.rulesByAlliance(allianceId),
       })
     },
   })
 }
 
 /**
- * Delete a copper mine rule
+ * Delete a copper mine rule with optimistic update
  */
 export function useDeleteCopperMineRule() {
   const queryClient = useQueryClient()
@@ -253,9 +325,37 @@ export function useDeleteCopperMineRule() {
   return useMutation({
     mutationFn: ({ ruleId }: { ruleId: string; allianceId: string }) =>
       mockDeleteRule(ruleId),
-    onSuccess: (_data, variables) => {
+
+    onMutate: async ({ ruleId, allianceId }) => {
+      await queryClient.cancelQueries({
+        queryKey: copperMineKeys.rulesByAlliance(allianceId),
+      })
+
+      const previousRules = queryClient.getQueryData<CopperMineRule[]>(
+        copperMineKeys.rulesByAlliance(allianceId)
+      )
+
+      // Optimistically remove the rule
+      queryClient.setQueryData<CopperMineRule[]>(
+        copperMineKeys.rulesByAlliance(allianceId),
+        (old) => old?.filter((rule) => rule.id !== ruleId)
+      )
+
+      return { previousRules }
+    },
+
+    onError: (_err, { allianceId }, context) => {
+      if (context?.previousRules) {
+        queryClient.setQueryData(
+          copperMineKeys.rulesByAlliance(allianceId),
+          context.previousRules
+        )
+      }
+    },
+
+    onSettled: (_data, _error, { allianceId }) => {
       queryClient.invalidateQueries({
-        queryKey: copperMineKeys.rulesByAlliance(variables.allianceId),
+        queryKey: copperMineKeys.rulesByAlliance(allianceId),
       })
     },
   })
@@ -277,11 +377,11 @@ export function useCopperMineOwnerships(seasonId: string | null) {
 }
 
 // =============================================================================
-// Mutation Hooks - Ownerships
+// Mutation Hooks - Ownerships (with Optimistic Updates)
 // =============================================================================
 
 /**
- * Create a new copper mine ownership record
+ * Create a new copper mine ownership record with optimistic update
  */
 export function useCreateCopperMineOwnership() {
   const queryClient = useQueryClient()
@@ -294,16 +394,57 @@ export function useCreateCopperMineOwnership() {
       seasonId: string
       data: CreateCopperMineOwnershipRequest
     }) => mockCreateOwnership(seasonId, data),
-    onSuccess: (_data, variables) => {
+
+    onMutate: async ({ seasonId, data }) => {
+      await queryClient.cancelQueries({
+        queryKey: copperMineKeys.ownershipsBySeason(seasonId),
+      })
+
+      const previousOwnerships = queryClient.getQueryData<CopperMineOwnership[]>(
+        copperMineKeys.ownershipsBySeason(seasonId)
+      )
+
+      const optimisticOwnership: CopperMineOwnership = {
+        id: `temp-${Date.now()}`,
+        season_id: seasonId,
+        ...data,
+        applied_at: data.applied_at || new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        member_name: '載入中...',
+        member_group: null,
+        line_display_name: null,
+      }
+
+      queryClient.setQueryData<CopperMineOwnership[]>(
+        copperMineKeys.ownershipsBySeason(seasonId),
+        (old) =>
+          [optimisticOwnership, ...(old || [])].sort(
+            (a, b) => new Date(b.applied_at).getTime() - new Date(a.applied_at).getTime()
+          )
+      )
+
+      return { previousOwnerships }
+    },
+
+    onError: (_err, { seasonId }, context) => {
+      if (context?.previousOwnerships) {
+        queryClient.setQueryData(
+          copperMineKeys.ownershipsBySeason(seasonId),
+          context.previousOwnerships
+        )
+      }
+    },
+
+    onSettled: (_data, _error, { seasonId }) => {
       queryClient.invalidateQueries({
-        queryKey: copperMineKeys.ownershipsBySeason(variables.seasonId),
+        queryKey: copperMineKeys.ownershipsBySeason(seasonId),
       })
     },
   })
 }
 
 /**
- * Delete a copper mine ownership record
+ * Delete a copper mine ownership record with optimistic update
  */
 export function useDeleteCopperMineOwnership() {
   const queryClient = useQueryClient()
@@ -311,9 +452,36 @@ export function useDeleteCopperMineOwnership() {
   return useMutation({
     mutationFn: ({ ownershipId }: { ownershipId: string; seasonId: string }) =>
       mockDeleteOwnership(ownershipId),
-    onSuccess: (_data, variables) => {
+
+    onMutate: async ({ ownershipId, seasonId }) => {
+      await queryClient.cancelQueries({
+        queryKey: copperMineKeys.ownershipsBySeason(seasonId),
+      })
+
+      const previousOwnerships = queryClient.getQueryData<CopperMineOwnership[]>(
+        copperMineKeys.ownershipsBySeason(seasonId)
+      )
+
+      queryClient.setQueryData<CopperMineOwnership[]>(
+        copperMineKeys.ownershipsBySeason(seasonId),
+        (old) => old?.filter((o) => o.id !== ownershipId)
+      )
+
+      return { previousOwnerships }
+    },
+
+    onError: (_err, { seasonId }, context) => {
+      if (context?.previousOwnerships) {
+        queryClient.setQueryData(
+          copperMineKeys.ownershipsBySeason(seasonId),
+          context.previousOwnerships
+        )
+      }
+    },
+
+    onSettled: (_data, _error, { seasonId }) => {
       queryClient.invalidateQueries({
-        queryKey: copperMineKeys.ownershipsBySeason(variables.seasonId),
+        queryKey: copperMineKeys.ownershipsBySeason(seasonId),
       })
     },
   })

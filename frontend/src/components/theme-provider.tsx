@@ -1,19 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ThemeProviderContext } from '@/contexts/theme-context'
 
 type Theme = 'dark' | 'light'
 
 interface ThemeProviderProps {
-  readonly children: React.ReactNode
+  readonly children: ReactNode
   readonly defaultTheme?: Theme
   readonly storageKey?: string
 }
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({
+export function ThemeProvider({
   children,
   defaultTheme = 'light',
   storageKey = 'three-kingdoms-theme',
-}) => {
+}: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   )

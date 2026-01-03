@@ -28,7 +28,7 @@ const chartConfig = {
   },
 }
 
-const GroupComparisonChart: React.FC<GroupComparisonChartProps> = ({ data }) => {
+export function GroupComparisonChart({ data }: GroupComparisonChartProps) {
   // Sort by avg_merit descending
   const sortedData = [...data].sort((a, b) => b.avg_merit - a.avg_merit)
 
@@ -121,5 +121,3 @@ const GroupComparisonChart: React.FC<GroupComparisonChartProps> = ({ data }) => 
     </Card>
   )
 }
-
-export default GroupComparisonChart

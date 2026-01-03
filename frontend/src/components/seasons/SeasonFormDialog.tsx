@@ -54,14 +54,14 @@ interface SeasonFormDialogProps {
   readonly isSubmitting?: boolean
 }
 
-export const SeasonFormDialog: React.FC<SeasonFormDialogProps> = ({
+export function SeasonFormDialog({
   open,
   editSeason,
   allianceId,
   onClose,
   onSubmit,
-  isSubmitting = false
-}) => {
+  isSubmitting = false,
+}: SeasonFormDialogProps) {
   const isEditMode = !!editSeason
 
   const {

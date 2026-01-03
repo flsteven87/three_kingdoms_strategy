@@ -8,7 +8,7 @@
  * - Two-tier weight system (Tier 1: indicators, Tier 2: snapshots)
  */
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Scale, Save, Loader2, AlertCircle, CheckCircle2, RotateCcw, RefreshCw } from 'lucide-react'
 import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { Button } from '@/components/ui/button'
@@ -53,7 +53,7 @@ interface LocalWeight {
   readonly snapshot_weight: number
 }
 
-export const HegemonyWeightCard: React.FC<HegemonyWeightCardProps> = ({ season }) => {
+export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
   const [localWeights, setLocalWeights] = useState<LocalWeight[]>([])
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [activeTab, setActiveTab] = useState<'config' | 'preview'>('config')

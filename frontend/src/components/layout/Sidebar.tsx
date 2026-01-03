@@ -1,3 +1,4 @@
+import { type ComponentType } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Calendar, Database, Trophy, Users, BarChart3, Settings, LogOut, Layers, Swords, MessageSquare, Gem } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -11,7 +12,7 @@ interface SidebarProps {
 interface NavigationItem {
   readonly name: string
   readonly href: string
-  readonly icon: React.ComponentType<{ className?: string }>
+  readonly icon: ComponentType<{ className?: string }>
 }
 
 const navigation: readonly NavigationItem[] = [
@@ -67,7 +68,7 @@ const navigation: readonly NavigationItem[] = [
   },
 ]
 
-export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
+export function Sidebar({ className }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, signOut } = useAuth()

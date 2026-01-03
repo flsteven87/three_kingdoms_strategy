@@ -10,7 +10,7 @@
  * - Native label association is the most reliable cross-browser solution
  */
 
-import { useCallback, useState, useId } from 'react'
+import { useCallback, useState, useId, type ChangeEvent, type DragEvent } from 'react'
 import { FileUp, FileSpreadsheet, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -45,7 +45,7 @@ export function CsvDropZone({
   const inputId = useId()
 
   const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       const selectedFile = e.target.files?.[0]
       if (selectedFile) {
         onFileChange(selectedFile)
@@ -57,7 +57,7 @@ export function CsvDropZone({
   )
 
   const handleDragEnter = useCallback(
-    (e: React.DragEvent<HTMLLabelElement>) => {
+    (e: DragEvent<HTMLLabelElement>) => {
       e.preventDefault()
       e.stopPropagation()
       if (!disabled) setIsDragging(true)
@@ -65,19 +65,19 @@ export function CsvDropZone({
     [disabled]
   )
 
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDragLeave = useCallback((e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
   }, [])
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDragOver = useCallback((e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault()
     e.stopPropagation()
   }, [])
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLLabelElement>) => {
+    (e: DragEvent<HTMLLabelElement>) => {
       e.preventDefault()
       e.stopPropagation()
       setIsDragging(false)

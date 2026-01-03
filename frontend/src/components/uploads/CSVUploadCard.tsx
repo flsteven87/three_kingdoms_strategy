@@ -13,7 +13,7 @@
  * - Native label association is the most reliable cross-browser solution
  */
 
-import React, { useCallback, useState, useId } from 'react'
+import { useCallback, useState, useId, type DragEvent, type ChangeEvent } from 'react'
 import { Upload, FileText, Trash2, AlertCircle, CheckCircle2, FileUp, RefreshCw, Loader2 } from 'lucide-react'
 import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { Button } from '@/components/ui/button'
@@ -33,13 +33,13 @@ interface CSVUploadCardProps {
   readonly isUploading?: boolean
 }
 
-export const CSVUploadCard: React.FC<CSVUploadCardProps> = ({
+export function CSVUploadCard({
   season,
   uploads,
   onUpload,
   onDelete,
-  isUploading = false
-}) => {
+  isUploading = false,
+}: CSVUploadCardProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [dateError, setDateError] = useState<string | null>(null)
   const [parsedDate, setParsedDate] = useState<Date | null>(null)
@@ -134,7 +134,7 @@ export const CSVUploadCard: React.FC<CSVUploadCardProps> = ({
   /**
    * Handle file selection from input
    */
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       processFile(file)
@@ -164,24 +164,24 @@ export const CSVUploadCard: React.FC<CSVUploadCardProps> = ({
   /**
    * Handle drag events for the label element
    */
-  const handleDragEnter = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDragEnter = useCallback((e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(true)
   }, [])
 
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDragLeave = useCallback((e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
   }, [])
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDragOver = useCallback((e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault()
     e.stopPropagation()
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDrop = useCallback((e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
@@ -492,5 +492,3 @@ export const CSVUploadCard: React.FC<CSVUploadCardProps> = ({
     </CollapsibleCard>
   )
 }
-
-export default CSVUploadCard

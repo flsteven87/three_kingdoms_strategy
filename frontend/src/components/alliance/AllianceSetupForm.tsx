@@ -8,7 +8,7 @@
  * - Component reusability 🟢
  */
 
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useCreateAlliance } from '@/hooks/use-alliance'
 import { Button } from '@/components/ui/button'
 import { AllianceFormFields } from './AllianceFormFields'
@@ -20,12 +20,12 @@ import {
   CardTitle
 } from '@/components/ui/card'
 
-export const AllianceSetupForm: React.FC = () => {
+export function AllianceSetupForm() {
   const [name, setName] = useState('')
   const [serverName, setServerName] = useState('')
   const createAlliance = useCreateAlliance()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
     if (!name.trim()) return

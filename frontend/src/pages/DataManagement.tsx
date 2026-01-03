@@ -8,7 +8,7 @@
  * - Optimistic updates
  */
 
-import React, { useCallback } from 'react'
+import { useCallback } from 'react'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CSVUploadCard } from '@/components/uploads/CSVUploadCard'
@@ -17,7 +17,7 @@ import { useSeasons } from '@/hooks/use-seasons'
 import { useCsvUploads, useUploadCsv, useDeleteCsvUpload } from '@/hooks/use-csv-uploads'
 import type { Season } from '@/types/season'
 
-const DataManagement: React.FC = () => {
+function DataManagement() {
   const { data: seasons, isLoading: seasonsLoading } = useSeasons()
   const uploadMutation = useUploadCsv()
 
@@ -93,7 +93,7 @@ interface SeasonUploadCardProps {
   readonly onUpload: (seasonId: string, file: File, snapshotDate?: string) => Promise<void>
 }
 
-const SeasonUploadCard: React.FC<SeasonUploadCardProps> = ({ season, onUpload }) => {
+function SeasonUploadCard({ season, onUpload }: SeasonUploadCardProps) {
   const { data: uploads = [], isLoading } = useCsvUploads(season.id)
   const deleteMutation = useDeleteCsvUpload(season.id)
 
