@@ -84,6 +84,33 @@ class CopperMineService:
             registered_at=mine.registered_at
         )
 
+    async def get_rules_for_liff(
+        self,
+        line_group_id: str
+    ) -> list:
+        """
+        Get copper mine rules for LIFF display
+
+        P1 修復: 讓 LIFF 用戶能看到銅礦申請規則
+
+        Args:
+            line_group_id: LINE group ID
+
+        Returns:
+            List of CopperMineRuleResponse
+        """
+        alliance_id = await self._get_alliance_id_from_group(line_group_id)
+        rules = await self.rule_repository.get_rules_by_alliance(alliance_id)
+
+        return [
+            {
+                "tier": rule.tier,
+                "required_merit": rule.required_merit,
+                "allowed_level": rule.allowed_level,
+            }
+            for rule in sorted(rules, key=lambda r: r.tier)
+        ]
+
     async def get_mines_list(
         self,
         line_group_id: str,
@@ -119,7 +146,7 @@ class CopperMineService:
 
     async def _match_member_id(self, alliance_id: UUID, game_id: str) -> UUID | None:
         """Try to match game_id to a member"""
-        member = await self.member_repository.get_member_by_name(alliance_id, game_id)
+        member = await self.member_repository.get_by_name(alliance_id, game_id)
         return member.id if member else None
 
     async def _check_coord_available(
@@ -440,6 +467,10 @@ class CopperMineService:
                 if snapshot:
                     member_group = snapshot.group_name
 
+            # P1 修復: 判斷註冊來源
+            registered_by = ownership.get("registered_by_line_user_id", "dashboard")
+            registered_via = "dashboard" if registered_by == "dashboard" else "liff"
+
             responses.append(CopperMineOwnershipResponse(
                 id=str(ownership["id"]),
                 season_id=str(ownership["season_id"]),
@@ -449,6 +480,7 @@ class CopperMineService:
                 level=ownership["level"],
                 applied_at=ownership["registered_at"],
                 created_at=ownership["registered_at"],
+                registered_via=registered_via,
                 member_name=member_name,
                 member_group=member_group,
                 line_display_name=line_display_name,
