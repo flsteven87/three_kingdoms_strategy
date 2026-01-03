@@ -242,16 +242,17 @@ class CopperMineService:
                 member = await self.member_repository.get_by_id(UUID(member_id))
                 if member:
                     member_name = member.name
+                    # Get LINE display name using game_id (member name)
+                    line_binding = await self.line_binding_repository.get_member_binding_by_game_id(
+                        alliance_id,
+                        member_name
+                    )
+                    if line_binding:
+                        line_display_name = line_binding.line_display_name
                 # Get latest snapshot for group info
                 snapshot = await self._get_latest_snapshot(UUID(member_id), season_id)
                 if snapshot:
                     member_group = snapshot.get("group_name")
-                # Get LINE display name
-                line_binding = await self.line_binding_repository.get_member_binding_by_member_id(
-                    UUID(member_id)
-                )
-                if line_binding:
-                    line_display_name = line_binding.line_display_name
 
             responses.append(CopperMineOwnershipResponse(
                 id=str(ownership["id"]),
