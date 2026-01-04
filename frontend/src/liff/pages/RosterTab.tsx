@@ -84,21 +84,21 @@ export function RosterTab({ session }: Props) {
           <Input
             value={newGameId}
             onChange={(e) => setNewGameId(e.target.value)}
-            placeholder="曹操丞相"
+            placeholder="例:曹操丞相"
             onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
             className="h-10"
           />
           <Button
-          onClick={handleRegister}
-          disabled={!newGameId.trim() || registerMutation.isPending}
-          size="icon"
-          className="h-10 w-10 shrink-0"
-        >
-          {registerMutation.isPending ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
+            onClick={handleRegister}
+            disabled={!newGameId.trim() || registerMutation.isPending}
+            size="icon"
+            className="h-10 w-10 shrink-0"
+          >
+            {registerMutation.isPending ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
