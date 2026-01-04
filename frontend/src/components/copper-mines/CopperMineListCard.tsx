@@ -5,7 +5,7 @@
  * Collaborators can add/delete records, all members can view.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import { Plus, Trash2, Loader2, Filter } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,8 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
+  TableHead,
   TableRow,
 } from '@/components/ui/table'
 import {
@@ -39,9 +39,12 @@ interface CopperMineListCardProps {
   readonly seasonName: string
 }
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' })
+function formatCalendarDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+function formatIntraday(dateString: string): string {
+  return new Date(dateString).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatCoord(x: number, y: number): string {
@@ -83,6 +86,25 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
     return result
   }, [ownerships, groupFilter])
 
+  // Group by date (YYYY-MM-DD) and keep newest first
+  const groupedByDate = useMemo(() => {
+    if (!filteredOwnerships) return { keys: [], groupsMap: new Map<string, CopperMineOwnership[]>() }
+
+    const groupsMap = new Map<string, CopperMineOwnership[]>()
+    for (const o of filteredOwnerships) {
+      const key = new Date(o.applied_at).toISOString().slice(0, 10) // YYYY-MM-DD
+      const arr = groupsMap.get(key) || []
+      arr.push(o)
+      groupsMap.set(key, arr)
+    }
+
+    // Sort date keys descending (newest first)
+    const keys = Array.from(groupsMap.keys()).sort((a, b) => (a < b ? 1 : -1))
+
+    return { keys, groupsMap }
+  }, [filteredOwnerships])
+
+
   function handleDeleteClick(ownership: CopperMineOwnership) {
     setDeletingOwnership(ownership)
     setDeleteDialogOpen(true)
@@ -112,21 +134,26 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
             <div className="flex items-center gap-2">
               {/* Group Filter */}
               {groups.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <Select value={groupFilter} onValueChange={setGroupFilter}>
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="篩選組別" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">全部組別</SelectItem>
-                      {groups.map((group) => (
-                        <SelectItem key={group} value={group}>
-                          {group}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <Select value={groupFilter} onValueChange={setGroupFilter}>
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="篩選組別" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部組別</SelectItem>
+                        <SelectItem value="divider" disabled>
+                          — 組別 —
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        {groups.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
 
@@ -157,67 +184,60 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-6">
-              <Table className="w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[100px] pl-6">座標</TableHead>
-                    <TableHead className="w-[20%] min-w-[100px]">遊戲 ID</TableHead>
-                    <TableHead className="w-[20%] min-w-[100px] hidden sm:table-cell">LINE 名稱</TableHead>
-                    <TableHead className="w-[70px] text-center">等級</TableHead>
-                    <TableHead className="w-[80px] text-center">組別</TableHead>
-                    <TableHead className="w-[80px] hidden md:table-cell">申請日期</TableHead>
-                    {canManage && <TableHead className="w-[50px] pr-6 text-right">操作</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOwnerships.map((ownership) => (
-                    <TableRow key={ownership.id}>
-                      <TableCell className="font-mono text-sm whitespace-nowrap pl-6">
-                        {formatCoord(ownership.coord_x, ownership.coord_y)}
-                      </TableCell>
-                      <TableCell className="font-medium truncate max-w-[150px]">
-                        {ownership.member_name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground truncate max-w-[150px] hidden sm:table-cell">
-                        {ownership.line_display_name || '-'}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={ownership.level === 10 ? 'default' : 'secondary'}
-                          className="whitespace-nowrap"
-                        >
-                          {ownership.level} 級
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {ownership.member_group ? (
-                          <Badge variant="outline" className="whitespace-nowrap">
-                            {ownership.member_group}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm hidden md:table-cell">
-                        {formatDate(ownership.applied_at)}
-                      </TableCell>
-                      {canManage && (
-                        <TableCell className="text-right pr-6">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteClick(ownership)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      )}
+            <div>
+              <div className="overflow-hidden rounded-md">
+                <Table className="w-full table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px] pl-6">座標</TableHead>
+                      <TableHead className="w-[20%] min-w-[100px]">遊戲 ID</TableHead>
+                      <TableHead className="w-[20%] min-w-[100px] hidden sm:table-cell">LINE 名稱</TableHead>
+                      <TableHead className="w-[70px] text-center">等級</TableHead>
+                      <TableHead className="w-[80px] text-center">組別</TableHead>
+                      <TableHead className="w-[80px] hidden md:table-cell">申請日期</TableHead>
+                      {canManage && <TableHead className="w-[50px] pr-6 text-right">操作</TableHead>}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {groupedByDate.keys.map((dateKey) => (
+                      <Fragment key={dateKey}>
+                        <TableRow className="bg-muted/10">
+                          <TableCell colSpan={canManage ? 7 : 6} className="border-t border-muted-foreground/10 py-3">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-medium">{formatCalendarDate(dateKey)}</div>
+                              <div className="text-sm text-muted-foreground">{groupedByDate.groupsMap.get(dateKey)?.length ?? 0} 筆</div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+
+                        {groupedByDate.groupsMap.get(dateKey)?.map((ownership) => (
+                          <TableRow key={ownership.id}>
+                            <TableCell className="font-mono text-sm whitespace-nowrap pl-6">
+                              {formatCoord(ownership.coord_x, ownership.coord_y)}
+                            </TableCell>
+                            <TableCell className="font-medium truncate max-w-[150px]">{ownership.member_name}</TableCell>
+                            <TableCell className="text-muted-foreground truncate max-w-[150px] hidden sm:table-cell">{ownership.line_display_name || '-'}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={ownership.level === 10 ? 'default' : 'secondary'} className="whitespace-nowrap">
+                                {ownership.level} 級
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">{ownership.member_group ? (<Badge variant="outline" className="whitespace-nowrap">{ownership.member_group}</Badge>) : (<span className="text-muted-foreground">-</span>)}</TableCell>
+                            <TableCell className="text-sm hidden md:table-cell">{formatIntraday(ownership.applied_at)}</TableCell>
+                            {canManage && (
+                              <TableCell className="text-right pr-6">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteClick(ownership)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </CardContent>
