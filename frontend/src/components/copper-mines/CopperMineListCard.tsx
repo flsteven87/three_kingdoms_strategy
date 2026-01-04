@@ -92,7 +92,7 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
 
     const groupsMap = new Map<string, CopperMineOwnership[]>()
     for (const o of filteredOwnerships) {
-      const key = new Date(o.applied_at).toISOString().slice(0, 10) // YYYY-MM-DD
+      const key = new Date(o.applied_at).toLocaleDateString('en-CA') // YYYY-MM-DD in local timezone
       const arr = groupsMap.get(key) || []
       arr.push(o)
       groupsMap.set(key, arr)
@@ -103,7 +103,6 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
 
     return { keys, groupsMap }
   }, [filteredOwnerships])
-
 
   function handleDeleteClick(ownership: CopperMineOwnership) {
     setDeletingOwnership(ownership)
@@ -215,18 +214,37 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
                             <TableCell className="font-mono text-sm whitespace-nowrap pl-6">
                               {formatCoord(ownership.coord_x, ownership.coord_y)}
                             </TableCell>
-                            <TableCell className="font-medium truncate max-w-[150px]">{ownership.member_name}</TableCell>
-                            <TableCell className="text-muted-foreground truncate max-w-[150px] hidden sm:table-cell">{ownership.line_display_name || '-'}</TableCell>
+                            <TableCell className="font-medium truncate max-w-[150px]">
+                              {ownership.member_name}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground truncate max-w-[150px] hidden sm:table-cell">
+                              {ownership.line_display_name || '-'}
+                            </TableCell>
                             <TableCell className="text-center">
                               <Badge variant={ownership.level === 10 ? 'default' : 'secondary'} className="whitespace-nowrap">
                                 {ownership.level} 級
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-center">{ownership.member_group ? (<Badge variant="outline" className="whitespace-nowrap">{ownership.member_group}</Badge>) : (<span className="text-muted-foreground">-</span>)}</TableCell>
-                            <TableCell className="text-sm hidden md:table-cell">{formatIntraday(ownership.applied_at)}</TableCell>
+                            <TableCell className="text-center">
+                              {ownership.member_group ? (
+                                <Badge variant="outline" className="whitespace-nowrap">
+                                  {ownership.member_group}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm hidden md:table-cell">
+                              {formatIntraday(ownership.applied_at)}
+                            </TableCell>
                             {canManage && (
                               <TableCell className="text-right pr-6">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteClick(ownership)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteClick(ownership)}
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </TableCell>

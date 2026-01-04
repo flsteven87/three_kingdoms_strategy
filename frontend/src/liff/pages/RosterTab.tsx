@@ -84,7 +84,7 @@ export function RosterTab({ session }: Props) {
           <Input
             value={newGameId}
             onChange={(e) => setNewGameId(e.target.value)}
-            placeholder="例:曹操丞相"
+            placeholder="例：曹操丞相"
             onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
             className="h-10"
           />
