@@ -13,7 +13,7 @@ Business logic for LINE Bot integration:
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -689,7 +689,7 @@ class LineBindingService:
                     detail="Trigger keyword already exists"
                 )
 
-        update_data["updated_at"] = datetime.utcnow().isoformat()
+        update_data["updated_at"] = datetime.now(UTC).isoformat()
         updated = await self.repository.update_custom_command(command_id, update_data)
         return self._to_custom_command_response(updated)
 
