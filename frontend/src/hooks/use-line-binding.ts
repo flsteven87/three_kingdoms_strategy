@@ -12,7 +12,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '@/lib/api-client'
-import type { LineBindingStatusResponse, LineBindingCode, RegisteredMembersResponse } from '@/types/line-binding'
+import type {
+  LineBindingCode,
+  LineBindingStatusResponse,
+  LineCustomCommand,
+  LineCustomCommandCreate,
+  LineCustomCommandUpdate,
+  RegisteredMembersResponse
+} from '@/types/line-binding'
 
 // =============================================================================
 // Query Keys
@@ -21,7 +28,8 @@ import type { LineBindingStatusResponse, LineBindingCode, RegisteredMembersRespo
 export const lineBindingKeys = {
   all: ['line-binding'] as const,
   status: () => [...lineBindingKeys.all, 'status'] as const,
-  members: () => [...lineBindingKeys.all, 'members'] as const
+  members: () => [...lineBindingKeys.all, 'members'] as const,
+  commands: () => [...lineBindingKeys.all, 'commands'] as const
 }
 
 // =============================================================================
@@ -87,6 +95,54 @@ export function useRegisteredMembers(enabled: boolean = true) {
     queryKey: lineBindingKeys.members(),
     queryFn: (): Promise<RegisteredMembersResponse> => apiClient.getRegisteredMembers(),
     enabled
+  })
+}
+
+export function useLineCustomCommands(enabled: boolean = true) {
+  return useQuery({
+    queryKey: lineBindingKeys.commands(),
+    queryFn: (): Promise<LineCustomCommand[]> => apiClient.getLineCustomCommands(),
+    enabled
+  })
+}
+
+export function useCreateLineCustomCommand() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: LineCustomCommandCreate) => apiClient.createLineCustomCommand(data),
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: lineBindingKeys.commands()
+      })
+    }
+  })
+}
+
+export function useUpdateLineCustomCommand() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ commandId, data }: { commandId: string; data: LineCustomCommandUpdate }) =>
+      apiClient.updateLineCustomCommand(commandId, data),
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: lineBindingKeys.commands()
+      })
+    }
+  })
+}
+
+export function useDeleteLineCustomCommand() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (commandId: string) => apiClient.deleteLineCustomCommand(commandId),
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: lineBindingKeys.commands()
+      })
+    }
   })
 }
 

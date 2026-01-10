@@ -16,6 +16,7 @@ import json
 import logging
 import re
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
@@ -36,6 +37,9 @@ from src.models.copper_mine import (
 from src.models.line_binding import (
     LineBindingCodeResponse,
     LineBindingStatusResponse,
+    LineCustomCommandCreate,
+    LineCustomCommandResponse,
+    LineCustomCommandUpdate,
     LineGroupBindingResponse,
     LineWebhookEvent,
     LineWebhookRequest,
@@ -189,6 +193,119 @@ async def get_registered_members(
         )
 
     return await service.get_registered_members(alliance.id)
+
+
+@router.get(
+    "/commands",
+    response_model=list[LineCustomCommandResponse],
+    summary="Get custom commands",
+    description="Get custom commands for current alliance"
+)
+async def get_custom_commands(
+    user_id: UserIdDep,
+    service: LineBindingServiceDep,
+    alliance_service: AllianceServiceDep,
+) -> list[LineCustomCommandResponse]:
+    alliance = await alliance_service.get_user_alliance(user_id)
+    if not alliance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User has no alliance"
+        )
+
+    return await service.list_custom_commands(alliance.id)
+
+
+@router.post(
+    "/commands",
+    response_model=LineCustomCommandResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create custom command",
+    description="Create a LINE custom command"
+)
+async def create_custom_command(
+    user_id: UserIdDep,
+    data: LineCustomCommandCreate,
+    service: LineBindingServiceDep,
+    alliance_service: AllianceServiceDep,
+    permission_service: PermissionServiceDep,
+) -> LineCustomCommandResponse:
+    alliance = await alliance_service.get_user_alliance(user_id)
+    if not alliance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User has no alliance"
+        )
+
+    await permission_service.require_owner_or_collaborator(
+        user_id, alliance.id, "create LINE custom command"
+    )
+
+    return await service.create_custom_command(
+        alliance_id=alliance.id,
+        user_id=user_id,
+        data=data,
+    )
+
+
+@router.patch(
+    "/commands/{command_id}",
+    response_model=LineCustomCommandResponse,
+    summary="Update custom command",
+    description="Update a LINE custom command"
+)
+async def update_custom_command(
+    command_id: UUID,
+    user_id: UserIdDep,
+    data: LineCustomCommandUpdate,
+    service: LineBindingServiceDep,
+    alliance_service: AllianceServiceDep,
+    permission_service: PermissionServiceDep,
+) -> LineCustomCommandResponse:
+    alliance = await alliance_service.get_user_alliance(user_id)
+    if not alliance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User has no alliance"
+        )
+
+    await permission_service.require_owner_or_collaborator(
+        user_id, alliance.id, "update LINE custom command"
+    )
+
+    return await service.update_custom_command(
+        alliance_id=alliance.id,
+        command_id=command_id,
+        data=data,
+    )
+
+
+@router.delete(
+    "/commands/{command_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete custom command",
+    description="Delete a LINE custom command"
+)
+async def delete_custom_command(
+    command_id: UUID,
+    user_id: UserIdDep,
+    service: LineBindingServiceDep,
+    alliance_service: AllianceServiceDep,
+    permission_service: PermissionServiceDep,
+) -> Response:
+    alliance = await alliance_service.get_user_alliance(user_id)
+    if not alliance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User has no alliance"
+        )
+
+    await permission_service.require_owner_or_collaborator(
+        user_id, alliance.id, "delete LINE custom command"
+    )
+
+    await service.delete_custom_command(alliance.id, command_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # =============================================================================
@@ -546,6 +663,17 @@ async def _handle_group_message(
     bot_user_id = settings.line_bot_user_id
 
     if bot_user_id and _is_bot_mentioned(mentionees, bot_user_id):
+        command_keyword = _extract_custom_command(text)
+        if command_keyword in {"/綁定", "/绑定"}:
+            command_keyword = None
+        if command_keyword:
+            command = await service.get_custom_command_response(
+                line_group_id=line_group_id,
+                trigger_keyword=command_keyword,
+            )
+            if command:
+                await _reply_text(reply_token, command.response_message)
+                return
         await _send_liff_entry(
             line_group_id=line_group_id,
             reply_token=reply_token,
@@ -591,6 +719,13 @@ def _extract_bind_code(text: str) -> str | None:
     if BIND_CODE_PATTERN.match(code):
         return code
     return None
+
+
+def _extract_custom_command(text: str) -> str | None:
+    match = re.search(r"/\S+", text)
+    if not match:
+        return None
+    return match.group(0)
 
 
 def _is_bot_mentioned(mentionees: list, bot_user_id: str) -> bool:

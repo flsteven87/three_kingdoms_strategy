@@ -17,6 +17,7 @@ from uuid import UUID
 
 from src.models.line_binding import (
     LineBindingCode,
+    LineCustomCommand,
     LineGroupBinding,
     MemberLineBinding,
 )
@@ -417,6 +418,124 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return len(data) > 0
+
+    async def list_custom_commands(self, alliance_id: UUID) -> list[LineCustomCommand]:
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("line_custom_commands")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .order("updated_at", desc=True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return [LineCustomCommand(**row) for row in data]
+
+    async def get_custom_command_by_id(self, command_id: UUID) -> LineCustomCommand | None:
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("line_custom_commands")
+            .select("*")
+            .eq("id", str(command_id))
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
+        if not data:
+            return None
+        return LineCustomCommand(**data)
+
+    async def get_custom_command_by_trigger(
+        self,
+        alliance_id: UUID,
+        trigger_keyword: str
+    ) -> LineCustomCommand | None:
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("line_custom_commands")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("trigger_keyword", trigger_keyword)
+            .eq("is_enabled", True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
+        if not data:
+            return None
+        return LineCustomCommand(**data)
+
+    async def get_custom_command_by_trigger_any(
+        self,
+        alliance_id: UUID,
+        trigger_keyword: str
+    ) -> LineCustomCommand | None:
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("line_custom_commands")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("trigger_keyword", trigger_keyword)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
+        if not data:
+            return None
+        return LineCustomCommand(**data)
+
+    async def create_custom_command(
+        self,
+        alliance_id: UUID,
+        command_name: str,
+        trigger_keyword: str,
+        response_message: str,
+        is_enabled: bool,
+        created_by: UUID,
+    ) -> LineCustomCommand:
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("line_custom_commands")
+            .insert({
+                "alliance_id": str(alliance_id),
+                "command_name": command_name,
+                "trigger_keyword": trigger_keyword,
+                "response_message": response_message,
+                "is_enabled": is_enabled,
+                "created_by": str(created_by),
+            })
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, expect_single=True)
+        return LineCustomCommand(**data)
+
+    async def update_custom_command(
+        self,
+        command_id: UUID,
+        update_data: dict[str, str | bool]
+    ) -> LineCustomCommand:
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("line_custom_commands")
+            .update(update_data)
+            .eq("id", str(command_id))
+            .select("*")
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, expect_single=True)
+        return LineCustomCommand(**data)
+
+    async def delete_custom_command(self, command_id: UUID) -> None:
+        await self._execute_async(
+            lambda: self.client
+            .from_("line_custom_commands")
+            .delete()
+            .eq("id", str(command_id))
+            .execute()
+        )
 
     # =========================================================================
     # User Notification Operations (每用戶每群組只通知一次)

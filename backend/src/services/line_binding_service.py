@@ -21,6 +21,10 @@ from fastapi import HTTPException, status
 from src.models.line_binding import (
     LineBindingCodeResponse,
     LineBindingStatusResponse,
+    LineCustomCommand,
+    LineCustomCommandCreate,
+    LineCustomCommandResponse,
+    LineCustomCommandUpdate,
     LineGroupBindingResponse,
     MemberInfoResponse,
     MemberPerformanceResponse,
@@ -628,6 +632,109 @@ class LineBindingService:
         await self.repository.record_user_notification(
             line_group_id=line_group_id,
             line_user_id=line_user_id
+        )
+
+    async def list_custom_commands(self, alliance_id: UUID) -> list[LineCustomCommandResponse]:
+        commands = await self.repository.list_custom_commands(alliance_id)
+        return [self._to_custom_command_response(command) for command in commands]
+
+    async def create_custom_command(
+        self,
+        alliance_id: UUID,
+        user_id: UUID,
+        data: LineCustomCommandCreate
+    ) -> LineCustomCommandResponse:
+        existing = await self.repository.get_custom_command_by_trigger_any(
+            alliance_id,
+            data.trigger_keyword
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Trigger keyword already exists"
+            )
+
+        command = await self.repository.create_custom_command(
+            alliance_id=alliance_id,
+            command_name=data.command_name,
+            trigger_keyword=data.trigger_keyword,
+            response_message=data.response_message,
+            is_enabled=data.is_enabled,
+            created_by=user_id
+        )
+        return self._to_custom_command_response(command)
+
+    async def update_custom_command(
+        self,
+        alliance_id: UUID,
+        command_id: UUID,
+        data: LineCustomCommandUpdate
+    ) -> LineCustomCommandResponse:
+        command = await self.repository.get_custom_command_by_id(command_id)
+        if not command or command.alliance_id != alliance_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Command not found"
+            )
+
+        update_data = data.model_dump(exclude_unset=True)
+        if "trigger_keyword" in update_data:
+            existing = await self.repository.get_custom_command_by_trigger_any(
+                alliance_id,
+                update_data["trigger_keyword"]
+            )
+            if existing and existing.id != command_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Trigger keyword already exists"
+                )
+
+        update_data["updated_at"] = datetime.utcnow().isoformat()
+        updated = await self.repository.update_custom_command(command_id, update_data)
+        return self._to_custom_command_response(updated)
+
+    async def delete_custom_command(self, alliance_id: UUID, command_id: UUID) -> None:
+        command = await self.repository.get_custom_command_by_id(command_id)
+        if not command or command.alliance_id != alliance_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Command not found"
+            )
+
+        await self.repository.delete_custom_command(command_id)
+
+    async def get_custom_command_response(
+        self,
+        line_group_id: str,
+        trigger_keyword: str
+    ) -> LineCustomCommandResponse | None:
+        group_binding = await self.repository.get_group_binding_by_line_group_id(
+            line_group_id
+        )
+        if not group_binding:
+            return None
+
+        command = await self.repository.get_custom_command_by_trigger(
+            group_binding.alliance_id,
+            trigger_keyword
+        )
+        if not command:
+            return None
+
+        return self._to_custom_command_response(command)
+
+    def _to_custom_command_response(
+        self,
+        command: LineCustomCommand
+    ) -> LineCustomCommandResponse:
+        return LineCustomCommandResponse(
+            id=command.id,
+            command_name=command.command_name,
+            trigger_keyword=command.trigger_keyword,
+            response_message=command.response_message,
+            is_enabled=command.is_enabled,
+            created_at=command.created_at,
+            updated_at=command.updated_at,
         )
 
     async def is_group_bound(self, line_group_id: str) -> bool:

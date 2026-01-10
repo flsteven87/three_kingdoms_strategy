@@ -115,6 +115,10 @@ export const apiClient = {
   generateLineBindingCode: lineApi.generateLineBindingCode,
   unbindLineGroup: lineApi.unbindLineGroup,
   getRegisteredMembers: lineApi.getRegisteredMembers,
+  getLineCustomCommands: lineApi.getLineCustomCommands,
+  createLineCustomCommand: lineApi.createLineCustomCommand,
+  updateLineCustomCommand: lineApi.updateLineCustomCommand,
+  deleteLineCustomCommand: lineApi.deleteLineCustomCommand,
 
   // Copper Mine
   getCopperMineRules: copperMineApi.getCopperMineRules,

@@ -164,6 +164,51 @@ class RegisteredMembersResponse(BaseModel):
     total: int
 
 
+class LineCustomCommandBase(BaseModel):
+    command_name: str = Field(..., min_length=1, max_length=100)
+    trigger_keyword: str = Field(
+        ..., min_length=2, max_length=50, pattern=r"^/[^\s]+$"
+    )
+    response_message: str = Field(..., min_length=1, max_length=1000)
+    is_enabled: bool = True
+
+
+class LineCustomCommandCreate(LineCustomCommandBase):
+    pass
+
+
+class LineCustomCommandUpdate(BaseModel):
+    command_name: str | None = Field(None, min_length=1, max_length=100)
+    trigger_keyword: str | None = Field(
+        None, min_length=2, max_length=50, pattern=r"^/[^\s]+$"
+    )
+    response_message: str | None = Field(None, min_length=1, max_length=1000)
+    is_enabled: bool | None = None
+
+
+class LineCustomCommand(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    alliance_id: UUID
+    command_name: str
+    trigger_keyword: str
+    response_message: str
+    is_enabled: bool
+    created_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class LineCustomCommandResponse(BaseModel):
+    id: UUID
+    command_name: str
+    trigger_keyword: str
+    response_message: str
+    is_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
 # =============================================================================
 # Binding Status Response (for Web App)
 # =============================================================================

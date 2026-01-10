@@ -61,6 +61,30 @@ export interface RegisteredMembersResponse {
   readonly total: number
 }
 
+export interface LineCustomCommand {
+  readonly id: string
+  readonly command_name: string
+  readonly trigger_keyword: string
+  readonly response_message: string
+  readonly is_enabled: boolean
+  readonly created_at: string
+  readonly updated_at: string
+}
+
+export interface LineCustomCommandCreate {
+  readonly command_name: string
+  readonly trigger_keyword: string
+  readonly response_message: string
+  readonly is_enabled: boolean
+}
+
+export interface LineCustomCommandUpdate {
+  readonly command_name?: string
+  readonly trigger_keyword?: string
+  readonly response_message?: string
+  readonly is_enabled?: boolean
+}
+
 // =============================================================================
 // API Response Types
 // =============================================================================
