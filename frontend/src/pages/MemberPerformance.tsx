@@ -661,6 +661,50 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
               </ChartContainer>
             </CardContent>
           </Card>
+
+          {/* 戰功明細表格 */}
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">戰功明細</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1.5 px-2 font-medium text-xs">日期</th>
+                      <th className="text-right py-1.5 px-2 font-medium text-xs">日均戰功</th>
+                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟平均</th>
+                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟中位數</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodData.map((d, index) => {
+                      const prev = index > 0 ? periodData[index - 1].daily_merit : null
+                      const delta = prev !== null ? d.daily_merit - prev : null
+                      const diffAvg = d.daily_merit - d.alliance_avg_merit
+                      const diffMedian = d.daily_merit - d.alliance_median_merit
+
+                      return (
+                        <tr key={d.period_number} className="border-b last:border-0">
+                          <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
+                          <td className="py-1.5 px-2 text-right text-xs tabular-nums">
+                            {formatNumber(d.daily_merit)} {delta === null ? '' : <span className={delta > 0 ? 'text-primary' : delta < 0 ? 'text-destructive' : 'text-muted-foreground'}>({delta >= 0 ? '+' : ''}{formatNumberCompact(delta)})</span>}
+                          </td>
+                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
+                            {formatNumber(d.alliance_avg_merit)} <span className={diffAvg > 0 ? 'text-primary' : diffAvg < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffAvg >= 0 ? '+' : ''}{formatNumberCompact(diffAvg)})</span>
+                          </td>
+                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
+                            {formatNumber(d.alliance_median_merit)} <span className={diffMedian > 0 ? 'text-primary' : diffMedian < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffMedian >= 0 ? '+' : ''}{formatNumberCompact(diffMedian)})</span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column: Assist */}
@@ -764,58 +808,54 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
               </ChartContainer>
             </CardContent>
           </Card>
+
+          {/* 助攻明細表格 */}
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">助攻明細</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1.5 px-2 font-medium text-xs">日期</th>
+                      <th className="text-right py-1.5 px-2 font-medium text-xs">日均助攻</th>
+                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟平均</th>
+                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟中位數</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodData.map((d, index) => {
+                      const prev = index > 0 ? periodData[index - 1].daily_assist : null
+                      const delta = prev !== null ? d.daily_assist - prev : null
+                      const diffAvg = d.daily_assist - d.alliance_avg_assist
+                      const diffMedian = d.daily_assist - d.alliance_median_assist
+
+                      return (
+                        <tr key={d.period_number} className="border-b last:border-0">
+                          <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
+                          <td className="py-1.5 px-2 text-right text-xs tabular-nums">
+                            {formatNumber(d.daily_assist)} {delta === null ? '' : <span className={delta > 0 ? 'text-primary' : delta < 0 ? 'text-destructive' : 'text-muted-foreground'}>({delta >= 0 ? '+' : ''}{formatNumberCompact(delta)})</span>}
+                          </td>
+                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
+                            {formatNumber(d.alliance_avg_assist)} <span className={diffAvg > 0 ? 'text-primary' : diffAvg < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffAvg >= 0 ? '+' : ''}{formatNumberCompact(diffAvg)})</span>
+                          </td>
+                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
+                            {formatNumber(d.alliance_median_assist)} <span className={diffMedian > 0 ? 'text-primary' : diffMedian < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffMedian >= 0 ? '+' : ''}{formatNumberCompact(diffMedian)})</span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* Period Detail Table */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">期間明細</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-1.5 px-2 font-medium text-xs">期間</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">日均戰功</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">變化</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">日均助攻</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">變化</th>
-                </tr>
-              </thead>
-              <tbody>
-                {periodData.map((d, index) => {
-                  const prevMerit = index > 0 ? periodData[index - 1].daily_merit : null
-                  const prevAssist = index > 0 ? periodData[index - 1].daily_assist : null
-                  const meritChange = prevMerit !== null ? d.daily_merit - prevMerit : null
-                  const assistChange = prevAssist !== null ? d.daily_assist - prevAssist : null
 
-                  return (
-                    <tr key={d.period_number} className="border-b last:border-0">
-                      <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
-                      <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.daily_merit)}</td>
-                      <td className={`py-1.5 px-2 text-right text-xs tabular-nums ${
-                        meritChange === null ? 'text-muted-foreground' :
-                        meritChange >= 0 ? 'text-primary' : 'text-destructive'
-                      }`}>
-                        {meritChange === null ? '-' : `${meritChange >= 0 ? '+' : ''}${formatNumber(meritChange)}`}
-                      </td>
-                      <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.daily_assist)}</td>
-                      <td className={`py-1.5 px-2 text-right text-xs tabular-nums ${
-                        assistChange === null ? 'text-muted-foreground' :
-                        assistChange >= 0 ? 'text-primary' : 'text-destructive'
-                      }`}>
-                        {assistChange === null ? '-' : `${assistChange >= 0 ? '+' : ''}${formatNumber(assistChange)}`}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
@@ -1000,54 +1040,7 @@ function ContributionTab({ periodData, seasonSummary, allianceAvg, totalMembers 
         </CardContent>
       </Card>
 
-      {/* Period Detail Table */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">期間明細</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-1.5 px-2 font-medium text-xs">期間</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">排名</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">排名變化</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">日均貢獻</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">貢獻變化</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">期間總貢獻</th>
-                </tr>
-              </thead>
-              <tbody>
-                {periodData.map((d, index) => {
-                  const prevContribution = index > 0 ? periodData[index - 1].daily_contribution : null
-                  const contributionChange = prevContribution !== null ? d.daily_contribution - prevContribution : null
 
-                  return (
-                    <tr key={d.period_number} className="border-b last:border-0">
-                      <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
-                      <td className="py-1.5 px-2 text-right text-xs tabular-nums">#{d.end_rank}</td>
-                      <td className="py-1.5 px-2 text-right">
-                        <RankChangeIndicator change={d.rank_change} size="sm" />
-                      </td>
-                      <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.daily_contribution)}</td>
-                      <td className={`py-1.5 px-2 text-right text-xs tabular-nums ${
-                        contributionChange === null ? 'text-muted-foreground' :
-                        contributionChange >= 0 ? 'text-primary' : 'text-destructive'
-                      }`}>
-                        {contributionChange === null ? '-' : `${contributionChange >= 0 ? '+' : ''}${formatNumber(contributionChange)}`}
-                      </td>
-                      <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
-                        {formatNumber(d.contribution_diff)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
@@ -1292,42 +1285,8 @@ function PowerDonationTab({ periodData, seasonSummary, allianceAvg }: PowerDonat
         </div>
       </div>
 
-      {/* Period Detail Table */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">期間明細</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-1.5 px-2 font-medium text-xs">期間</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">勢力值</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">變化</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">捐獻</th>
-                  <th className="text-right py-1.5 px-2 font-medium text-xs">日均</th>
-                </tr>
-              </thead>
-              <tbody>
-                {periodData.map((d) => (
-                  <tr key={d.period_number} className="border-b last:border-0">
-                    <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
-                    <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.end_power)}</td>
-                    <td className={`py-1.5 px-2 text-right text-xs tabular-nums ${d.power_diff >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      {d.power_diff >= 0 ? '+' : ''}{formatNumber(d.power_diff)}
-                    </td>
-                    <td className="py-1.5 px-2 text-right text-xs tabular-nums">{formatNumber(d.donation_diff)}</td>
-                    <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
-                      {formatNumber(d.daily_donation)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+
+
     </div>
   )
 }
