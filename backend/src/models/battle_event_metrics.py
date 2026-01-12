@@ -82,3 +82,54 @@ class EventSummary(BaseModel):
     mvp_member_id: UUID | None = Field(None, description="Top performer member ID")
     mvp_member_name: str | None = Field(None, description="Top performer name")
     mvp_merit: int | None = Field(None, description="Top performer merit")
+
+
+# =============================================================================
+# Group Analytics Models (for LINE Bot report)
+# =============================================================================
+
+
+class GroupEventStats(BaseModel):
+    """Statistics for a single group in a battle event"""
+
+    group_name: str = Field(..., description="Group name (or '未分組' if null)")
+    member_count: int = Field(..., ge=0, description="Total members in group")
+    participated_count: int = Field(..., ge=0, description="Members who participated")
+    absent_count: int = Field(..., ge=0, description="Members who were absent")
+    participation_rate: float = Field(..., ge=0, le=100, description="Group participation rate")
+
+    # Merit statistics (calculated from participants only)
+    total_merit: int = Field(0, ge=0, description="Sum of merit diffs")
+    avg_merit: float = Field(0, ge=0, description="Average merit per participant")
+    merit_min: int = Field(0, ge=0, description="Minimum merit")
+    merit_max: int = Field(0, ge=0, description="Maximum merit")
+
+
+class TopMemberItem(BaseModel):
+    """Top performer item for ranking display"""
+
+    rank: int = Field(..., ge=1, description="Ranking position")
+    member_name: str = Field(..., description="Member name (game ID)")
+    group_name: str | None = Field(None, description="Member group")
+    merit_diff: int = Field(..., ge=0, description="Merit earned in event")
+    line_display_name: str | None = Field(None, description="LINE display name if bound")
+
+
+class EventGroupAnalytics(BaseModel):
+    """Complete group analytics for a battle event (used in LINE Bot report)"""
+
+    # Event info
+    event_id: UUID
+    event_name: str
+    event_type: str | None = None
+    event_start: datetime | None = None
+    event_end: datetime | None = None
+
+    # Overall summary
+    summary: EventSummary
+
+    # Group-level statistics (sorted by total_merit desc)
+    group_stats: list[GroupEventStats] = []
+
+    # Top performers
+    top_members: list[TopMemberItem] = []

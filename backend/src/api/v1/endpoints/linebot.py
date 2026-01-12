@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from src.core.config import Settings, get_settings
 from src.core.dependencies import (
     AllianceServiceDep,
+    BattleEventServiceDep,
     CopperMineServiceDep,
     LineBindingServiceDep,
     PermissionServiceDep,
@@ -49,6 +50,7 @@ from src.models.line_binding import (
     RegisteredMembersResponse,
     RegisterMemberResponse,
 )
+from src.services.battle_event_service import BattleEventService
 from src.services.line_binding_service import LineBindingService
 
 logger = logging.getLogger(__name__)
@@ -485,6 +487,7 @@ async def delete_copper_mine(
 async def handle_webhook(
     body: WebhookBodyDep,
     service: LineBindingServiceDep,
+    battle_event_service: BattleEventServiceDep,
     settings: Settings = Depends(get_settings),
 ) -> str:
     """Handle LINE webhook events"""
@@ -496,7 +499,7 @@ async def handle_webhook(
         return "OK"
 
     for event in webhook_request.events:
-        await _handle_event(event, service, settings)
+        await _handle_event(event, service, battle_event_service, settings)
 
     return "OK"
 
@@ -504,6 +507,7 @@ async def handle_webhook(
 async def _handle_event(
     event: LineWebhookEvent,
     service: LineBindingService,
+    battle_event_service: BattleEventService,
     settings: Settings,
 ) -> None:
     """
@@ -547,7 +551,7 @@ async def _handle_event(
 
         # 群組訊息
         if source_type == "group":
-            await _handle_group_message(event, service, settings)
+            await _handle_group_message(event, service, battle_event_service, settings)
             return
 
 
@@ -625,6 +629,7 @@ async def _handle_private_message(event: LineWebhookEvent) -> None:
 async def _handle_group_message(
     event: LineWebhookEvent,
     service: LineBindingService,
+    battle_event_service: BattleEventService,
     settings: Settings,
 ) -> None:
     """
@@ -680,6 +685,18 @@ async def _handle_group_message(
             command_keyword = _extract_custom_command(args_text)
             if command_keyword in {"/綁定", "/绑定"}:
                 command_keyword = None
+
+            # Built-in command: /最新戰役 or /最新战役
+            if command_keyword in {"/最新戰役", "/最新战役"}:
+                await _handle_latest_event_report(
+                    line_group_id=line_group_id,
+                    reply_token=reply_token,
+                    line_binding_service=service,
+                    battle_event_service=battle_event_service,
+                )
+                return
+
+            # Check custom commands
             if command_keyword:
                 command = await service.get_custom_command_response(
                     line_group_id=line_group_id,
@@ -774,6 +791,104 @@ def _extract_custom_command(text: str) -> str | None:
 def _is_bot_mentioned(mentionees: list, bot_user_id: str) -> bool:
     """檢查 Bot 是否被 @"""
     return any(m.get("userId") == bot_user_id for m in mentionees)
+
+
+async def _handle_latest_event_report(
+    line_group_id: str,
+    reply_token: str,
+    line_binding_service: LineBindingService,
+    battle_event_service: BattleEventService,
+) -> None:
+    """
+    處理 /最新戰役 指令
+
+    查詢該群組綁定同盟的最新已完成戰役，並發送分析報告。
+    """
+    from src.lib.line_flex_builder import build_event_report_flex
+
+    # 1. 查詢群組綁定的同盟
+    group_binding = await line_binding_service.repository.get_group_binding_by_line_group_id(
+        line_group_id
+    )
+
+    if not group_binding:
+        await _reply_text(
+            reply_token,
+            "❌ 此群組尚未綁定同盟\n\n"
+            "請盟主在 Web App 生成綁定碼，\n"
+            "然後發送「/綁定 XXXXXX」完成綁定"
+        )
+        return
+
+    alliance_id = group_binding.alliance_id
+
+    # 2. 查詢最新已完成戰役
+    latest_event = await battle_event_service.get_latest_completed_event_for_alliance(
+        alliance_id
+    )
+
+    if not latest_event:
+        await _reply_text(
+            reply_token,
+            "📭 目前沒有已完成的戰役分析\n\n"
+            "請先在 Web App 建立並完成戰役分析"
+        )
+        return
+
+    # 3. 取得組別分析
+    analytics = await battle_event_service.get_event_group_analytics(latest_event.id)
+
+    if not analytics:
+        await _reply_text(
+            reply_token,
+            "❌ 無法取得戰役分析資料"
+        )
+        return
+
+    # 4. 補充 Top Members 的 LINE 名稱
+    if analytics.top_members:
+        game_ids = [m.member_name for m in analytics.top_members]
+        line_bindings = await line_binding_service.repository.get_member_bindings_by_game_ids(
+            alliance_id=alliance_id,
+            game_ids=game_ids,
+        )
+        # 建立 game_id -> line_display_name 映射
+        line_name_map = {b.game_id: b.line_display_name for b in line_bindings}
+
+        # 更新 top_members 的 line_display_name
+        for member in analytics.top_members:
+            member.line_display_name = line_name_map.get(member.member_name)
+
+    # 5. 建構 Flex Message 並發送
+    flex_message = build_event_report_flex(analytics)
+
+    if not flex_message:
+        # Fallback to text if Flex build fails
+        await _reply_text(
+            reply_token,
+            f"⚔️ {analytics.event_name}\n\n"
+            f"📊 出席率: {analytics.summary.participation_rate:.0f}%\n"
+            f"⚔️ 總戰功: {analytics.summary.total_merit:,}\n"
+            f"🏆 MVP: {analytics.summary.mvp_member_name or '-'}"
+        )
+        return
+
+    line_bot = get_line_bot_api()
+    if not line_bot:
+        logger.error("LINE Bot API not available")
+        return
+
+    try:
+        from linebot.v3.messaging import ReplyMessageRequest
+
+        line_bot.reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[flex_message],
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send event report: {e}")
 
 
 async def _handle_bind_command(

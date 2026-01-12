@@ -25,7 +25,10 @@ from src.models.battle_event import (
 from src.models.battle_event_metrics import (
     BattleEventMetricsCreate,
     BattleEventMetricsWithMember,
+    EventGroupAnalytics,
     EventSummary,
+    GroupEventStats,
+    TopMemberItem,
 )
 from src.repositories.battle_event_metrics_repository import BattleEventMetricsRepository
 from src.repositories.battle_event_repository import BattleEventRepository
@@ -400,3 +403,137 @@ class BattleEventService:
         """
         # Metrics are deleted via CASCADE
         return await self._event_repo.delete(event_id)
+
+    async def get_latest_completed_event_for_alliance(
+        self, alliance_id: UUID
+    ) -> BattleEvent | None:
+        """
+        Get the most recent completed battle event for an alliance.
+
+        Args:
+            alliance_id: Alliance UUID
+
+        Returns:
+            Latest completed battle event or None
+        """
+        return await self._event_repo.get_latest_completed_event(alliance_id)
+
+    async def get_event_group_analytics(
+        self, event_id: UUID, top_n: int = 5
+    ) -> EventGroupAnalytics | None:
+        """
+        Get group-level analytics for a battle event.
+
+        Calculates per-group statistics including:
+        - Participation rate
+        - Merit distribution (min/avg/max)
+        - Member counts
+
+        Args:
+            event_id: Event UUID
+            top_n: Number of top performers to include
+
+        Returns:
+            EventGroupAnalytics with group stats and top members,
+            or None if event not found
+        """
+        event = await self._event_repo.get_by_id(event_id)
+        if not event:
+            return None
+
+        # Get all metrics with group info
+        metrics = await self._metrics_repo.get_by_event_with_member_and_group(event_id)
+        if not metrics:
+            return None
+
+        # Get overall summary
+        summary = await self._calculate_event_summary(event_id)
+
+        # Group metrics by group_name
+        groups: dict[str, list[BattleEventMetricsWithMember]] = {}
+        for m in metrics:
+            group_name = m.group_name or "未分組"
+            if group_name not in groups:
+                groups[group_name] = []
+            groups[group_name].append(m)
+
+        # Calculate stats for each group
+        group_stats: list[GroupEventStats] = []
+        for group_name, group_metrics in groups.items():
+            stats = self._calculate_group_stats(group_name, group_metrics)
+            group_stats.append(stats)
+
+        # Sort by total_merit descending
+        group_stats.sort(key=lambda g: g.total_merit, reverse=True)
+
+        # Get top performers (exclude new members)
+        participants = [m for m in metrics if m.participated]
+        participants.sort(key=lambda m: m.merit_diff, reverse=True)
+
+        top_members = [
+            TopMemberItem(
+                rank=i + 1,
+                member_name=m.member_name,
+                group_name=m.group_name,
+                merit_diff=m.merit_diff,
+            )
+            for i, m in enumerate(participants[:top_n])
+        ]
+
+        return EventGroupAnalytics(
+            event_id=event.id,
+            event_name=event.name,
+            event_type=event.event_type,
+            event_start=event.event_start,
+            event_end=event.event_end,
+            summary=summary,
+            group_stats=group_stats,
+            top_members=top_members,
+        )
+
+    def _calculate_group_stats(
+        self,
+        group_name: str,
+        metrics: list[BattleEventMetricsWithMember],
+    ) -> GroupEventStats:
+        """
+        Calculate statistics for a single group.
+
+        Args:
+            group_name: Name of the group
+            metrics: All metrics for members in this group
+
+        Returns:
+            GroupEventStats with calculated values
+        """
+        # Exclude new members from participation calculation
+        eligible = [m for m in metrics if not m.is_new_member]
+        member_count = len(eligible)
+
+        participated_count = sum(1 for m in eligible if m.participated)
+        absent_count = sum(1 for m in eligible if m.is_absent)
+
+        participation_rate = (
+            (participated_count / member_count * 100) if member_count > 0 else 0.0
+        )
+
+        # Merit stats from participants only
+        participants = [m for m in eligible if m.participated]
+        merit_values = [m.merit_diff for m in participants]
+
+        total_merit = sum(merit_values)
+        avg_merit = total_merit / len(merit_values) if merit_values else 0.0
+        merit_min = min(merit_values) if merit_values else 0
+        merit_max = max(merit_values) if merit_values else 0
+
+        return GroupEventStats(
+            group_name=group_name,
+            member_count=member_count,
+            participated_count=participated_count,
+            absent_count=absent_count,
+            participation_rate=round(participation_rate, 1),
+            total_merit=total_merit,
+            avg_merit=round(avg_merit, 1),
+            merit_min=merit_min,
+            merit_max=merit_max,
+        )
