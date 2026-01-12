@@ -705,7 +705,7 @@ async def _handle_group_message(
 
             # Format response
             if not results:
-                await _reply_text(reply_token, f"搜尋結果 (共0筆):")
+                await _reply_text(reply_token, "搜尋結果 (共0筆):")
                 return
 
             lines = [f"搜尋結果 (共{len(results)}筆):"]

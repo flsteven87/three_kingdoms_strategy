@@ -27,6 +27,7 @@ from src.models.line_binding import (
     LineCustomCommandUpdate,
     LineGroupBindingResponse,
     MemberInfoResponse,
+    MemberLineBinding,
     MemberPerformanceResponse,
     PerformanceMetrics,
     PerformanceRank,

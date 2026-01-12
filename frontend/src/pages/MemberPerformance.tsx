@@ -122,6 +122,15 @@ interface AllianceMedian {
 // ============================================================================
 
 /**
+ * Get CSS class name for diff value (positive/negative/zero)
+ */
+function getDiffClassName(diff: number): string {
+  if (diff > 0) return 'text-primary'
+  if (diff < 0) return 'text-destructive'
+  return 'text-muted-foreground'
+}
+
+/**
  * Create daily chart data from period data.
  * Expands period data to daily data points for date-based X axis.
  * Uses expandPeriodsToDaily with a mapper for member performance charts.
@@ -533,6 +542,88 @@ function OverviewTab({ periodData, seasonSummary, allianceAvg, allianceMedian, m
 }
 
 // ============================================================================
+// Shared Components
+// ============================================================================
+
+type MetricType = 'merit' | 'assist'
+
+interface MetricDetailTableProps {
+  readonly title: string
+  readonly metricType: MetricType
+  readonly periodData: readonly MemberTrendItem[]
+}
+
+/**
+ * Reusable table component for displaying metric details with alliance comparison
+ */
+function MetricDetailTable({ title, metricType, periodData }: MetricDetailTableProps) {
+  const getMetricValue = (d: MemberTrendItem) =>
+    metricType === 'merit' ? d.daily_merit : d.daily_assist
+  const getAvgValue = (d: MemberTrendItem) =>
+    metricType === 'merit' ? d.alliance_avg_merit : d.alliance_avg_assist
+  const getMedianValue = (d: MemberTrendItem) =>
+    metricType === 'merit' ? d.alliance_median_merit : d.alliance_median_assist
+  const metricLabel = metricType === 'merit' ? '戰功' : '助攻'
+
+  return (
+    <Card>
+      <CardHeader className="py-3">
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-1.5 px-2 font-medium text-xs">日期</th>
+                <th className="text-right py-1.5 px-2 font-medium text-xs">日均{metricLabel}</th>
+                <th className="text-right py-1.5 px-2 font-medium text-xs">同盟平均</th>
+                <th className="text-right py-1.5 px-2 font-medium text-xs">同盟中位數</th>
+              </tr>
+            </thead>
+            <tbody>
+              {periodData.map((d, index) => {
+                const value = getMetricValue(d)
+                const prev = index > 0 ? getMetricValue(periodData[index - 1]) : null
+                const delta = prev !== null ? value - prev : null
+                const diffAvg = value - getAvgValue(d)
+                const diffMedian = value - getMedianValue(d)
+
+                return (
+                  <tr key={d.period_number} className="border-b last:border-0">
+                    <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
+                    <td className="py-1.5 px-2 text-right text-xs tabular-nums">
+                      {formatNumber(value)}
+                      {delta !== null && (
+                        <span className={`ml-1 ${getDiffClassName(delta)}`}>
+                          ({delta >= 0 ? '+' : ''}{formatNumberCompact(delta)})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
+                      {formatNumber(getAvgValue(d))}
+                      <span className={`ml-1 ${getDiffClassName(diffAvg)}`}>
+                        ({diffAvg >= 0 ? '+' : ''}{formatNumberCompact(diffAvg)})
+                      </span>
+                    </td>
+                    <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
+                      {formatNumber(getMedianValue(d))}
+                      <span className={`ml-1 ${getDiffClassName(diffMedian)}`}>
+                        ({diffMedian >= 0 ? '+' : ''}{formatNumberCompact(diffMedian)})
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================================================
 // Tab 2: Merit & Assist (Combat Performance)
 // ============================================================================
 
@@ -662,49 +753,7 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
             </CardContent>
           </Card>
 
-          {/* 戰功明細表格 */}
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm">戰功明細</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-1.5 px-2 font-medium text-xs">日期</th>
-                      <th className="text-right py-1.5 px-2 font-medium text-xs">日均戰功</th>
-                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟平均</th>
-                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟中位數</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {periodData.map((d, index) => {
-                      const prev = index > 0 ? periodData[index - 1].daily_merit : null
-                      const delta = prev !== null ? d.daily_merit - prev : null
-                      const diffAvg = d.daily_merit - d.alliance_avg_merit
-                      const diffMedian = d.daily_merit - d.alliance_median_merit
-
-                      return (
-                        <tr key={d.period_number} className="border-b last:border-0">
-                          <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
-                          <td className="py-1.5 px-2 text-right text-xs tabular-nums">
-                            {formatNumber(d.daily_merit)} {delta === null ? '' : <span className={delta > 0 ? 'text-primary' : delta < 0 ? 'text-destructive' : 'text-muted-foreground'}>({delta >= 0 ? '+' : ''}{formatNumberCompact(delta)})</span>}
-                          </td>
-                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
-                            {formatNumber(d.alliance_avg_merit)} <span className={diffAvg > 0 ? 'text-primary' : diffAvg < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffAvg >= 0 ? '+' : ''}{formatNumberCompact(diffAvg)})</span>
-                          </td>
-                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
-                            {formatNumber(d.alliance_median_merit)} <span className={diffMedian > 0 ? 'text-primary' : diffMedian < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffMedian >= 0 ? '+' : ''}{formatNumberCompact(diffMedian)})</span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          <MetricDetailTable title="戰功明細" metricType="merit" periodData={periodData} />
         </div>
 
         {/* Right Column: Assist */}
@@ -809,53 +858,9 @@ function CombatTab({ periodData, seasonSummary, allianceAvg, viewMode }: CombatT
             </CardContent>
           </Card>
 
-          {/* 助攻明細表格 */}
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm">助攻明細</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-1.5 px-2 font-medium text-xs">日期</th>
-                      <th className="text-right py-1.5 px-2 font-medium text-xs">日均助攻</th>
-                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟平均</th>
-                      <th className="text-right py-1.5 px-2 font-medium text-xs">同盟中位數</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {periodData.map((d, index) => {
-                      const prev = index > 0 ? periodData[index - 1].daily_assist : null
-                      const delta = prev !== null ? d.daily_assist - prev : null
-                      const diffAvg = d.daily_assist - d.alliance_avg_assist
-                      const diffMedian = d.daily_assist - d.alliance_median_assist
-
-                      return (
-                        <tr key={d.period_number} className="border-b last:border-0">
-                          <td className="py-1.5 px-2 text-xs text-muted-foreground">{d.period_label}</td>
-                          <td className="py-1.5 px-2 text-right text-xs tabular-nums">
-                            {formatNumber(d.daily_assist)} {delta === null ? '' : <span className={delta > 0 ? 'text-primary' : delta < 0 ? 'text-destructive' : 'text-muted-foreground'}>({delta >= 0 ? '+' : ''}{formatNumberCompact(delta)})</span>}
-                          </td>
-                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
-                            {formatNumber(d.alliance_avg_assist)} <span className={diffAvg > 0 ? 'text-primary' : diffAvg < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffAvg >= 0 ? '+' : ''}{formatNumberCompact(diffAvg)})</span>
-                          </td>
-                          <td className="py-1.5 px-2 text-right text-xs tabular-nums text-muted-foreground">
-                            {formatNumber(d.alliance_median_assist)} <span className={diffMedian > 0 ? 'text-primary' : diffMedian < 0 ? 'text-destructive' : 'text-muted-foreground'}>({diffMedian >= 0 ? '+' : ''}{formatNumberCompact(diffMedian)})</span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          <MetricDetailTable title="助攻明細" metricType="assist" periodData={periodData} />
         </div>
       </div>
-
-
     </div>
   )
 }
@@ -1039,8 +1044,6 @@ function ContributionTab({ periodData, seasonSummary, allianceAvg, totalMembers 
           </ChartContainer>
         </CardContent>
       </Card>
-
-
     </div>
   )
 }
@@ -1284,9 +1287,6 @@ function PowerDonationTab({ periodData, seasonSummary, allianceAvg }: PowerDonat
           </Card>
         </div>
       </div>
-
-
-
     </div>
   )
 }

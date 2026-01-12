@@ -29,7 +29,7 @@ export function formatNumberCompact(value: number): string {
   if (absValue >= 1000000) {
     return `${sign}${(absValue / 1000000).toFixed(1)}M`
   }
-  else if (absValue >= 1000) {
+  if (absValue >= 1000) {
     return `${sign}${(absValue / 1000).toFixed(0)}K`
   }
   return value.toLocaleString()
