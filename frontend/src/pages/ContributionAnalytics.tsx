@@ -1,17 +1,17 @@
 import { useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { RoleGuard } from '@/components/alliance/RoleGuard'
 import { useSeasons } from '@/hooks/use-seasons'
-import { Plus, Trash, Users } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { nanoid } from 'nanoid'
-import { Badge } from '@/components/ui/badge'
-import { CollapsibleCard } from '@/components/ui/collapsible-card'
+
 import { useAnalyticsMembers } from '@/hooks/use-analytics'
+import { ContributionCard } from '@/components/contributions/ContributionCard'
 import {
     Dialog,
     DialogContent,
@@ -69,27 +69,7 @@ function ContributionAnalytics() {
         handleCloseDialog()
     }, [newAmount, newDeadline, handleCloseDialog])
 
-    const handleRemove = useCallback((id: string) => {
-        setDeadlines((prev) => prev.filter((d) => d.id !== id))
-    }, [])
 
-    const handleAddProgress = useCallback((id: string) => {
-        const memberIdRaw = prompt('輸入成員 id（可留空以手動計入）')
-        if (memberIdRaw === null) return
-        const memberId = memberIdRaw.trim() || 'manual'
-
-        const raw = prompt('輸入要新增的貢獻量（數字）')
-        if (!raw) return
-        const value = Number(raw)
-        if (Number.isNaN(value) || value <= 0) return alert('請輸入有效的正數')
-
-        setDeadlines((prev) => prev.map((d) => {
-            if (d.id !== id) return d
-            const existing = d.contributions[memberId] || 0
-            const capped = Math.min(existing + value, d.amount)
-            return { ...d, contributions: { ...d.contributions, [memberId]: capped } }
-        }))
-    }, [])
 
     return (
         <AllianceGuard>
@@ -114,7 +94,7 @@ function ContributionAnalytics() {
                     </RoleGuard>
                 </div>
 
-                {/* Deadlines Table */}
+                {/* Deadlines List */}
                 {deadlines.length === 0 ? (
                     <Card>
                         <CardHeader className="flex items-center justify-between">
@@ -126,7 +106,35 @@ function ContributionAnalytics() {
                             <div className="text-sm text-muted-foreground">尚無設定的捐獻活動。</div>
                         </CardContent>
                     </Card>
-                ) : (<div />)}
+                ) : (
+                    <div className="space-y-4">
+                        {deadlines.map((d) => {
+                            const total = Object.values(d.contributions || {}).reduce((a, b) => a + b, 0)
+                            const memberCount = (members && members.length) || 1
+                            const targetTotal = d.amount * memberCount
+                            const isExpired = new Date(d.deadline).getTime() < Date.now()
+                            const status: any = isExpired ? (total >= targetTotal ? 'completed' : 'expired') : (total >= targetTotal ? 'completed' : 'in-progress')
+
+                            const tags = [
+                                { id: 'alliance', label: '同盟捐献' },
+                                { id: 'punish', label: '惩罚' },
+                            ]
+
+                            return (
+                                <ContributionCard
+                                    key={d.id}
+                                    title={`${new Date(d.deadline).toLocaleDateString()}捐獻`}
+                                    tags={tags}
+                                    deadline={new Date(d.deadline).toLocaleDateString()}
+                                    currentAmount={total}
+                                    targetAmount={targetTotal}
+                                    status={status}
+                                    perPersonTarget={d.amount}
+                                />
+                            )
+                        })}
+                    </div>
+                )}
 
                 {/* Add Deadline Dialog */}
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
