@@ -1,6 +1,6 @@
 import { useState, type ComponentType } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Database, Trophy, Users, User, BarChart3, Settings, LogOut, Swords, MessageSquare, Gem, ChevronDown } from 'lucide-react'
+import { Calendar, Database, Trophy, Users, User, BarChart3, Settings, LogOut, Swords, MessageSquare, Gem, Coins, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,11 @@ const navigation: readonly NavigationEntry[] = [
     name: '銅礦管理',
     href: '/copper-mines',
     icon: Gem,
+  },
+  {
+    name: '捐獻管理',
+    href: '/contributions',
+    icon: Coins,
   },
   {
     name: '事件戰役',

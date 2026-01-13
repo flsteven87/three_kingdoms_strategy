@@ -12,6 +12,7 @@ import { AllianceAnalytics } from './pages/AllianceAnalytics'
 import { GroupAnalytics } from './pages/GroupAnalytics'
 import { EventAnalytics } from './pages/EventAnalytics'
 import { EventDetail } from './pages/EventDetail'
+import { ContributionAnalytics } from './pages/ContributionAnalytics'
 import { Settings } from './pages/Settings'
 import { LineBinding } from './pages/LineBinding'
 import { CopperMines } from './pages/CopperMines'
@@ -59,6 +60,7 @@ function App() {
               <Route path="data" element={<DataManagement />} />
               <Route path="hegemony" element={<HegemonyWeights />} />
               <Route path="copper-mines" element={<CopperMines />} />
+              <Route path="contributions" element={<ContributionAnalytics />} />
               <Route path="members" element={<MemberPerformance />} />
               <Route path="analytics" element={<AllianceAnalytics />} />
               <Route path="groups" element={<GroupAnalytics />} />
