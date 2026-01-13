@@ -23,6 +23,8 @@ import {
 
 interface ContributionDeadline {
     id: string
+    title?: string
+    type?: 'alliance' | 'punish'
     amount: number // per-member target
     deadline: string // ISO date
     contributions: Record<string, number> // member_id -> contributed amount
@@ -84,11 +86,6 @@ function ContributionAnalytics() {
         ].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()))
 
         handleCloseDialog()
-
-        if (newType === 'punish') {
-            // Inform user they can enter individual punishments after creation
-            alert('已建立懲罰活動。您可以在建立後為輸入成員懲罰金額。')
-        }
     }, [newTitle, newType, newAmount, newDeadline, handleCloseDialog])
 
 
@@ -137,15 +134,14 @@ function ContributionAnalytics() {
                             const isExpired = new Date(d.deadline).getTime() < Date.now()
                             const status: any = isExpired ? (total >= targetTotal ? 'completed' : 'expired') : (total >= targetTotal ? 'completed' : 'in-progress')
 
-                            const tags = [
-                                { id: 'alliance', label: '同盟捐献' },
-                                { id: 'punish', label: '惩罚' },
-                            ]
+                            const tags = d.type === 'punish'
+                                ? [{ id: 'punish', label: '惩罚' }]
+                                : [{ id: 'alliance', label: '同盟捐献' }]
 
                             return (
                                 <ContributionCard
                                     key={d.id}
-                                    title={`${new Date(d.deadline).toLocaleDateString()}捐獻`}
+                                    title={d.title || `${new Date(d.deadline).toLocaleDateString()}捐獻`}
                                     tags={tags}
                                     deadline={new Date(d.deadline).toLocaleDateString()}
                                     currentAmount={total}
