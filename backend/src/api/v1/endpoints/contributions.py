@@ -68,7 +68,7 @@ async def get_contributions(
     符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
     """
     # Verify user has access to this alliance
-    await service._permission_service.verify_alliance_access(user_id, alliance_id)
+    await service._permission_service.verify_user_access(user_id, alliance_id)
 
     contributions = await service.get_contributions_by_alliance_and_season(
         alliance_id, season_id
