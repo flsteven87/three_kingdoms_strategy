@@ -5,7 +5,7 @@ export type StatusType = 'active' | 'completed' | 'cancelled'
 export function StatusBadge({ status }: { status: StatusType }) {
     if (status === 'completed') {
         return (
-            <Badge className="text-xs bg-emerald-500 text-white">完成</Badge>
+            <Badge className="text-xs bg-gray-500 text-white">完成</Badge>
         )
     }
 

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, Gift, Calendar } from 'lucide-react'
 import { StatusBadge, type StatusType } from './StatusBadge'
-import { ProgressBar } from './ProgressBar'
 import { cn } from '@/lib/utils'
 
 interface MemberLike {
@@ -19,8 +18,6 @@ interface ContributionCardProps {
     title: string
     tags: Tag[]
     deadline: string
-    currentAmount: number
-    targetAmount: number
     status: StatusType
     perPersonTarget?: number
     members?: MemberLike[] | null
@@ -32,8 +29,6 @@ export function ContributionCard({
     title,
     tags,
     deadline,
-    currentAmount,
-    targetAmount,
     status,
     perPersonTarget,
     children,
@@ -56,29 +51,26 @@ export function ContributionCard({
 
                 {/* Content */}
                 <div className="min-w-0 flex-1 space-y-2">
-                    {/* Title row with status */}
+                    {/* Title row with tags */}
                     <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
-                        <StatusBadge status={status} />
+                        {tags.length > 0 && (
+                            <>
+                                {tags.map((tag) => (
+                                    <span
+                                        key={tag.id}
+                                        className={
+                                            tag.id === 'penalty'
+                                                ? 'inline-flex items-center rounded-md bg-destructive px-2 py-0.5 text-xs font-medium text-white'
+                                                : 'inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground'
+                                        }
+                                    >
+                                        {tag.label}
+                                    </span>
+                                ))}
+                            </>
+                        )}
                     </div>
-
-                    {/* Tags */}
-                    {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                            {tags.map((tag) => (
-                                <span
-                                    key={tag.id}
-                                    className={
-                                        tag.id === 'punish'
-                                            ? 'inline-flex items-center rounded-md bg-destructive px-2 py-0.5 text-xs font-medium text-white'
-                                            : 'inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground'
-                                    }
-                                >
-                                    {tag.label}
-                                </span>
-                            ))}
-                        </div>
-                    )}
 
                     {/* Deadline and target info */}
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -86,17 +78,17 @@ export function ContributionCard({
                         <span>截止日: {deadline}</span>
                         {perPersonTarget && <span className="ml-2">每人目標: {formatNumber(perPersonTarget)}</span>}
                     </div>
-
-                    {/* Progress */}
-                    <ProgressBar current={currentAmount} total={targetAmount} />
                 </div>
 
-                {/* Chevron */}
-                <div
-                    className={`flex-shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                    aria-hidden
-                >
-                    <ChevronDown className="h-5 w-5" />
+                {/* Status and Chevron */}
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <StatusBadge status={status} />
+                    <div
+                        className={`text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        aria-hidden
+                    >
+                        <ChevronDown className="h-5 w-5" />
+                    </div>
                 </div>
             </button>
 
@@ -107,7 +99,7 @@ export function ContributionCard({
                         {children ? (
                             <div className="space-y-3 pl-6 pr-6">{children}</div>
                         ) : (
-                            <p className="text-sm italic text-muted-foreground">暫無詳細說明</p>
+                            <p className="text-sm italic text-muted-foreground pl-6">暫無詳細說明</p>
                         )}
                     </div>
                 </div>

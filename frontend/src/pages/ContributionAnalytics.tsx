@@ -7,11 +7,10 @@ import { Label } from '@/components/ui/label'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { RoleGuard } from '@/components/alliance/RoleGuard'
 import { useSeasons } from '@/hooks/use-seasons'
-import { Plus, Trash2 } from 'lucide-react'
-
-import { useAnalyticsMembers } from '@/hooks/use-analytics'
+import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { useContributions, useContributionDetail, useCreateContribution, useUpsertMemberTargetOverride, useDeleteMemberTargetOverride } from '@/hooks/use-contributions'
 import { ContributionCard } from '@/components/contributions/ContributionCard'
+import { ProgressBar } from '@/components/contributions/ProgressBar'
 import {
     Dialog,
     DialogContent,
@@ -28,14 +27,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import type { MemberListItem } from '@/types/analytics'
 
 function ContributionAnalytics() {
     const { data: seasons } = useSeasons()
     const activeSeason = seasons?.find((s) => s.is_active)
-
-    // Members list (used to show who's completed)
-    const { data: members } = useAnalyticsMembers(activeSeason?.id, true)
 
     // Fetch contributions from backend
     const { data: contributions, isLoading } = useContributions(activeSeason?.alliance_id, activeSeason?.id)
@@ -45,7 +40,7 @@ function ContributionAnalytics() {
 
     // Track which contribution is expanded to fetch details
     const [expandedId, setExpandedId] = useState<string | null>(null)
-    const { data: expandedDetail } = useContributionDetail(expandedId || undefined)
+    const { data: expandedDetail, isLoading: isDetailLoading } = useContributionDetail(expandedId || undefined)
 
     // Wrapper to handle card click - set expanded ID to trigger detail fetch
     const handleCardClick = (id: string, currentlyOpen: boolean) => {
@@ -150,9 +145,6 @@ function ContributionAnalytics() {
                 ) : (
                     <div className="space-y-4">
                         {contributions.map((d) => {
-                            const memberCount = (members && members.length) || 1
-                            const targetTotal = d.target_amount * memberCount
-
                             const tags = d.type === 'penalty'
                                 ? [{ id: 'penalty', label: '懲罰' }]
                                 : [{ id: 'regular', label: '捐獻' }]
@@ -161,24 +153,38 @@ function ContributionAnalytics() {
                             const detail = expandedId === d.id ? expandedDetail : null
                             const contribMap: Record<string, number> = {}
                             let total = 0
+                            let targetTotal = 0
 
                             if (detail?.contribution_info) {
                                 detail.contribution_info.forEach(info => {
                                     contribMap[info.member_id] = info.contribution_made
                                     total += info.contribution_made
+                                    targetTotal += info.target_amount
                                 })
                             }
 
                             const perMemberTarget = d.target_amount
 
-                            // For regular: use all members; for penalty: use only members with contributions
-                            const displayMembers = d.type === 'penalty'
-                                ? Object.keys(contribMap).map(memberId => members?.find((m: MemberListItem) => m.id === memberId)).filter(Boolean)
-                                : members
+                            // Build members list from contribution detail
+                            const members = detail?.contribution_info?.map(info => ({
+                                id: info.member_id,
+                                display_name: info.member_name,
+                                name: info.member_name,
+                            })) || []
 
-                            const sortedMembers = displayMembers
-                                ? [...displayMembers].sort((a: any, b: any) => (contribMap[b.id] || 0) - (contribMap[a.id] || 0))
-                                : []
+                            // Sort members by contribution
+                            const sortedMembers = [...members].sort((a, b) => (contribMap[b.id] || 0) - (contribMap[a.id] || 0))
+
+                            // Determine status based on deadline and backend status
+                            const deadlineDate = new Date(d.deadline)
+                            const today = new Date()
+                            today.setHours(0, 0, 0, 0)
+                            deadlineDate.setHours(0, 0, 0, 0)
+
+                            let displayStatus = d.status
+                            if (d.status === 'active' && deadlineDate < today) {
+                                displayStatus = 'completed'
+                            }
 
                             return (
                                 <div key={d.id} onClick={() => handleCardClick(d.id, expandedId === d.id)}>
@@ -186,14 +192,25 @@ function ContributionAnalytics() {
                                         title={d.title}
                                         tags={tags}
                                         deadline={new Date(d.deadline).toLocaleDateString()}
-                                        currentAmount={total}
-                                        targetAmount={targetTotal}
-                                        status={d.status}
-                                        perPersonTarget={d.target_amount}
+                                        status={displayStatus}
+                                        perPersonTarget={d.type === 'regular' ? d.target_amount : undefined}
                                         members={members}
                                         contributions={contribMap}
                                     >
-                                        {expandedId === d.id && (
+                                        {/* Progress Bar */}
+                                        {(total > 0 || targetTotal > 0) && (
+                                            <div className="pl-6 pr-6">
+                                                <ProgressBar current={total} total={targetTotal} />
+                                            </div>
+                                        )}
+
+                                        {expandedId === d.id && isDetailLoading && (
+                                            <div className="py-8 flex items-center justify-center">
+                                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                            </div>
+                                        )}
+
+                                        {expandedId === d.id && detail && (
                                             <div className="space-y-4">
                                                 <div className="space-y-3">
                                                     {d.type === 'regular' && <p className="text-sm font-medium">成員捐獻進度</p>}
@@ -214,7 +231,7 @@ function ContributionAnalytics() {
                                                                     <div className="grid grid-cols-3 gap-2">
                                                                         <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)} className="rounded-md border px-2 py-1.5 text-sm">
                                                                             <option value="">選擇成員</option>
-                                                                            {members?.map((m: any) => (
+                                                                            {members.map((m) => (
                                                                                 <option key={m.id} value={m.id}>{m.display_name || m.name || m.id}</option>
                                                                             ))}
                                                                         </select>
@@ -262,9 +279,7 @@ function ContributionAnalytics() {
                                                         </>
                                                     )}
 
-                                                    {!detail ? (
-                                                        <div className="py-2 text-center text-muted-foreground text-sm">載入明細...</div>
-                                                    ) : sortedMembers.length === 0 ? (
+                                                    {members.length === 0 ? (
                                                         <div className="text-sm text-muted-foreground">
                                                             {d.type === 'penalty' ? '尚無懲罰記錄' : '尚無成員'}
                                                         </div>
@@ -278,7 +293,7 @@ function ContributionAnalytics() {
                                                                 </TableRow>
                                                             </TableHeader>
                                                             <TableBody>
-                                                                {sortedMembers.map((m: any) => {
+                                                                {sortedMembers.map((m) => {
                                                                     const amount = contribMap[m.id] || 0
                                                                     const pct = perMemberTarget > 0
                                                                         ? Math.min(100, Math.round((amount / perMemberTarget) * 100))
