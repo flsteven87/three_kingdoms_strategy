@@ -1,6 +1,7 @@
 import { axiosInstance } from './base-client'
 
 export type ContributionType = 'regular' | 'penalty'
+export type ContributionStatus = 'active' | 'completed' | 'cancelled'
 
 export interface ContributionListItem {
   id: string
@@ -9,15 +10,18 @@ export interface ContributionListItem {
   title: string
   type: ContributionType
   deadline: string
-  target_contribution: number
+  target_amount: number
+  description: string | null
+  status: ContributionStatus
   created_at: string
   created_by: string | null
+  updated_at: string
 }
 
 export interface ContributionMemberInfo {
   member_id: string
   member_name: string
-  contribution_target: number
+  target_amount: number
   contribution_made: number // end snapshot total
 }
 
@@ -29,12 +33,13 @@ export interface CreateContributionPayload {
   title: string
   type: ContributionType
   deadline: string // ISO datetime or date
-  target_contribution: number
+  target_amount: number
+  description?: string
 }
 
 export interface TargetOverridePayload {
   member_id: string
-  target_contribution: number
+  target_amount: number
 }
 
 const basePath = '/api/v1/contributions'
