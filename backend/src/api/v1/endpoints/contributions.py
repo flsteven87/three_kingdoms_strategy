@@ -146,8 +146,6 @@ async def get_contribution_detail(
 
     符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
     """
-    await service.verify_user_access(user_id, contribution_id)
-
     contribution_with_info = await service.get_contribution_with_info(
         contribution_id, target_amount
     )
@@ -166,7 +164,7 @@ async def get_contribution_detail(
         created_by=contribution_with_info.created_by,
         updated_at=contribution_with_info.updated_at,
         contribution_info=[
-            ContributionInfoResponse.model_validate(info)
+            ContributionInfoResponse(**info.model_dump())
             for info in contribution_with_info.contribution_info
         ],
     )

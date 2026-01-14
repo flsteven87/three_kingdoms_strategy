@@ -117,56 +117,77 @@ class ContributionService:
             else contribution.target_amount
         )
 
-        # Find snapshots closest to creation_time and deadline
-        start_upload = await self._upload_repo.get_closest_before_date(
-            season_id=contribution.season_id, target_date=contribution.created_at
+        # Check if this is a retrospective contribution (created after deadline)
+        is_retrospective = contribution.created_at > contribution.deadline
+
+        # Get snapshots closest to creation_time and deadline from MemberSnapshotRepository
+        if is_retrospective:
+            start_snapshots = []
+        else:
+            # Normal case: get both start and end snapshots
+            start_snapshots = await self._snapshot_repo.get_closest_to_date(
+                alliance_id=contribution.alliance_id,
+                season_id=contribution.season_id,
+                target_date=contribution.created_at,
+            )
+
+        # For retrospective contributions, only use end snapshot
+        end_snapshots = await self._snapshot_repo.get_closest_to_date(
+            alliance_id=contribution.alliance_id,
+            season_id=contribution.season_id,
+            target_date=contribution.deadline,
         )
 
-        end_upload = await self._upload_repo.get_closest_before_date(
-            season_id=contribution.season_id, target_date=contribution.deadline
-        )
-
-        if not start_upload or not end_upload:
+        if not end_snapshots:
             # No snapshots found, return empty info
             return ContributionWithInfo(
                 **contribution.model_dump(), contribution_info=[]
             )
 
-        # Get member snapshots from end upload
-        end_snapshots = await self._snapshot_repo.get_by_upload(end_upload.id)
-
-        # Build lookup dictionary for end snapshots
+        # Build lookup dictionaries
+        start_snapshot_map = {snap.member_id: snap for snap in start_snapshots}
         end_snapshot_map = {snap.member_id: snap for snap in end_snapshots}
 
         # Calculate contributions for all members in end snapshot
         contribution_info_list: list[ContributionInfo] = []
 
-        # For penalty, load per-member target overrides
-        overrides_map: dict[UUID, int] = {}
         if is_penalty:
-            overrides = await self._target_repo.get_by_donation_event(contribution.id)
-            overrides_map = {ov.member_id: ov.target_amount for ov in overrides}
+            overrides = await self._target_repo.get_by_donation_event(contribution_id)
+            member_source = { ov.member_id: end_snapshot_map.get(ov.member_id) for ov in overrides }
+            # Filter out None values (members not in snapshot)
+            member_source = {k: v for k, v in member_source.items() if v is not None}
+        else:
+            member_source = end_snapshot_map
 
-        for member_id, end_snap in end_snapshot_map.items():
-            # Use the end snapshot total contribution
-            end_total = end_snap.total_contribution
-            # Determine target per type
-            target_for_member = (
-                effective_target if is_regular else overrides_map.get(member_id, 0)
-            )
+        for member_id, end_snap in member_source.items():
+            # Calculate contribution made based on retrospective status
+            if is_retrospective:
+                # Use weekly contribution from end snapshot
+                contribution_made = end_snap.weekly_contribution
+            else:
+                # Calculate difference between end and start total contributions
+                start_snap = start_snapshot_map.get(member_id)
+                # Corner case: if start and end are from same upload, use weekly contribution
+                if start_snap and start_snap.csv_upload_id == end_snap.csv_upload_id:
+                    contribution_made = end_snap.weekly_contribution
+                else:
+                    start_total = start_snap.total_contribution if start_snap else 0
+                    end_total = end_snap.total_contribution
+                    contribution_made = max(0, end_total - start_total)
 
             contribution_info = ContributionInfo(
                 member_id=member_id,
                 member_name=end_snap.member_name,
-                target_amount=target_for_member,
-                contribution_made=end_total,
+                target_amount=effective_target,
+                contribution_made=contribution_made,
             )
             contribution_info_list.append(contribution_info)
 
-        # Sort by total contribution descending
+        # Sort by contribution made descending
         contribution_info_list.sort(
             key=lambda x: x.contribution_made, reverse=True
         )
+
 
         return ContributionWithInfo(
             **contribution.model_dump(), contribution_info=contribution_info_list

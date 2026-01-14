@@ -6,6 +6,7 @@ Member Snapshot Repository
 - Uses _handle_supabase_result() for all queries
 """
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from src.models.member_snapshot import MemberSnapshot
@@ -314,3 +315,67 @@ class MemberSnapshotRepository(SupabaseRepository[MemberSnapshot]):
                 latest_by_member[member_id_str] = self._build_model(row)
 
         return latest_by_member
+
+    async def get_closest_to_date(
+        self, alliance_id: UUID, season_id: UUID, target_date: datetime
+    ) -> list[MemberSnapshot]:
+        """
+        Get member snapshots closest before or on target date for given alliance and season.
+
+        Queries member_snapshots and joins with csv_uploads to filter by season,
+        then finds the upload closest to but not after the target date.
+
+        Args:
+            alliance_id: Alliance UUID
+            season_id: Season UUID
+            target_date: Target datetime to find closest snapshot (before or on this date)
+
+        Returns:
+            List of MemberSnapshot models from the closest upload, empty if none found
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        # First, find the csv_upload closest to target_date for this season
+        upload_result = await self._execute_async(
+            lambda: self.client.from_("csv_uploads")
+            .select("id, created_at")
+            .eq("season_id", str(season_id))
+            .execute()
+        )
+
+        uploads = self._handle_supabase_result(upload_result, allow_empty=True)
+        if not uploads:
+            return []
+
+        # Filter to only uploads before or on target_date
+        target_ts = (
+            target_date.replace(tzinfo=UTC)
+            if target_date.tzinfo is None
+            else target_date
+        )
+
+        valid_uploads = [
+            u for u in uploads
+            if datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")) <= target_ts
+        ]
+
+        if not valid_uploads:
+            return []
+
+        # Find upload closest to target_date (latest before or on target)
+        closest_upload = max(
+            valid_uploads,
+            key=lambda u: datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")),
+        )
+
+        # Now get all member snapshots for this upload and alliance
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*")
+            .eq("csv_upload_id", closest_upload["id"])
+            .eq("alliance_id", str(alliance_id))
+            .execute()
+        )
+
+        data_list = self._handle_supabase_result(result, allow_empty=True)
+        return self._build_models(data_list)
