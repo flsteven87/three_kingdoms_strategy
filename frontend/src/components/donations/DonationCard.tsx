@@ -79,16 +79,17 @@ export function DonationCard({
                     <div className="flex items-center gap-2">
                         <StatusBadge status={status} />
                         {onDelete && (
-                            <button
+                            <div
+                                role="button"
                                 onClick={(e) => {
                                     e.stopPropagation()
                                     onDelete()
                                 }}
-                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                                 aria-label="刪除活動"
                             >
                                 <Trash2 className="h-4 w-4" />
-                            </button>
+                            </div>
                         )}
                     </div>
                     <div

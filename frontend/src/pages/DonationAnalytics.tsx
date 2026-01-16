@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { RoleGuard } from '@/components/alliance/RoleGuard'
@@ -51,6 +51,9 @@ function DonationAnalytics() {
 
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const { data: expandedDetail, isLoading: isDetailLoading } = useDonationDetail(expandedId || undefined)
+
+    // Track which donations have their completed members section expanded
+    const [expandedCompletedSections, setExpandedCompletedSections] = useState<Record<string, boolean>>({})
 
     const handleCardClick = (id: string, currentlyOpen: boolean) => {
         setExpandedId(currentlyOpen ? null : id)
@@ -179,8 +182,6 @@ function DonationAnalytics() {
                                 display_name: info.member_name,
                                 name: info.member_name,
                             })) || []
-
-                            const sortedMembers = [...members].sort((a, b) => (donationMap[b.id] || 0) - (donationMap[a.id] || 0))
 
                             const deadlineDate = new Date(d.deadline)
                             const today = new Date()
@@ -328,64 +329,164 @@ function DonationAnalytics() {
                                                         <div className="text-sm text-muted-foreground">
                                                             {d.type === 'penalty' ? '尚無懲罰記錄' : '尚無成員'}
                                                         </div>
-                                                    ) : (
-                                                        <Table>
-                                                            <TableHeader>
-                                                                <TableRow>
-                                                                    <TableHead>成員</TableHead>
-                                                                    <TableHead className="text-right">已捐獻 / 目標</TableHead>
-                                                                    <TableHead className="text-right">進度</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody>
-                                                                {sortedMembers.map((m) => {
-                                                                    const amount = donationMap[m.id] || 0
-                                                                    const memberTarget = d.type === 'penalty'
-                                                                        ? (targetMap[m.id] || 0)
-                                                                        : d.target_amount
-                                                                    const pct = memberTarget > 0
-                                                                        ? Math.min(100, Math.round((amount / memberTarget) * 100))
-                                                                        : 0
-                                                                    return (
-                                                                        <TableRow key={m.id}>
-                                                                            <TableCell className="font-medium">{m.display_name || m.name || m.id}</TableCell>
-                                                                            <TableCell className="text-right tabular-nums text-muted-foreground">
-                                                                                {amount.toLocaleString('zh-TW')} / {memberTarget.toLocaleString('zh-TW')}
-                                                                            </TableCell>
-                                                                            <TableCell className="text-right">
-                                                                                <div className="flex items-center justify-end gap-2">
-                                                                                    <div className="h-1.5 w-24 rounded-full bg-muted">
-                                                                                        <div
-                                                                                            className={pct >= 100 ? 'h-1.5 rounded-full bg-emerald-500 transition-all' : 'h-1.5 rounded-full bg-primary/70 transition-all'}
-                                                                                            style={{ width: `${pct}%` }}
-                                                                                        />
-                                                                                    </div>
-                                                                                    <span className="w-7 text-right text-xs font-medium tabular-nums">{pct}%</span>
-                                                                                </div>
-                                                                            </TableCell>
+                                                    ) : (() => {
+                                                        // Split members into completed (100%) and incomplete (<100%)
+                                                        const completedMembers: typeof members = []
+                                                        const incompleteMembers: typeof members = []
 
-                                                                            {d.type === 'penalty' &&
-                                                                                <TableCell className="text-right">
-                                                                                    <button
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation()
-                                                                                            deleteTargetMutation.mutate({
-                                                                                                donationId: d.id,
-                                                                                                memberId: m.id
-                                                                                            })
-                                                                                        }}
-                                                                                        className="text-destructive hover:text-destructive/80"
-                                                                                    >
-                                                                                        <Trash2 className="h-4 w-4" />
-                                                                                    </button>
+                                                        members.forEach((m) => {
+                                                            const amount = donationMap[m.id] || 0
+                                                            const memberTarget = (targetMap[m.id] || 0)
+
+                                                            if (amount >= memberTarget) {
+                                                                completedMembers.push(m)
+                                                            } else {
+                                                                incompleteMembers.push(m)
+                                                            }
+                                                        })
+
+                                                        const isCompletedExpanded = expandedCompletedSections[d.id] || false
+
+                                                        return (
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead>成員</TableHead>
+                                                                        <TableHead className="text-right">已捐獻 / 目標</TableHead>
+                                                                        <TableHead className="text-right">進度</TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {/* Incomplete members - always shown first */}
+                                                                    {incompleteMembers.map((m) => {
+                                                                        const amount = donationMap[m.id] || 0
+                                                                        const memberTarget = (targetMap[m.id] || 0)
+                                                                        const pct = memberTarget > 0
+                                                                            ? Math.min(100, Math.round((amount / memberTarget) * 100))
+                                                                            : 0
+                                                                        return (
+                                                                            <TableRow key={m.id}>
+                                                                                <TableCell className="font-medium">{m.display_name || m.name || m.id}</TableCell>
+                                                                                <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                                    {amount.toLocaleString('zh-TW')} / {memberTarget.toLocaleString('zh-TW')}
                                                                                 </TableCell>
-                                                                            }
-                                                                        </TableRow>
-                                                                    )
-                                                                })}
-                                                            </TableBody>
-                                                        </Table>
-                                                    )}
+                                                                                <TableCell className="text-right">
+                                                                                    <div className="flex items-center justify-end gap-2">
+                                                                                        <div className="h-1.5 w-24 rounded-full bg-muted">
+                                                                                            <div
+                                                                                                className={pct >= 100 ? 'h-1.5 rounded-full bg-emerald-500 transition-all' : 'h-1.5 rounded-full bg-primary/70 transition-all'}
+                                                                                                style={{ width: `${pct}%` }}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <span className="w-7 text-right text-xs font-medium tabular-nums">{pct}%</span>
+                                                                                    </div>
+                                                                                </TableCell>
+                                                                                {d.type === 'penalty' &&
+                                                                                    <TableCell className="text-right">
+                                                                                        <button
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation()
+                                                                                                deleteTargetMutation.mutate({
+                                                                                                    donationId: d.id,
+                                                                                                    memberId: m.id
+                                                                                                })
+                                                                                            }}
+                                                                                            className="text-destructive hover:text-destructive/80"
+                                                                                        >
+                                                                                            <Trash2 className="h-4 w-4" />
+                                                                                        </button>
+                                                                                    </TableCell>
+                                                                                }
+                                                                            </TableRow>
+                                                                        )
+                                                                    })}
+
+                                                                    {/* Completed members summary row (collapsible) - shown at the end */}
+                                                                    {completedMembers.length > 0 && (
+                                                                        <>
+                                                                            <TableRow
+                                                                                className="cursor-pointer hover:bg-muted/50"
+                                                                                onClick={() => {
+                                                                                    setExpandedCompletedSections(prev => ({
+                                                                                        ...prev,
+                                                                                        [d.id]: !prev[d.id]
+                                                                                    }))
+                                                                                }}
+                                                                            >
+                                                                                <TableCell className="font-medium flex items-center gap-2">
+                                                                                    {isCompletedExpanded ? (
+                                                                                        <ChevronUp className="h-4 w-4" />
+                                                                                    ) : (
+                                                                                        <ChevronDown className="h-4 w-4" />
+                                                                                    )}
+                                                                                    <span className="text-emerald-600">已完成 ({completedMembers.length}/{members.length})</span>
+                                                                                </TableCell>
+                                                                                <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                                    -
+                                                                                </TableCell>
+                                                                                <TableCell className="text-right">
+                                                                                    <div className="flex items-center justify-end gap-2">
+                                                                                        <div className="h-1.5 w-24 rounded-full bg-muted">
+                                                                                            <div
+                                                                                                className="h-1.5 rounded-full bg-emerald-500 transition-all"
+                                                                                                style={{ width: '100%' }}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <span className="w-7 text-right text-xs font-medium tabular-nums">100%</span>
+                                                                                    </div>
+                                                                                </TableCell>
+                                                                                {d.type === 'penalty' && <TableCell />}
+                                                                            </TableRow>
+
+                                                                            {/* Show individual completed members when expanded */}
+                                                                            {isCompletedExpanded && completedMembers.map((m) => {
+                                                                                const amount = donationMap[m.id] || 0
+                                                                                const memberTarget = (targetMap[m.id] || 0)
+                                                                                const pct = memberTarget > 0
+                                                                                    ? Math.min(100, Math.round((amount / memberTarget) * 100))
+                                                                                    : 0
+                                                                                return (
+                                                                                    <TableRow key={m.id} className="bg-emerald-50/50">
+                                                                                        <TableCell className="font-medium pl-10">{m.display_name || m.name || m.id}</TableCell>
+                                                                                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                                                                                            {amount.toLocaleString('zh-TW')} / {memberTarget.toLocaleString('zh-TW')}
+                                                                                        </TableCell>
+                                                                                        <TableCell className="text-right">
+                                                                                            <div className="flex items-center justify-end gap-2">
+                                                                                                <div className="h-1.5 w-24 rounded-full bg-muted">
+                                                                                                    <div
+                                                                                                        className="h-1.5 rounded-full bg-emerald-500 transition-all"
+                                                                                                        style={{ width: `${pct}%` }}
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <span className="w-7 text-right text-xs font-medium tabular-nums">{pct}%</span>
+                                                                                            </div>
+                                                                                        </TableCell>
+                                                                                        {d.type === 'penalty' &&
+                                                                                            <TableCell className="text-right">
+                                                                                                <button
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation()
+                                                                                                        deleteTargetMutation.mutate({
+                                                                                                            donationId: d.id,
+                                                                                                            memberId: m.id
+                                                                                                        })
+                                                                                                    }}
+                                                                                                    className="text-destructive hover:text-destructive/80"
+                                                                                                >
+                                                                                                    <Trash2 className="h-4 w-4" />
+                                                                                                </button>
+                                                                                            </TableCell>
+                                                                                        }
+                                                                                    </TableRow>
+                                                                                )
+                                                                            })}
+                                                                        </>
+                                                                    )}
+                                                                </TableBody>
+                                                            </Table>
+                                                        )
+                                                    })()}
                                                 </div>
                                             </div>
                                         )}
