@@ -589,7 +589,7 @@ class CopperMineService:
         # Handle reserved copper mines (no member validation)
         is_reserved = member_id is None
         member_name = "【預留獎勵】" if is_reserved else None
-        
+
         if not is_reserved:
             # Validate member exists
             member = await self.member_repository.get_by_id(member_id)
@@ -599,7 +599,7 @@ class CopperMineService:
                     detail="Member not found"
                 )
             member_name = member.name
-        
+
         # P0 修復: 使用統一的座標檢查方法
         await self._check_coord_available(
             alliance_id=alliance_id,
@@ -684,3 +684,77 @@ class CopperMineService:
             )
 
         return True
+
+    async def update_ownership(
+        self,
+        ownership_id: UUID,
+        season_id: UUID,
+        alliance_id: UUID,
+        member_id: UUID
+    ) -> CopperMineOwnershipResponse:
+        """
+        Update a copper mine ownership (for transferring reserved mines to members)
+
+        Args:
+            ownership_id: Ownership UUID to update
+            season_id: Season UUID
+            alliance_id: Alliance UUID (for authorization)
+            member_id: New member UUID
+
+        Returns:
+            Updated ownership response
+
+        Raises:
+            HTTPException 404: If ownership or member not found
+            HTTPException 403: If ownership doesn't belong to alliance or rule validation fails
+        """
+        # Verify ownership exists and belongs to alliance
+        ownership = await self.repository.get_by_id(ownership_id)
+        if not ownership:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ownership not found"
+            )
+
+        if ownership.alliance_id != alliance_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Ownership does not belong to this alliance"
+            )
+
+        # Validate new member exists
+        member = await self.member_repository.get_by_id(member_id)
+        if not member:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Member not found"
+            )
+
+        # Validate rules for the new member
+        await self._validate_rule(
+            alliance_id=alliance_id,
+            member_id=member_id,
+            season_id=season_id,
+            level=ownership.level
+        )
+
+        # Update the ownership
+        updated_mine = await self.repository.update_ownership(
+            ownership_id=ownership_id,
+            member_id=member_id,
+            game_id=member.name
+        )
+
+        return CopperMineOwnershipResponse(
+            id=str(updated_mine.id),
+            season_id=str(season_id),
+            member_id=str(member_id),
+            coord_x=updated_mine.coord_x,
+            coord_y=updated_mine.coord_y,
+            level=updated_mine.level,
+            applied_at=updated_mine.registered_at,
+            created_at=updated_mine.registered_at,
+            member_name=member.name,
+            member_group=None,
+            line_display_name=None,
+        )

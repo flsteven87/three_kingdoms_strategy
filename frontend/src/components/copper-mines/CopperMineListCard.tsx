@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo, Fragment } from 'react'
-import { Plus, Trash2, Loader2, Filter } from 'lucide-react'
+import { Plus, Trash2, Loader2, Filter, ArrowRightLeft } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,9 +27,11 @@ import {
 } from '@/components/ui/select'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { CopperMineFormDialog } from './CopperMineFormDialog'
+import { TransferCopperMineDialog } from './TransferCopperMineDialog'
 import {
   useCopperMineOwnerships,
   useDeleteCopperMineOwnership,
+  useUpdateCopperMineOwnership,
 } from '@/hooks/use-copper-mines'
 import { useCanManageWeights } from '@/hooks/use-user-role'
 import type { CopperMineOwnership } from '@/types/copper-mine'
@@ -55,10 +57,13 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
   const canManage = useCanManageWeights()
   const { data: ownerships, isLoading } = useCopperMineOwnerships(seasonId)
   const deleteMutation = useDeleteCopperMineOwnership()
+  const updateMutation = useUpdateCopperMineOwnership()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [deletingOwnership, setDeletingOwnership] = useState<CopperMineOwnership | null>(null)
+  const [transferringOwnership, setTransferringOwnership] = useState<CopperMineOwnership | null>(null)
   const [groupFilter, setGroupFilter] = useState<string>('all')
 
   // Extract unique groups for filter dropdown
@@ -109,6 +114,11 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
     setDeleteDialogOpen(true)
   }
 
+  function handleTransferClick(ownership: CopperMineOwnership) {
+    setTransferringOwnership(ownership)
+    setTransferDialogOpen(true)
+  }
+
   async function handleDeleteConfirm() {
     if (!deletingOwnership) return
     await deleteMutation.mutateAsync({
@@ -117,6 +127,14 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
     })
     setDeleteDialogOpen(false)
     setDeletingOwnership(null)
+  }
+
+  async function handleTransferConfirm(ownershipId: string, memberId: string) {
+    await updateMutation.mutateAsync({
+      ownershipId,
+      seasonId,
+      data: { member_id: memberId },
+    })
   }
 
   return (
@@ -239,14 +257,29 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
                             </TableCell>
                             {canManage && (
                               <TableCell className="text-right pr-6">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                  onClick={() => handleDeleteClick(ownership)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                  {/* Transfer button - only show for reserved mines */}
+                                  {!ownership.member_id && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                      onClick={() => handleTransferClick(ownership)}
+                                      title="轉移給成員"
+                                    >
+                                      <ArrowRightLeft className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {/* Delete button */}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteClick(ownership)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             )}
                           </TableRow>
@@ -266,6 +299,16 @@ export function CopperMineListCard({ seasonId, seasonName }: CopperMineListCardP
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         seasonId={seasonId}
+      />
+
+      {/* Transfer Dialog */}
+      <TransferCopperMineDialog
+        open={transferDialogOpen}
+        onOpenChange={setTransferDialogOpen}
+        seasonId={seasonId}
+        ownership={transferringOwnership}
+        onTransfer={handleTransferConfirm}
+        isTransferring={updateMutation.isPending}
       />
 
       {/* Delete Confirm Dialog */}

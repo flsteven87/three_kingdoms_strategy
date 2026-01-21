@@ -25,6 +25,7 @@ from src.models.copper_mine import (
     CopperMineOwnershipCreate,
     CopperMineOwnershipListResponse,
     CopperMineOwnershipResponse,
+    CopperMineOwnershipUpdate,
     CopperMineRuleCreate,
     CopperMineRuleResponse,
     CopperMineRuleUpdate,
@@ -168,10 +169,10 @@ async def create_ownership(
     await season_service.verify_user_access(user_id, season_id)
 
     alliance = await alliance_service.get_user_alliance(user_id)
-    
+
     # Handle reserved copper mines (use None for member_id)
     member_uuid = None if data.member_id == "reserved" else UUID(data.member_id)
-    
+
     return await mine_service.create_ownership(
         season_id=season_id,
         alliance_id=alliance.id,
@@ -199,4 +200,37 @@ async def delete_ownership(
     await mine_service.delete_ownership(
         ownership_id=ownership_id,
         alliance_id=alliance.id,
+    )
+
+
+@router.patch("/ownerships/{ownership_id}", response_model=CopperMineOwnershipResponse)
+async def update_ownership(
+    ownership_id: UUID,
+    data: CopperMineOwnershipUpdate,
+    mine_service: CopperMineServiceDep,
+    alliance_service: AllianceServiceDep,
+    season_service: SeasonServiceDep,
+    user_id: UserIdDep,
+    season_id: UUID = Query(..., description="Season UUID"),
+):
+    """
+    Update a copper mine ownership (for transferring reserved mines to members).
+
+    Validates:
+    - Member exists
+    - Ownership belongs to user's alliance
+    """
+    # Verify user access to season
+    await season_service.verify_user_access(user_id, season_id)
+
+    alliance = await alliance_service.get_user_alliance(user_id)
+
+    # Convert member_id string to UUID
+    member_uuid = UUID(data.member_id)
+
+    return await mine_service.update_ownership(
+        ownership_id=ownership_id,
+        season_id=season_id,
+        alliance_id=alliance.id,
+        member_id=member_uuid,
     )

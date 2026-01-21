@@ -75,3 +75,18 @@ export async function createCopperMineOwnership(
 export async function deleteCopperMineOwnership(ownershipId: string): Promise<void> {
   await axiosInstance.delete(`/api/v1/copper-mines/ownerships/${ownershipId}`)
 }
+
+export async function updateCopperMineOwnership(
+  ownershipId: string,
+  seasonId: string,
+  data: { member_id: string }
+): Promise<CopperMineOwnership> {
+  const response = await axiosInstance.patch<CopperMineOwnership>(
+    `/api/v1/copper-mines/ownerships/${ownershipId}`,
+    data,
+    {
+      params: { season_id: seasonId }
+    }
+  )
+  return response.data
+}

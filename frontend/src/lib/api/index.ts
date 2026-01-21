@@ -137,5 +137,6 @@ export const apiClient = {
   deleteCopperMineRule: copperMineApi.deleteCopperMineRule,
   getCopperMineOwnerships: copperMineApi.getCopperMineOwnerships,
   createCopperMineOwnership: copperMineApi.createCopperMineOwnership,
+  updateCopperMineOwnership: copperMineApi.updateCopperMineOwnership,
   deleteCopperMineOwnership: copperMineApi.deleteCopperMineOwnership,
 }

@@ -272,7 +272,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         # Only include member_id if it's not None (for reserved mines)
         if member_id is not None:
             insert_data["member_id"] = str(member_id)
-        
+
         if applied_at:
             insert_data["registered_at"] = applied_at.isoformat()
 
@@ -302,3 +302,25 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         )
 
         return result.count or 0
+
+    async def update_ownership(
+        self,
+        ownership_id: UUID,
+        member_id: UUID,
+        game_id: str
+    ) -> CopperMine:
+        """Update copper mine ownership (for transferring reserved mines)"""
+        result = await self._execute_async(
+            lambda: self.client
+            .from_("copper_mines")
+            .update({
+                "member_id": str(member_id),
+                "game_id": game_id,
+                "updated_at": datetime.now(UTC).isoformat()
+            })
+            .eq("id", str(ownership_id))
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, expect_single=True)
+        return CopperMine(**data)

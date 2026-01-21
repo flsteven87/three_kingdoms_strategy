@@ -190,3 +190,9 @@ class CopperMineOwnershipCreate(BaseModel):
     coord_y: int = Field(..., ge=0)
     level: int = Field(..., ge=9, le=10)
     applied_at: datetime | None = None
+
+
+class CopperMineOwnershipUpdate(BaseModel):
+    """Request to update a copper mine ownership (for transferring reserved mines)"""
+
+    member_id: str = Field(..., description="Member UUID to transfer to")

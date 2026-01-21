@@ -327,6 +327,31 @@ export function useDeleteCopperMineOwnership() {
   })
 }
 
+/**
+ * Update a copper mine ownership record (for transferring reserved mines)
+ */
+export function useUpdateCopperMineOwnership() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      ownershipId,
+      seasonId,
+      data,
+    }: {
+      ownershipId: string
+      seasonId: string
+      data: { member_id: string }
+    }) => apiClient.updateCopperMineOwnership(ownershipId, seasonId, data),
+
+    onSettled: (_data, _error, { seasonId }) => {
+      queryClient.invalidateQueries({
+        queryKey: copperMineKeys.ownershipsBySeason(seasonId),
+      })
+    },
+  })
+}
+
 // =============================================================================
 // Utility Hooks
 // =============================================================================
