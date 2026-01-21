@@ -201,8 +201,8 @@ class DonationService:
             )
             member_info_list.append(member_info)
 
-        # Sort by donated amount descending
-        member_info_list.sort(key=lambda x: x.donated_amount, reverse=False)
+        # Sort by donated amount descending (highest first)
+        member_info_list.sort(key=lambda x: x.donated_amount, reverse=True)
 
         return DonationWithInfo(**donation.model_dump(), member_info=member_info_list)
 

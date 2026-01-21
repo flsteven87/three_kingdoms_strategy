@@ -37,6 +37,72 @@ import {
 import { useSeasons } from '@/hooks/use-seasons'
 import type { DonationType } from '@/lib/api/donation-api'
 
+// =============================================================================
+// Sub-components
+// =============================================================================
+
+interface DonationMemberRowProps {
+    readonly memberName: string
+    readonly amount: number
+    readonly target: number
+    readonly isPenalty: boolean
+    readonly isCompleted?: boolean
+    readonly onDelete?: () => void
+}
+
+function DonationMemberRow({
+    memberName,
+    amount,
+    target,
+    isPenalty,
+    isCompleted = false,
+    onDelete,
+}: DonationMemberRowProps) {
+    const pct = target > 0 ? Math.min(100, Math.round((amount / target) * 100)) : 0
+
+    return (
+        <TableRow className={isCompleted ? 'bg-emerald-50/50' : undefined}>
+            <TableCell className={isCompleted ? 'font-medium pl-10' : 'font-medium'}>
+                {memberName}
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-muted-foreground">
+                {amount.toLocaleString('zh-TW')} / {target.toLocaleString('zh-TW')}
+            </TableCell>
+            <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                    <div className="h-1.5 w-24 rounded-full bg-muted">
+                        <div
+                            className={pct >= 100
+                                ? 'h-1.5 rounded-full bg-emerald-500 transition-all'
+                                : 'h-1.5 rounded-full bg-primary/70 transition-all'
+                            }
+                            style={{ width: `${pct}%` }}
+                        />
+                    </div>
+                    <span className="w-7 text-right text-xs font-medium tabular-nums">{pct}%</span>
+                </div>
+            </TableCell>
+            {isPenalty && onDelete && (
+                <TableCell className="text-right">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onDelete()
+                        }}
+                        className="text-destructive hover:text-destructive/80"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </button>
+                </TableCell>
+            )}
+        </TableRow>
+    )
+}
+
+// =============================================================================
+// Main Component
+// =============================================================================
+
 function DonationAnalytics() {
     const { data: seasons } = useSeasons()
     const activeSeason = seasons?.find((s) => s.is_active)
@@ -358,48 +424,19 @@ function DonationAnalytics() {
                                                                 </TableHeader>
                                                                 <TableBody>
                                                                     {/* Incomplete members - always shown first */}
-                                                                    {incompleteMembers.map((m) => {
-                                                                        const amount = donationMap[m.id] || 0
-                                                                        const memberTarget = (targetMap[m.id] || 0)
-                                                                        const pct = memberTarget > 0
-                                                                            ? Math.min(100, Math.round((amount / memberTarget) * 100))
-                                                                            : 0
-                                                                        return (
-                                                                            <TableRow key={m.id}>
-                                                                                <TableCell className="font-medium">{m.display_name || m.name || m.id}</TableCell>
-                                                                                <TableCell className="text-right tabular-nums text-muted-foreground">
-                                                                                    {amount.toLocaleString('zh-TW')} / {memberTarget.toLocaleString('zh-TW')}
-                                                                                </TableCell>
-                                                                                <TableCell className="text-right">
-                                                                                    <div className="flex items-center justify-end gap-2">
-                                                                                        <div className="h-1.5 w-24 rounded-full bg-muted">
-                                                                                            <div
-                                                                                                className={pct >= 100 ? 'h-1.5 rounded-full bg-emerald-500 transition-all' : 'h-1.5 rounded-full bg-primary/70 transition-all'}
-                                                                                                style={{ width: `${pct}%` }}
-                                                                                            />
-                                                                                        </div>
-                                                                                        <span className="w-7 text-right text-xs font-medium tabular-nums">{pct}%</span>
-                                                                                    </div>
-                                                                                </TableCell>
-                                                                                {d.type === 'penalty' &&
-                                                                                    <TableCell className="text-right">
-                                                                                        <button
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation()
-                                                                                                deleteTargetMutation.mutate({
-                                                                                                    donationId: d.id,
-                                                                                                    memberId: m.id
-                                                                                                })
-                                                                                            }}
-                                                                                            className="text-destructive hover:text-destructive/80"
-                                                                                        >
-                                                                                            <Trash2 className="h-4 w-4" />
-                                                                                        </button>
-                                                                                    </TableCell>
-                                                                                }
-                                                                            </TableRow>
-                                                                        )
-                                                                    })}
+                                                                    {incompleteMembers.map((m) => (
+                                                                        <DonationMemberRow
+                                                                            key={m.id}
+                                                                            memberName={m.display_name || m.name || m.id}
+                                                                            amount={donationMap[m.id] || 0}
+                                                                            target={targetMap[m.id] || 0}
+                                                                            isPenalty={d.type === 'penalty'}
+                                                                            onDelete={() => deleteTargetMutation.mutate({
+                                                                                donationId: d.id,
+                                                                                memberId: m.id
+                                                                            })}
+                                                                        />
+                                                                    ))}
 
                                                                     {/* Completed members summary row (collapsible) - shown at the end */}
                                                                     {completedMembers.length > 0 && (
@@ -439,48 +476,20 @@ function DonationAnalytics() {
                                                                             </TableRow>
 
                                                                             {/* Show individual completed members when expanded */}
-                                                                            {isCompletedExpanded && completedMembers.map((m) => {
-                                                                                const amount = donationMap[m.id] || 0
-                                                                                const memberTarget = (targetMap[m.id] || 0)
-                                                                                const pct = memberTarget > 0
-                                                                                    ? Math.min(100, Math.round((amount / memberTarget) * 100))
-                                                                                    : 0
-                                                                                return (
-                                                                                    <TableRow key={m.id} className="bg-emerald-50/50">
-                                                                                        <TableCell className="font-medium pl-10">{m.display_name || m.name || m.id}</TableCell>
-                                                                                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                                                                                            {amount.toLocaleString('zh-TW')} / {memberTarget.toLocaleString('zh-TW')}
-                                                                                        </TableCell>
-                                                                                        <TableCell className="text-right">
-                                                                                            <div className="flex items-center justify-end gap-2">
-                                                                                                <div className="h-1.5 w-24 rounded-full bg-muted">
-                                                                                                    <div
-                                                                                                        className="h-1.5 rounded-full bg-emerald-500 transition-all"
-                                                                                                        style={{ width: `${pct}%` }}
-                                                                                                    />
-                                                                                                </div>
-                                                                                                <span className="w-7 text-right text-xs font-medium tabular-nums">{pct}%</span>
-                                                                                            </div>
-                                                                                        </TableCell>
-                                                                                        {d.type === 'penalty' &&
-                                                                                            <TableCell className="text-right">
-                                                                                                <button
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation()
-                                                                                                        deleteTargetMutation.mutate({
-                                                                                                            donationId: d.id,
-                                                                                                            memberId: m.id
-                                                                                                        })
-                                                                                                    }}
-                                                                                                    className="text-destructive hover:text-destructive/80"
-                                                                                                >
-                                                                                                    <Trash2 className="h-4 w-4" />
-                                                                                                </button>
-                                                                                            </TableCell>
-                                                                                        }
-                                                                                    </TableRow>
-                                                                                )
-                                                                            })}
+                                                                            {isCompletedExpanded && completedMembers.map((m) => (
+                                                                                <DonationMemberRow
+                                                                                    key={m.id}
+                                                                                    memberName={m.display_name || m.name || m.id}
+                                                                                    amount={donationMap[m.id] || 0}
+                                                                                    target={targetMap[m.id] || 0}
+                                                                                    isPenalty={d.type === 'penalty'}
+                                                                                    isCompleted
+                                                                                    onDelete={() => deleteTargetMutation.mutate({
+                                                                                        donationId: d.id,
+                                                                                        memberId: m.id
+                                                                                    })}
+                                                                                />
+                                                                            ))}
                                                                         </>
                                                                     )}
                                                                 </TableBody>

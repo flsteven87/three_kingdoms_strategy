@@ -30,6 +30,10 @@ import {
 import { useCreateCopperMineOwnership } from '@/hooks/use-copper-mines'
 import { useAnalyticsMembers } from '@/hooks/use-analytics'
 
+// Constants for reserved copper mine (awarded as rewards, not assigned to specific member)
+const RESERVED_MINE_ID = 'reserved'
+const RESERVED_MINE_DISPLAY_NAME = '【預留獎勵】'
+
 interface FormData {
   member_id: string
   coord_x: string
@@ -83,9 +87,9 @@ export function CopperMineFormDialog({
     if (!members) return []
     const sorted = [...members].sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'))
 
-    // Add "reserved" placeholder member at the top
+    // Add reserved option at the top (for copper mines awarded as rewards)
     return [
-      { id: 'reserved', name: '【預留獎勵】' },
+      { id: RESERVED_MINE_ID, name: RESERVED_MINE_DISPLAY_NAME },
       ...sorted
     ]
   }, [members])
