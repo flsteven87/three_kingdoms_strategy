@@ -81,7 +81,13 @@ export function CopperMineFormDialog({
   // Sort members by name for better UX
   const sortedMembers = useMemo(() => {
     if (!members) return []
-    return [...members].sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'))
+    const sorted = [...members].sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'))
+
+    // Add "reserved" placeholder member at the top
+    return [
+      { id: 'reserved', name: '【預留獎勵】' },
+      ...sorted
+    ]
   }, [members])
 
   // Reset form and error when dialog opens

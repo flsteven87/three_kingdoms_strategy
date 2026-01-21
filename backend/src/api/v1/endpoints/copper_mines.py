@@ -168,10 +168,14 @@ async def create_ownership(
     await season_service.verify_user_access(user_id, season_id)
 
     alliance = await alliance_service.get_user_alliance(user_id)
+    
+    # Handle reserved copper mines (use None for member_id)
+    member_uuid = None if data.member_id == "reserved" else UUID(data.member_id)
+    
     return await mine_service.create_ownership(
         season_id=season_id,
         alliance_id=alliance.id,
-        member_id=UUID(data.member_id),
+        member_id=member_uuid,
         coord_x=data.coord_x,
         coord_y=data.coord_y,
         level=data.level,

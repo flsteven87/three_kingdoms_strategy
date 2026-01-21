@@ -561,7 +561,7 @@ class CopperMineService:
         self,
         season_id: UUID,
         alliance_id: UUID,
-        member_id: UUID,
+        member_id: UUID | None,
         coord_x: int,
         coord_y: int,
         level: int,
@@ -575,7 +575,7 @@ class CopperMineService:
         Args:
             season_id: Season UUID
             alliance_id: Alliance UUID
-            member_id: Member UUID
+            member_id: Member UUID, or None for reserved mines
             coord_x: X coordinate
             coord_y: Y coordinate
             level: Mine level (9 or 10)
@@ -586,14 +586,20 @@ class CopperMineService:
             HTTPException 403: If rule validation fails
             HTTPException 409: If coordinates already taken
         """
-        # Validate member exists
-        member = await self.member_repository.get_by_id(member_id)
-        if not member:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Member not found"
-            )
-
+        # Handle reserved copper mines (no member validation)
+        is_reserved = member_id is None
+        member_name = "【預留獎勵】" if is_reserved else None
+        
+        if not is_reserved:
+            # Validate member exists
+            member = await self.member_repository.get_by_id(member_id)
+            if not member:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Member not found"
+                )
+            member_name = member.name
+        
         # P0 修復: 使用統一的座標檢查方法
         await self._check_coord_available(
             alliance_id=alliance_id,
@@ -603,19 +609,21 @@ class CopperMineService:
         )
 
         # P0 修復: 驗證銅礦申請規則（與 LIFF 行為一致）
-        await self._validate_rule(
-            alliance_id=alliance_id,
-            member_id=member_id,
-            season_id=season_id,
-            level=level
-        )
+        # Skip validation for reserved mines
+        if not is_reserved:
+            await self._validate_rule(
+                alliance_id=alliance_id,
+                member_id=member_id,
+                season_id=season_id,
+                level=level
+            )
 
         # Create ownership
         mine = await self.repository.create_ownership(
             season_id=season_id,
             alliance_id=alliance_id,
             member_id=member_id,
-            game_id=member.name,
+            game_id=member_name,
             coord_x=coord_x,
             coord_y=coord_y,
             level=level,
@@ -625,13 +633,13 @@ class CopperMineService:
         return CopperMineOwnershipResponse(
             id=str(mine.id),
             season_id=str(season_id),
-            member_id=str(member_id),
+            member_id=str(member_id) if member_id else None,
             coord_x=mine.coord_x,
             coord_y=mine.coord_y,
             level=mine.level,
             applied_at=mine.registered_at,
             created_at=mine.registered_at,
-            member_name=member.name,
+            member_name=member_name,
             member_group=None,
             line_display_name=None,
         )

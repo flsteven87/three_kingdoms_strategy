@@ -251,7 +251,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         self,
         season_id: UUID,
         alliance_id: UUID,
-        member_id: UUID,
+        member_id: UUID | None,
         game_id: str,
         coord_x: int,
         coord_y: int,
@@ -262,7 +262,6 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         insert_data: dict[str, Any] = {
             "alliance_id": str(alliance_id),
             "season_id": str(season_id),
-            "member_id": str(member_id),
             "game_id": game_id,
             "coord_x": coord_x,
             "coord_y": coord_y,
@@ -270,6 +269,10 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
             "status": "active",
             "registered_by_line_user_id": "dashboard",  # Mark as Dashboard entry
         }
+        # Only include member_id if it's not None (for reserved mines)
+        if member_id is not None:
+            insert_data["member_id"] = str(member_id)
+        
         if applied_at:
             insert_data["registered_at"] = applied_at.isoformat()
 
