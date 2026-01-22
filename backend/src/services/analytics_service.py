@@ -78,20 +78,23 @@ class AnalyticsService:
         self, alliance_id: UUID, active_only: bool = True, season_id: UUID | None = None
     ) -> list[dict]:
         """
-        Get all members for analytics member selector with latest rank and group.
+        Get members for analytics member selector with latest rank and group.
+
+        If season_id is provided, only returns members with data in that season.
+        If season_id is not provided, returns all members.
 
         Args:
             alliance_id: Alliance UUID
             active_only: Only return active members
-            season_id: Season UUID to get latest period metrics from
+            season_id: Optional Season UUID to filter members with data in that season
 
         Returns:
             List of member dicts with id, name, contribution_rank, and group
         """
-        members = await self._member_repo.get_by_alliance(alliance_id, active_only)
-
         # Build member_id -> metrics map from latest period
         member_metrics_map: dict[UUID, dict] = {}
+        members_with_data: set[UUID] = set()
+
         if season_id:
             # Get all periods for the season and find the latest one
             periods = await self._period_repo.get_by_season(season_id)
@@ -99,21 +102,39 @@ class AnalyticsService:
                 latest_period = periods[-1]  # Already sorted by period_number
                 metrics = await self._metrics_repo.get_by_period(latest_period.id)
                 for m in metrics:
+                    members_with_data.add(m.member_id)
                     member_metrics_map[m.member_id] = {
                         "contribution_rank": m.end_rank,
                         "group": m.end_group,
                     }
 
-        return [
-            {
-                "id": str(m.id),
-                "name": m.name,
-                "is_active": m.is_active,
-                "contribution_rank": member_metrics_map.get(m.id, {}).get("contribution_rank"),
-                "group": member_metrics_map.get(m.id, {}).get("group"),
-            }
-            for m in members
-        ]
+        # Get all members, then filter to only those with data in this season (if season_id provided)
+        all_members = await self._member_repo.get_by_alliance(alliance_id, active_only)
+
+        # If season_id is provided, filter to members with data; otherwise return all
+        if season_id:
+            return [
+                {
+                    "id": str(m.id),
+                    "name": m.name,
+                    "is_active": m.is_active,
+                    "contribution_rank": member_metrics_map.get(m.id, {}).get("contribution_rank"),
+                    "group": member_metrics_map.get(m.id, {}).get("group"),
+                }
+                for m in all_members
+                if m.id in members_with_data
+            ]
+        else:
+            return [
+                {
+                    "id": str(m.id),
+                    "name": m.name,
+                    "is_active": m.is_active,
+                    "contribution_rank": None,
+                    "group": None,
+                }
+                for m in all_members
+            ]
 
     async def get_member_trend(
         self, member_id: UUID, season_id: UUID
