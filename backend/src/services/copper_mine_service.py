@@ -140,8 +140,14 @@ class CopperMineService:
         """
         alliance_id = await self._get_alliance_id_from_group(line_group_id)
 
-        # 顯示全同盟銅礦（公開資訊）
-        mines = await self.repository.get_mines_by_alliance(alliance_id)
+        # 獲取當前活動賽季
+        active_season_id = await self._get_active_season(alliance_id)
+
+        # 只顯示當前賽季的銅礦（公開資訊）
+        mines = await self.repository.get_mines_by_alliance(
+            alliance_id,
+            season_id=active_season_id
+        )
 
         # P0 修復: 計算用戶銅礦申請狀態
         # 取得規則數量作為上限

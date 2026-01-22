@@ -30,9 +30,10 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
     async def get_mines_by_alliance(
         self,
         alliance_id: UUID,
-        status: str | None = None
+        status: str | None = None,
+        season_id: UUID | None = None
     ) -> list[CopperMine]:
-        """Get all copper mines for an alliance"""
+        """Get all copper mines for an alliance, optionally filtered by season"""
         query = (
             self.client
             .from_("copper_mines")
@@ -42,6 +43,9 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
 
         if status:
             query = query.eq("status", status)
+
+        if season_id:
+            query = query.eq("season_id", str(season_id))
 
         result = await self._execute_async(
             lambda: query.order("registered_at", desc=True).execute()
