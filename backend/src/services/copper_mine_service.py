@@ -320,6 +320,11 @@ class CopperMineService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"總戰功不足：需要 {rule.required_merit:,}，目前 {snapshot.total_merit:,}"
                 )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="成員戰功不存在，無法驗證戰功要求"
+            )
 
         # 6. 驗證等級限制
         if not self._is_level_allowed(level, rule.allowed_level):
