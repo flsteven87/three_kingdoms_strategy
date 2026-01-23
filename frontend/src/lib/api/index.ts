@@ -26,7 +26,7 @@ export * from './event-api'
 export * from './donation-api'
 export * from './line-api'
 export * from './copper-mine-api'
-export * from './subscription-api'
+export * from './season-quota-api'
 
 // Import all functions for backward-compatible apiClient object
 import { setAuthToken } from './base-client'
@@ -39,7 +39,7 @@ import * as eventApi from './event-api'
 import * as donationApi from './donation-api'
 import * as lineApi from './line-api'
 import * as copperMineApi from './copper-mine-api'
-import * as subscriptionApi from './subscription-api'
+import * as seasonQuotaApi from './season-quota-api'
 
 /**
  * Backward-compatible API client object
@@ -145,6 +145,6 @@ export const apiClient = {
   updateCopperMineOwnership: copperMineApi.updateCopperMineOwnership,
   deleteCopperMineOwnership: copperMineApi.deleteCopperMineOwnership,
 
-  // Subscription
-  getSubscriptionStatus: subscriptionApi.getSubscriptionStatus,
+  // Season Quota
+  getSeasonQuotaStatus: seasonQuotaApi.getSeasonQuotaStatus,
 }
