@@ -76,11 +76,6 @@ class SeasonRepository(SupabaseRepository[Season]):
 
         return self._build_model(data)
 
-    # Backward compatibility alias
-    async def get_active_season(self, alliance_id: UUID) -> Season | None:
-        """Alias for get_current_season for backward compatibility"""
-        return await self.get_current_season(alliance_id)
-
     async def create(self, season_data: dict) -> Season:
         """
         Create new season
