@@ -5,13 +5,16 @@
  * Only visible to Owner and Collaborator roles.
  */
 
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Coins, Clock, TrendingUp, TrendingDown } from 'lucide-react'
 import { useSeasonQuota } from '@/hooks/use-season-quota'
+import { PurchaseQuotaModal } from './PurchaseQuotaModal'
 
 export function SeasonQuotaTab() {
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false)
   const { data: quotaStatus, isLoading } = useSeasonQuota()
 
   if (isLoading) {
@@ -106,10 +109,17 @@ export function SeasonQuotaTab() {
 
           {/* Purchase Button */}
           <div className="flex justify-center pt-2">
-            <Button size="lg" disabled>
-              購買額度（即將推出）
+            <Button size="lg" onClick={() => setIsPurchaseModalOpen(true)}>
+              購買額度
             </Button>
           </div>
+
+          {/* Purchase Modal */}
+          <PurchaseQuotaModal
+            open={isPurchaseModalOpen}
+            onOpenChange={setIsPurchaseModalOpen}
+            currentAvailable={quotaStatus.available_seasons}
+          />
         </CardContent>
       </Card>
 
