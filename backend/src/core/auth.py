@@ -55,7 +55,7 @@ def verify_supabase_token(token: str) -> dict:
 
 
 def get_current_user_id(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> UUID:
     """
     Extract user ID from JWT token
@@ -100,7 +100,7 @@ def get_current_user_id(
 
 # Optional: Get user with additional metadata
 def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> dict:
     """
     Get full user payload from JWT token

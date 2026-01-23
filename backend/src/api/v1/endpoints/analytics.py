@@ -231,7 +231,9 @@ async def get_alliance_analytics(
     user_id: UserIdDep,
     service: AnalyticsServiceDep,
     season_service: SeasonServiceDep,
-    view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
+    view: str = Query(
+        "latest", description="View mode: 'latest' for latest period, 'season' for season average"
+    ),
 ) -> AllianceAnalyticsResponse:
     """
     Get complete alliance analytics for AllianceAnalytics page.
@@ -283,7 +285,9 @@ async def get_groups_comparison(
     user_id: UserIdDep,
     service: AnalyticsServiceDep,
     season_service: SeasonServiceDep,
-    view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
+    view: str = Query(
+        "latest", description="View mode: 'latest' for latest period, 'season' for season average"
+    ),
 ) -> list[GroupComparisonItem]:
     """
     Get comparison data for all groups in a season.
@@ -309,7 +313,9 @@ async def get_group_analytics(
     user_id: UserIdDep,
     service: AnalyticsServiceDep,
     season_service: SeasonServiceDep,
-    view: str = Query("latest", description="View mode: 'latest' for latest period, 'season' for season average"),
+    view: str = Query(
+        "latest", description="View mode: 'latest' for latest period, 'season' for season average"
+    ),
 ) -> GroupAnalyticsResponse:
     """
     Get complete analytics for a specific group.

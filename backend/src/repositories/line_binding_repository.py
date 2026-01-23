@@ -36,32 +36,26 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
     def __init__(self):
         # Primary table for base class methods
-        super().__init__(
-            table_name="line_binding_codes",
-            model_class=LineBindingCode
-        )
+        super().__init__(table_name="line_binding_codes", model_class=LineBindingCode)
 
     # =========================================================================
     # Binding Codes Operations
     # =========================================================================
 
     async def create_binding_code(
-        self,
-        alliance_id: UUID,
-        code: str,
-        created_by: UUID,
-        expires_at: datetime
+        self, alliance_id: UUID, code: str, created_by: UUID, expires_at: datetime
     ) -> LineBindingCode:
         """Create a new binding code"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_binding_codes")
-            .insert({
-                "alliance_id": str(alliance_id),
-                "code": code,
-                "created_by": str(created_by),
-                "expires_at": expires_at.isoformat()
-            })
+            lambda: self.client.from_("line_binding_codes")
+            .insert(
+                {
+                    "alliance_id": str(alliance_id),
+                    "code": code,
+                    "created_by": str(created_by),
+                    "expires_at": expires_at.isoformat(),
+                }
+            )
             .execute()
         )
 
@@ -71,8 +65,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     async def get_valid_code(self, code: str) -> LineBindingCode | None:
         """Get a valid (unused, not expired) binding code"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_binding_codes")
+            lambda: self.client.from_("line_binding_codes")
             .select("*")
             .eq("code", code)
             .is_("used_at", "null")
@@ -85,14 +78,10 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             return None
         return LineBindingCode(**data)
 
-    async def get_pending_code_by_alliance(
-        self,
-        alliance_id: UUID
-    ) -> LineBindingCode | None:
+    async def get_pending_code_by_alliance(self, alliance_id: UUID) -> LineBindingCode | None:
         """Get pending (unused, not expired) code for an alliance"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_binding_codes")
+            lambda: self.client.from_("line_binding_codes")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .is_("used_at", "null")
@@ -110,22 +99,16 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     async def mark_code_used(self, code_id: UUID) -> None:
         """Mark a binding code as used"""
         await self._execute_async(
-            lambda: self.client
-            .from_("line_binding_codes")
+            lambda: self.client.from_("line_binding_codes")
             .update({"used_at": datetime.utcnow().isoformat()})
             .eq("id", str(code_id))
             .execute()
         )
 
-    async def count_recent_codes(
-        self,
-        alliance_id: UUID,
-        since: datetime
-    ) -> int:
+    async def count_recent_codes(self, alliance_id: UUID, since: datetime) -> int:
         """Count codes created for alliance since given time (for rate limiting)"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_binding_codes")
+            lambda: self.client.from_("line_binding_codes")
             .select("id", count="exact")
             .eq("alliance_id", str(alliance_id))
             .gte("created_at", since.isoformat())
@@ -139,13 +122,11 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     # =========================================================================
 
     async def get_active_group_binding_by_alliance(
-        self,
-        alliance_id: UUID
+        self, alliance_id: UUID
     ) -> LineGroupBinding | None:
         """Get active group binding for an alliance"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_group_bindings")
+            lambda: self.client.from_("line_group_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("is_active", True)
@@ -158,13 +139,11 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return LineGroupBinding(**data)
 
     async def get_group_binding_by_line_group_id(
-        self,
-        line_group_id: str
+        self, line_group_id: str
     ) -> LineGroupBinding | None:
         """Get group binding by LINE group ID"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_group_bindings")
+            lambda: self.client.from_("line_group_bindings")
             .select("*")
             .eq("line_group_id", line_group_id)
             .eq("is_active", True)
@@ -182,20 +161,21 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         line_group_id: str,
         bound_by_line_user_id: str,
         group_name: str | None = None,
-        group_picture_url: str | None = None
+        group_picture_url: str | None = None,
     ) -> LineGroupBinding:
         """Create a new group binding"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_group_bindings")
-            .insert({
-                "alliance_id": str(alliance_id),
-                "line_group_id": line_group_id,
-                "group_name": group_name,
-                "group_picture_url": group_picture_url,
-                "bound_by_line_user_id": bound_by_line_user_id,
-                "is_active": True
-            })
+            lambda: self.client.from_("line_group_bindings")
+            .insert(
+                {
+                    "alliance_id": str(alliance_id),
+                    "line_group_id": line_group_id,
+                    "group_name": group_name,
+                    "group_picture_url": group_picture_url,
+                    "bound_by_line_user_id": bound_by_line_user_id,
+                    "is_active": True,
+                }
+            )
             .execute()
         )
 
@@ -205,34 +185,24 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     async def deactivate_group_binding(self, binding_id: UUID) -> None:
         """Deactivate a group binding"""
         await self._execute_async(
-            lambda: self.client
-            .from_("line_group_bindings")
-            .update({
-                "is_active": False,
-                "updated_at": datetime.utcnow().isoformat()
-            })
+            lambda: self.client.from_("line_group_bindings")
+            .update({"is_active": False, "updated_at": datetime.utcnow().isoformat()})
             .eq("id", str(binding_id))
             .execute()
         )
 
     async def update_group_info(
-        self,
-        binding_id: UUID,
-        group_name: str | None = None,
-        group_picture_url: str | None = None
+        self, binding_id: UUID, group_name: str | None = None, group_picture_url: str | None = None
     ) -> LineGroupBinding:
         """Update group name and/or picture for an existing binding"""
-        update_data: dict[str, str] = {
-            "updated_at": datetime.utcnow().isoformat()
-        }
+        update_data: dict[str, str] = {"updated_at": datetime.utcnow().isoformat()}
         if group_name is not None:
             update_data["group_name"] = group_name
         if group_picture_url is not None:
             update_data["group_picture_url"] = group_picture_url
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_group_bindings")
+            lambda: self.client.from_("line_group_bindings")
             .update(update_data)
             .eq("id", str(binding_id))
             .select("*")
@@ -247,14 +217,11 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     # =========================================================================
 
     async def get_member_bindings_by_line_user(
-        self,
-        alliance_id: UUID,
-        line_user_id: str
+        self, alliance_id: UUID, line_user_id: str
     ) -> list[MemberLineBinding]:
         """Get all game ID bindings for a LINE user in an alliance"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
+            lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("line_user_id", line_user_id)
@@ -266,14 +233,11 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return [MemberLineBinding(**row) for row in data]
 
     async def get_member_binding_by_game_id(
-        self,
-        alliance_id: UUID,
-        game_id: str
+        self, alliance_id: UUID, game_id: str
     ) -> MemberLineBinding | None:
         """Check if a game ID is already registered in an alliance"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
+            lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("game_id", game_id)
@@ -286,9 +250,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return MemberLineBinding(**data)
 
     async def get_member_bindings_by_game_ids(
-        self,
-        alliance_id: UUID,
-        game_ids: list[str]
+        self, alliance_id: UUID, game_ids: list[str]
     ) -> list[MemberLineBinding]:
         """
         Get member LINE bindings for multiple game IDs in a single query.
@@ -306,8 +268,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             return []
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
+            lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .in_("game_id", game_ids)
@@ -318,14 +279,11 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return [MemberLineBinding(**row) for row in data]
 
     async def search_member_bindings(
-        self,
-        alliance_id: UUID,
-        query: str
+        self, alliance_id: UUID, query: str
     ) -> list[MemberLineBinding]:
         """Search member bindings by game ID (case-insensitive)."""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
+            lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .ilike("game_id", f"%{query}%")
@@ -341,7 +299,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         line_user_id: str,
         line_display_name: str,
         game_id: str,
-        member_id: UUID | None = None
+        member_id: UUID | None = None,
     ) -> MemberLineBinding:
         """Create a new member LINE binding"""
         insert_data = {
@@ -349,16 +307,13 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             "line_user_id": line_user_id,
             "line_display_name": line_display_name,
             "game_id": game_id,
-            "is_verified": member_id is not None
+            "is_verified": member_id is not None,
         }
         if member_id:
             insert_data["member_id"] = str(member_id)
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
-            .insert(insert_data)
-            .execute()
+            lambda: self.client.from_("member_line_bindings").insert(insert_data).execute()
         )
 
         data = self._handle_supabase_result(result, expect_single=True)
@@ -367,8 +322,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     async def count_member_bindings_by_alliance(self, alliance_id: UUID) -> int:
         """Count member bindings for an alliance"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
+            lambda: self.client.from_("member_line_bindings")
             .select("id", count="exact")
             .eq("alliance_id", str(alliance_id))
             .execute()
@@ -377,13 +331,11 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return result.count or 0
 
     async def get_all_member_bindings_by_alliance(
-        self,
-        alliance_id: UUID
+        self, alliance_id: UUID
     ) -> list[MemberLineBinding]:
         """Get all member LINE bindings for an alliance (for admin view)"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
+            lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .order("created_at", desc=True)
@@ -393,15 +345,10 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
 
-    async def find_member_by_name(
-        self,
-        alliance_id: UUID,
-        name: str
-    ) -> UUID | None:
+    async def find_member_by_name(self, alliance_id: UUID, name: str) -> UUID | None:
         """Find member ID by name in members table (for auto-matching)"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("members")
+            lambda: self.client.from_("members")
             .select("id")
             .eq("alliance_id", str(alliance_id))
             .eq("name", name)
@@ -414,10 +361,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return UUID(data["id"])
 
     async def delete_member_binding(
-        self,
-        alliance_id: UUID,
-        line_user_id: str,
-        game_id: str
+        self, alliance_id: UUID, line_user_id: str, game_id: str
     ) -> bool:
         """
         Delete a member LINE binding
@@ -425,8 +369,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         Returns True if a row was deleted, False if not found
         """
         result = await self._execute_async(
-            lambda: self.client
-            .from_("member_line_bindings")
+            lambda: self.client.from_("member_line_bindings")
             .delete()
             .eq("alliance_id", str(alliance_id))
             .eq("line_user_id", line_user_id)
@@ -439,8 +382,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
     async def list_custom_commands(self, alliance_id: UUID) -> list[LineCustomCommand]:
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_custom_commands")
+            lambda: self.client.from_("line_custom_commands")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .order("updated_at", desc=True)
@@ -452,8 +394,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
     async def get_custom_command_by_id(self, command_id: UUID) -> LineCustomCommand | None:
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_custom_commands")
+            lambda: self.client.from_("line_custom_commands")
             .select("*")
             .eq("id", str(command_id))
             .execute()
@@ -465,13 +406,10 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return LineCustomCommand(**data)
 
     async def get_custom_command_by_trigger(
-        self,
-        alliance_id: UUID,
-        trigger_keyword: str
+        self, alliance_id: UUID, trigger_keyword: str
     ) -> LineCustomCommand | None:
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_custom_commands")
+            lambda: self.client.from_("line_custom_commands")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("trigger_keyword", trigger_keyword)
@@ -485,13 +423,10 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return LineCustomCommand(**data)
 
     async def get_custom_command_by_trigger_any(
-        self,
-        alliance_id: UUID,
-        trigger_keyword: str
+        self, alliance_id: UUID, trigger_keyword: str
     ) -> LineCustomCommand | None:
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_custom_commands")
+            lambda: self.client.from_("line_custom_commands")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("trigger_keyword", trigger_keyword)
@@ -513,16 +448,17 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         created_by: UUID,
     ) -> LineCustomCommand:
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_custom_commands")
-            .insert({
-                "alliance_id": str(alliance_id),
-                "command_name": command_name,
-                "trigger_keyword": trigger_keyword,
-                "response_message": response_message,
-                "is_enabled": is_enabled,
-                "created_by": str(created_by),
-            })
+            lambda: self.client.from_("line_custom_commands")
+            .insert(
+                {
+                    "alliance_id": str(alliance_id),
+                    "command_name": command_name,
+                    "trigger_keyword": trigger_keyword,
+                    "response_message": response_message,
+                    "is_enabled": is_enabled,
+                    "created_by": str(created_by),
+                }
+            )
             .execute()
         )
 
@@ -530,15 +466,12 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         return LineCustomCommand(**data)
 
     async def update_custom_command(
-        self,
-        command_id: UUID,
-        update_data: dict[str, str | bool]
+        self, command_id: UUID, update_data: dict[str, str | bool]
     ) -> LineCustomCommand:
         # Note: Supabase Python SDK doesn't support .select() after .update().eq()
         # The update operation returns updated data automatically
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_custom_commands")
+            lambda: self.client.from_("line_custom_commands")
             .update(update_data)
             .eq("id", str(command_id))
             .execute()
@@ -549,8 +482,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
     async def delete_custom_command(self, command_id: UUID) -> None:
         await self._execute_async(
-            lambda: self.client
-            .from_("line_custom_commands")
+            lambda: self.client.from_("line_custom_commands")
             .delete()
             .eq("id", str(command_id))
             .execute()
@@ -563,11 +495,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     # Sentinel value for group-level notifications
     GROUP_NOTIFICATION_SENTINEL = "__GROUP__"
 
-    async def has_group_been_notified_since(
-        self,
-        line_group_id: str,
-        since: datetime
-    ) -> bool:
+    async def has_group_been_notified_since(self, line_group_id: str, since: datetime) -> bool:
         """
         Check if group has been notified since the given timestamp (group-level CD)
 
@@ -579,8 +507,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             True if group was notified after the given time
         """
         result = await self._execute_async(
-            lambda: self.client
-            .from_("line_user_notifications")
+            lambda: self.client.from_("line_user_notifications")
             .select("sent_at")
             .eq("line_group_id", line_group_id)
             .eq("line_user_id", self.GROUP_NOTIFICATION_SENTINEL)
@@ -591,41 +518,32 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return len(data) > 0
 
-    async def record_group_notification(
-        self,
-        line_group_id: str
-    ) -> None:
+    async def record_group_notification(self, line_group_id: str) -> None:
         """
         Record that group has been notified (group-level CD)
 
         Uses upsert to update sent_at timestamp if record exists
         """
         await self._execute_async(
-            lambda: self.client
-            .from_("line_user_notifications")
+            lambda: self.client.from_("line_user_notifications")
             .upsert(
                 {
                     "line_group_id": line_group_id,
                     "line_user_id": self.GROUP_NOTIFICATION_SENTINEL,
-                    "sent_at": datetime.now(UTC).isoformat()
+                    "sent_at": datetime.now(UTC).isoformat(),
                 },
-                on_conflict="line_group_id,line_user_id"
+                on_conflict="line_group_id,line_user_id",
             )
             .execute()
         )
 
-    async def is_user_registered_in_group(
-        self,
-        line_group_id: str,
-        line_user_id: str
-    ) -> bool:
+    async def is_user_registered_in_group(self, line_group_id: str, line_user_id: str) -> bool:
         """Check if a LINE user has any registered game IDs in the group's alliance"""
         group_binding = await self.get_group_binding_by_line_group_id(line_group_id)
         if not group_binding:
             return False
 
         bindings = await self.get_member_bindings_by_line_user(
-            alliance_id=group_binding.alliance_id,
-            line_user_id=line_user_id
+            alliance_id=group_binding.alliance_id, line_user_id=line_user_id
         )
         return len(bindings) > 0

@@ -97,9 +97,7 @@ class DonationService:
         Returns:
             List of donation events
         """
-        return await self._donation_repo.get_by_alliance_and_season(
-            alliance_id, season_id
-        )
+        return await self._donation_repo.get_by_alliance_and_season(alliance_id, season_id)
 
     async def create_donation(self, donation_data: DonationCreate) -> Donation:
         """
@@ -137,9 +135,7 @@ class DonationService:
         is_regular = donation.type == DonationType.REGULAR
         is_penalty = donation.type == DonationType.PENALTY
         effective_target = (
-            target_amount
-            if (is_regular and target_amount is not None)
-            else donation.target_amount
+            target_amount if (is_regular and target_amount is not None) else donation.target_amount
         )
 
         # Check if this is a retrospective donation (created after deadline)
@@ -173,10 +169,7 @@ class DonationService:
 
         if is_penalty:
             overrides = await self._target_repo.get_by_donation_event(donation_id)
-            member_source = {
-                ov.member_id: end_snapshot_map.get(ov.member_id)
-                for ov in overrides
-            }
+            member_source = {ov.member_id: end_snapshot_map.get(ov.member_id) for ov in overrides}
             member_source = {k: v for k, v in member_source.items() if v is not None}
             # Build target map from overrides
             target_map = {ov.member_id: ov.target_amount for ov in overrides}

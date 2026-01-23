@@ -91,14 +91,14 @@ class HegemonyWeightService:
         if role is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="You are not a member of this alliance"
+                detail="You are not a member of this alliance",
             )
 
         if role not in required_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You don't have permission to manage hegemony weights. "
-                       f"Required role: {' or '.join(required_roles)}, your role: {role}"
+                f"Required role: {' or '.join(required_roles)}, your role: {role}",
             )
 
         return season, alliance
@@ -123,12 +123,10 @@ class HegemonyWeightService:
             HTTPException 403: If user is not a member
         """
         # All members can view weights
-        await self._verify_season_access(user_id, season_id, ['owner', 'collaborator', 'member'])
+        await self._verify_season_access(user_id, season_id, ["owner", "collaborator", "member"])
         return await self._weight_repo.get_with_snapshot_info(season_id)
 
-    async def get_weights_summary(
-        self, user_id: UUID, season_id: UUID
-    ) -> SnapshotWeightsSummary:
+    async def get_weights_summary(self, user_id: UUID, season_id: UUID) -> SnapshotWeightsSummary:
         """
         Get summary of all snapshot weights for a season.
 
@@ -178,7 +176,7 @@ class HegemonyWeightService:
         """
         try:
             _, alliance = await self._verify_season_access(
-                user_id, season_id, ['owner', 'collaborator']
+                user_id, season_id, ["owner", "collaborator"]
             )
 
             # Verify subscription: trial or paid subscription required
@@ -217,7 +215,7 @@ class HegemonyWeightService:
             logger.error(
                 f"Failed to initialize weights - season_id={season_id}, "
                 f"error={type(e).__name__}: {str(e)}",
-                exc_info=True
+                exc_info=True,
             )
             raise
 
@@ -240,7 +238,9 @@ class HegemonyWeightService:
         Raises:
             HTTPException 403: If user doesn't have permission
         """
-        _, alliance = await self._verify_season_access(user_id, season_id, ['owner', 'collaborator'])
+        _, alliance = await self._verify_season_access(
+            user_id, season_id, ["owner", "collaborator"]
+        )
 
         # Verify subscription: trial or paid subscription required
         await self._permission_service.require_active_subscription(
@@ -302,11 +302,11 @@ class HegemonyWeightService:
         except ValueError:
             role = None
 
-        if role not in ['owner', 'collaborator']:
+        if role not in ["owner", "collaborator"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You don't have permission to {action}. "
-                       f"Required role: owner or collaborator, your role: {role or 'none'}"
+                f"Required role: owner or collaborator, your role: {role or 'none'}",
             )
 
         return weight, alliance.id
@@ -404,7 +404,9 @@ class HegemonyWeightService:
         Performance: Optimized to avoid N+1 queries by fetching all snapshots at once
         """
         # All members can view scores
-        _, alliance = await self._verify_season_access(user_id, season_id, ['owner', 'collaborator', 'member'])
+        _, alliance = await self._verify_season_access(
+            user_id, season_id, ["owner", "collaborator", "member"]
+        )
 
         # Get all weight configurations for this season
         weights = await self._weight_repo.get_with_snapshot_info(season_id)
@@ -461,12 +463,14 @@ class HegemonyWeightService:
                 # Apply tier 2 weight
                 member_final_score += snapshot_score * weight_config.snapshot_weight
 
-            member_scores.append({
-                "member_id": member_id,
-                "member_name": member_names[member_id],
-                "final_score": member_final_score,
-                "snapshot_scores": snapshot_scores,
-            })
+            member_scores.append(
+                {
+                    "member_id": member_id,
+                    "member_name": member_names[member_id],
+                    "final_score": member_final_score,
+                    "snapshot_scores": snapshot_scores,
+                }
+            )
 
         # Sort by final score (descending) and assign ranks
         member_scores.sort(key=lambda x: x["final_score"], reverse=True)

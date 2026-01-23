@@ -217,7 +217,9 @@ class GroupStats(BaseModel):
     member_count: int = Field(..., ge=0, description="Number of members")
 
     # Person-day averages (人日均 - core comparison metrics)
-    avg_daily_contribution: float = Field(..., ge=0, description="Average daily contribution per member")
+    avg_daily_contribution: float = Field(
+        ..., ge=0, description="Average daily contribution per member"
+    )
     avg_daily_merit: float = Field(..., ge=0, description="Average daily merit per member")
     avg_daily_assist: float = Field(..., ge=0, description="Average daily assist per member")
     avg_daily_donation: float = Field(..., ge=0, description="Average daily donation per member")
@@ -230,11 +232,19 @@ class GroupStats(BaseModel):
 
     # Contribution distribution (box plot data)
     contribution_min: float = Field(..., ge=0, description="Minimum daily contribution")
-    contribution_q1: float = Field(..., ge=0, description="Contribution first quartile (25th percentile)")
-    contribution_median: float = Field(..., ge=0, description="Contribution median (50th percentile)")
-    contribution_q3: float = Field(..., ge=0, description="Contribution third quartile (75th percentile)")
+    contribution_q1: float = Field(
+        ..., ge=0, description="Contribution first quartile (25th percentile)"
+    )
+    contribution_median: float = Field(
+        ..., ge=0, description="Contribution median (50th percentile)"
+    )
+    contribution_q3: float = Field(
+        ..., ge=0, description="Contribution third quartile (75th percentile)"
+    )
     contribution_max: float = Field(..., ge=0, description="Maximum daily contribution")
-    contribution_cv: float = Field(..., ge=0, description="Contribution coefficient of variation (std/mean)")
+    contribution_cv: float = Field(
+        ..., ge=0, description="Contribution coefficient of variation (std/mean)"
+    )
 
     # Merit distribution (box plot data)
     merit_min: float = Field(..., ge=0, description="Minimum daily merit")
@@ -259,7 +269,9 @@ class GroupMember(BaseModel):
     daily_donation: float = Field(..., ge=0, description="Daily average donation")
     power: int = Field(..., ge=0, description="Current power value")
     rank_change: int | None = Field(None, description="Rank change from previous period")
-    contribution_change: float | None = Field(None, description="Daily contribution change from previous period")
+    contribution_change: float | None = Field(
+        None, description="Daily contribution change from previous period"
+    )
     merit_change: float | None = Field(None, description="Daily merit change from previous period")
 
 
@@ -325,7 +337,9 @@ class AllianceSummary(BaseModel):
     median_daily_contribution: float = Field(..., ge=0)
     median_daily_merit: float = Field(..., ge=0)
     # Change percentages vs previous period (None for season view)
-    contribution_change_pct: float | None = Field(None, description="Contribution change % vs previous period")
+    contribution_change_pct: float | None = Field(
+        None, description="Contribution change % vs previous period"
+    )
     merit_change_pct: float | None = Field(None, description="Merit change % vs previous period")
     power_change_pct: float | None = Field(None, description="Power change % vs previous period")
 
@@ -463,10 +477,14 @@ class AllianceAnalyticsResponse(BaseModel):
     groups: list[GroupStatsWithBoxPlot] = Field(..., description="All groups with box plot data")
 
     # Top performers (top 10 by contribution)
-    top_performers: list[PerformerItem] = Field(..., description="Top 10 performers by contribution")
+    top_performers: list[PerformerItem] = Field(
+        ..., description="Top 10 performers by contribution"
+    )
 
     # Bottom performers (bottom 5 by contribution)
-    bottom_performers: list[PerformerItem] = Field(..., description="Bottom 5 performers by contribution")
+    bottom_performers: list[PerformerItem] = Field(
+        ..., description="Bottom 5 performers by contribution"
+    )
 
     # Needs attention members
     needs_attention: list[AttentionItem] = Field(..., description="Members needing attention")

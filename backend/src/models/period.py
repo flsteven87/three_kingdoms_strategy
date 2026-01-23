@@ -26,7 +26,9 @@ class PeriodCreate(PeriodBase):
 
     season_id: UUID = Field(..., description="Season ID")
     alliance_id: UUID = Field(..., description="Alliance ID")
-    start_upload_id: UUID | None = Field(None, description="Start CSV upload ID (None for first period)")
+    start_upload_id: UUID | None = Field(
+        None, description="Start CSV upload ID (None for first period)"
+    )
     end_upload_id: UUID = Field(..., description="End CSV upload ID")
 
 

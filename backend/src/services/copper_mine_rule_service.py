@@ -24,10 +24,7 @@ from src.repositories.copper_mine_rule_repository import CopperMineRuleRepositor
 class CopperMineRuleService:
     """Service for copper mine rule operations"""
 
-    def __init__(
-        self,
-        repository: CopperMineRuleRepository | None = None
-    ):
+    def __init__(self, repository: CopperMineRuleRepository | None = None):
         self.repository = repository or CopperMineRuleRepository()
 
     def _to_response(self, rule: CopperMineRule) -> CopperMineRuleResponse:
@@ -52,7 +49,7 @@ class CopperMineRuleService:
         alliance_id: UUID,
         tier: int,
         required_merit: int,
-        allowed_level: AllowedLevel = "both"
+        allowed_level: AllowedLevel = "both",
     ) -> CopperMineRuleResponse:
         """
         Create a new copper mine rule
@@ -70,7 +67,7 @@ class CopperMineRuleService:
         if tier != expected_tier:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tier must be {expected_tier} (sequential)"
+                detail=f"Tier must be {expected_tier} (sequential)",
             )
 
         # Validate merit is greater than previous tier
@@ -79,7 +76,7 @@ class CopperMineRuleService:
             if required_merit <= prev_merit:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Required merit must be greater than {prev_merit}"
+                    detail=f"Required merit must be greater than {prev_merit}",
                 )
 
         rule = await self.repository.create_rule(
@@ -96,7 +93,7 @@ class CopperMineRuleService:
         rule_id: UUID,
         alliance_id: UUID,
         required_merit: int | None = None,
-        allowed_level: AllowedLevel | None = None
+        allowed_level: AllowedLevel | None = None,
     ) -> CopperMineRuleResponse:
         """
         Update a copper mine rule
@@ -107,16 +104,13 @@ class CopperMineRuleService:
         # Get the rule to update
         existing_rule = await self.repository.get_by_id(rule_id)
         if not existing_rule:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Rule not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
 
         # Validate alliance ownership
         if existing_rule.alliance_id != alliance_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Rule does not belong to this alliance"
+                detail="Rule does not belong to this alliance",
             )
 
         # Validate merit constraints if updating merit
@@ -137,13 +131,13 @@ class CopperMineRuleService:
             if required_merit < min_merit:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Required merit must be at least {min_merit}"
+                    detail=f"Required merit must be at least {min_merit}",
                 )
 
             if max_merit is not None and required_merit > max_merit:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Required merit must be at most {max_merit}"
+                    detail=f"Required merit must be at most {max_merit}",
                 )
 
         updated_rule = await self.repository.update_rule(
@@ -154,17 +148,12 @@ class CopperMineRuleService:
 
         if not updated_rule:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update rule"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update rule"
             )
 
         return self._to_response(updated_rule)
 
-    async def delete_rule(
-        self,
-        rule_id: UUID,
-        alliance_id: UUID
-    ) -> bool:
+    async def delete_rule(self, rule_id: UUID, alliance_id: UUID) -> bool:
         """
         Delete a copper mine rule
 
@@ -173,16 +162,13 @@ class CopperMineRuleService:
         # Get the rule to delete
         existing_rule = await self.repository.get_by_id(rule_id)
         if not existing_rule:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Rule not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
 
         # Validate alliance ownership
         if existing_rule.alliance_id != alliance_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Rule does not belong to this alliance"
+                detail="Rule does not belong to this alliance",
             )
 
         # Only allow deleting the highest tier
@@ -192,7 +178,7 @@ class CopperMineRuleService:
         if existing_rule.tier != max_tier:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only the highest tier rule can be deleted"
+                detail="Only the highest tier rule can be deleted",
             )
 
         return await self.repository.delete_rule(rule_id)

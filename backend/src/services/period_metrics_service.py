@@ -297,7 +297,9 @@ class PeriodMetricsService:
             Metrics data dictionary ready for insertion
         """
         # Calculate diffs (ensure non-negative for cumulative values)
-        contribution_diff = max(0, end_snapshot.total_contribution - start_snapshot.total_contribution)
+        contribution_diff = max(
+            0, end_snapshot.total_contribution - start_snapshot.total_contribution
+        )
         merit_diff = max(0, end_snapshot.total_merit - start_snapshot.total_merit)
         assist_diff = max(0, end_snapshot.total_assist - start_snapshot.total_assist)
         donation_diff = max(0, end_snapshot.total_donation - start_snapshot.total_donation)
@@ -419,9 +421,7 @@ class PeriodMetricsService:
         """
         return await self._metrics_repo.get_by_period_with_member(period_id)
 
-    async def get_member_trend(
-        self, member_id: UUID, season_id: UUID | None = None
-    ) -> list[dict]:
+    async def get_member_trend(self, member_id: UUID, season_id: UUID | None = None) -> list[dict]:
         """
         Get period metrics trend for a member.
 
@@ -464,6 +464,7 @@ class PeriodMetricsService:
         """
         # 1. Get all seasons for this alliance
         from src.repositories.season_repository import SeasonRepository
+
         season_repo = SeasonRepository()
 
         seasons = await season_repo.get_by_alliance(alliance_id)
@@ -497,12 +498,14 @@ class PeriodMetricsService:
                 metrics_count += len(metrics)
             total_metrics += metrics_count
 
-            season_results.append({
-                "season_id": str(season.id),
-                "season_name": season.name,
-                "periods_created": period_count,
-                "metrics_created": metrics_count,
-            })
+            season_results.append(
+                {
+                    "season_id": str(season.id),
+                    "season_name": season.name,
+                    "periods_created": period_count,
+                    "metrics_created": metrics_count,
+                }
+            )
 
         return {
             "success": True,

@@ -65,9 +65,7 @@ async def get_donations(
         List of donation events ordered by creation time (newest first)
     """
     await service.require_alliance_access(user_id, alliance_id)
-    donations = await service.get_donations_by_alliance_and_season(
-        alliance_id, season_id
-    )
+    donations = await service.get_donations_by_alliance_and_season(alliance_id, season_id)
     return [DonationListResponse.model_validate(d) for d in donations]
 
 
@@ -139,9 +137,7 @@ async def get_donation_detail(
     # Verify user has access (🔴 CRITICAL: was missing in original PR)
     await service.verify_donation_access(user_id, donation_id)
 
-    donation_with_info = await service.get_donation_with_info(
-        donation_id, target_amount
-    )
+    donation_with_info = await service.get_donation_with_info(donation_id, target_amount)
 
     return DonationDetailResponse(
         id=donation_with_info.id,

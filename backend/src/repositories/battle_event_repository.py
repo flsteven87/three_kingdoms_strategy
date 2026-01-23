@@ -200,10 +200,7 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
         result = await self._execute_async(
-            lambda: self.client.from_(self.table_name)
-            .delete()
-            .eq("id", str(event_id))
-            .execute()
+            lambda: self.client.from_(self.table_name).delete().eq("id", str(event_id)).execute()
         )
         self._handle_supabase_result(result, allow_empty=True)
         return True

@@ -211,9 +211,7 @@ class SeasonService:
         season = await self.get_season(user_id, season_id)
 
         if season.activation_status != "draft":
-            raise ValueError(
-                f"Season is already {season.activation_status}, cannot activate"
-            )
+            raise ValueError(f"Season is already {season.activation_status}, cannot activate")
 
         # Verify can activate (has trial or seasons)
         await self._season_quota_service.require_season_activation(season.alliance_id)

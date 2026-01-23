@@ -53,12 +53,9 @@ class Settings(BaseSettings):
     @property
     def line_bot_enabled(self) -> bool:
         """Check if LINE Bot is configured"""
-        return all([
-            self.line_channel_id,
-            self.line_channel_secret,
-            self.line_access_token,
-            self.liff_id
-        ])
+        return all(
+            [self.line_channel_id, self.line_channel_secret, self.line_access_token, self.liff_id]
+        )
 
     @property
     def cors_origins_list(self) -> list[str]:

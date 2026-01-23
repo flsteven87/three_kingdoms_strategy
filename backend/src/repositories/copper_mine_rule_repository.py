@@ -20,19 +20,12 @@ class CopperMineRuleRepository(SupabaseRepository[CopperMineRule]):
     """Repository for copper mine rule operations"""
 
     def __init__(self):
-        super().__init__(
-            table_name="copper_mine_rules",
-            model_class=CopperMineRule
-        )
+        super().__init__(table_name="copper_mine_rules", model_class=CopperMineRule)
 
-    async def get_rules_by_alliance(
-        self,
-        alliance_id: UUID
-    ) -> list[CopperMineRule]:
+    async def get_rules_by_alliance(self, alliance_id: UUID) -> list[CopperMineRule]:
         """Get all rules for an alliance, ordered by tier"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
+            lambda: self.client.from_(self.table_name)
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .order("tier")
@@ -42,15 +35,10 @@ class CopperMineRuleRepository(SupabaseRepository[CopperMineRule]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return self._build_models(data)
 
-    async def get_rule_by_tier(
-        self,
-        alliance_id: UUID,
-        tier: int
-    ) -> CopperMineRule | None:
+    async def get_rule_by_tier(self, alliance_id: UUID, tier: int) -> CopperMineRule | None:
         """Get a specific rule by alliance and tier"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
+            lambda: self.client.from_(self.table_name)
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("tier", tier)
@@ -67,7 +55,7 @@ class CopperMineRuleRepository(SupabaseRepository[CopperMineRule]):
         alliance_id: UUID,
         tier: int,
         required_merit: int,
-        allowed_level: AllowedLevel = "both"
+        allowed_level: AllowedLevel = "both",
     ) -> CopperMineRule:
         """Create a new copper mine rule"""
         insert_data = {
@@ -78,10 +66,7 @@ class CopperMineRuleRepository(SupabaseRepository[CopperMineRule]):
         }
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
-            .insert(insert_data)
-            .execute()
+            lambda: self.client.from_(self.table_name).insert(insert_data).execute()
         )
 
         data = self._handle_supabase_result(result, expect_single=True)
@@ -91,12 +76,10 @@ class CopperMineRuleRepository(SupabaseRepository[CopperMineRule]):
         self,
         rule_id: UUID,
         required_merit: int | None = None,
-        allowed_level: AllowedLevel | None = None
+        allowed_level: AllowedLevel | None = None,
     ) -> CopperMineRule | None:
         """Update a copper mine rule"""
-        update_data: dict = {
-            "updated_at": datetime.now(UTC).isoformat()
-        }
+        update_data: dict = {"updated_at": datetime.now(UTC).isoformat()}
 
         if required_merit is not None:
             update_data["required_merit"] = required_merit
@@ -104,8 +87,7 @@ class CopperMineRuleRepository(SupabaseRepository[CopperMineRule]):
             update_data["allowed_level"] = allowed_level
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
+            lambda: self.client.from_(self.table_name)
             .update(update_data)
             .eq("id", str(rule_id))
             .execute()
@@ -119,11 +101,7 @@ class CopperMineRuleRepository(SupabaseRepository[CopperMineRule]):
     async def delete_rule(self, rule_id: UUID) -> bool:
         """Delete a copper mine rule by ID"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
-            .delete()
-            .eq("id", str(rule_id))
-            .execute()
+            lambda: self.client.from_(self.table_name).delete().eq("id", str(rule_id)).execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True)

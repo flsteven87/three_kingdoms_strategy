@@ -33,11 +33,7 @@ from src.repositories.member_snapshot_repository import MemberSnapshotRepository
 from src.repositories.season_repository import SeasonRepository
 
 # 等級文字對照表（避免重複定義）
-LEVEL_TEXT = {
-    "nine": "9 級",
-    "ten": "10 級",
-    "both": "9 或 10 級"
-}
+LEVEL_TEXT = {"nine": "9 級", "ten": "10 級", "both": "9 或 10 級"}
 
 
 class CopperMineService:
@@ -53,9 +49,7 @@ class CopperMineService:
         snapshot_repository: MemberSnapshotRepository | None = None,
     ):
         self.repository = repository or CopperMineRepository()
-        self.line_binding_repository = (
-            line_binding_repository or LineBindingRepository()
-        )
+        self.line_binding_repository = line_binding_repository or LineBindingRepository()
         self.season_repository = season_repository or SeasonRepository()
         self.member_repository = member_repository or MemberRepository()
         self.rule_repository = rule_repository or CopperMineRuleRepository()
@@ -73,8 +67,7 @@ class CopperMineService:
         )
         if not group_binding:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Group not bound to any alliance"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Group not bound to any alliance"
             )
         return group_binding.alliance_id
 
@@ -88,13 +81,10 @@ class CopperMineService:
             level=mine.level,
             status=mine.status,
             notes=mine.notes,
-            registered_at=mine.registered_at
+            registered_at=mine.registered_at,
         )
 
-    async def get_rules_for_liff(
-        self,
-        line_group_id: str
-    ) -> list:
+    async def get_rules_for_liff(self, line_group_id: str) -> list:
         """
         Get copper mine rules for LIFF display
 
@@ -118,11 +108,7 @@ class CopperMineService:
             for rule in sorted(rules, key=lambda r: r.tier)
         ]
 
-    async def get_mines_list(
-        self,
-        line_group_id: str,
-        line_user_id: str
-    ) -> CopperMineListResponse:
+    async def get_mines_list(self, line_group_id: str, line_user_id: str) -> CopperMineListResponse:
         """
         Get copper mines list for LIFF display
 
@@ -146,10 +132,7 @@ class CopperMineService:
 
         # 只顯示當前賽季的銅礦（公開資訊）
         # 當 active_season_id 為 None 時，repository 會返回所有銅礦
-        mines = await self.repository.get_mines_by_alliance(
-            alliance_id,
-            season_id=active_season_id
-        )
+        mines = await self.repository.get_mines_by_alliance(alliance_id, season_id=active_season_id)
 
         # P0 修復: 計算用戶銅礦申請狀態
         # 取得規則數量作為上限
@@ -170,7 +153,7 @@ class CopperMineService:
             mines=[self._to_response(mine) for mine in mines],
             total=len(mines),
             my_count=my_count,
-            max_allowed=max_allowed
+            max_allowed=max_allowed,
         )
 
     async def _get_active_season(self, alliance_id: UUID) -> UUID | None:
@@ -184,11 +167,7 @@ class CopperMineService:
         return member.id if member else None
 
     async def _check_coord_available(
-        self,
-        alliance_id: UUID,
-        coord_x: int,
-        coord_y: int,
-        season_id: UUID | None = None
+        self, alliance_id: UUID, coord_x: int, coord_y: int, season_id: UUID | None = None
     ) -> None:
         """
         Check if coordinates are available for a new copper mine.
@@ -207,15 +186,11 @@ class CopperMineService:
             HTTPException 409: If coordinates are already taken
         """
         existing = await self.repository.get_mine_by_coords(
-            alliance_id=alliance_id,
-            coord_x=coord_x,
-            coord_y=coord_y,
-            season_id=season_id
+            alliance_id=alliance_id, coord_x=coord_x, coord_y=coord_y, season_id=season_id
         )
         if existing:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"座標 ({coord_x}, {coord_y}) 已被註冊"
+                status_code=status.HTTP_409_CONFLICT, detail=f"座標 ({coord_x}, {coord_y}) 已被註冊"
             )
 
     def _is_level_allowed(self, level: int, allowed_level: AllowedLevel) -> bool:
@@ -238,11 +213,7 @@ class CopperMineService:
         return False
 
     async def _validate_rule(
-        self,
-        alliance_id: UUID,
-        member_id: UUID | None,
-        season_id: UUID | None,
-        level: int
+        self, alliance_id: UUID, member_id: UUID | None, season_id: UUID | None, level: int
     ) -> None:
         """
         Validate copper mine registration against alliance rules.
@@ -272,8 +243,7 @@ class CopperMineService:
         # 如果沒有設定任何規則，不允許申請銅礦
         if max_allowed == 0:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="同盟尚未設定銅礦規則，請聯繫盟主"
+                status_code=status.HTTP_403_FORBIDDEN, detail="同盟尚未設定銅礦規則，請聯繫盟主"
             )
 
         # 2. 如果無法識別成員身份，無法驗證個人上限
@@ -283,7 +253,7 @@ class CopperMineService:
             if not self._is_level_allowed(level, first_rule.allowed_level):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"銅礦等級限制：{LEVEL_TEXT[first_rule.allowed_level]}"
+                    detail=f"銅礦等級限制：{LEVEL_TEXT[first_rule.allowed_level]}",
                 )
             return
 
@@ -293,7 +263,7 @@ class CopperMineService:
         if current_count >= max_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"已達銅礦上限（{current_count}/{max_allowed} 座）"
+                detail=f"已達銅礦上限（{current_count}/{max_allowed} 座）",
             )
 
         next_tier = current_count + 1
@@ -304,8 +274,7 @@ class CopperMineService:
         if not rule:
             # 防禦性檢查：理論上不應該發生
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"第 {next_tier} 座銅礦規則未設定"
+                status_code=status.HTTP_403_FORBIDDEN, detail=f"第 {next_tier} 座銅礦規則未設定"
             )
 
         # 5. 取得成員快照驗證戰功
@@ -318,19 +287,18 @@ class CopperMineService:
             if snapshot.total_merit < rule.required_merit:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"總戰功不足：需要 {rule.required_merit:,}，目前 {snapshot.total_merit:,}"
+                    detail=f"總戰功不足：需要 {rule.required_merit:,}，目前 {snapshot.total_merit:,}",
                 )
         else:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="成員戰功不存在，無法驗證戰功要求"
+                status_code=status.HTTP_403_FORBIDDEN, detail="成員戰功不存在，無法驗證戰功要求"
             )
 
         # 6. 驗證等級限制
         if not self._is_level_allowed(level, rule.allowed_level):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"第 {next_tier} 座銅礦只能申請{LEVEL_TEXT[rule.allowed_level]}"
+                detail=f"第 {next_tier} 座銅礦只能申請{LEVEL_TEXT[rule.allowed_level]}",
             )
 
     async def register_mine(
@@ -341,7 +309,7 @@ class CopperMineService:
         coord_x: int,
         coord_y: int,
         level: int,
-        notes: str | None = None
+        notes: str | None = None,
     ) -> RegisterCopperResponse:
         """
         Register a new copper mine (LIFF)
@@ -375,18 +343,12 @@ class CopperMineService:
         # P0 修復: 使用統一的座標檢查方法
         # 當有活躍賽季時，只檢查該賽季內的座標
         await self._check_coord_available(
-            alliance_id=alliance_id,
-            coord_x=coord_x,
-            coord_y=coord_y,
-            season_id=season_id
+            alliance_id=alliance_id, coord_x=coord_x, coord_y=coord_y, season_id=season_id
         )
 
         # P1 修復: 驗證銅礦申請規則
         await self._validate_rule(
-            alliance_id=alliance_id,
-            member_id=member_id,
-            season_id=season_id,
-            level=level
+            alliance_id=alliance_id, member_id=member_id, season_id=season_id, level=level
         )
 
         # Create the mine
@@ -405,15 +367,10 @@ class CopperMineService:
         return RegisterCopperResponse(
             success=True,
             mine=self._to_response(mine),
-            message="Copper mine registered successfully"
+            message="Copper mine registered successfully",
         )
 
-    async def delete_mine(
-        self,
-        mine_id: UUID,
-        line_group_id: str,
-        line_user_id: str
-    ) -> bool:
+    async def delete_mine(self, mine_id: UUID, line_group_id: str, line_user_id: str) -> bool:
         """
         Delete a copper mine (LIFF)
 
@@ -438,22 +395,19 @@ class CopperMineService:
         mine = await self.repository.get_by_id(mine_id)
         if not mine:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Copper mine not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Copper mine not found"
             )
 
         # P0 修復: 驗證是否為本人註冊
         if mine.registered_by_line_user_id != line_user_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="只能刪除自己註冊的銅礦"
+                status_code=status.HTTP_403_FORBIDDEN, detail="只能刪除自己註冊的銅礦"
             )
 
         deleted = await self.repository.delete_mine(mine_id)
         if not deleted:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Failed to delete copper mine"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Failed to delete copper mine"
             )
 
         return True
@@ -463,9 +417,7 @@ class CopperMineService:
     # =========================================================================
 
     async def get_ownerships_by_season(
-        self,
-        season_id: UUID,
-        alliance_id: UUID
+        self, season_id: UUID, alliance_id: UUID
     ) -> list[CopperMineOwnershipResponse]:
         """
         Get copper mine ownerships for Dashboard display.
@@ -490,12 +442,18 @@ class CopperMineService:
 
         # 3. Batch fetch all related data
         members_list = await self.member_repository.get_by_ids(member_ids) if member_ids else []
-        bindings_list = await self.line_binding_repository.get_member_bindings_by_game_ids(
-            alliance_id, game_ids
-        ) if game_ids else []
-        snapshots_map = await self.snapshot_repository.get_latest_by_members_in_season(
-            member_ids, season_id
-        ) if member_ids else {}
+        bindings_list = (
+            await self.line_binding_repository.get_member_bindings_by_game_ids(
+                alliance_id, game_ids
+            )
+            if game_ids
+            else []
+        )
+        snapshots_map = (
+            await self.snapshot_repository.get_latest_by_members_in_season(member_ids, season_id)
+            if member_ids
+            else {}
+        )
 
         # 4. Build lookup maps
         members_map = {str(m.id): m for m in members_list}
@@ -525,28 +483,26 @@ class CopperMineService:
             registered_by = ownership.get("registered_by_line_user_id", "dashboard")
             registered_via = "dashboard" if registered_by == "dashboard" else "liff"
 
-            responses.append(CopperMineOwnershipResponse(
-                id=str(ownership["id"]),
-                season_id=str(ownership["season_id"]),
-                member_id=str(member_id) if member_id else None,
-                coord_x=ownership["coord_x"],
-                coord_y=ownership["coord_y"],
-                level=ownership["level"],
-                applied_at=ownership["registered_at"],
-                created_at=ownership["registered_at"],
-                registered_via=registered_via,
-                member_name=member_name,
-                member_group=member_group,
-                line_display_name=line_display_name,
-            ))
+            responses.append(
+                CopperMineOwnershipResponse(
+                    id=str(ownership["id"]),
+                    season_id=str(ownership["season_id"]),
+                    member_id=str(member_id) if member_id else None,
+                    coord_x=ownership["coord_x"],
+                    coord_y=ownership["coord_y"],
+                    level=ownership["level"],
+                    applied_at=ownership["registered_at"],
+                    created_at=ownership["registered_at"],
+                    registered_via=registered_via,
+                    member_name=member_name,
+                    member_group=member_group,
+                    line_display_name=line_display_name,
+                )
+            )
 
         return responses
 
-    async def _get_latest_snapshot(
-        self,
-        member_id: UUID,
-        season_id: UUID
-    ) -> dict | None:
+    async def _get_latest_snapshot(self, member_id: UUID, season_id: UUID) -> dict | None:
         """
         Get latest snapshot for a member in a season.
 
@@ -578,7 +534,7 @@ class CopperMineService:
         coord_x: int,
         coord_y: int,
         level: int,
-        applied_at: datetime | None = None
+        applied_at: datetime | None = None,
     ) -> CopperMineOwnershipResponse:
         """
         Create a copper mine ownership (Dashboard)
@@ -608,27 +564,20 @@ class CopperMineService:
             member = await self.member_repository.get_by_id(member_id)
             if not member:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Member not found"
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Member not found"
                 )
             member_name = member.name
 
         # P0 修復: 使用統一的座標檢查方法
         await self._check_coord_available(
-            alliance_id=alliance_id,
-            coord_x=coord_x,
-            coord_y=coord_y,
-            season_id=season_id
+            alliance_id=alliance_id, coord_x=coord_x, coord_y=coord_y, season_id=season_id
         )
 
         # P0 修復: 驗證銅礦申請規則（與 LIFF 行為一致）
         # Skip validation for reserved mines
         if not is_reserved:
             await self._validate_rule(
-                alliance_id=alliance_id,
-                member_id=member_id,
-                season_id=season_id,
-                level=level
+                alliance_id=alliance_id, member_id=member_id, season_id=season_id, level=level
             )
 
         # Create ownership
@@ -657,11 +606,7 @@ class CopperMineService:
             line_display_name=None,
         )
 
-    async def delete_ownership(
-        self,
-        ownership_id: UUID,
-        alliance_id: UUID
-    ) -> bool:
+    async def delete_ownership(self, ownership_id: UUID, alliance_id: UUID) -> bool:
         """
         Delete a copper mine ownership (Dashboard)
 
@@ -678,32 +623,24 @@ class CopperMineService:
         # Verify ownership exists and belongs to alliance
         ownership = await self.repository.get_by_id(ownership_id)
         if not ownership:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Ownership not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ownership not found")
 
         if ownership.alliance_id != alliance_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Ownership does not belong to this alliance"
+                detail="Ownership does not belong to this alliance",
             )
 
         deleted = await self.repository.delete_mine(ownership_id)
         if not deleted:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Failed to delete ownership"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Failed to delete ownership"
             )
 
         return True
 
     async def update_ownership(
-        self,
-        ownership_id: UUID,
-        season_id: UUID,
-        alliance_id: UUID,
-        member_id: UUID
+        self, ownership_id: UUID, season_id: UUID, alliance_id: UUID, member_id: UUID
     ) -> CopperMineOwnershipResponse:
         """
         Update a copper mine ownership (for transferring reserved mines to members)
@@ -724,38 +661,27 @@ class CopperMineService:
         # Verify ownership exists and belongs to alliance
         ownership = await self.repository.get_by_id(ownership_id)
         if not ownership:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Ownership not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ownership not found")
 
         if ownership.alliance_id != alliance_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Ownership does not belong to this alliance"
+                detail="Ownership does not belong to this alliance",
             )
 
         # Validate new member exists
         member = await self.member_repository.get_by_id(member_id)
         if not member:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Member not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
 
         # Validate rules for the new member
         await self._validate_rule(
-            alliance_id=alliance_id,
-            member_id=member_id,
-            season_id=season_id,
-            level=ownership.level
+            alliance_id=alliance_id, member_id=member_id, season_id=season_id, level=ownership.level
         )
 
         # Update the ownership
         updated_mine = await self.repository.update_ownership(
-            ownership_id=ownership_id,
-            member_id=member_id,
-            game_id=member.name
+            ownership_id=ownership_id, member_id=member_id, game_id=member.name
         )
 
         return CopperMineOwnershipResponse(

@@ -205,9 +205,7 @@ class AuthService:
             # Re-raise auth-specific exceptions as HTTP exceptions
             return self.authenticate_user(authorization)  # Will raise HTTPException
 
-    def authenticate_optional(
-        self, authorization: str | None
-    ) -> AuthenticatedUser | None:
+    def authenticate_optional(self, authorization: str | None) -> AuthenticatedUser | None:
         """
         Authenticate user optionally (return None if not authenticated).
 

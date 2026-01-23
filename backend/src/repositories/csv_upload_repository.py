@@ -49,9 +49,7 @@ class CsvUploadRepository(SupabaseRepository[CsvUpload]):
 
         return self._build_models(data)
 
-    async def get_by_alliance(
-        self, alliance_id: UUID, limit: int = 100
-    ) -> list[CsvUpload]:
+    async def get_by_alliance(self, alliance_id: UUID, limit: int = 100) -> list[CsvUpload]:
         """
         Get CSV uploads by alliance ID
 

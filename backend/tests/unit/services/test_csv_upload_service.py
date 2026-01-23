@@ -260,9 +260,7 @@ class TestUploadCsv:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await csv_upload_service.upload_csv(
-                user_id, season_id, "test.csv", valid_csv_content
-            )
+            await csv_upload_service.upload_csv(user_id, season_id, "test.csv", valid_csv_content)
         assert exc_info.value.status_code == 404
         assert "Season not found" in exc_info.value.detail
 
@@ -321,7 +319,9 @@ class TestUploadCsv:
         mock_csv_upload_repo.get_by_date = AsyncMock(return_value=None)
         mock_upload = create_mock_upload(upload_id, season_id, alliance_id)
         mock_csv_upload_repo.create = AsyncMock(return_value=mock_upload)
-        mock_member_repo.upsert_batch = AsyncMock(return_value=[create_mock_member("張飛"), create_mock_member("關羽")])
+        mock_member_repo.upsert_batch = AsyncMock(
+            return_value=[create_mock_member("張飛"), create_mock_member("關羽")]
+        )
         mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
         mock_period_metrics_service.calculate_periods_for_season = AsyncMock(return_value=[])
 
@@ -371,7 +371,9 @@ class TestUploadCsv:
 
         mock_upload = create_mock_upload(upload_id, season_id, alliance_id)
         mock_csv_upload_repo.create = AsyncMock(return_value=mock_upload)
-        mock_member_repo.upsert_batch = AsyncMock(return_value=[create_mock_member("張飛"), create_mock_member("關羽")])
+        mock_member_repo.upsert_batch = AsyncMock(
+            return_value=[create_mock_member("張飛"), create_mock_member("關羽")]
+        )
         mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
         mock_period_metrics_service.calculate_periods_for_season = AsyncMock(return_value=[])
 
@@ -411,7 +413,9 @@ class TestUploadCsv:
         mock_permission_service.require_write_permission = AsyncMock()
         mock_upload = create_mock_upload(upload_id, season_id, alliance_id)
         mock_csv_upload_repo.create = AsyncMock(return_value=mock_upload)
-        mock_member_repo.upsert_batch = AsyncMock(return_value=[create_mock_member("張飛"), create_mock_member("關羽")])
+        mock_member_repo.upsert_batch = AsyncMock(
+            return_value=[create_mock_member("張飛"), create_mock_member("關羽")]
+        )
         mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
 
         filename = "同盟統計2025年10月09日10时13分09秒.csv"

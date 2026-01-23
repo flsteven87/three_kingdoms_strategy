@@ -346,12 +346,14 @@ def _calculate_merit_distribution(merits: list[int]) -> list[DistributionBinResp
     current = bin_start
     while current < max_val:
         next_val = current + bin_width
-        bins.append({
-            "range": f"{_format_value(current)}-{_format_value(next_val)}",
-            "min_value": current,
-            "max_value": next_val,
-            "count": 0,
-        })
+        bins.append(
+            {
+                "range": f"{_format_value(current)}-{_format_value(next_val)}",
+                "min_value": current,
+                "max_value": next_val,
+                "count": 0,
+            }
+        )
         current = next_val
 
     # Count values in each bin

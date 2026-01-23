@@ -102,7 +102,7 @@ class CSVUploadService:
         # Step 2: Determine snapshot date (custom or from filename)
         if custom_snapshot_date:
             try:
-                snapshot_date = datetime.fromisoformat(custom_snapshot_date.replace('Z', '+00:00'))
+                snapshot_date = datetime.fromisoformat(custom_snapshot_date.replace("Z", "+00:00"))
             except ValueError as e:
                 raise HTTPException(
                     status_code=400, detail=f"Invalid snapshot date format: {str(e)}"
@@ -237,9 +237,7 @@ class CSVUploadService:
         # Verify permission: all members can view uploads
         role = await self._permission_service.get_user_role(user_id, season.alliance_id)
         if role is None:
-            raise HTTPException(
-                status_code=403, detail="You are not a member of this alliance"
-            )
+            raise HTTPException(status_code=403, detail="You are not a member of this alliance")
 
         uploads = await self._csv_upload_repo.get_by_season(season_id)
 

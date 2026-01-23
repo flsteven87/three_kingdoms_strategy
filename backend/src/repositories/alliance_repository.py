@@ -108,10 +108,7 @@ class AllianceRepository(SupabaseRepository[Alliance]):
         符合 CLAUDE.md: Hard delete only
         """
         result = await self._execute_async(
-            lambda: self.client.from_(self.table_name)
-            .delete()
-            .eq("id", str(alliance_id))
-            .execute()
+            lambda: self.client.from_(self.table_name).delete().eq("id", str(alliance_id)).execute()
         )
 
         # Delete operations may return empty data

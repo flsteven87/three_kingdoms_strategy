@@ -79,12 +79,8 @@ async def get_alliance_collaborators(
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
-    collaborators = await service.get_alliance_collaborators(
-        current_user_id, alliance_id
-    )
-    return AllianceCollaboratorListResponse(
-        collaborators=collaborators, total=len(collaborators)
-    )
+    collaborators = await service.get_alliance_collaborators(current_user_id, alliance_id)
+    return AllianceCollaboratorListResponse(collaborators=collaborators, total=len(collaborators))
 
 
 @router.delete(
@@ -182,9 +178,7 @@ async def update_collaborator_role(
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
-    return await service.update_collaborator_role(
-        current_user_id, alliance_id, user_id, new_role
-    )
+    return await service.update_collaborator_role(current_user_id, alliance_id, user_id, new_role)
 
 
 @router.get(

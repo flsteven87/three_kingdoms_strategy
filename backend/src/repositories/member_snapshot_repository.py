@@ -78,9 +78,7 @@ class MemberSnapshotRepository(SupabaseRepository[MemberSnapshot]):
 
         return self._build_models(data)
 
-    async def get_by_member(
-        self, member_id: UUID, limit: int = 100
-    ) -> list[MemberSnapshot]:
+    async def get_by_member(self, member_id: UUID, limit: int = 100) -> list[MemberSnapshot]:
         """
         Get member snapshots by member ID (historical performance)
 
@@ -136,9 +134,7 @@ class MemberSnapshotRepository(SupabaseRepository[MemberSnapshot]):
 
         return self._build_model(data)
 
-    async def get_by_alliance(
-        self, alliance_id: UUID, limit: int = 1000
-    ) -> list[MemberSnapshot]:
+    async def get_by_alliance(self, alliance_id: UUID, limit: int = 1000) -> list[MemberSnapshot]:
         """
         Get member snapshots by alliance ID
 
@@ -348,14 +344,11 @@ class MemberSnapshotRepository(SupabaseRepository[MemberSnapshot]):
             return []
 
         # Filter to only uploads before or on target_date
-        target_ts = (
-            target_date.replace(tzinfo=UTC)
-            if target_date.tzinfo is None
-            else target_date
-        )
+        target_ts = target_date.replace(tzinfo=UTC) if target_date.tzinfo is None else target_date
 
         valid_uploads = [
-            u for u in uploads
+            u
+            for u in uploads
             if datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")) <= target_ts
         ]
 

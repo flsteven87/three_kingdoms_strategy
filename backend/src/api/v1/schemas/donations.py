@@ -27,9 +27,7 @@ class CreateDonationRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=100, description="Event title")
     type: DonationType = Field(..., description="Regular or penalty type")
     deadline: datetime = Field(..., description="Deadline datetime")
-    target_amount: int = Field(
-        0, ge=0, description="Default target for all members (regular type)"
-    )
+    target_amount: int = Field(0, ge=0, description="Default target for all members (regular type)")
     description: str | None = Field(None, description="Optional event description")
 
 
@@ -37,9 +35,7 @@ class DonationTargetOverrideRequest(BaseModel):
     """Request body for per-member target override"""
 
     member_id: UUID = Field(..., description="Member UUID")
-    target_amount: int = Field(
-        ..., ge=0, description="Override target amount for the member"
-    )
+    target_amount: int = Field(..., ge=0, description="Override target amount for the member")
 
 
 # ============================================================================

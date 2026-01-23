@@ -312,7 +312,9 @@ class TestUpdateAlliance:
     ):
         """Should only update fields that are provided"""
         # Arrange
-        existing_alliance = create_mock_alliance(alliance_id, name="Old Name", server_name="Old Server")
+        existing_alliance = create_mock_alliance(
+            alliance_id, name="Old Name", server_name="Old Server"
+        )
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=existing_alliance)
         mock_permission_service.require_write_permission = AsyncMock()
         mock_alliance_repo.update = AsyncMock(return_value=existing_alliance)

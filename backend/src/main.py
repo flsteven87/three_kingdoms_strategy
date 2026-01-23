@@ -74,10 +74,7 @@ async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse
     Converts ValueError (domain exceptions) to HTTP 400 Bad Request
     This eliminates the need for repetitive try/except blocks in endpoints
     """
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": str(exc)}
-    )
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
 
 
 @app.exception_handler(FileNotFoundError)
@@ -87,10 +84,7 @@ async def file_not_found_handler(request: Request, exc: FileNotFoundError) -> JS
 
     Converts FileNotFoundError to HTTP 404 Not Found
     """
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND,
-        content={"detail": str(exc)}
-    )
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
 
 
 @app.exception_handler(PermissionError)
@@ -100,10 +94,7 @@ async def permission_error_handler(request: Request, exc: PermissionError) -> JS
 
     Converts PermissionError to HTTP 403 Forbidden
     """
-    return JSONResponse(
-        status_code=status.HTTP_403_FORBIDDEN,
-        content={"detail": str(exc)}
-    )
+    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
 
 
 @app.exception_handler(SeasonQuotaExhaustedError)
@@ -118,7 +109,7 @@ async def season_quota_exhausted_handler(
     """
     return JSONResponse(
         status_code=status.HTTP_402_PAYMENT_REQUIRED,
-        content={"detail": exc.message, "error_code": exc.error_code}
+        content={"detail": exc.message, "error_code": exc.error_code},
     )
 
 
@@ -126,11 +117,7 @@ async def season_quota_exhausted_handler(
 @app.get("/health")
 async def health_check():
     """Health check endpoint (no auth required)"""
-    return {
-        "status": "healthy",
-        "environment": settings.environment,
-        "version": settings.version
-    }
+    return {"status": "healthy", "environment": settings.environment, "version": settings.version}
 
 
 # Root endpoint
@@ -140,7 +127,7 @@ async def root():
     return {
         "message": "Three Kingdoms Strategy Manager API",
         "docs": "/docs" if settings.debug else "disabled",
-        "version": settings.version
+        "version": settings.version,
     }
 
 
@@ -152,5 +139,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8087,
         reload=settings.debug,
-        log_level=settings.log_level.lower()
+        log_level=settings.log_level.lower(),
     )

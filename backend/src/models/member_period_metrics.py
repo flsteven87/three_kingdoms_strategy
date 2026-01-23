@@ -32,7 +32,9 @@ class MemberPeriodMetricsBase(BaseModel):
     daily_donation: Decimal = Field(Decimal("0"), ge=0, description="Daily average donation")
 
     # Ranking data
-    start_rank: int | None = Field(None, ge=1, description="Rank at period start (None for new members)")
+    start_rank: int | None = Field(
+        None, ge=1, description="Rank at period start (None for new members)"
+    )
     end_rank: int = Field(..., ge=1, description="Rank at period end")
     rank_change: int | None = Field(None, description="Rank change (positive = improved)")
 
@@ -51,7 +53,9 @@ class MemberPeriodMetricsCreate(MemberPeriodMetricsBase):
     period_id: UUID = Field(..., description="Period ID")
     member_id: UUID = Field(..., description="Member ID")
     alliance_id: UUID = Field(..., description="Alliance ID")
-    start_snapshot_id: UUID | None = Field(None, description="Start snapshot ID (None for new members)")
+    start_snapshot_id: UUID | None = Field(
+        None, description="Start snapshot ID (None for new members)"
+    )
     end_snapshot_id: UUID = Field(..., description="End snapshot ID")
 
 

@@ -52,10 +52,7 @@ class HegemonyWeightBase(BaseModel):
     def validate_indicator_weights_sum(self) -> bool:
         """Validate that tier 1 weights sum to 1.0 (with small tolerance)"""
         total = (
-            self.weight_contribution
-            + self.weight_merit
-            + self.weight_assist
-            + self.weight_donation
+            self.weight_contribution + self.weight_merit + self.weight_assist + self.weight_donation
         )
         return abs(total - Decimal("1.0")) < Decimal("0.0001")
 

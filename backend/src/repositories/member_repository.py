@@ -19,9 +19,7 @@ class MemberRepository(SupabaseRepository[Member]):
         """Initialize member repository"""
         super().__init__(table_name="members", model_class=Member)
 
-    async def get_by_alliance(
-        self, alliance_id: UUID, active_only: bool = False
-    ) -> list[Member]:
+    async def get_by_alliance(self, alliance_id: UUID, active_only: bool = False) -> list[Member]:
         """
         Get members by alliance ID
 
@@ -34,8 +32,11 @@ class MemberRepository(SupabaseRepository[Member]):
 
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
+
         def _query():
-            query = self.client.from_(self.table_name).select("*").eq("alliance_id", str(alliance_id))
+            query = (
+                self.client.from_(self.table_name).select("*").eq("alliance_id", str(alliance_id))
+            )
             if active_only:
                 query = query.eq("is_active", True)
             return query.order("name").execute()
@@ -117,9 +118,7 @@ class MemberRepository(SupabaseRepository[Member]):
 
         return self._build_model(data)
 
-    async def upsert_by_name(
-        self, alliance_id: UUID, name: str, member_data: dict
-    ) -> Member:
+    async def upsert_by_name(self, alliance_id: UUID, name: str, member_data: dict) -> Member:
         """
         Create or update member by name
 

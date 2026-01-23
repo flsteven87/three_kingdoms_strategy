@@ -53,9 +53,7 @@ class DonationTargetRepository(SupabaseRepository[DonationTarget]):
             .execute()
         )
 
-    async def get_by_donation_event(
-        self, donation_event_id: UUID
-    ) -> list[DonationTarget]:
+    async def get_by_donation_event(self, donation_event_id: UUID) -> list[DonationTarget]:
         """Fetch all member target overrides for a donation event"""
         result = await self._execute_async(
             lambda: self.client.from_(self.table_name)

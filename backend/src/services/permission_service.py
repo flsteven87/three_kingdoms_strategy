@@ -61,6 +61,7 @@ class PermissionService:
         # Lazy import to avoid circular dependency
         if subscription_service is None:
             from src.services.subscription_service import SubscriptionService
+
             self._subscription_service: SubscriptionService = SubscriptionService()
         else:
             self._subscription_service = subscription_service
@@ -88,15 +89,12 @@ class PermissionService:
             logger.error(
                 f"Failed to get user role - user_id={user_id}, alliance_id={alliance_id}, "
                 f"error={type(e).__name__}: {str(e)}",
-                exc_info=True
+                exc_info=True,
             )
             raise RuntimeError(f"Failed to get user role: {type(e).__name__}") from e
 
     async def check_permission(
-        self,
-        user_id: UUID,
-        alliance_id: UUID,
-        required_roles: list[str]
+        self, user_id: UUID, alliance_id: UUID, required_roles: list[str]
     ) -> bool:
         """
         Check if user has one of the required roles
@@ -124,7 +122,7 @@ class PermissionService:
         user_id: UUID,
         alliance_id: UUID,
         required_roles: list[str],
-        action: str = "perform this action"
+        action: str = "perform this action",
     ) -> None:
         """
         Require user to have one of the specified roles
@@ -163,10 +161,7 @@ class PermissionService:
             )
 
     async def require_owner(
-        self,
-        user_id: UUID,
-        alliance_id: UUID,
-        action: str = "perform this action"
+        self, user_id: UUID, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
         Require user to be the alliance owner
@@ -182,13 +177,10 @@ class PermissionService:
             ValueError: If user is not a member
             PermissionError: If user is not owner
         """
-        await self.require_permission(user_id, alliance_id, ['owner'], action)
+        await self.require_permission(user_id, alliance_id, ["owner"], action)
 
     async def require_owner_or_collaborator(
-        self,
-        user_id: UUID,
-        alliance_id: UUID,
-        action: str = "perform this action"
+        self, user_id: UUID, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
         Require user to be owner or collaborator
@@ -204,42 +196,32 @@ class PermissionService:
             ValueError: If user is not a member
             PermissionError: If user is only a member (not owner/collaborator)
         """
-        await self.require_permission(
-            user_id,
-            alliance_id,
-            ['owner', 'collaborator'],
-            action
-        )
+        await self.require_permission(user_id, alliance_id, ["owner", "collaborator"], action)
 
     async def can_manage_collaborators(self, user_id: UUID, alliance_id: UUID) -> bool:
         """Check if user can manage collaborators (owner only)"""
-        return await self.check_permission(user_id, alliance_id, ['owner'])
+        return await self.check_permission(user_id, alliance_id, ["owner"])
 
     async def can_upload_data(self, user_id: UUID, alliance_id: UUID) -> bool:
         """Check if user can upload CSV data (owner + collaborator)"""
-        return await self.check_permission(user_id, alliance_id, ['owner', 'collaborator'])
+        return await self.check_permission(user_id, alliance_id, ["owner", "collaborator"])
 
     async def can_manage_seasons(self, user_id: UUID, alliance_id: UUID) -> bool:
         """Check if user can manage seasons (owner + collaborator)"""
-        return await self.check_permission(user_id, alliance_id, ['owner', 'collaborator'])
+        return await self.check_permission(user_id, alliance_id, ["owner", "collaborator"])
 
     async def can_manage_weights(self, user_id: UUID, alliance_id: UUID) -> bool:
         """Check if user can manage hegemony weights (owner + collaborator)"""
-        return await self.check_permission(user_id, alliance_id, ['owner', 'collaborator'])
+        return await self.check_permission(user_id, alliance_id, ["owner", "collaborator"])
 
     async def can_view_data(self, user_id: UUID, alliance_id: UUID) -> bool:
         """Check if user can view data (all members)"""
         return await self.check_permission(
-            user_id,
-            alliance_id,
-            ['owner', 'collaborator', 'member']
+            user_id, alliance_id, ["owner", "collaborator", "member"]
         )
 
     async def require_write_permission(
-        self,
-        user_id: UUID,
-        alliance_id: UUID,
-        action: str = "perform this action"
+        self, user_id: UUID, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
         Require user to have write permission (role + active subscription).
@@ -274,9 +256,7 @@ class PermissionService:
         await self._subscription_service.require_write_access(alliance_id, action)
 
     async def require_active_subscription(
-        self,
-        alliance_id: UUID,
-        action: str = "perform this action"
+        self, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
         Require alliance to have active subscription (subscription check only).
@@ -294,10 +274,7 @@ class PermissionService:
         await self._subscription_service.require_write_access(alliance_id, action)
 
     async def require_role_permission(
-        self,
-        user_id: UUID,
-        alliance_id: UUID,
-        action: str = "perform this action"
+        self, user_id: UUID, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
         Require user to have write role (owner or collaborator) without subscription check.

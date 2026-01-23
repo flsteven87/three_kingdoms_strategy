@@ -30,12 +30,7 @@ class SupabaseRepository[T: BaseModel]:
     We use asyncio.to_thread() to run in thread pool and avoid blocking.
     """
 
-    def __init__(
-        self,
-        table_name: str,
-        model_class: type[T],
-        client: Client | None = None
-    ):
+    def __init__(self, table_name: str, model_class: type[T], client: Client | None = None):
         """
         Initialize repository
 
@@ -64,10 +59,7 @@ class SupabaseRepository[T: BaseModel]:
         return await asyncio.to_thread(func)
 
     def _handle_supabase_result(
-        self,
-        result: Any,
-        allow_empty: bool = False,
-        expect_single: bool = False
+        self, result: Any, allow_empty: bool = False, expect_single: bool = False
     ) -> list[dict] | dict:
         """
         Handle Supabase query result with error checking
@@ -134,8 +126,7 @@ class SupabaseRepository[T: BaseModel]:
             Model instance or None if not found
         """
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
+            lambda: self.client.from_(self.table_name)
             .select("*")
             .eq("id", str(record_id))
             .execute()
@@ -166,11 +157,7 @@ class SupabaseRepository[T: BaseModel]:
         id_strings = [str(rid) for rid in record_ids]
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
-            .select("*")
-            .in_("id", id_strings)
-            .execute()
+            lambda: self.client.from_(self.table_name).select("*").in_("id", id_strings).execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True)
@@ -187,11 +174,7 @@ class SupabaseRepository[T: BaseModel]:
             List of model instances
         """
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
-            .select("*")
-            .limit(limit)
-            .execute()
+            lambda: self.client.from_(self.table_name).select("*").limit(limit).execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True)
@@ -205,8 +188,7 @@ class SupabaseRepository[T: BaseModel]:
             Total record count
         """
         result = await self._execute_async(
-            lambda: self.client
-            .from_(self.table_name)
+            lambda: self.client.from_(self.table_name)
             .select("*", count=CountMethod.exact)
             .execute()
         )

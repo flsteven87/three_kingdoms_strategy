@@ -33,12 +33,8 @@ class DonationBase(BaseModel):
     type: DonationType = Field(..., description="Regular or penalty type")
     description: str | None = Field(None, description="Event description")
     deadline: datetime = Field(..., description="Deadline datetime")
-    target_amount: int = Field(
-        0, ge=0, description="Default target for all members (regular type)"
-    )
-    status: DonationStatus = Field(
-        default=DonationStatus.ACTIVE, description="Event status"
-    )
+    target_amount: int = Field(0, ge=0, description="Default target for all members (regular type)")
+    status: DonationStatus = Field(default=DonationStatus.ACTIVE, description="Event status")
 
 
 class DonationCreate(DonationBase):

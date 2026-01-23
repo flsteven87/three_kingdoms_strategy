@@ -121,7 +121,7 @@ class CSVParserService:
         符合 CLAUDE.md 🟡: Pure data transformation
         """
         # Remove UTF-8 BOM if present
-        if csv_content.startswith('\ufeff'):
+        if csv_content.startswith("\ufeff"):
             csv_content = csv_content[1:]
 
         # Read CSV and strip whitespace from field names
@@ -130,10 +130,10 @@ class CSVParserService:
             raise ValueError("CSV file is empty")
 
         # Strip whitespace from header
-        header = [field.strip() for field in lines[0].split(',')]
+        header = [field.strip() for field in lines[0].split(",")]
 
         # Create new CSV content with cleaned header
-        cleaned_csv = ','.join(header) + '\n' + '\n'.join(lines[1:])
+        cleaned_csv = ",".join(header) + "\n" + "\n".join(lines[1:])
 
         reader = csv.DictReader(StringIO(cleaned_csv))
 

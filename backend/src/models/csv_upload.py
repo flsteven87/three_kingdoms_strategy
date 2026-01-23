@@ -19,14 +19,12 @@ UploadType = Literal["regular", "event"]
 class CsvUploadBase(BaseModel):
     """Base CSV upload model with common fields"""
 
-    snapshot_date: datetime = Field(
-        ..., description="Snapshot datetime parsed from filename"
-    )
+    snapshot_date: datetime = Field(..., description="Snapshot datetime parsed from filename")
     file_name: str = Field(..., min_length=1, max_length=255, description="Original filename")
     total_members: int = Field(0, ge=0, description="Total member count in this upload")
     upload_type: UploadType = Field(
         default="regular",
-        description="Type of upload: 'regular' for data management, 'event' for battle events"
+        description="Type of upload: 'regular' for data management, 'event' for battle events",
     )
 
 

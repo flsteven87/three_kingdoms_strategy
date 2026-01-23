@@ -71,7 +71,7 @@ class AllianceCollaboratorService:
 
             # 2. Look up user by email in auth.users
             result = self._supabase.auth.admin.list_users()
-            users_list = result.users if hasattr(result, 'users') else result
+            users_list = result.users if hasattr(result, "users") else result
             users_array = list(users_list)
             target_user = next((u for u in users_array if u.email == email), None)
 
@@ -110,9 +110,7 @@ class AllianceCollaboratorService:
             target_user_id = UUID(target_user.id)
 
             # Check if already a collaborator
-            if await self._collaborator_repo.is_collaborator(
-                alliance_id, target_user_id
-            ):
+            if await self._collaborator_repo.is_collaborator(alliance_id, target_user_id):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="User is already a collaborator of this alliance",
@@ -189,9 +187,7 @@ class AllianceCollaboratorService:
                 )
 
             # 4. Remove collaborator
-            return await self._collaborator_repo.remove_collaborator(
-                alliance_id, target_user_id
-            )
+            return await self._collaborator_repo.remove_collaborator(alliance_id, target_user_id)
 
         except HTTPException:
             raise
@@ -343,7 +339,9 @@ class AllianceCollaboratorService:
                     )
 
                     if is_existing:
-                        logger.warning("User already a collaborator, marking invitation as accepted")
+                        logger.warning(
+                            "User already a collaborator, marking invitation as accepted"
+                        )
                         await self._invitation_repo.mark_as_accepted(invitation.id)
                         processed_count += 1
                         continue
@@ -393,17 +391,13 @@ class AllianceCollaboratorService:
         """
         try:
             # Verify permission
-            if not await self._collaborator_repo.is_collaborator(
-                alliance_id, current_user_id
-            ):
+            if not await self._collaborator_repo.is_collaborator(alliance_id, current_user_id):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You are not a collaborator of this alliance",
                 )
 
-            collaborators = await self._collaborator_repo.get_alliance_collaborators(
-                alliance_id
-            )
+            collaborators = await self._collaborator_repo.get_alliance_collaborators(alliance_id)
 
             # Enrich with user metadata from Supabase Auth
             enriched_collaborators = []
@@ -418,29 +412,35 @@ class AllianceCollaboratorService:
 
                     # Handle different response formats from Supabase Auth
                     user = None
-                    if hasattr(user_response, 'user'):
+                    if hasattr(user_response, "user"):
                         user = user_response.user
-                    elif isinstance(user_response, dict) and 'user' in user_response:
-                        user = user_response['user']
+                    elif isinstance(user_response, dict) and "user" in user_response:
+                        user = user_response["user"]
                     else:
                         user = user_response
 
                     if user:
                         # Extract email
-                        email = getattr(user, 'email', None) if hasattr(user, 'email') else user.get('email')
+                        email = (
+                            getattr(user, "email", None)
+                            if hasattr(user, "email")
+                            else user.get("email")
+                        )
                         if email:
                             collab["user_email"] = email
 
                         # Extract user metadata (full_name, avatar_url)
                         user_metadata = None
-                        if hasattr(user, 'user_metadata'):
+                        if hasattr(user, "user_metadata"):
                             user_metadata = user.user_metadata
-                        elif isinstance(user, dict) and 'user_metadata' in user:
-                            user_metadata = user['user_metadata']
+                        elif isinstance(user, dict) and "user_metadata" in user:
+                            user_metadata = user["user_metadata"]
 
                         if user_metadata and isinstance(user_metadata, dict):
                             full_name = user_metadata.get("full_name") or user_metadata.get("name")
-                            avatar_url = user_metadata.get("avatar_url") or user_metadata.get("picture")
+                            avatar_url = user_metadata.get("avatar_url") or user_metadata.get(
+                                "picture"
+                            )
 
                             if full_name:
                                 collab["user_full_name"] = full_name

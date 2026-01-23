@@ -166,9 +166,7 @@ class RegisteredMembersResponse(BaseModel):
 
 class LineCustomCommandBase(BaseModel):
     command_name: str = Field(..., min_length=1, max_length=100)
-    trigger_keyword: str = Field(
-        ..., min_length=2, max_length=50, pattern=r"^/[^\s]+$"
-    )
+    trigger_keyword: str = Field(..., min_length=2, max_length=50, pattern=r"^/[^\s]+$")
     response_message: str = Field(..., min_length=1, max_length=1000)
     is_enabled: bool = True
 
@@ -179,9 +177,7 @@ class LineCustomCommandCreate(LineCustomCommandBase):
 
 class LineCustomCommandUpdate(BaseModel):
     command_name: str | None = Field(None, min_length=1, max_length=100)
-    trigger_keyword: str | None = Field(
-        None, min_length=2, max_length=50, pattern=r"^/[^\s]+$"
-    )
+    trigger_keyword: str | None = Field(None, min_length=2, max_length=50, pattern=r"^/[^\s]+$")
     response_message: str | None = Field(None, min_length=1, max_length=1000)
     is_enabled: bool | None = None
 
@@ -208,6 +204,7 @@ class LineCustomCommandResponse(BaseModel):
     is_enabled: bool
     created_at: datetime
     updated_at: datetime
+
 
 # =============================================================================
 # Binding Status Response (for Web App)

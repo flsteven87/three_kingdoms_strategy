@@ -138,10 +138,7 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
         result = (
-            self.client.from_(self.table_name)
-            .delete()
-            .eq("period_id", str(period_id))
-            .execute()
+            self.client.from_(self.table_name).delete().eq("period_id", str(period_id)).execute()
         )
         self._handle_supabase_result(result, allow_empty=True)
         return True
@@ -167,9 +164,7 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         self._handle_supabase_result(result, allow_empty=True)
         return True
 
-    async def get_periods_averages_batch(
-        self, period_ids: list[UUID]
-    ) -> dict[UUID, dict]:
+    async def get_periods_averages_batch(self, period_ids: list[UUID]) -> dict[UUID, dict]:
         """
         Get alliance average and median metrics for multiple periods in one query.
 
@@ -191,7 +186,9 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         # Query all metrics for these periods
         result = (
             self.client.from_(self.table_name)
-            .select("period_id, daily_contribution, daily_merit, daily_assist, daily_donation, end_power")
+            .select(
+                "period_id, daily_contribution, daily_merit, daily_assist, daily_donation, end_power"
+            )
             .in_("period_id", [str(pid) for pid in period_ids])
             .execute()
         )
@@ -271,28 +268,25 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         averages = []
         for group_name, members in groups.items():
             count = len(members)
-            averages.append({
-                "group_name": group_name,
-                "member_count": count,
-                "avg_daily_contribution": sum(
-                    Decimal(str(m["daily_contribution"])) for m in members
-                ) / count,
-                "avg_daily_merit": sum(
-                    Decimal(str(m["daily_merit"])) for m in members
-                ) / count,
-                "avg_daily_assist": sum(
-                    Decimal(str(m["daily_assist"])) for m in members
-                ) / count,
-                "avg_daily_donation": sum(
-                    Decimal(str(m["daily_donation"])) for m in members
-                ) / count,
-            })
+            averages.append(
+                {
+                    "group_name": group_name,
+                    "member_count": count,
+                    "avg_daily_contribution": sum(
+                        Decimal(str(m["daily_contribution"])) for m in members
+                    )
+                    / count,
+                    "avg_daily_merit": sum(Decimal(str(m["daily_merit"])) for m in members) / count,
+                    "avg_daily_assist": sum(Decimal(str(m["daily_assist"])) for m in members)
+                    / count,
+                    "avg_daily_donation": sum(Decimal(str(m["daily_donation"])) for m in members)
+                    / count,
+                }
+            )
 
         return sorted(averages, key=lambda x: x["avg_daily_contribution"], reverse=True)
 
-    async def get_metrics_by_group_for_period(
-        self, period_id: UUID, group_name: str
-    ) -> list[dict]:
+    async def get_metrics_by_group_for_period(self, period_id: UUID, group_name: str) -> list[dict]:
         """
         Get all metrics for members in a specific group for a period.
 
@@ -384,18 +378,14 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         data = self._handle_supabase_result(result, allow_empty=True)
 
         # Count members per group
-        group_counts = Counter(
-            row.get("end_group") or "未分組" for row in data
-        )
+        group_counts = Counter(row.get("end_group") or "未分組" for row in data)
 
         return [
             {"name": name, "member_count": count}
             for name, count in sorted(group_counts.items(), key=lambda x: -x[1])
         ]
 
-    async def get_metrics_with_snapshot_totals(
-        self, period_id: UUID
-    ) -> list[dict]:
+    async def get_metrics_with_snapshot_totals(self, period_id: UUID) -> list[dict]:
         """
         Get all metrics for a period with snapshot total_* values.
 

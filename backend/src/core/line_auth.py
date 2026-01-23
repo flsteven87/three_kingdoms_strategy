@@ -21,11 +21,7 @@ from src.core.config import Settings, get_settings
 logger = logging.getLogger(__name__)
 
 
-def verify_line_signature(
-    body: bytes,
-    signature: str,
-    channel_secret: str
-) -> bool:
+def verify_line_signature(body: bytes, signature: str, channel_secret: str) -> bool:
     """
     Verify LINE webhook signature using HMAC-SHA256
 
@@ -37,11 +33,7 @@ def verify_line_signature(
     Returns:
         True if signature is valid, False otherwise
     """
-    hash_value = hmac.new(
-        channel_secret.encode("utf-8"),
-        body,
-        hashlib.sha256
-    ).digest()
+    hash_value = hmac.new(channel_secret.encode("utf-8"), body, hashlib.sha256).digest()
 
     expected_signature = base64.b64encode(hash_value).decode("utf-8")
 
@@ -51,7 +43,7 @@ def verify_line_signature(
 async def verify_webhook_signature(
     request: Request,
     x_line_signature: Annotated[str, Header()],
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
 ) -> bytes:
     """
     FastAPI dependency to verify LINE webhook signature
@@ -71,8 +63,7 @@ async def verify_webhook_signature(
     if not settings.line_bot_enabled:
         logger.error("LINE Bot not configured")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="LINE Bot not configured"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="LINE Bot not configured"
         )
 
     body = await request.body()
@@ -80,13 +71,10 @@ async def verify_webhook_signature(
     if not verify_line_signature(
         body=body,
         signature=x_line_signature,
-        channel_secret=settings.line_channel_secret  # type: ignore
+        channel_secret=settings.line_channel_secret,  # type: ignore
     ):
         logger.warning("Invalid LINE webhook signature")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid signature"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
 
     return body
 
@@ -165,10 +153,7 @@ def get_group_info(group_id: str) -> LineGroupInfo | None:
 
     try:
         summary = line_bot.get_group_summary(group_id)
-        return LineGroupInfo(
-            name=summary.group_name,
-            picture_url=summary.picture_url
-        )
+        return LineGroupInfo(name=summary.group_name, picture_url=summary.picture_url)
     except Exception as e:
         logger.warning(f"Failed to get group info for {group_id}: {e}")
         return None

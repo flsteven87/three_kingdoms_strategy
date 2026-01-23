@@ -23,9 +23,7 @@ class AllianceCollaboratorRepository(SupabaseRepository[AllianceCollaboratorDB])
     """
 
     def __init__(self):
-        super().__init__(
-            table_name="alliance_collaborators", model_class=AllianceCollaboratorDB
-        )
+        super().__init__(table_name="alliance_collaborators", model_class=AllianceCollaboratorDB)
 
     async def add_collaborator(
         self,
@@ -153,9 +151,7 @@ class AllianceCollaboratorRepository(SupabaseRepository[AllianceCollaboratorDB])
         data = self._handle_supabase_result(result, allow_empty=True)
         return len(data) > 0
 
-    async def get_collaborator_role(
-        self, alliance_id: UUID, user_id: UUID
-    ) -> str | None:
+    async def get_collaborator_role(self, alliance_id: UUID, user_id: UUID) -> str | None:
         """
         Get user's role in alliance.
 

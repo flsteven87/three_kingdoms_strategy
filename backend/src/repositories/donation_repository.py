@@ -85,8 +85,5 @@ class DonationRepository(SupabaseRepository[Donation]):
     async def delete(self, donation_id: UUID) -> None:
         """Delete a donation event by ID"""
         await self._execute_async(
-            lambda: self.client.from_(self.table_name)
-            .delete()
-            .eq("id", str(donation_id))
-            .execute()
+            lambda: self.client.from_(self.table_name).delete().eq("id", str(donation_id)).execute()
         )

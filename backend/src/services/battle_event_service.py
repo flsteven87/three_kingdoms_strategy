@@ -189,9 +189,7 @@ class BattleEventService:
             event.alliance_id, "process battle event snapshots"
         )
 
-        await self._event_repo.update_upload_ids(
-            event_id, before_upload_id, after_upload_id
-        )
+        await self._event_repo.update_upload_ids(event_id, before_upload_id, after_upload_id)
         await self._event_repo.update_status(event_id, EventStatus.ANALYZING)
 
         # 1.5 Auto-set event times from CSV upload snapshot dates
@@ -230,9 +228,7 @@ class BattleEventService:
                 )
                 merit_diff = max(0, after_snap.total_merit - before_snap.total_merit)
                 assist_diff = max(0, after_snap.total_assist - before_snap.total_assist)
-                donation_diff = max(
-                    0, after_snap.total_donation - before_snap.total_donation
-                )
+                donation_diff = max(0, after_snap.total_donation - before_snap.total_donation)
                 power_diff = after_snap.power_value - before_snap.power_value
 
                 # Participation: merit or contribution increased
@@ -305,9 +301,7 @@ class BattleEventService:
         # 7. Update event status to completed
         return await self._event_repo.update_status(event_id, EventStatus.COMPLETED)
 
-    async def get_event_metrics(
-        self, event_id: UUID
-    ) -> list[BattleEventMetricsWithMember]:
+    async def get_event_metrics(self, event_id: UUID) -> list[BattleEventMetricsWithMember]:
         """
         Get all member metrics for an event with member info.
 
@@ -378,12 +372,8 @@ class BattleEventService:
         total_contribution = sum(m.contribution_diff for m in metrics)
 
         # Average metrics (only for participants)
-        avg_merit = (
-            total_merit / participated_count if participated_count > 0 else 0.0
-        )
-        avg_assist = (
-            total_assist / participated_count if participated_count > 0 else 0.0
-        )
+        avg_merit = total_merit / participated_count if participated_count > 0 else 0.0
+        avg_assist = total_assist / participated_count if participated_count > 0 else 0.0
 
         # Find MVP (highest merit)
         mvp = max(metrics, key=lambda m: m.merit_diff) if metrics else None
@@ -540,9 +530,7 @@ class BattleEventService:
         participated_count = sum(1 for m in eligible if m.participated)
         absent_count = sum(1 for m in eligible if m.is_absent)
 
-        participation_rate = (
-            (participated_count / member_count * 100) if member_count > 0 else 0.0
-        )
+        participation_rate = (participated_count / member_count * 100) if member_count > 0 else 0.0
 
         # Merit stats from participants only
         participants = [m for m in eligible if m.participated]

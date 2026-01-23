@@ -71,9 +71,7 @@ class TestGetUserRole:
 
         # Assert
         assert result == "owner"
-        mock_collaborator_repo.get_collaborator_role.assert_called_once_with(
-            alliance_id, user_id
-        )
+        mock_collaborator_repo.get_collaborator_role.assert_called_once_with(alliance_id, user_id)
 
     @pytest.mark.asyncio
     async def test_should_return_collaborator_role_when_user_is_collaborator(
@@ -85,9 +83,7 @@ class TestGetUserRole:
     ):
         """Should return 'collaborator' when user is collaborator"""
         # Arrange
-        mock_collaborator_repo.get_collaborator_role = AsyncMock(
-            return_value="collaborator"
-        )
+        mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="collaborator")
 
         # Act
         result = await permission_service.get_user_role(user_id, alliance_id)
@@ -219,9 +215,7 @@ class TestCheckPermission:
         )
 
         # Act
-        result = await permission_service.check_permission(
-            user_id, alliance_id, ["owner"]
-        )
+        result = await permission_service.check_permission(user_id, alliance_id, ["owner"])
 
         # Assert
         assert result is False
@@ -240,9 +234,7 @@ class TestRequirePermission:
     ):
         """Should not raise when user has required role"""
         # Arrange
-        mock_collaborator_repo.get_collaborator_role = AsyncMock(
-            return_value="collaborator"
-        )
+        mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="collaborator")
 
         # Act & Assert - should not raise
         await permission_service.require_permission(
@@ -319,15 +311,11 @@ class TestRequireOwner:
     ):
         """Should raise PermissionError when user is collaborator, not owner"""
         # Arrange
-        mock_collaborator_repo.get_collaborator_role = AsyncMock(
-            return_value="collaborator"
-        )
+        mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="collaborator")
 
         # Act & Assert
         with pytest.raises(PermissionError):
-            await permission_service.require_owner(
-                user_id, alliance_id, "delete alliance"
-            )
+            await permission_service.require_owner(user_id, alliance_id, "delete alliance")
 
 
 class TestRequireOwnerOrCollaborator:
@@ -346,9 +334,7 @@ class TestRequireOwnerOrCollaborator:
         mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="owner")
 
         # Act & Assert
-        await permission_service.require_owner_or_collaborator(
-            user_id, alliance_id, "upload data"
-        )
+        await permission_service.require_owner_or_collaborator(user_id, alliance_id, "upload data")
 
     @pytest.mark.asyncio
     async def test_should_pass_when_user_is_collaborator(
@@ -360,14 +346,10 @@ class TestRequireOwnerOrCollaborator:
     ):
         """Should not raise when user is collaborator"""
         # Arrange
-        mock_collaborator_repo.get_collaborator_role = AsyncMock(
-            return_value="collaborator"
-        )
+        mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="collaborator")
 
         # Act & Assert
-        await permission_service.require_owner_or_collaborator(
-            user_id, alliance_id, "upload data"
-        )
+        await permission_service.require_owner_or_collaborator(user_id, alliance_id, "upload data")
 
     @pytest.mark.asyncio
     async def test_should_raise_when_user_is_member(
@@ -419,9 +401,7 @@ class TestConvenienceMethods:
     ):
         """can_manage_collaborators should return False for collaborator"""
         # Arrange
-        mock_collaborator_repo.get_collaborator_role = AsyncMock(
-            return_value="collaborator"
-        )
+        mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="collaborator")
 
         # Act
         result = await permission_service.can_manage_collaborators(user_id, alliance_id)
@@ -485,9 +465,7 @@ class TestRequireWritePermission:
 
         service = PermissionService(subscription_service=mock_subscription_service)
         service._collaborator_repo = mock_collaborator_repo
-        mock_collaborator_repo.get_collaborator_role = AsyncMock(
-            return_value="collaborator"
-        )
+        mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="collaborator")
 
         # Act
         await service.require_write_permission(user_id, alliance_id, "upload CSV")

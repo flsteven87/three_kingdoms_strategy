@@ -38,12 +38,13 @@ from src.services.hegemony_weight_service import HegemonyWeightService
 from src.services.line_binding_service import LineBindingService
 from src.services.period_metrics_service import PeriodMetricsService
 from src.services.permission_service import PermissionService
-from src.services.season_service import SeasonService
 from src.services.season_quota_service import SeasonQuotaService
+from src.services.season_service import SeasonService
 
 # ============================================================================
 # Provider Functions (called by Type Aliases)
 # ============================================================================
+
 
 def get_db() -> Client:
     """Get Supabase database client"""
@@ -131,24 +132,14 @@ AllianceServiceDep = Annotated[AllianceService, Depends(get_alliance_service)]
 SeasonServiceDep = Annotated[SeasonService, Depends(get_season_service)]
 CSVUploadServiceDep = Annotated[CSVUploadService, Depends(get_csv_upload_service)]
 AllianceCollaboratorServiceDep = Annotated[
-    AllianceCollaboratorService,
-    Depends(get_alliance_collaborator_service)
+    AllianceCollaboratorService, Depends(get_alliance_collaborator_service)
 ]
 PermissionServiceDep = Annotated[PermissionService, Depends(get_permission_service)]
-HegemonyWeightServiceDep = Annotated[
-    HegemonyWeightService,
-    Depends(get_hegemony_weight_service)
-]
-PeriodMetricsServiceDep = Annotated[
-    PeriodMetricsService,
-    Depends(get_period_metrics_service)
-]
+HegemonyWeightServiceDep = Annotated[HegemonyWeightService, Depends(get_hegemony_weight_service)]
+PeriodMetricsServiceDep = Annotated[PeriodMetricsService, Depends(get_period_metrics_service)]
 AnalyticsServiceDep = Annotated[AnalyticsService, Depends(get_analytics_service)]
 BattleEventServiceDep = Annotated[BattleEventService, Depends(get_battle_event_service)]
 LineBindingServiceDep = Annotated[LineBindingService, Depends(get_line_binding_service)]
 CopperMineServiceDep = Annotated[CopperMineService, Depends(get_copper_mine_service)]
-CopperMineRuleServiceDep = Annotated[
-    CopperMineRuleService,
-    Depends(get_copper_mine_rule_service)
-]
+CopperMineRuleServiceDep = Annotated[CopperMineRuleService, Depends(get_copper_mine_rule_service)]
 SeasonQuotaServiceDep = Annotated[SeasonQuotaService, Depends(get_season_quota_service)]

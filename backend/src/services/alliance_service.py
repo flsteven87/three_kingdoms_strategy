@@ -83,9 +83,7 @@ class AllianceService:
 
         return alliance
 
-    async def update_alliance(
-        self, user_id: UUID, alliance_data: AllianceUpdate
-    ) -> Alliance:
+    async def update_alliance(self, user_id: UUID, alliance_data: AllianceUpdate) -> Alliance:
         """
         Update user's alliance.
 
@@ -148,9 +146,7 @@ class AllianceService:
             raise ValueError("User has no alliance to delete")
 
         # Verify permission: only owner can delete alliance
-        await self._permission_service.require_owner(
-            user_id, alliance.id, "delete alliance"
-        )
+        await self._permission_service.require_owner(user_id, alliance.id, "delete alliance")
 
         # Delete alliance (collaborators will be deleted via CASCADE)
         return await self._repo.delete(alliance.id)

@@ -184,9 +184,7 @@ class SeasonQuotaService:
             is_trial=alliance.subscription_status == "trial",
             is_trial_active=is_trial_active,
             trial_days_remaining=trial_days_remaining,
-            trial_ends_at=(
-                alliance.trial_ends_at.isoformat() if alliance.trial_ends_at else None
-            ),
+            trial_ends_at=(alliance.trial_ends_at.isoformat() if alliance.trial_ends_at else None),
             purchased_seasons=alliance.purchased_seasons,
             used_seasons=alliance.used_seasons,
             available_seasons=available_seasons,
@@ -213,9 +211,7 @@ class SeasonQuotaService:
 
         return self._calculate_quota_status(alliance)
 
-    async def get_quota_status_by_alliance(
-        self, alliance_id: UUID
-    ) -> SeasonQuotaStatus:
+    async def get_quota_status_by_alliance(self, alliance_id: UUID) -> SeasonQuotaStatus:
         """
         Get season quota status for a specific alliance.
 
@@ -361,8 +357,7 @@ class SeasonQuotaService:
 
         remaining = alliance.purchased_seasons - new_used
         logger.info(
-            f"Season consumed - alliance_id={alliance_id}, "
-            f"used={new_used}, remaining={remaining}"
+            f"Season consumed - alliance_id={alliance_id}, used={new_used}, remaining={remaining}"
         )
 
         return (remaining, False)

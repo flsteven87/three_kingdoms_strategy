@@ -154,9 +154,7 @@ class TestParseCSVContent:
         assert result[2]["group_name"] == "後勤隊"
         assert result[3]["group_name"] is None  # "未分組" → None
 
-    def test_should_parse_simplified_chinese_field_names(
-        self, valid_csv_content_simplified: str
-    ):
+    def test_should_parse_simplified_chinese_field_names(self, valid_csv_content_simplified: str):
         """Simplified Chinese field names should be recognized"""
         # Act
         result = CSVParserService.parse_csv_content(valid_csv_content_simplified)

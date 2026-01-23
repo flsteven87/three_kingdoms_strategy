@@ -135,9 +135,7 @@ class TestVerifyUserAccess:
         # Assert
         assert result == alliance_id
         mock_season_repo.get_by_id.assert_called_once_with(season_id)
-        mock_permission_service.get_user_role.assert_called_once_with(
-            user_id, alliance_id
-        )
+        mock_permission_service.get_user_role.assert_called_once_with(user_id, alliance_id)
 
     @pytest.mark.asyncio
     async def test_should_raise_valueerror_when_season_not_found(
@@ -212,9 +210,7 @@ class TestGetSeasons:
         # Assert
         assert len(result) == 2
         mock_alliance_repo.get_by_collaborator.assert_called_once_with(user_id)
-        mock_season_repo.get_by_alliance.assert_called_once_with(
-            alliance_id, active_only=False
-        )
+        mock_season_repo.get_by_alliance.assert_called_once_with(alliance_id, active_only=False)
 
     @pytest.mark.asyncio
     async def test_should_return_only_active_seasons_when_active_only_true(
@@ -235,9 +231,7 @@ class TestGetSeasons:
         await season_service.get_seasons(user_id, active_only=True)
 
         # Assert
-        mock_season_repo.get_by_alliance.assert_called_once_with(
-            alliance_id, active_only=True
-        )
+        mock_season_repo.get_by_alliance.assert_called_once_with(alliance_id, active_only=True)
 
     @pytest.mark.asyncio
     async def test_should_raise_valueerror_when_user_has_no_alliance(
@@ -488,9 +482,7 @@ class TestSetActiveSeason:
         other_season = create_mock_season(uuid4(), alliance_id, "S1", is_active=True)
 
         mock_season_repo.get_by_id = AsyncMock(return_value=target_season)
-        mock_season_repo.get_by_alliance = AsyncMock(
-            return_value=[target_season, other_season]
-        )
+        mock_season_repo.get_by_alliance = AsyncMock(return_value=[target_season, other_season])
         mock_season_repo.update = AsyncMock(return_value=target_season)
         mock_permission_service.require_owner_or_collaborator = AsyncMock()
         mock_permission_service.require_write_permission = AsyncMock()

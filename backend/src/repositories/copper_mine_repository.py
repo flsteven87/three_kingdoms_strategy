@@ -22,16 +22,10 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
     """Repository for copper mine operations"""
 
     def __init__(self):
-        super().__init__(
-            table_name="copper_mines",
-            model_class=CopperMine
-        )
+        super().__init__(table_name="copper_mines", model_class=CopperMine)
 
     async def get_mines_by_alliance(
-        self,
-        alliance_id: UUID,
-        status: str | None = None,
-        season_id: UUID | None = None
+        self, alliance_id: UUID, status: str | None = None, season_id: UUID | None = None
     ) -> list[CopperMine]:
         """
         Get copper mines for an alliance, optionally filtered by status and season.
@@ -45,12 +39,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         Returns:
             List of CopperMine entities, ordered by registered_at descending
         """
-        query = (
-            self.client
-            .from_("copper_mines")
-            .select("*")
-            .eq("alliance_id", str(alliance_id))
-        )
+        query = self.client.from_("copper_mines").select("*").eq("alliance_id", str(alliance_id))
 
         if status:
             query = query.eq("status", status)
@@ -66,14 +55,11 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         return [CopperMine(**row) for row in data]
 
     async def get_mines_by_line_user(
-        self,
-        alliance_id: UUID,
-        line_user_id: str
+        self, alliance_id: UUID, line_user_id: str
     ) -> list[CopperMine]:
         """Get copper mines registered by a specific LINE user"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
+            lambda: self.client.from_("copper_mines")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("registered_by_line_user_id", line_user_id)
@@ -85,11 +71,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         return [CopperMine(**row) for row in data]
 
     async def get_mine_by_coords(
-        self,
-        alliance_id: UUID,
-        coord_x: int,
-        coord_y: int,
-        season_id: UUID | None = None
+        self, alliance_id: UUID, coord_x: int, coord_y: int, season_id: UUID | None = None
     ) -> CopperMine | None:
         """
         Check if a mine exists at given coordinates.
@@ -105,8 +87,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
             CopperMine if exists, None otherwise
         """
         query = (
-            self.client
-            .from_("copper_mines")
+            self.client.from_("copper_mines")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("coord_x", coord_x)
@@ -134,7 +115,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         level: int,
         notes: str | None = None,
         season_id: UUID | None = None,
-        member_id: UUID | None = None
+        member_id: UUID | None = None,
     ) -> CopperMine:
         """Create a new copper mine record (LIFF registration)"""
         insert_data: dict[str, Any] = {
@@ -144,7 +125,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
             "coord_x": coord_x,
             "coord_y": coord_y,
             "level": level,
-            "status": "active"
+            "status": "active",
         }
         if notes:
             insert_data["notes"] = notes
@@ -154,10 +135,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
             insert_data["member_id"] = str(member_id)
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
-            .insert(insert_data)
-            .execute()
+            lambda: self.client.from_("copper_mines").insert(insert_data).execute()
         )
 
         data = self._handle_supabase_result(result, expect_single=True)
@@ -166,29 +144,17 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
     async def delete_mine(self, mine_id: UUID) -> bool:
         """Delete a copper mine by ID"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
-            .delete()
-            .eq("id", str(mine_id))
-            .execute()
+            lambda: self.client.from_("copper_mines").delete().eq("id", str(mine_id)).execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return len(data) > 0 if isinstance(data, list) else bool(data)
 
-    async def update_mine_status(
-        self,
-        mine_id: UUID,
-        status: str
-    ) -> CopperMine | None:
+    async def update_mine_status(self, mine_id: UUID, status: str) -> CopperMine | None:
         """Update copper mine status"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
-            .update({
-                "status": status,
-                "updated_at": datetime.now(UTC).isoformat()
-            })
+            lambda: self.client.from_("copper_mines")
+            .update({"status": status, "updated_at": datetime.now(UTC).isoformat()})
             .eq("id", str(mine_id))
             .execute()
         )
@@ -201,8 +167,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
     async def count_mines_by_alliance(self, alliance_id: UUID) -> int:
         """Count copper mines for an alliance"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
+            lambda: self.client.from_("copper_mines")
             .select("id", count="exact")
             .eq("alliance_id", str(alliance_id))
             .execute()
@@ -214,10 +179,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
     # Dashboard Methods (with member data joins)
     # =========================================================================
 
-    async def get_ownerships_by_season(
-        self,
-        season_id: UUID
-    ) -> list[dict]:
+    async def get_ownerships_by_season(self, season_id: UUID) -> list[dict]:
         """
         Get copper mines for a season with member info (Dashboard view)
 
@@ -225,8 +187,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         """
         # Use Supabase's foreign key join syntax
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
+            lambda: self.client.from_("copper_mines")
             .select(
                 "id, season_id, member_id, coord_x, coord_y, level, "
                 "registered_at, game_id, "
@@ -241,18 +202,14 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return data if isinstance(data, list) else []
 
-    async def get_ownerships_by_season_simple(
-        self,
-        season_id: UUID
-    ) -> list[dict]:
+    async def get_ownerships_by_season_simple(self, season_id: UUID) -> list[dict]:
         """
         Get copper mines for a season (simplified query without complex joins)
 
         For Dashboard, we'll join the data in service layer.
         """
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
+            lambda: self.client.from_("copper_mines")
             .select("*")
             .eq("season_id", str(season_id))
             .order("registered_at", desc=True)
@@ -271,7 +228,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         coord_x: int,
         coord_y: int,
         level: int,
-        applied_at: datetime | None = None
+        applied_at: datetime | None = None,
     ) -> CopperMine:
         """Create a copper mine ownership record (Dashboard)"""
         insert_data: dict[str, Any] = {
@@ -292,24 +249,16 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
             insert_data["registered_at"] = applied_at.isoformat()
 
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
-            .insert(insert_data)
-            .execute()
+            lambda: self.client.from_("copper_mines").insert(insert_data).execute()
         )
 
         data = self._handle_supabase_result(result, expect_single=True)
         return CopperMine(**data)
 
-    async def count_member_mines(
-        self,
-        season_id: UUID,
-        member_id: UUID
-    ) -> int:
+    async def count_member_mines(self, season_id: UUID, member_id: UUID) -> int:
         """Count how many mines a member owns in a season"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
+            lambda: self.client.from_("copper_mines")
             .select("id", count="exact")
             .eq("season_id", str(season_id))
             .eq("member_id", str(member_id))
@@ -319,20 +268,18 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         return result.count or 0
 
     async def update_ownership(
-        self,
-        ownership_id: UUID,
-        member_id: UUID,
-        game_id: str
+        self, ownership_id: UUID, member_id: UUID, game_id: str
     ) -> CopperMine:
         """Update copper mine ownership (for transferring reserved mines)"""
         result = await self._execute_async(
-            lambda: self.client
-            .from_("copper_mines")
-            .update({
-                "member_id": str(member_id),
-                "game_id": game_id,
-                "updated_at": datetime.now(UTC).isoformat()
-            })
+            lambda: self.client.from_("copper_mines")
+            .update(
+                {
+                    "member_id": str(member_id),
+                    "game_id": game_id,
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
+            )
             .eq("id", str(ownership_id))
             .execute()
         )

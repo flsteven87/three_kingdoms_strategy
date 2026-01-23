@@ -25,7 +25,9 @@ class BattleEventMetricsBase(BaseModel):
     # Participation flags (computed from diffs)
     participated: bool = Field(False, description="Whether member actively participated")
     is_new_member: bool = Field(False, description="Whether member only exists in after snapshot")
-    is_absent: bool = Field(False, description="Whether member exists in before but has no activity")
+    is_absent: bool = Field(
+        False, description="Whether member exists in before but has no activity"
+    )
 
 
 class BattleEventMetricsCreate(BattleEventMetricsBase):
@@ -69,7 +71,9 @@ class EventSummary(BaseModel):
     participated_count: int = Field(..., description="Members who participated")
     absent_count: int = Field(..., description="Members who didn't participate")
     new_member_count: int = Field(..., description="New members (only in after)")
-    participation_rate: float = Field(..., ge=0, le=100, description="Participation rate percentage")
+    participation_rate: float = Field(
+        ..., ge=0, le=100, description="Participation rate percentage"
+    )
 
     # Aggregate metrics
     total_merit: int = Field(..., description="Sum of all merit diffs")

@@ -71,7 +71,7 @@ BIND_CODE_PATTERN = re.compile(r"^[A-Z0-9]{6}$")
     response_model=LineBindingCodeResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Generate binding code",
-    description="Generate a one-time binding code for linking LINE group to alliance"
+    description="Generate a one-time binding code for linking LINE group to alliance",
 )
 async def generate_binding_code(
     user_id: UserIdDep,
@@ -82,26 +82,20 @@ async def generate_binding_code(
     """Generate a new binding code for the user's alliance"""
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     await permission_service.require_owner_or_collaborator(
         user_id, alliance.id, "generate LINE binding code"
     )
 
-    return await service.generate_binding_code(
-        alliance_id=alliance.id,
-        user_id=user_id
-    )
+    return await service.generate_binding_code(alliance_id=alliance.id, user_id=user_id)
 
 
 @router.get(
     "/binding",
     response_model=LineBindingStatusResponse,
     summary="Get binding status",
-    description="Get current LINE binding status for user's alliance"
+    description="Get current LINE binding status for user's alliance",
 )
 async def get_binding_status(
     user_id: UserIdDep,
@@ -111,11 +105,7 @@ async def get_binding_status(
     """Get current LINE binding status"""
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        return LineBindingStatusResponse(
-            is_bound=False,
-            binding=None,
-            pending_code=None
-        )
+        return LineBindingStatusResponse(is_bound=False, binding=None, pending_code=None)
 
     return await service.get_binding_status(alliance.id)
 
@@ -124,7 +114,7 @@ async def get_binding_status(
     "/binding",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Unbind LINE group",
-    description="Remove LINE group binding from alliance"
+    description="Remove LINE group binding from alliance",
 )
 async def unbind_line_group(
     user_id: UserIdDep,
@@ -135,10 +125,7 @@ async def unbind_line_group(
     """Unbind LINE group from alliance"""
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     await permission_service.require_owner_or_collaborator(
         user_id, alliance.id, "unbind LINE group"
@@ -152,7 +139,7 @@ async def unbind_line_group(
     "/binding/refresh-info",
     response_model=LineGroupBindingResponse,
     summary="Refresh group info",
-    description="Refresh LINE group name and picture from LINE API"
+    description="Refresh LINE group name and picture from LINE API",
 )
 async def refresh_group_info(
     user_id: UserIdDep,
@@ -163,10 +150,7 @@ async def refresh_group_info(
     """Refresh LINE group name and picture from LINE API"""
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     await permission_service.require_owner_or_collaborator(
         user_id, alliance.id, "refresh LINE group info"
@@ -179,7 +163,7 @@ async def refresh_group_info(
     "/binding/members",
     response_model=RegisteredMembersResponse,
     summary="Get registered members",
-    description="Get list of LINE users who registered game IDs"
+    description="Get list of LINE users who registered game IDs",
 )
 async def get_registered_members(
     user_id: UserIdDep,
@@ -189,10 +173,7 @@ async def get_registered_members(
     """Get registered members list for alliance admin view"""
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     return await service.get_registered_members(alliance.id)
 
@@ -201,7 +182,7 @@ async def get_registered_members(
     "/commands",
     response_model=list[LineCustomCommandResponse],
     summary="Get custom commands",
-    description="Get custom commands for current alliance"
+    description="Get custom commands for current alliance",
 )
 async def get_custom_commands(
     user_id: UserIdDep,
@@ -210,10 +191,7 @@ async def get_custom_commands(
 ) -> list[LineCustomCommandResponse]:
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     return await service.list_custom_commands(alliance.id)
 
@@ -223,7 +201,7 @@ async def get_custom_commands(
     response_model=LineCustomCommandResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create custom command",
-    description="Create a LINE custom command"
+    description="Create a LINE custom command",
 )
 async def create_custom_command(
     user_id: UserIdDep,
@@ -234,10 +212,7 @@ async def create_custom_command(
 ) -> LineCustomCommandResponse:
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     await permission_service.require_owner_or_collaborator(
         user_id, alliance.id, "create LINE custom command"
@@ -254,7 +229,7 @@ async def create_custom_command(
     "/commands/{command_id}",
     response_model=LineCustomCommandResponse,
     summary="Update custom command",
-    description="Update a LINE custom command"
+    description="Update a LINE custom command",
 )
 async def update_custom_command(
     command_id: UUID,
@@ -266,10 +241,7 @@ async def update_custom_command(
 ) -> LineCustomCommandResponse:
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     await permission_service.require_owner_or_collaborator(
         user_id, alliance.id, "update LINE custom command"
@@ -286,7 +258,7 @@ async def update_custom_command(
     "/commands/{command_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete custom command",
-    description="Delete a LINE custom command"
+    description="Delete a LINE custom command",
 )
 async def delete_custom_command(
     command_id: UUID,
@@ -297,10 +269,7 @@ async def delete_custom_command(
 ) -> Response:
     alliance = await alliance_service.get_user_alliance(user_id)
     if not alliance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no alliance"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     await permission_service.require_owner_or_collaborator(
         user_id, alliance.id, "delete LINE custom command"
@@ -319,7 +288,7 @@ async def delete_custom_command(
     "/member/info",
     response_model=MemberInfoResponse,
     summary="Get member info",
-    description="Get member registration info for LIFF display"
+    description="Get member registration info for LIFF display",
 )
 async def get_member_info(
     service: LineBindingServiceDep,
@@ -327,17 +296,14 @@ async def get_member_info(
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> MemberInfoResponse:
     """Get member info for LIFF page"""
-    return await service.get_member_info(
-        line_user_id=u,
-        line_group_id=g
-    )
+    return await service.get_member_info(line_user_id=u, line_group_id=g)
 
 
 @router.get(
     "/member/performance",
     response_model=MemberPerformanceResponse,
     summary="Get member performance",
-    description="Get member performance analytics for LIFF display"
+    description="Get member performance analytics for LIFF display",
 )
 async def get_member_performance(
     service: LineBindingServiceDep,
@@ -346,11 +312,7 @@ async def get_member_performance(
     game_id: Annotated[str, Query(description="Game ID to get performance for")],
 ) -> MemberPerformanceResponse:
     """Get member performance analytics for LIFF page"""
-    return await service.get_member_performance(
-        line_group_id=g,
-        line_user_id=u,
-        game_id=game_id
-    )
+    return await service.get_member_performance(line_group_id=g, line_user_id=u, game_id=game_id)
 
 
 @router.post(
@@ -358,7 +320,7 @@ async def get_member_performance(
     response_model=RegisterMemberResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register game ID",
-    description="Register a game ID for a LINE user"
+    description="Register a game ID for a LINE user",
 )
 async def register_game_id(
     service: LineBindingServiceDep,
@@ -369,7 +331,7 @@ async def register_game_id(
         line_group_id=data.line_group_id,
         line_user_id=data.line_user_id,
         line_display_name=data.line_display_name,
-        game_id=data.game_id
+        game_id=data.game_id,
     )
 
 
@@ -377,7 +339,7 @@ async def register_game_id(
     "/member/unregister",
     response_model=RegisterMemberResponse,
     summary="Unregister game ID",
-    description="Remove a game ID registration for a LINE user"
+    description="Remove a game ID registration for a LINE user",
 )
 async def unregister_game_id(
     service: LineBindingServiceDep,
@@ -386,11 +348,7 @@ async def unregister_game_id(
     game_id: Annotated[str, Query(description="Game ID to unregister")],
 ) -> RegisterMemberResponse:
     """Unregister a game ID for a LINE user"""
-    return await service.unregister_member(
-        line_group_id=g,
-        line_user_id=u,
-        game_id=game_id
-    )
+    return await service.unregister_member(line_group_id=g, line_user_id=u, game_id=game_id)
 
 
 # =============================================================================
@@ -401,7 +359,7 @@ async def unregister_game_id(
 @router.get(
     "/copper/rules",
     summary="Get copper mine rules",
-    description="Get copper mine rules for LIFF display"
+    description="Get copper mine rules for LIFF display",
 )
 async def get_copper_rules(
     service: CopperMineServiceDep,
@@ -415,7 +373,7 @@ async def get_copper_rules(
     "/copper/list",
     response_model=CopperMineListResponse,
     summary="Get copper mines list",
-    description="Get copper mines for LIFF display"
+    description="Get copper mines for LIFF display",
 )
 async def get_copper_mines(
     service: CopperMineServiceDep,
@@ -423,10 +381,7 @@ async def get_copper_mines(
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> CopperMineListResponse:
     """Get copper mines list for LIFF page"""
-    return await service.get_mines_list(
-        line_group_id=g,
-        line_user_id=u
-    )
+    return await service.get_mines_list(line_group_id=g, line_user_id=u)
 
 
 @router.post(
@@ -434,7 +389,7 @@ async def get_copper_mines(
     response_model=RegisterCopperResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register copper mine",
-    description="Register a new copper mine location"
+    description="Register a new copper mine location",
 )
 async def register_copper_mine(
     service: CopperMineServiceDep,
@@ -448,7 +403,7 @@ async def register_copper_mine(
         coord_x=data.coord_x,
         coord_y=data.coord_y,
         level=data.level,
-        notes=data.notes
+        notes=data.notes,
     )
 
 
@@ -456,7 +411,7 @@ async def register_copper_mine(
     "/copper/{mine_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete copper mine",
-    description="Remove a copper mine record"
+    description="Remove a copper mine record",
 )
 async def delete_copper_mine(
     mine_id: str,
@@ -466,11 +421,8 @@ async def delete_copper_mine(
 ) -> Response:
     """Delete a copper mine by ID"""
     from uuid import UUID
-    await service.delete_mine(
-        mine_id=UUID(mine_id),
-        line_group_id=g,
-        line_user_id=u
-    )
+
+    await service.delete_mine(mine_id=UUID(mine_id), line_group_id=g, line_user_id=u)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -479,11 +431,7 @@ async def delete_copper_mine(
 # =============================================================================
 
 
-@router.post(
-    "/webhook",
-    summary="LINE webhook",
-    description="Handle LINE webhook events"
-)
+@router.post("/webhook", summary="LINE webhook", description="Handle LINE webhook events")
 async def handle_webhook(
     body: WebhookBodyDep,
     service: LineBindingServiceDep,
@@ -571,7 +519,7 @@ async def _handle_join_event(event: LineWebhookEvent) -> None:
         "👋 我是三國小幫手！\n\n"
         "📌 開始使用：\n"
         "盟主請發送「/綁定 XXXXXX」完成綁定\n"
-        "（綁定碼請在 Web App 生成）"
+        "（綁定碼請在 Web App 生成）",
     )
 
 
@@ -611,9 +559,7 @@ async def _handle_follow_event(event: LineWebhookEvent) -> None:
         return
 
     await _reply_text(
-        reply_token,
-        "👋 嗨！我主要在群組中使用。\n"
-        "請在已綁定的同盟群組中 @我 開始使用！"
+        reply_token, "👋 嗨！我主要在群組中使用。\n請在已綁定的同盟群組中 @我 開始使用！"
     )
 
 
@@ -623,10 +569,7 @@ async def _handle_private_message(event: LineWebhookEvent) -> None:
     if not reply_token:
         return
 
-    await _reply_text(
-        reply_token,
-        "💡 請在同盟群組中 @我 使用功能～"
-    )
+    await _reply_text(reply_token, "💡 請在同盟群組中 @我 使用功能～")
 
 
 async def _handle_group_message(
@@ -675,7 +618,11 @@ async def _handle_group_message(
         # LINE mention payload usually includes index/length for the mention; use that if available.
         mentionee = next((m for m in mentionees if m.get("userId") == bot_user_id), None)
         args_text = ""
-        if mentionee and isinstance(mentionee.get("index"), int) and isinstance(mentionee.get("length"), int):
+        if (
+            mentionee
+            and isinstance(mentionee.get("index"), int)
+            and isinstance(mentionee.get("length"), int)
+        ):
             start = mentionee["index"] + mentionee["length"]
             args_text = text[start:].strip()
         else:
@@ -746,8 +693,7 @@ async def _handle_group_message(
 
     # 3. 未註冊者發言 → 發送 LIFF 入口（群組層級 30 分鐘 CD）
     should_notify = await service.should_send_liff_notification(
-        line_group_id=line_group_id,
-        line_user_id=line_user_id
+        line_group_id=line_group_id, line_user_id=line_user_id
     )
 
     if should_notify:
@@ -816,22 +762,18 @@ async def _handle_latest_event_report(
             reply_token,
             "❌ 此群組尚未綁定同盟\n\n"
             "請盟主在 Web App 生成綁定碼，\n"
-            "然後發送「/綁定 XXXXXX」完成綁定"
+            "然後發送「/綁定 XXXXXX」完成綁定",
         )
         return
 
     alliance_id = group_binding.alliance_id
 
     # 2. 查詢最新已完成戰役
-    latest_event = await battle_event_service.get_latest_completed_event_for_alliance(
-        alliance_id
-    )
+    latest_event = await battle_event_service.get_latest_completed_event_for_alliance(alliance_id)
 
     if not latest_event:
         await _reply_text(
-            reply_token,
-            "📭 目前沒有已完成的戰役分析\n\n"
-            "請先在 Web App 建立並完成戰役分析"
+            reply_token, "📭 目前沒有已完成的戰役分析\n\n請先在 Web App 建立並完成戰役分析"
         )
         return
 
@@ -839,10 +781,7 @@ async def _handle_latest_event_report(
     analytics = await battle_event_service.get_event_group_analytics(latest_event.id)
 
     if not analytics:
-        await _reply_text(
-            reply_token,
-            "❌ 無法取得戰役分析資料"
-        )
+        await _reply_text(reply_token, "❌ 無法取得戰役分析資料")
         return
 
     # 4. 補充 Top Members 的 LINE 名稱
@@ -869,7 +808,7 @@ async def _handle_latest_event_report(
             f"⚔️ {analytics.event_name}\n\n"
             f"📊 出席率: {analytics.summary.participation_rate:.0f}%\n"
             f"⚔️ 總戰功: {analytics.summary.total_merit:,}\n"
-            f"🏆 MVP: {analytics.summary.mvp_member_name or '-'}"
+            f"🏆 MVP: {analytics.summary.mvp_member_name or '-'}",
         )
         return
 
@@ -917,11 +856,7 @@ async def _handle_bind_command(
 
     # 綁定成功 → 發送歡迎訊息 + LIFF
     if not settings.liff_id:
-        await _reply_text(
-            reply_token,
-            "✅ 綁定成功！\n\n"
-            "盟友們請註冊您的遊戲 ID～"
-        )
+        await _reply_text(reply_token, "✅ 綁定成功！\n\n盟友們請註冊您的遊戲 ID～")
         return
 
     liff_url = create_liff_url(settings.liff_id, line_group_id)

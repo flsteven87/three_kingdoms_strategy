@@ -39,9 +39,7 @@ class SeasonRepository(SupabaseRepository[Season]):
         if activated_only:
             query = query.eq("activation_status", "activated")
 
-        result = await self._execute_async(
-            lambda: query.order("start_date", desc=True).execute()
-        )
+        result = await self._execute_async(lambda: query.order("start_date", desc=True).execute())
 
         data = self._handle_supabase_result(result, allow_empty=True)
 

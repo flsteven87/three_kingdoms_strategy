@@ -97,10 +97,7 @@ class PeriodRepository(SupabaseRepository[Period]):
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
         result = (
-            self.client.from_(self.table_name)
-            .delete()
-            .eq("season_id", str(season_id))
-            .execute()
+            self.client.from_(self.table_name).delete().eq("season_id", str(season_id)).execute()
         )
         self._handle_supabase_result(result, allow_empty=True)
         return True
