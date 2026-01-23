@@ -10,7 +10,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { QuotaWarningLevel, SeasonQuotaStatus } from '@/types/season-quota'
+import type { QuotaWarningLevel } from '@/types/season-quota'
 import { getQuotaWarningLevel, getQuotaWarningMessage } from '@/types/season-quota'
 
 // Query Keys Factory
