@@ -16,7 +16,7 @@
 | **程式碼品質** | ⚠️ 需改善 | 多個檔案超過行數限制 |
 | **安全性** | ✅ 良好 | npm 漏洞已修復 |
 | **效能** | ⚠️ 需優化 | Bundle size 過大 (1.47MB)，lucide-react 已確認支持 tree-shaking |
-| **測試覆蓋** | ❌ 不足 | 僅 1 個測試檔案 |
+| **測試覆蓋** | ⚠️ 中等 | 111 測試 / 6 Services (37.5%) |
 | **文檔完整性** | ✅ 良好 | 架構文檔完整 |
 | **CI/CD** | ❌ 缺失 | 無自動化流程 |
 
@@ -40,18 +40,38 @@ cd frontend && npm audit fix
 - tar 檔案覆蓋漏洞
 - Vite 7.1.9 → 7.3.1
 
-### C2. 測試覆蓋率極低
+### C2. 測試覆蓋率 - 持續改善中
 
-**現況**: 僅 `backend/tests/test_event_report.py` (1 個檔案)
-**嚴重性**: HIGH
+**現況**:
+- **測試總數**: 111 個測試 (109 passed, 2 skipped)
+- **測試檔案**: 8 個測試檔案
+- **Service 覆蓋率**: 6/16 (37.5%)
 
-**影響**:
-- 無法確保業務邏輯正確性
-- 重構風險高
-- 無法自動化驗證
+**已測試 Services**:
+| Service | 測試數 |
+|---------|--------|
+| permission_service | 22 |
+| csv_parser_service | 22 |
+| season_service | 15 |
+| copper_mine_service | 14 |
+| alliance_service | 12 |
+| csv_upload_service | 10 |
+| event_report (整合測試) | 16 |
+
+**待測試 Services** (10 個):
+- alliance_collaborator_service
+- analytics_service
+- auth_service
+- battle_event_service
+- copper_mine_rule_service
+- donation_service
+- hegemony_weight_service
+- line_binding_service
+- period_metrics_service
+- season_quota_service
 
 **建議行動**:
-1. 為核心 Services 建立單元測試
+1. 優先為高風險 Services 建立測試 (analytics, season_quota)
 2. 為 Repository 層建立整合測試
 3. 目標測試覆蓋率: >70%
 
@@ -325,7 +345,7 @@ repos:
 | P1 | M1. 拆分超大檔案 | 8h | ⏳ 待處理 |
 | P1 | M3. Bundle size 優化 | 4h | ⏳ 待處理 |
 | P1 | M4. 建立 .env.example | 0.5h | ⏳ 待處理 |
-| P2 | C2. 增加測試覆蓋 | 16h+ | ⏳ 進行中 |
+| P2 | C2. 增加測試覆蓋 (目前 37.5%) | 16h+ | 🔄 進行中 (111 tests) |
 | P3 | R1-R4 建議改善 | 8h | ⏳ 待處理 |
 
 ---
@@ -351,4 +371,5 @@ repos:
 |------|------|----------|
 | 2026-01-22 | v0.3.0 | 初始審查報告 |
 | 2026-01-22 | v0.9.0 | 版本升級至 Pre-release，更新 Lucide imports 結論 (無需修改，已內建 tree-shaking) |
+| 2026-01-23 | v0.9.1 | 測試覆蓋率更新：111 測試 / 6 Services (37.5%)，修復過時測試引用 |
 
