@@ -165,7 +165,7 @@ class SeasonService:
         if season_data.alliance_id != alliance.id:
             raise PermissionError("Cannot create season for different alliance")
 
-        # Verify write permission (role check only - creating draft doesn't require subscription)
+        # Verify write permission (role check only - creating draft doesn't require quota)
         await self._permission_service.require_role_permission(user_id, alliance.id)
 
         # Create season as draft (not current)

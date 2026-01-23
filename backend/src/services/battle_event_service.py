@@ -86,12 +86,12 @@ class BattleEventService:
             Created battle event
 
         Raises:
-            SeasonQuotaExhaustedError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/season quota has expired
 
         符合 CLAUDE.md 🔴: Service layer orchestration
         """
-        # Verify quota: trial or paid subscription required
-        await self._permission_service.require_active_subscription(
+        # Verify quota: trial or available seasons required
+        await self._permission_service.require_active_quota(
             event_data.alliance_id, "create battle events"
         )
 
@@ -184,8 +184,8 @@ class BattleEventService:
         if not event:
             raise ValueError(f"Event {event_id} not found")
 
-        # Verify quota: trial or paid subscription required
-        await self._permission_service.require_active_subscription(
+        # Verify quota: trial or available seasons required
+        await self._permission_service.require_active_quota(
             event.alliance_id, "process battle event snapshots"
         )
 
@@ -406,15 +406,15 @@ class BattleEventService:
 
         Raises:
             ValueError: If event not found
-            SeasonQuotaExhaustedError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/season quota has expired
         """
         # Get event to check alliance_id
         event = await self._event_repo.get_by_id(event_id)
         if not event:
             raise ValueError("Event not found")
 
-        # Verify quota: trial or paid subscription required
-        await self._permission_service.require_active_subscription(
+        # Verify quota: trial or available seasons required
+        await self._permission_service.require_active_quota(
             event.alliance_id, "delete battle events"
         )
 

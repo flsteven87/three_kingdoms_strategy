@@ -386,7 +386,7 @@ class SeasonQuotaService:
 
         new_purchased = alliance.purchased_seasons + seasons
 
-        # Update subscription status to active if was expired
+        # Update subscription_status field to active if was expired
         updates = {"purchased_seasons": new_purchased}
         if alliance.subscription_status == "expired":
             updates["subscription_status"] = "active"

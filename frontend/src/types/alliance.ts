@@ -5,7 +5,9 @@
  */
 
 /**
- * Subscription status for season purchase system
+ * Season quota status (DB field: subscription_status)
+ *
+ * Note: Field name kept as 'subscription_status' to match DB schema.
  * - trial: Within 14-day trial period
  * - active: Trial active OR has available seasons
  * - expired: Trial expired AND no available seasons
@@ -19,7 +21,7 @@ export interface Alliance {
   readonly server_name: string | null
   readonly created_at: string
   readonly updated_at: string
-  // Subscription fields
+  // Season quota fields (DB field names kept for schema compatibility)
   readonly subscription_status: SubscriptionStatus
   readonly trial_started_at: string | null
   readonly trial_ends_at: string | null

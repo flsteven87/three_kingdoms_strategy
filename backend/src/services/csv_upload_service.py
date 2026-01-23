@@ -89,7 +89,7 @@ class CSVUploadService:
         if not season:
             raise HTTPException(status_code=404, detail="Season not found")
 
-        # Verify write permission (role + subscription check)
+        # Verify write permission (role + quota check)
         await self._permission_service.require_write_permission(
             user_id, season.alliance_id, "upload CSV data"
         )
@@ -282,7 +282,7 @@ class CSVUploadService:
         if not season:
             raise HTTPException(status_code=404, detail="Season not found")
 
-        # Verify write permission (role + subscription check)
+        # Verify write permission (role + quota check)
         await self._permission_service.require_write_permission(
             user_id, season.alliance_id, "delete CSV uploads"
         )

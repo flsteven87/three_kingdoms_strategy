@@ -9,13 +9,13 @@ Permission Service
 
 This service is the SINGLE ENTRY POINT for all permission checks:
 - Role-based access control (owner, collaborator, member)
-- Subscription-based write access control
+- Season quota-based write access control
 
 Usage:
-    # For write operations (role + subscription check)
+    # For write operations (role + quota check)
     await permission_service.require_write_permission(user_id, alliance_id, "upload CSV")
 
-    # For owner-only operations (no subscription check needed)
+    # For owner-only operations (no quota check needed)
     await permission_service.require_owner(user_id, alliance_id, "delete alliance")
 """
 
@@ -37,15 +37,15 @@ logger = logging.getLogger(__name__)
 
 class PermissionService:
     """
-    Permission service for role-based and subscription-based access control.
+    Permission service for role-based and season quota-based access control.
 
     This is the SINGLE ENTRY POINT for all permission checks in the application.
     Other services should only depend on PermissionService, not SeasonQuotaService directly.
 
     Permission Matrix:
-    - View data: any member (no subscription required)
-    - Write operations: owner/collaborator + active subscription
-    - Owner-only operations: owner only (no subscription required)
+    - View data: any member (no quota required)
+    - Write operations: owner/collaborator + active season quota
+    - Owner-only operations: owner only (no quota required)
     """
 
     def __init__(self, quota_service: SeasonQuotaService | None = None):
@@ -224,11 +224,11 @@ class PermissionService:
         self, user_id: UUID, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
-        Require user to have write permission (role + active subscription).
+        Require user to have write permission (role + active season quota).
 
         This is the PRIMARY METHOD for checking write access. It combines:
         1. Role check: User must be owner or collaborator
-        2. Subscription check: Alliance must have active trial or subscription
+        2. Quota check: Alliance must have active trial or available seasons
 
         All write operations should use this method for consistent permission enforcement.
 
@@ -240,7 +240,7 @@ class PermissionService:
         Raises:
             ValueError: If user is not a member of the alliance
             PermissionError: If user doesn't have required role (owner/collaborator)
-            SeasonQuotaExhaustedError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/season quota has expired
 
         Example:
             >>> await permission_service.require_write_permission(
@@ -255,11 +255,11 @@ class PermissionService:
         # Step 2: Check quota (must be active)
         await self._quota_service.require_write_access(alliance_id, action)
 
-    async def require_active_subscription(
+    async def require_active_quota(
         self, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
-        Require alliance to have active subscription (subscription check only).
+        Require alliance to have active season quota (quota check only).
 
         Use this method when role has already been verified separately.
         For most cases, prefer require_write_permission() which combines both checks.
@@ -269,7 +269,7 @@ class PermissionService:
             action: Description of the action being attempted
 
         Raises:
-            SeasonQuotaExhaustedError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/season quota has expired
         """
         await self._quota_service.require_write_access(alliance_id, action)
 
@@ -277,14 +277,14 @@ class PermissionService:
         self, user_id: UUID, alliance_id: UUID, action: str = "perform this action"
     ) -> None:
         """
-        Require user to have write role (owner or collaborator) without subscription check.
+        Require user to have write role (owner or collaborator) without quota check.
 
-        Use this for operations that don't require active subscription, such as:
+        Use this for operations that don't require active season quota, such as:
         - Creating draft seasons
         - Updating season metadata
         - Viewing/editing existing data
 
-        For operations that require subscription (like activating seasons),
+        For operations that require active quota (like activating seasons),
         use require_write_permission() instead.
 
         Args:

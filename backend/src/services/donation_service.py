@@ -44,7 +44,7 @@ class DonationService:
 
     async def require_alliance_access(self, user_id: UUID, alliance_id: UUID) -> None:
         """
-        Verify user has owner or collaborator access to alliance AND active subscription.
+        Verify user has owner or collaborator access to alliance AND active season quota.
 
         Args:
             user_id: User UUID
@@ -52,7 +52,7 @@ class DonationService:
 
         Raises:
             PermissionError: If user lacks access
-            SeasonQuotaExhaustedError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/season quota has expired
         """
         await self._permission_service.require_write_permission(
             user_id, alliance_id, "manage donation events"
@@ -62,7 +62,7 @@ class DonationService:
         """
         Verify user has access to donation's alliance and return the donation.
 
-        Checks both role (owner/collaborator) AND active subscription.
+        Checks both role (owner/collaborator) AND active season quota.
 
         Args:
             user_id: User UUID
@@ -74,7 +74,7 @@ class DonationService:
         Raises:
             HTTPException: If donation not found
             PermissionError: If user lacks access
-            SeasonQuotaExhaustedError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/season quota has expired
         """
         donation = await self._donation_repo.get_by_id(donation_id)
         if not donation:
