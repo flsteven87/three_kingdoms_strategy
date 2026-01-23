@@ -580,7 +580,7 @@ async def _handle_member_joined(
     service: LineBindingService,
     settings: Settings,
 ) -> None:
-    """新成員加入 → 發送 LIFF 入口（每用戶一次）"""
+    """新成員加入 → 發送 LIFF 入口（群組層級 30 分鐘 CD）"""
     source = event.source
     line_group_id = source.get("groupId")
     reply_token = event.reply_token
@@ -588,13 +588,16 @@ async def _handle_member_joined(
     if not line_group_id or not reply_token:
         return
 
-    # 檢查群組是否已綁定
-    is_bound = await service.is_group_bound(line_group_id)
-    if not is_bound:
-        return
-
     if not settings.liff_id:
         return
+
+    # 檢查是否應該發送通知（群組已綁定 + 群組層級 CD）
+    should_notify = await service.should_send_member_joined_notification(line_group_id)
+    if not should_notify:
+        return
+
+    # 先記錄，防止重複發送
+    await service.record_liff_notification(line_group_id)
 
     # 發送歡迎訊息
     liff_url = create_liff_url(settings.liff_id, line_group_id)
@@ -741,18 +744,15 @@ async def _handle_group_message(
         )
         return
 
-    # 3. 未註冊者首次發言 → 發送 LIFF 入口
+    # 3. 未註冊者發言 → 發送 LIFF 入口（群組層級 30 分鐘 CD）
     should_notify = await service.should_send_liff_notification(
         line_group_id=line_group_id,
         line_user_id=line_user_id
     )
 
     if should_notify:
-        # 先記錄，防止重複發送
-        await service.record_liff_notification(
-            line_group_id=line_group_id,
-            line_user_id=line_user_id
-        )
+        # 先記錄，防止重複發送（群組層級 CD）
+        await service.record_liff_notification(line_group_id)
         await _send_liff_first_message_reminder(
             line_group_id=line_group_id,
             reply_token=reply_token,

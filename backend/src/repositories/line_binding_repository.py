@@ -557,32 +557,33 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         )
 
     # =========================================================================
-    # User Notification Operations
+    # Group Notification Operations (30-minute cooldown)
     # =========================================================================
 
-    async def has_user_been_notified_since(
+    # Sentinel value for group-level notifications
+    GROUP_NOTIFICATION_SENTINEL = "__GROUP__"
+
+    async def has_group_been_notified_since(
         self,
         line_group_id: str,
-        line_user_id: str,
         since: datetime
     ) -> bool:
         """
-        Check if user has been notified since the given timestamp
+        Check if group has been notified since the given timestamp (group-level CD)
 
         Args:
             line_group_id: LINE group ID
-            line_user_id: LINE user ID
             since: Check for notifications after this time
 
         Returns:
-            True if user was notified after the given time
+            True if group was notified after the given time
         """
         result = await self._execute_async(
             lambda: self.client
             .from_("line_user_notifications")
             .select("sent_at")
             .eq("line_group_id", line_group_id)
-            .eq("line_user_id", line_user_id)
+            .eq("line_user_id", self.GROUP_NOTIFICATION_SENTINEL)
             .gte("sent_at", since.isoformat())
             .execute()
         )
@@ -590,13 +591,12 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return len(data) > 0
 
-    async def record_user_notification(
+    async def record_group_notification(
         self,
-        line_group_id: str,
-        line_user_id: str
+        line_group_id: str
     ) -> None:
         """
-        Record that user has been notified in this group
+        Record that group has been notified (group-level CD)
 
         Uses upsert to update sent_at timestamp if record exists
         """
@@ -606,7 +606,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .upsert(
                 {
                     "line_group_id": line_group_id,
-                    "line_user_id": line_user_id,
+                    "line_user_id": self.GROUP_NOTIFICATION_SENTINEL,
                     "sent_at": datetime.now(UTC).isoformat()
                 },
                 on_conflict="line_group_id,line_user_id"

@@ -597,6 +597,16 @@ class LineBindingService:
     # Cooldown period for LIFF notifications (in minutes) - group level
     NOTIFICATION_COOLDOWN_MINUTES = 30
 
+    async def _is_group_in_cooldown(self, line_group_id: str) -> bool:
+        """Check if group is within notification cooldown period (30 minutes)"""
+        cooldown_threshold = datetime.now(UTC) - timedelta(
+            minutes=self.NOTIFICATION_COOLDOWN_MINUTES
+        )
+        return await self.repository.has_group_been_notified_since(
+            line_group_id=line_group_id,
+            since=cooldown_threshold
+        )
+
     async def should_send_liff_notification(
         self,
         line_group_id: str,
@@ -605,26 +615,14 @@ class LineBindingService:
         """
         Check if we should send LIFF notification for unregistered user message
 
-        Conditions for sending:
+        Conditions:
         1. Group is bound to an alliance
         2. User has NOT registered any game ID
-        3. Group has NOT been notified within the cooldown period (30 minutes)
-
-        Args:
-            line_group_id: LINE group ID
-            line_user_id: LINE user ID
-
-        Returns:
-            True if notification should be sent
+        3. Group is NOT in cooldown (30 minutes)
         """
-        # Check if group is bound
-        group_binding = await self.repository.get_group_binding_by_line_group_id(
-            line_group_id
-        )
-        if not group_binding:
+        if not await self.is_group_bound(line_group_id):
             return False
 
-        # Check if user already registered
         is_registered = await self.repository.is_user_registered_in_group(
             line_group_id=line_group_id,
             line_user_id=line_user_id
@@ -632,18 +630,7 @@ class LineBindingService:
         if is_registered:
             return False
 
-        # Check if group has been notified within cooldown period (group-level CD)
-        cooldown_threshold = datetime.now(UTC) - timedelta(
-            minutes=self.NOTIFICATION_COOLDOWN_MINUTES
-        )
-        has_been_notified = await self.repository.has_group_been_notified_since(
-            line_group_id=line_group_id,
-            since=cooldown_threshold
-        )
-        if has_been_notified:
-            return False
-
-        return True
+        return not await self._is_group_in_cooldown(line_group_id)
 
     async def should_send_member_joined_notification(
         self,
@@ -652,47 +639,18 @@ class LineBindingService:
         """
         Check if we should send welcome notification for new member joined
 
-        Conditions for sending:
+        Conditions:
         1. Group is bound to an alliance
-        2. Group has NOT been notified within the cooldown period (30 minutes)
-
-        Args:
-            line_group_id: LINE group ID
-
-        Returns:
-            True if notification should be sent
+        2. Group is NOT in cooldown (30 minutes)
         """
-        # Check if group is bound
-        is_bound = await self.is_group_bound(line_group_id)
-        if not is_bound:
+        if not await self.is_group_bound(line_group_id):
             return False
 
-        # Check if group has been notified within cooldown period (group-level CD)
-        cooldown_threshold = datetime.now(UTC) - timedelta(
-            minutes=self.NOTIFICATION_COOLDOWN_MINUTES
-        )
-        has_been_notified = await self.repository.has_group_been_notified_since(
-            line_group_id=line_group_id,
-            since=cooldown_threshold
-        )
-        if has_been_notified:
-            return False
+        return not await self._is_group_in_cooldown(line_group_id)
 
-        return True
-
-    async def record_liff_notification(
-        self,
-        line_group_id: str
-    ) -> None:
-        """
-        Record that group has been notified (group-level CD)
-
-        Args:
-            line_group_id: LINE group ID
-        """
-        await self.repository.record_group_notification(
-            line_group_id=line_group_id
-        )
+    async def record_liff_notification(self, line_group_id: str) -> None:
+        """Record that group has been notified (group-level CD)"""
+        await self.repository.record_group_notification(line_group_id)
 
     async def list_custom_commands(self, alliance_id: UUID) -> list[LineCustomCommandResponse]:
         commands = await self.repository.list_custom_commands(alliance_id)
