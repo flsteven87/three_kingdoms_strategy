@@ -66,23 +66,18 @@ class Alliance(AllianceBase):
     recur_customer_id: str | None = None
 
 
-class SubscriptionStatusResponse(BaseModel):
-    """Response model for subscription status API - Season Purchase System"""
-
-    # Overall status
-    status: SubscriptionStatus
-    is_active: bool = Field(description="Whether can activate new seasons (trial or has seasons)")
+class SeasonQuotaStatus(BaseModel):
+    """Response model for season quota status API - Season Purchase System"""
 
     # Trial information
-    is_trial: bool = Field(description="Whether currently in trial period")
-    is_trial_active: bool = Field(description="Whether trial is still valid")
-    trial_days_remaining: int | None = Field(description="Days remaining in trial")
-    trial_ends_at: str | None = Field(description="Trial end date (ISO format)")
+    is_trial_active: bool = Field(description="Whether trial period is still valid")
+    trial_days_remaining: int | None = Field(description="Days remaining in trial period")
+    trial_ends_at: str | None = Field(description="Trial end date in ISO format")
 
     # Season purchase information
-    purchased_seasons: int = Field(description="Total purchased seasons")
-    used_seasons: int = Field(description="Seasons already used")
-    available_seasons: int = Field(description="Remaining available seasons")
+    purchased_seasons: int = Field(description="Total number of purchased seasons")
+    used_seasons: int = Field(description="Number of seasons already activated")
+    available_seasons: int = Field(description="Remaining seasons available for activation")
 
     # Activation capability
     can_activate_season: bool = Field(
