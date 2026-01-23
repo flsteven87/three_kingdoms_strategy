@@ -30,7 +30,7 @@ from src.repositories.alliance_collaborator_repository import (
 )
 
 if TYPE_CHECKING:
-    from src.services.subscription_service import SubscriptionService
+    from src.services.season_quota_service import SeasonQuotaService
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class PermissionService:
     Permission service for role-based and subscription-based access control.
 
     This is the SINGLE ENTRY POINT for all permission checks in the application.
-    Other services should only depend on PermissionService, not SubscriptionService directly.
+    Other services should only depend on PermissionService, not SeasonQuotaService directly.
 
     Permission Matrix:
     - View data: any member (no subscription required)
@@ -48,23 +48,23 @@ class PermissionService:
     - Owner-only operations: owner only (no subscription required)
     """
 
-    def __init__(self, subscription_service: SubscriptionService | None = None):
+    def __init__(self, quota_service: SeasonQuotaService | None = None):
         """
         Initialize permission service.
 
         Args:
-            subscription_service: Optional SubscriptionService instance.
-                                  If not provided, one will be created automatically.
+            quota_service: Optional SeasonQuotaService instance.
+                           If not provided, one will be created automatically.
         """
         self._collaborator_repo = AllianceCollaboratorRepository()
 
         # Lazy import to avoid circular dependency
-        if subscription_service is None:
-            from src.services.subscription_service import SubscriptionService
+        if quota_service is None:
+            from src.services.season_quota_service import SeasonQuotaService
 
-            self._subscription_service: SubscriptionService = SubscriptionService()
+            self._quota_service: SeasonQuotaService = SeasonQuotaService()
         else:
-            self._subscription_service = subscription_service
+            self._quota_service = quota_service
 
     async def get_user_role(self, user_id: UUID, alliance_id: UUID) -> str | None:
         """
@@ -240,7 +240,7 @@ class PermissionService:
         Raises:
             ValueError: If user is not a member of the alliance
             PermissionError: If user doesn't have required role (owner/collaborator)
-            SubscriptionExpiredError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/subscription has expired
 
         Example:
             >>> await permission_service.require_write_permission(
@@ -252,8 +252,8 @@ class PermissionService:
         # Step 1: Check role (must be owner or collaborator)
         await self.require_owner_or_collaborator(user_id, alliance_id, action)
 
-        # Step 2: Check subscription (must be active)
-        await self._subscription_service.require_write_access(alliance_id, action)
+        # Step 2: Check quota (must be active)
+        await self._quota_service.require_write_access(alliance_id, action)
 
     async def require_active_subscription(
         self, alliance_id: UUID, action: str = "perform this action"
@@ -269,9 +269,9 @@ class PermissionService:
             action: Description of the action being attempted
 
         Raises:
-            SubscriptionExpiredError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/subscription has expired
         """
-        await self._subscription_service.require_write_access(alliance_id, action)
+        await self._quota_service.require_write_access(alliance_id, action)
 
     async def require_role_permission(
         self, user_id: UUID, alliance_id: UUID, action: str = "perform this action"
