@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { ThemeToggle } from '../theme-toggle'
-import { TrialBanner } from '../subscription/TrialBanner'
+import { QuotaWarningBanner } from '../season-quota/QuotaWarningBanner'
 import { cn } from '@/lib/utils'
 
 interface DashboardLayoutProps {
@@ -66,8 +66,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </header>
 
-        {/* Trial/Subscription warning banner */}
-        <TrialBanner />
+        {/* Quota warning banner */}
+        <QuotaWarningBanner />
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">

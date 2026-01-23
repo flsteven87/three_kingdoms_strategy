@@ -1,7 +1,7 @@
 /**
- * Trial Banner Component
+ * Quota Warning Banner Component
  *
- * Displays warning banner based on trial/subscription status:
+ * Displays warning banner based on quota/subscription status:
  * - None: No banner shown
  * - Warning (7 days or less): Yellow banner
  * - Critical (3 days or less): Orange banner
@@ -11,9 +11,9 @@
  */
 
 import { AlertTriangle, Clock, XCircle } from 'lucide-react'
-import { useTrialWarning } from '@/hooks/use-subscription'
+import { useQuotaWarning } from '@/hooks/use-season-quota'
 import { cn } from '@/lib/utils'
-import type { TrialWarningLevel } from '@/types/subscription'
+import type { QuotaWarningLevel } from '@/types/season-quota'
 
 interface BannerConfig {
   readonly icon: typeof Clock
@@ -22,7 +22,7 @@ interface BannerConfig {
   readonly borderClass: string
 }
 
-const bannerConfigs: Record<Exclude<TrialWarningLevel, 'none'>, BannerConfig> = {
+const bannerConfigs: Record<Exclude<QuotaWarningLevel, 'none'>, BannerConfig> = {
   warning: {
     icon: Clock,
     bgClass: 'bg-yellow-50 dark:bg-yellow-950/20',
@@ -43,8 +43,8 @@ const bannerConfigs: Record<Exclude<TrialWarningLevel, 'none'>, BannerConfig> = 
   },
 }
 
-export function TrialBanner() {
-  const { level, message } = useTrialWarning()
+export function QuotaWarningBanner() {
+  const { level, message } = useQuotaWarning()
 
   // Don't show banner if no warning
   if (level === 'none' || !message) {

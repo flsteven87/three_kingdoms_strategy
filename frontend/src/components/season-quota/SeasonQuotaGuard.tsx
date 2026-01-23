@@ -1,7 +1,7 @@
 /**
- * Subscription Guard Component
+ * Season Quota Guard Component
  *
- * Checks if user's subscription/trial is active
+ * Checks if user's season quota is active (trial or purchased)
  * If expired, shows upgrade prompt instead of children
  * If active, renders children normally
  *
@@ -10,14 +10,14 @@
 
 import type { ReactNode } from 'react'
 import { AlertCircle } from 'lucide-react'
-import { useSubscription } from '@/hooks/use-subscription'
+import { useSeasonQuota } from '@/hooks/use-season-quota'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 
-interface SubscriptionGuardProps {
+interface SeasonQuotaGuardProps {
   readonly children: ReactNode
   /**
-   * Custom message to show when subscription is expired
+   * Custom message to show when quota is expired
    */
   readonly expiredMessage?: string
   /**
@@ -28,7 +28,7 @@ interface SubscriptionGuardProps {
 }
 
 /**
- * Expired subscription overlay
+ * Expired quota overlay
  */
 function ExpiredOverlay({ message }: { readonly message: string }) {
   return (
@@ -60,24 +60,24 @@ function ExpiredInline({ message }: { readonly message: string }) {
   )
 }
 
-export function SubscriptionGuard({
+export function SeasonQuotaGuard({
   children,
   expiredMessage = '您的試用期已結束且無可用季數，請購買季數以繼續使用完整功能。',
   inline = false,
-}: SubscriptionGuardProps) {
-  const { data, isLoading } = useSubscription()
+}: SeasonQuotaGuardProps) {
+  const { data, isLoading } = useSeasonQuota()
 
   // While loading, render children to avoid flash of expired state
   if (isLoading || !data) {
     return <>{children}</>
   }
 
-  // If subscription is active, render children
-  if (data.is_active) {
+  // If quota is active, render children
+  if (data.can_activate_season) {
     return <>{children}</>
   }
 
-  // Subscription expired, show appropriate message
+  // Quota expired, show appropriate message
   if (inline) {
     return <ExpiredInline message={expiredMessage} />
   }
