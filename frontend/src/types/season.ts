@@ -84,6 +84,3 @@ export function getActivationStatusColor(
       return 'blue'
   }
 }
-
-// Legacy alias for backward compatibility
-export const isSeasonActive = (season: Season): boolean => season.is_current
