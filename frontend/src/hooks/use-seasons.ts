@@ -14,7 +14,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
 import type { Season, SeasonCreate, SeasonUpdate } from '@/types/season'
-import { subscriptionKeys } from './use-subscription'
+import { seasonQuotaKeys } from './use-season-quota'
 
 // Query Keys Factory
 export const seasonKeys = {
@@ -235,8 +235,8 @@ export function useActivateSeason() {
     onSettled: () => {
       // Refetch all season data to sync with server
       queryClient.invalidateQueries({ queryKey: seasonKeys.all })
-      // Also invalidate subscription status (season count changed)
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+      // Also invalidate season quota status (season count changed)
+      queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
     }
   })
 }
@@ -349,5 +349,3 @@ export function useCompleteSeason() {
   })
 }
 
-// Legacy alias for backward compatibility
-export const useActiveSeason = useCurrentSeason
