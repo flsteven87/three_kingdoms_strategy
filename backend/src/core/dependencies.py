@@ -39,7 +39,7 @@ from src.services.line_binding_service import LineBindingService
 from src.services.period_metrics_service import PeriodMetricsService
 from src.services.permission_service import PermissionService
 from src.services.season_service import SeasonService
-from src.services.subscription_service import SubscriptionService
+from src.services.season_quota_service import SeasonQuotaService
 
 # ============================================================================
 # Provider Functions (called by Type Aliases)
@@ -110,9 +110,9 @@ def get_copper_mine_rule_service() -> CopperMineRuleService:
     return CopperMineRuleService()
 
 
-def get_subscription_service() -> SubscriptionService:
-    """Get subscription service instance"""
-    return SubscriptionService()
+def get_season_quota_service() -> SeasonQuotaService:
+    """Get season quota service instance"""
+    return SeasonQuotaService()
 
 
 # ============================================================================
@@ -151,4 +151,4 @@ CopperMineRuleServiceDep = Annotated[
     CopperMineRuleService,
     Depends(get_copper_mine_rule_service)
 ]
-SubscriptionServiceDep = Annotated[SubscriptionService, Depends(get_subscription_service)]
+SeasonQuotaServiceDep = Annotated[SeasonQuotaService, Depends(get_season_quota_service)]
