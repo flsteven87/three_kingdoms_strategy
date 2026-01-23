@@ -73,16 +73,6 @@ async def get_current_season(
     return await service.get_current_season(user_id)
 
 
-# Backward compatibility alias
-@router.get("/active", response_model=Season | None, include_in_schema=False)
-async def get_active_season(
-    service: SeasonServiceDep,
-    user_id: UserIdDep,
-):
-    """Alias for /current for backward compatibility"""
-    return await service.get_current_season(user_id)
-
-
 @router.get("/{season_id}", response_model=Season)
 async def get_season(
     season_id: UUID,
