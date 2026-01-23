@@ -52,7 +52,7 @@ class DonationService:
 
         Raises:
             PermissionError: If user lacks access
-            SubscriptionExpiredError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/subscription has expired
         """
         await self._permission_service.require_write_permission(
             user_id, alliance_id, "manage donation events"
@@ -74,7 +74,7 @@ class DonationService:
         Raises:
             HTTPException: If donation not found
             PermissionError: If user lacks access
-            SubscriptionExpiredError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/subscription has expired
         """
         donation = await self._donation_repo.get_by_id(donation_id)
         if not donation:

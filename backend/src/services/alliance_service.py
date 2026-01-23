@@ -99,7 +99,7 @@ class AllianceService:
         Raises:
             ValueError: If user has no alliance
             PermissionError: If user doesn't have permission
-            SubscriptionExpiredError: If trial/subscription has expired
+            SeasonQuotaExhaustedError: If trial/subscription has expired
 
         Note:
             Changed from get_by_user_id() to get_by_collaborator()

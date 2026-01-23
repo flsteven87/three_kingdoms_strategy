@@ -205,7 +205,7 @@ async def activate_season(
     Raises:
         ValueError: If season not found or not in draft status
         PermissionError: If user doesn't own the season
-        SubscriptionExpiredError: If no available seasons
+        SeasonQuotaExhaustedError: If no available seasons
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """

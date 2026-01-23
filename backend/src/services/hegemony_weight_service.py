@@ -179,7 +179,7 @@ class HegemonyWeightService:
                 user_id, season_id, ["owner", "collaborator"]
             )
 
-            # Verify subscription: trial or paid subscription required
+            # Verify quota: trial or paid subscription required
             await self._permission_service.require_active_subscription(
                 alliance.id, "initialize hegemony weights"
             )
@@ -242,7 +242,7 @@ class HegemonyWeightService:
             user_id, season_id, ["owner", "collaborator"]
         )
 
-        # Verify subscription: trial or paid subscription required
+        # Verify quota: trial or paid subscription required
         await self._permission_service.require_active_subscription(
             alliance.id, "create hegemony weights"
         )
@@ -334,7 +334,7 @@ class HegemonyWeightService:
             user_id, weight_id, "update hegemony weights"
         )
 
-        # Verify subscription: trial or paid subscription required
+        # Verify quota: trial or paid subscription required
         await self._permission_service.require_active_subscription(
             alliance_id, "update hegemony weights"
         )
@@ -368,7 +368,7 @@ class HegemonyWeightService:
             user_id, weight_id, "delete hegemony weights"
         )
 
-        # Verify subscription: trial or paid subscription required
+        # Verify quota: trial or paid subscription required
         await self._permission_service.require_active_subscription(
             alliance_id, "delete hegemony weights"
         )
