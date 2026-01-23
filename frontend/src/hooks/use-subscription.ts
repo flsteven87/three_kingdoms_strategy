@@ -1,5 +1,5 @@
 /**
- * Subscription Query Hooks
+ * Subscription Query Hooks - Season Purchase System
  *
  * 符合 CLAUDE.md 🟡:
  * - TanStack Query for server state
@@ -8,8 +8,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { TrialWarningLevel } from '@/types/subscription'
-import { getTrialWarningLevel } from '@/types/subscription'
+import type { SubscriptionWarningLevel } from '@/types/subscription'
+import {
+  getSubscriptionWarningLevel,
+  getSubscriptionWarningMessage,
+} from '@/types/subscription'
 
 // Query Keys Factory
 export const subscriptionKeys = {
@@ -40,48 +43,55 @@ export function useCanWrite(): boolean {
 }
 
 /**
- * Hook to get trial warning information
- *
- * Returns warning level and days remaining for UI display
+ * Hook to check if user can activate a new season
  */
-export function useTrialWarning(): {
-  level: TrialWarningLevel
-  daysRemaining: number | null
-  isExpired: boolean
+export function useCanActivateSeason(): boolean {
+  const { data } = useSubscription()
+  return data?.can_activate_season ?? false
+}
+
+/**
+ * Hook to get available seasons count
+ */
+export function useAvailableSeasons(): number {
+  const { data } = useSubscription()
+  return data?.available_seasons ?? 0
+}
+
+/**
+ * Hook to get subscription warning information
+ *
+ * Returns warning level and message for UI display
+ */
+export function useSubscriptionWarning(): {
+  level: SubscriptionWarningLevel
   message: string | null
+  isExpired: boolean
+  trialDaysRemaining: number | null
+  availableSeasons: number
 } {
   const { data } = useSubscription()
 
   if (!data) {
     return {
       level: 'none',
-      daysRemaining: null,
-      isExpired: false,
       message: null,
+      isExpired: false,
+      trialDaysRemaining: null,
+      availableSeasons: 0,
     }
   }
 
-  const level = getTrialWarningLevel(data.days_remaining, data.is_trial_active)
+  const level = getSubscriptionWarningLevel(data)
+  const message = getSubscriptionWarningMessage(data)
   const isExpired = !data.is_active
-
-  let message: string | null = null
-  if (level === 'expired' || isExpired) {
-    if (data.is_trial) {
-      message = '您的 14 天試用期已結束，請升級以繼續使用完整功能。'
-    } else {
-      message = '您的訂閱已過期，請續訂以繼續使用完整功能。'
-    }
-  } else if (level === 'critical') {
-    message = `試用期即將結束！還剩 ${data.days_remaining} 天。`
-  } else if (level === 'warning') {
-    message = `試用期還剩 ${data.days_remaining} 天，請考慮升級。`
-  }
 
   return {
     level,
-    daysRemaining: data.days_remaining,
-    isExpired,
     message,
+    isExpired,
+    trialDaysRemaining: data.trial_days_remaining,
+    availableSeasons: data.available_seasons,
   }
 }
 
@@ -93,8 +103,9 @@ export function useTrialWarning(): {
 export function useSubscriptionDisplay(): {
   status: string
   statusColor: 'green' | 'yellow' | 'red' | 'gray'
-  planName: string | null
-  endDate: string | null
+  trialDaysRemaining: number | null
+  availableSeasons: number
+  canActivate: boolean
 } {
   const { data } = useSubscription()
 
@@ -102,8 +113,9 @@ export function useSubscriptionDisplay(): {
     return {
       status: '載入中...',
       statusColor: 'gray',
-      planName: null,
-      endDate: null,
+      trialDaysRemaining: null,
+      availableSeasons: 0,
+      canActivate: false,
     }
   }
 
@@ -111,22 +123,40 @@ export function useSubscriptionDisplay(): {
   let statusColor: 'green' | 'yellow' | 'red' | 'gray'
 
   if (data.is_active) {
-    if (data.is_trial) {
-      status = `試用中 (${data.days_remaining} 天)`
-      statusColor = data.days_remaining && data.days_remaining <= 3 ? 'yellow' : 'green'
+    if (data.is_trial_active) {
+      status = `試用中 (${data.trial_days_remaining} 天)`
+      statusColor =
+        data.trial_days_remaining !== null && data.trial_days_remaining <= 3
+          ? 'yellow'
+          : 'green'
+    } else if (data.available_seasons > 0) {
+      status = `可用 ${data.available_seasons} 季`
+      statusColor = 'green'
     } else {
       status = '已訂閱'
       statusColor = 'green'
     }
   } else {
-    status = data.is_trial ? '試用已過期' : '訂閱已過期'
+    status = data.is_trial ? '試用已過期' : '已過期'
     statusColor = 'red'
   }
 
   return {
     status,
     statusColor,
-    planName: data.subscription_plan,
-    endDate: data.is_trial ? data.trial_ends_at : data.subscription_ends_at,
+    trialDaysRemaining: data.trial_days_remaining,
+    availableSeasons: data.available_seasons,
+    canActivate: data.can_activate_season,
+  }
+}
+
+// Legacy alias for backward compatibility
+export function useTrialWarning() {
+  const warning = useSubscriptionWarning()
+  return {
+    level: warning.level,
+    daysRemaining: warning.trialDaysRemaining,
+    isExpired: warning.isExpired,
+    message: warning.message,
   }
 }

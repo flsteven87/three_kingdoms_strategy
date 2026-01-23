@@ -889,9 +889,9 @@ function AllianceAnalytics() {
   const [activeTab, setActiveTab] = useState('overview')
   const [viewMode, setViewMode] = useState<ViewMode>('latest')
 
-  // Get active season
+  // Get current season
   const { data: seasons, isLoading: seasonsLoading } = useSeasons()
-  const activeSeason = seasons?.find((s) => s.is_active)
+  const activeSeason = seasons?.find((s) => s.is_current)
 
   // Get alliance analytics data
   const { data: analyticsData, isLoading: analyticsLoading } = useAllianceAnalytics(

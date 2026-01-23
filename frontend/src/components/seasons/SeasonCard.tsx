@@ -1,6 +1,10 @@
 /**
  * SeasonCard - Collapsible Season Card with Inline Editing
  *
+ * Season Purchase System:
+ * - activation_status: draft → activated → completed (payment state)
+ * - is_current: Whether this season is selected for display
+ *
  * 符合 CLAUDE.md 🔴:
  * - JSX syntax only
  * - Type-safe component
@@ -9,7 +13,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Calendar, Activity, Trash2, Check, X, Edit2 } from 'lucide-react'
+import { Calendar, Activity, Trash2, Check, X, Edit2, Star, CheckCircle } from 'lucide-react'
 import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,13 +21,22 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { useCanManageSeasons } from '@/hooks/use-user-role'
+import { useCanActivateSeason } from '@/hooks/use-subscription'
 import type { Season } from '@/types/season'
+import {
+  canActivate,
+  canSetAsCurrent,
+  getActivationStatusLabel,
+  getActivationStatusColor,
+} from '@/types/season'
 
 interface SeasonCardProps {
   readonly season: Season
   readonly onUpdate: (seasonId: string, data: Partial<Season>) => Promise<void>
   readonly onDelete: (seasonId: string) => Promise<void>
   readonly onActivate: (seasonId: string) => Promise<void>
+  readonly onSetCurrent: (seasonId: string) => Promise<void>
+  readonly onComplete?: (seasonId: string) => Promise<void>
 }
 
 export function SeasonCard({
@@ -31,10 +44,14 @@ export function SeasonCard({
   onUpdate,
   onDelete,
   onActivate,
+  onSetCurrent,
+  onComplete,
 }: SeasonCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [activateDialogOpen, setActivateDialogOpen] = useState(false)
+  const [setCurrentDialogOpen, setSetCurrentDialogOpen] = useState(false)
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
   const [editData, setEditData] = useState({
     name: season.name,
     start_date: season.start_date,
@@ -43,6 +60,7 @@ export function SeasonCard({
   })
 
   const canManageSeasons = useCanManageSeasons()
+  const canActivateSeasonStatus = useCanActivateSeason()
 
   const handleEdit = useCallback(() => {
     setIsEditing(true)
@@ -77,6 +95,26 @@ export function SeasonCard({
     setActivateDialogOpen(false)
   }, [season.id, onActivate])
 
+  const handleSetCurrentClick = useCallback(() => {
+    setSetCurrentDialogOpen(true)
+  }, [])
+
+  const handleConfirmSetCurrent = useCallback(async () => {
+    await onSetCurrent(season.id)
+    setSetCurrentDialogOpen(false)
+  }, [season.id, onSetCurrent])
+
+  const handleCompleteClick = useCallback(() => {
+    setCompleteDialogOpen(true)
+  }, [])
+
+  const handleConfirmComplete = useCallback(async () => {
+    if (onComplete) {
+      await onComplete(season.id)
+    }
+    setCompleteDialogOpen(false)
+  }, [season.id, onComplete])
+
   const handleDeleteClick = useCallback(() => {
     setDeleteDialogOpen(true)
   }, [])
@@ -84,6 +122,11 @@ export function SeasonCard({
   const handleConfirmDelete = useCallback(async () => {
     await onDelete(season.id)
   }, [season.id, onDelete])
+
+  // Determine which buttons to show based on activation_status and is_current
+  const showActivateButton = canActivate(season) && canActivateSeasonStatus
+  const showSetCurrentButton = canSetAsCurrent(season) && !season.is_current
+  const showCompleteButton = season.activation_status === 'activated' && onComplete
 
   const actions = canManageSeasons ? (
     <div className="flex items-center gap-2">
@@ -108,7 +151,8 @@ export function SeasonCard({
         </>
       ) : (
         <>
-          {!season.is_active && (
+          {/* Activate button for draft seasons */}
+          {showActivateButton && (
             <Button
               size="sm"
               variant="outline"
@@ -116,7 +160,31 @@ export function SeasonCard({
               className="h-8"
             >
               <Activity className="h-4 w-4 mr-1" />
-              啟用
+              啟用賽季
+            </Button>
+          )}
+          {/* Set as current button for activated but not current seasons */}
+          {showSetCurrentButton && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSetCurrentClick}
+              className="h-8"
+            >
+              <Star className="h-4 w-4 mr-1" />
+              設為目前
+            </Button>
+          )}
+          {/* Complete button for activated seasons */}
+          {showCompleteButton && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCompleteClick}
+              className="h-8"
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              結束賽季
             </Button>
           )}
           <Button
@@ -144,15 +212,29 @@ export function SeasonCard({
 
   const title = season.name
 
-  const badge = season.is_active ? (
-    <Badge variant="default" className="text-xs">
-      進行中
-    </Badge>
-  ) : undefined
+  // Build badges based on status
+  const statusColor = getActivationStatusColor(season.activation_status)
+  const statusVariant = statusColor === 'green' ? 'default' :
+                        statusColor === 'blue' ? 'secondary' : 'outline'
 
-  const description = season.is_active
-    ? '目前進行中的賽季，所有新上傳的數據將歸類至此賽季'
-    : `${season.start_date}${season.end_date ? ` - ${season.end_date}` : ' - 進行中'}`
+  const badge = (
+    <div className="flex items-center gap-2">
+      {season.is_current && (
+        <Badge variant="default" className="text-xs">
+          目前賽季
+        </Badge>
+      )}
+      <Badge variant={statusVariant} className="text-xs">
+        {getActivationStatusLabel(season.activation_status)}
+      </Badge>
+    </div>
+  )
+
+  const description = season.is_current
+    ? '目前選定的賽季，所有新上傳的數據將歸類至此賽季'
+    : season.activation_status === 'draft'
+      ? '草稿狀態 - 啟用後才能設為目前賽季'
+      : `${season.start_date}${season.end_date ? ` - ${season.end_date}` : ' - 進行中'}`
 
   return (
     <>
@@ -163,7 +245,7 @@ export function SeasonCard({
         description={description}
         actions={actions}
         collapsible={true}
-        defaultExpanded={season.is_active}
+        defaultExpanded={season.is_current}
       >
         {isEditing ? (
           <div className="space-y-4">
@@ -252,8 +334,34 @@ export function SeasonCard({
         title="啟用賽季"
         description="確定要啟用此賽季嗎？"
         itemName={season.name}
-        warningMessage="啟用此賽季後，其他所有賽季將自動停用。系統的數據分析功能（總覽、同盟分析、成員表現等）將僅顯示此賽季的數據。已上傳的歷史數據不會受影響，您可以隨時切換回其他賽季。"
+        warningMessage="啟用賽季將消耗一個季數額度（試用期間免費）。啟用後，此賽季可以設為「目前賽季」來進行數據分析。"
         confirmText="確定啟用"
+        variant="default"
+      />
+
+      {/* Set Current Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={setCurrentDialogOpen}
+        onOpenChange={setSetCurrentDialogOpen}
+        onConfirm={handleConfirmSetCurrent}
+        title="設為目前賽季"
+        description="確定要將此賽季設為目前賽季嗎？"
+        itemName={season.name}
+        warningMessage="設為目前賽季後，系統的數據分析功能（總覽、同盟分析、成員表現等）將顯示此賽季的數據。其他賽季將取消「目前」狀態，但資料不會受影響。"
+        confirmText="確定設定"
+        variant="default"
+      />
+
+      {/* Complete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={completeDialogOpen}
+        onOpenChange={setCompleteDialogOpen}
+        onConfirm={handleConfirmComplete}
+        title="結束賽季"
+        description="確定要結束此賽季嗎？"
+        itemName={season.name}
+        warningMessage="結束賽季後，此賽季將標記為「已結束」。您仍可查看歷史數據，但無法再上傳新資料到此賽季。"
+        confirmText="確定結束"
         variant="default"
       />
 
@@ -265,7 +373,7 @@ export function SeasonCard({
         title="刪除賽季"
         description="確定要刪除此賽季嗎？"
         itemName={season.name}
-        warningMessage="此操作將永久刪除賽季及相關的所有數據（CSV 上傳記錄、成員快照等），且無法復原。"
+        warningMessage="此操作將永久刪除賽季及相關的所有數據（CSV 上傳記錄、成員快照等），且無法復原。已消耗的季數額度不會退還。"
       />
     </>
   )

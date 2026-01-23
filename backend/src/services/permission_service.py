@@ -292,3 +292,31 @@ class PermissionService:
             SubscriptionExpiredError: If trial/subscription has expired
         """
         await self._subscription_service.require_write_access(alliance_id, action)
+
+    async def require_role_permission(
+        self,
+        user_id: UUID,
+        alliance_id: UUID,
+        action: str = "perform this action"
+    ) -> None:
+        """
+        Require user to have write role (owner or collaborator) without subscription check.
+
+        Use this for operations that don't require active subscription, such as:
+        - Creating draft seasons
+        - Updating season metadata
+        - Viewing/editing existing data
+
+        For operations that require subscription (like activating seasons),
+        use require_write_permission() instead.
+
+        Args:
+            user_id: User UUID
+            alliance_id: Alliance UUID
+            action: Description of the action being attempted
+
+        Raises:
+            ValueError: If user is not a member of the alliance
+            PermissionError: If user doesn't have required role (owner/collaborator)
+        """
+        await self.require_owner_or_collaborator(user_id, alliance_id, action)

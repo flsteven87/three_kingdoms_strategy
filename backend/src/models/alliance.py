@@ -10,8 +10,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Subscription status type
-SubscriptionStatus = Literal["trial", "active", "expired", "cancelled"]
+# Subscription status type for season purchase system
+# - trial: Within 14-day trial period
+# - active: Trial active OR has available seasons
+# - expired: Trial expired AND no available seasons
+SubscriptionStatus = Literal["trial", "active", "expired"]
 
 
 class AllianceBase(BaseModel):
@@ -28,6 +31,7 @@ class AllianceCreate(AllianceBase):
     Note: user_id is NOT included here - it's extracted from JWT token on the server.
     符合 CLAUDE.md 🔴: Security best practice - never trust client-provided user_id
     """
+
     pass
 
 
@@ -51,23 +55,36 @@ class Alliance(AllianceBase):
     created_at: datetime
     updated_at: datetime
 
-    # Subscription fields
+    # Trial fields
     subscription_status: SubscriptionStatus = "trial"
     trial_started_at: datetime | None = None
     trial_ends_at: datetime | None = None
-    subscription_plan: str | None = None
-    subscription_started_at: datetime | None = None
-    subscription_ends_at: datetime | None = None
+
+    # Season purchase fields
+    purchased_seasons: int = 0
+    used_seasons: int = 0
+    recur_customer_id: str | None = None
 
 
 class SubscriptionStatusResponse(BaseModel):
-    """Response model for subscription status API"""
+    """Response model for subscription status API - Season Purchase System"""
 
+    # Overall status
     status: SubscriptionStatus
-    is_active: bool = Field(description="Whether subscription is active (trial or paid)")
+    is_active: bool = Field(description="Whether can activate new seasons (trial or has seasons)")
+
+    # Trial information
     is_trial: bool = Field(description="Whether currently in trial period")
     is_trial_active: bool = Field(description="Whether trial is still valid")
-    days_remaining: int | None = Field(description="Days remaining in trial/subscription")
+    trial_days_remaining: int | None = Field(description="Days remaining in trial")
     trial_ends_at: str | None = Field(description="Trial end date (ISO format)")
-    subscription_plan: str | None = Field(description="Current subscription plan name")
-    subscription_ends_at: str | None = Field(description="Subscription end date (ISO format)")
+
+    # Season purchase information
+    purchased_seasons: int = Field(description="Total purchased seasons")
+    used_seasons: int = Field(description="Seasons already used")
+    available_seasons: int = Field(description="Remaining available seasons")
+
+    # Activation capability
+    can_activate_season: bool = Field(
+        description="Whether user can activate a new season (trial active OR has available seasons)"
+    )

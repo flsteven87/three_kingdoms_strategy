@@ -1,22 +1,27 @@
 /**
- * Season Query Hooks
+ * Season Query Hooks - Season Purchase System
  *
  * 符合 CLAUDE.md 🟡:
  * - TanStack Query for server state
  * - Type-safe hooks
  * - Optimistic updates for mutations
+ *
+ * Key concepts:
+ * - activation_status: draft → activated → completed (payment state)
+ * - is_current: Whether this season is selected for display
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
 import type { Season, SeasonCreate, SeasonUpdate } from '@/types/season'
+import { subscriptionKeys } from './use-subscription'
 
 // Query Keys Factory
 export const seasonKeys = {
   all: ['seasons'] as const,
   lists: () => [...seasonKeys.all, 'list'] as const,
-  list: (activeOnly: boolean) => [...seasonKeys.lists(), { activeOnly }] as const,
-  active: () => [...seasonKeys.all, 'active'] as const,
+  list: (activatedOnly: boolean) => [...seasonKeys.lists(), { activatedOnly }] as const,
+  current: () => [...seasonKeys.all, 'current'] as const,
   details: () => [...seasonKeys.all, 'detail'] as const,
   detail: (id: string) => [...seasonKeys.details(), id] as const
 }
@@ -24,25 +29,26 @@ export const seasonKeys = {
 /**
  * Hook to fetch all seasons
  *
+ * @param activatedOnly - Filter to only activated seasons (not draft/completed)
  * Returns empty array if user has no alliance
  */
-export function useSeasons(activeOnly: boolean = false) {
+export function useSeasons(activatedOnly: boolean = false) {
   return useQuery({
-    queryKey: seasonKeys.list(activeOnly),
-    queryFn: () => apiClient.getSeasons(activeOnly),
+    queryKey: seasonKeys.list(activatedOnly),
+    queryFn: () => apiClient.getSeasons(activatedOnly),
     staleTime: 5 * 60 * 1000 // 5 minutes
   })
 }
 
 /**
- * Hook to fetch active season
+ * Hook to fetch current (selected) season
  *
- * Returns null if no active season
+ * Returns null if no current season
  */
-export function useActiveSeason() {
+export function useCurrentSeason() {
   return useQuery({
-    queryKey: seasonKeys.active(),
-    queryFn: () => apiClient.getActiveSeason(),
+    queryKey: seasonKeys.current(),
+    queryFn: () => apiClient.getCurrentSeason(),
     staleTime: 5 * 60 * 1000
   })
 }
@@ -62,6 +68,7 @@ export function useSeason(seasonId: string) {
 /**
  * Hook to create season
  *
+ * New seasons are created as 'draft' status.
  * Automatically updates cache on success
  */
 export function useCreateSeason() {
@@ -71,8 +78,8 @@ export function useCreateSeason() {
     mutationFn: (data: SeasonCreate) => apiClient.createSeason(data),
     onSuccess: (newSeason) => {
       queryClient.invalidateQueries({ queryKey: seasonKeys.lists() })
-      if (newSeason.is_active) {
-        queryClient.invalidateQueries({ queryKey: seasonKeys.active() })
+      if (newSeason.is_current) {
+        queryClient.invalidateQueries({ queryKey: seasonKeys.current() })
       }
     },
     onSettled: () => {
@@ -184,9 +191,10 @@ export function useDeleteSeason() {
 }
 
 /**
- * Hook to activate season
+ * Hook to activate a draft season (consume season credit or use trial)
  *
- * Optimistic activation with is_active toggle for all seasons
+ * Changes activation_status from 'draft' to 'activated'.
+ * Also invalidates subscription status since season count changes.
  */
 export function useActivateSeason() {
   const queryClient = useQueryClient()
@@ -199,39 +207,90 @@ export function useActivateSeason() {
 
       // Snapshot previous values
       const previousSeasons = queryClient.getQueryData<Season[]>(seasonKeys.list(false))
-      const previousActive = queryClient.getQueryData<Season | null>(seasonKeys.active())
 
-      // Optimistically update season list (deactivate all, activate target)
+      // Optimistically update season list (change activation_status to 'activated')
       if (previousSeasons) {
         queryClient.setQueryData<Season[]>(
           seasonKeys.list(false),
-          previousSeasons.map(season => ({
-            ...season,
-            is_active: season.id === seasonId,
-            updated_at: new Date().toISOString()
-          }))
+          previousSeasons.map(season =>
+            season.id === seasonId
+              ? {
+                  ...season,
+                  activation_status: 'activated' as const,
+                  updated_at: new Date().toISOString()
+                }
+              : season
+          )
         )
       }
 
-      // Optimistically update active season
-      const newActiveSeason = previousSeasons?.find(s => s.id === seasonId)
-      if (newActiveSeason) {
-        queryClient.setQueryData(seasonKeys.active(), {
-          ...newActiveSeason,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        })
-      }
-
-      return { previousSeasons, previousActive }
+      return { previousSeasons }
     },
     onError: (_error, _variables, context) => {
       // Rollback on error
       if (context?.previousSeasons) {
         queryClient.setQueryData(seasonKeys.list(false), context.previousSeasons)
       }
-      if (context?.previousActive) {
-        queryClient.setQueryData(seasonKeys.active(), context.previousActive)
+    },
+    onSettled: () => {
+      // Refetch all season data to sync with server
+      queryClient.invalidateQueries({ queryKey: seasonKeys.all })
+      // Also invalidate subscription status (season count changed)
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+    }
+  })
+}
+
+/**
+ * Hook to set an activated season as current (selected for display)
+ *
+ * Only activated seasons can be set as current.
+ * This unsets the current flag on all other seasons.
+ */
+export function useSetCurrentSeason() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (seasonId: string) => apiClient.setCurrentSeason(seasonId),
+    onMutate: async (seasonId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: seasonKeys.all })
+
+      // Snapshot previous values
+      const previousSeasons = queryClient.getQueryData<Season[]>(seasonKeys.list(false))
+      const previousCurrent = queryClient.getQueryData<Season | null>(seasonKeys.current())
+
+      // Optimistically update season list (set is_current on target, unset on others)
+      if (previousSeasons) {
+        queryClient.setQueryData<Season[]>(
+          seasonKeys.list(false),
+          previousSeasons.map(season => ({
+            ...season,
+            is_current: season.id === seasonId,
+            updated_at: new Date().toISOString()
+          }))
+        )
+      }
+
+      // Optimistically update current season
+      const newCurrentSeason = previousSeasons?.find(s => s.id === seasonId)
+      if (newCurrentSeason) {
+        queryClient.setQueryData(seasonKeys.current(), {
+          ...newCurrentSeason,
+          is_current: true,
+          updated_at: new Date().toISOString()
+        })
+      }
+
+      return { previousSeasons, previousCurrent }
+    },
+    onError: (_error, _variables, context) => {
+      // Rollback on error
+      if (context?.previousSeasons) {
+        queryClient.setQueryData(seasonKeys.list(false), context.previousSeasons)
+      }
+      if (context?.previousCurrent !== undefined) {
+        queryClient.setQueryData(seasonKeys.current(), context.previousCurrent)
       }
     },
     onSettled: () => {
@@ -240,3 +299,55 @@ export function useActivateSeason() {
     }
   })
 }
+
+/**
+ * Hook to mark a season as completed
+ *
+ * Changes activation_status from 'activated' to 'completed'.
+ */
+export function useCompleteSeason() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (seasonId: string) => apiClient.completeSeason(seasonId),
+    onMutate: async (seasonId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: seasonKeys.all })
+
+      // Snapshot previous values
+      const previousSeasons = queryClient.getQueryData<Season[]>(seasonKeys.list(false))
+
+      // Optimistically update season list (change activation_status to 'completed')
+      if (previousSeasons) {
+        queryClient.setQueryData<Season[]>(
+          seasonKeys.list(false),
+          previousSeasons.map(season =>
+            season.id === seasonId
+              ? {
+                  ...season,
+                  activation_status: 'completed' as const,
+                  is_current: false, // Completed seasons cannot be current
+                  updated_at: new Date().toISOString()
+                }
+              : season
+          )
+        )
+      }
+
+      return { previousSeasons }
+    },
+    onError: (_error, _variables, context) => {
+      // Rollback on error
+      if (context?.previousSeasons) {
+        queryClient.setQueryData(seasonKeys.list(false), context.previousSeasons)
+      }
+    },
+    onSettled: () => {
+      // Refetch all season data to sync with server
+      queryClient.invalidateQueries({ queryKey: seasonKeys.all })
+    }
+  })
+}
+
+// Legacy alias for backward compatibility
+export const useActiveSeason = useCurrentSeason

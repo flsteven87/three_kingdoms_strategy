@@ -137,7 +137,7 @@ function EventAnalytics() {
 
   // Data fetching
   const { data: seasons, isLoading: seasonsLoading } = useSeasons()
-  const activeSeason = seasons?.find((s) => s.is_active)
+  const activeSeason = seasons?.find((s) => s.is_current)
   const { data: events, isLoading: eventsLoading } = useEvents(activeSeason?.id)
 
   // Mutations

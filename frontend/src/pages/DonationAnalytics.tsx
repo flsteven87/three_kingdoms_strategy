@@ -105,7 +105,7 @@ function DonationMemberRow({
 
 function DonationAnalytics() {
     const { data: seasons } = useSeasons()
-    const activeSeason = seasons?.find((s) => s.is_active)
+    const activeSeason = seasons?.find((s) => s.is_current)
 
     const { data: registeredMembers } = useAnalyticsMembers(activeSeason?.id, true)
 

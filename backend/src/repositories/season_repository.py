@@ -19,13 +19,15 @@ class SeasonRepository(SupabaseRepository[Season]):
         """Initialize season repository"""
         super().__init__(table_name="seasons", model_class=Season)
 
-    async def get_by_alliance(self, alliance_id: UUID, active_only: bool = False) -> list[Season]:
+    async def get_by_alliance(
+        self, alliance_id: UUID, activated_only: bool = False
+    ) -> list[Season]:
         """
         Get seasons by alliance ID
 
         Args:
             alliance_id: Alliance UUID
-            active_only: Only return active seasons
+            activated_only: Only return activated seasons (not draft/completed)
 
         Returns:
             List of season instances
@@ -34,8 +36,8 @@ class SeasonRepository(SupabaseRepository[Season]):
         """
         query = self.client.from_(self.table_name).select("*").eq("alliance_id", str(alliance_id))
 
-        if active_only:
-            query = query.eq("is_active", True)
+        if activated_only:
+            query = query.eq("activation_status", "activated")
 
         result = await self._execute_async(
             lambda: query.order("start_date", desc=True).execute()
@@ -45,15 +47,15 @@ class SeasonRepository(SupabaseRepository[Season]):
 
         return self._build_models(data)
 
-    async def get_active_season(self, alliance_id: UUID) -> Season | None:
+    async def get_current_season(self, alliance_id: UUID) -> Season | None:
         """
-        Get the active season for an alliance
+        Get the current (selected) season for an alliance
 
         Args:
             alliance_id: Alliance UUID
 
         Returns:
-            Active season or None if not found
+            Current season or None if not found
 
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
@@ -61,7 +63,7 @@ class SeasonRepository(SupabaseRepository[Season]):
             lambda: self.client.from_(self.table_name)
             .select("*")
             .eq("alliance_id", str(alliance_id))
-            .eq("is_active", True)
+            .eq("is_current", True)
             .order("start_date", desc=True)
             .limit(1)
             .execute()
@@ -73,6 +75,11 @@ class SeasonRepository(SupabaseRepository[Season]):
             return None
 
         return self._build_model(data)
+
+    # Backward compatibility alias
+    async def get_active_season(self, alliance_id: UUID) -> Season | None:
+        """Alias for get_current_season for backward compatibility"""
+        return await self.get_current_season(alliance_id)
 
     async def create(self, season_data: dict) -> Season:
         """

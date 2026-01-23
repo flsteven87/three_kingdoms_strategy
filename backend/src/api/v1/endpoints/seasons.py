@@ -1,5 +1,5 @@
 """
-Season API Endpoints
+Season API Endpoints - Season Purchase System
 
 符合 CLAUDE.md 🔴:
 - API Layer delegates to Service Layer
@@ -8,6 +8,11 @@ Season API Endpoints
 - JWT authentication required
 符合 CLAUDE.md 🟡:
 - Global exception handlers eliminate try/except boilerplate
+
+Key endpoints:
+- POST /seasons/{id}/activate - Activate a draft season (consume season credit)
+- POST /seasons/{id}/set-current - Set an activated season as current
+- POST /seasons/{id}/complete - Mark a season as completed
 """
 
 from uuid import UUID
@@ -15,7 +20,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from src.core.dependencies import SeasonServiceDep, UserIdDep
-from src.models.season import Season, SeasonCreate, SeasonUpdate
+from src.models.season import Season, SeasonActivateResponse, SeasonCreate, SeasonUpdate
 
 router = APIRouter(prefix="/seasons", tags=["seasons"])
 
@@ -24,7 +29,7 @@ router = APIRouter(prefix="/seasons", tags=["seasons"])
 async def get_seasons(
     service: SeasonServiceDep,
     user_id: UserIdDep,
-    active_only: bool = False,
+    activated_only: bool = False,
 ):
     """
     Get all seasons for current user's alliance
@@ -32,7 +37,7 @@ async def get_seasons(
     Args:
         service: Season service (injected)
         user_id: User UUID (from JWT token)
-        active_only: Only return active seasons
+        activated_only: Only return activated seasons (not draft/completed)
 
     Returns:
         List of season instances
@@ -42,30 +47,40 @@ async def get_seasons(
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
-    return await service.get_seasons(user_id, active_only=active_only)
+    return await service.get_seasons(user_id, activated_only=activated_only)
 
 
-@router.get("/active", response_model=Season | None)
-async def get_active_season(
+@router.get("/current", response_model=Season | None)
+async def get_current_season(
     service: SeasonServiceDep,
     user_id: UserIdDep,
 ):
     """
-    Get active season for current user's alliance
+    Get current (selected) season for current user's alliance
 
     Args:
         service: Season service (injected)
         user_id: User UUID (from JWT token)
 
     Returns:
-        Active season or None if not found
+        Current season or None if not found
 
     Raises:
         ValueError: If user has no alliance
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
-    return await service.get_active_season(user_id)
+    return await service.get_current_season(user_id)
+
+
+# Backward compatibility alias
+@router.get("/active", response_model=Season | None, include_in_schema=False)
+async def get_active_season(
+    service: SeasonServiceDep,
+    user_id: UserIdDep,
+):
+    """Alias for /current for backward compatibility"""
+    return await service.get_current_season(user_id)
 
 
 @router.get("/{season_id}", response_model=Season)
@@ -103,20 +118,22 @@ async def create_season(
     """
     Create new season for current user's alliance
 
+    New seasons are created as 'draft' status.
+    User must call /activate to consume a season credit and activate it.
+
     Args:
         season_data: Season creation data
         service: Season service (injected)
         user_id: User UUID (from JWT token)
 
     Returns:
-        Created season instance
+        Created season instance (draft status)
 
     Raises:
         ValueError: If user has no alliance
         PermissionError: If alliance_id doesn't match user's alliance
 
     符合 CLAUDE.md 🔴: API layer delegates to service
-    符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
     """
     return await service.create_season(user_id, season_data)
 
@@ -145,7 +162,6 @@ async def update_season(
         PermissionError: If user doesn't own the season
 
     符合 CLAUDE.md 🔴: API layer delegates to service
-    符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
     """
     return await service.update_season(user_id, season_id, season_data)
 
@@ -173,14 +189,20 @@ async def delete_season(
     await service.delete_season(user_id, season_id)
 
 
-@router.post("/{season_id}/activate", response_model=Season)
+@router.post("/{season_id}/activate", response_model=SeasonActivateResponse)
 async def activate_season(
     season_id: UUID,
     service: SeasonServiceDep,
     user_id: UserIdDep,
 ):
     """
-    Set a season as active (deactivates all other seasons for the alliance)
+    Activate a draft season (consume season credit or use trial)
+
+    This changes the season status from 'draft' to 'activated'.
+    - If trial is active: free activation
+    - If trial expired: consumes one purchased season
+
+    After activation, the season can be set as current using /set-current.
 
     Args:
         season_id: Season UUID to activate
@@ -188,12 +210,68 @@ async def activate_season(
         user_id: User UUID (from JWT token)
 
     Returns:
-        Updated active season
+        SeasonActivateResponse with activation result and remaining seasons
 
     Raises:
-        ValueError: If season not found or user has no alliance
+        ValueError: If season not found or not in draft status
+        PermissionError: If user doesn't own the season
+        SubscriptionExpiredError: If no available seasons
+
+    符合 CLAUDE.md 🔴: API layer delegates to service
+    """
+    return await service.activate_season(user_id, season_id)
+
+
+@router.post("/{season_id}/set-current", response_model=Season)
+async def set_current_season(
+    season_id: UUID,
+    service: SeasonServiceDep,
+    user_id: UserIdDep,
+):
+    """
+    Set an activated season as current (selected for display)
+
+    Only activated seasons can be set as current.
+    This unsets the current flag on all other seasons for the alliance.
+
+    Args:
+        season_id: Season UUID to set as current
+        service: Season service (injected)
+        user_id: User UUID (from JWT token)
+
+    Returns:
+        Updated current season
+
+    Raises:
+        ValueError: If season not found or not activated
         PermissionError: If user doesn't own the season
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
-    return await service.set_active_season(user_id, season_id)
+    return await service.set_current_season(user_id, season_id)
+
+
+@router.post("/{season_id}/complete", response_model=Season)
+async def complete_season(
+    season_id: UUID,
+    service: SeasonServiceDep,
+    user_id: UserIdDep,
+):
+    """
+    Mark a season as completed
+
+    Args:
+        season_id: Season UUID to complete
+        service: Season service (injected)
+        user_id: User UUID (from JWT token)
+
+    Returns:
+        Updated season
+
+    Raises:
+        ValueError: If season not found or not activated
+        PermissionError: If user doesn't own the season
+
+    符合 CLAUDE.md 🔴: API layer delegates to service
+    """
+    return await service.complete_season(user_id, season_id)

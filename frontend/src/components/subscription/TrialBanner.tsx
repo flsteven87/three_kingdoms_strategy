@@ -78,7 +78,7 @@ export function TrialBanner() {
           )}
           disabled
         >
-          升級方案（即將推出）
+          購買季數（即將推出）
         </button>
       )}
     </div>

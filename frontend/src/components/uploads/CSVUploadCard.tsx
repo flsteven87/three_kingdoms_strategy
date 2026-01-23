@@ -224,9 +224,9 @@ export function CSVUploadCard({
 
   const title = season.name
 
-  const badge = season.is_active ? (
+  const badge = season.is_current ? (
     <Badge variant="default" className="text-xs">
-      進行中
+      目前賽季
     </Badge>
   ) : undefined
 
@@ -239,7 +239,7 @@ export function CSVUploadCard({
       badge={badge}
       description={description}
       collapsible={true}
-      defaultExpanded={season.is_active}
+      defaultExpanded={season.is_current}
     >
       <div className="space-y-6">
         {/* Drag & Drop Upload Zone - Only for owners/collaborators */}

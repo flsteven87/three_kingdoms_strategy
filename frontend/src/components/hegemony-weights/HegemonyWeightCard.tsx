@@ -331,9 +331,9 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
   const title = (
     <div className="flex items-center gap-2">
       <span>{season.name}</span>
-      {season.is_active && (
+      {season.is_current && (
         <Badge variant="default" className="ml-2">
-          進行中
+          目前賽季
         </Badge>
       )}
     </div>
@@ -350,7 +350,7 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
       title={title}
       description={description}
       collapsible={true}
-      defaultExpanded={season.is_active}
+      defaultExpanded={season.is_current}
     >
       <div className="space-y-6">
         {/* Loading State */}

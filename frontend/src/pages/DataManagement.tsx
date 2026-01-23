@@ -22,12 +22,12 @@ function DataManagement() {
   const uploadMutation = useUploadCsv()
 
   /**
-   * Sort seasons: active first, then by start_date descending
+   * Sort seasons: current first, then by start_date descending
    */
   const sortedSeasons = seasons
     ? [...seasons].sort((a, b) => {
-        if (a.is_active && !b.is_active) return -1
-        if (!a.is_active && b.is_active) return 1
+        if (a.is_current && !b.is_current) return -1
+        if (!a.is_current && b.is_current) return 1
         return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
       })
     : []

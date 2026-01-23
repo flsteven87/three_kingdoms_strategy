@@ -65,12 +65,15 @@ export const apiClient = {
 
   // Season
   getSeasons: seasonApi.getSeasons,
-  getActiveSeason: seasonApi.getActiveSeason,
+  getCurrentSeason: seasonApi.getCurrentSeason,
+  getActiveSeason: seasonApi.getActiveSeason, // Legacy alias
   getSeason: seasonApi.getSeason,
   createSeason: seasonApi.createSeason,
   updateSeason: seasonApi.updateSeason,
   deleteSeason: seasonApi.deleteSeason,
   activateSeason: seasonApi.activateSeason,
+  setCurrentSeason: seasonApi.setCurrentSeason,
+  completeSeason: seasonApi.completeSeason,
 
   // CSV Upload
   getCsvUploads: uploadApi.getCsvUploads,
