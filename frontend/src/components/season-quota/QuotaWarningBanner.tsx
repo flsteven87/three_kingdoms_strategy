@@ -5,14 +5,16 @@
  * - None: No banner shown
  * - Warning (7 days or less): Yellow banner
  * - Critical (3 days or less): Orange banner
- * - Expired: Red banner
+ * - Expired: Red banner with purchase button
  *
  * 符合 CLAUDE.md 🔴: ES imports only, explicit TypeScript interfaces, function declarations
  */
 
+import { useState } from 'react'
 import { AlertTriangle, Clock, XCircle } from 'lucide-react'
-import { useQuotaWarning } from '@/hooks/use-season-quota'
+import { useQuotaWarning, useAvailableSeasons } from '@/hooks/use-season-quota'
 import { cn } from '@/lib/utils'
+import { PurchaseQuotaModal } from '@/components/settings'
 import type { QuotaWarningLevel } from '@/types/season-quota'
 
 interface BannerConfig {
@@ -44,7 +46,9 @@ const bannerConfigs: Record<Exclude<QuotaWarningLevel, 'none'>, BannerConfig> = 
 }
 
 export function QuotaWarningBanner() {
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false)
   const { level, message } = useQuotaWarning()
+  const availableSeasons = useAvailableSeasons()
 
   // Don't show banner if no warning
   if (level === 'none' || !message) {
@@ -55,32 +59,40 @@ export function QuotaWarningBanner() {
   const Icon = config.icon
 
   return (
-    <div
-      className={cn(
-        'flex items-center gap-3 px-4 py-2.5 border-b text-sm',
-        config.bgClass,
-        config.textClass,
-        config.borderClass
-      )}
-      role="alert"
-    >
-      <Icon className="h-4 w-4 shrink-0" />
-      <p className="flex-1">{message}</p>
-      {level === 'expired' && (
-        <button
-          type="button"
-          className={cn(
-            'shrink-0 rounded-md px-3 py-1 text-xs font-medium',
-            'bg-red-600 text-white hover:bg-red-700',
-            'dark:bg-red-600 dark:hover:bg-red-500',
-            'focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
-          )}
-          disabled
-        >
-          購買季數（即將推出）
-        </button>
-      )}
-    </div>
+    <>
+      <div
+        className={cn(
+          'flex items-center gap-3 px-4 py-2.5 border-b text-sm',
+          config.bgClass,
+          config.textClass,
+          config.borderClass
+        )}
+        role="alert"
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <p className="flex-1">{message}</p>
+        {level === 'expired' && (
+          <button
+            type="button"
+            className={cn(
+              'shrink-0 rounded-md px-3 py-1 text-xs font-medium',
+              'bg-red-600 text-white hover:bg-red-700',
+              'dark:bg-red-600 dark:hover:bg-red-500',
+              'focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2',
+              'transition-colors'
+            )}
+            onClick={() => setIsPurchaseModalOpen(true)}
+          >
+            購買季數
+          </button>
+        )}
+      </div>
+
+      <PurchaseQuotaModal
+        open={isPurchaseModalOpen}
+        onOpenChange={setIsPurchaseModalOpen}
+        currentAvailable={availableSeasons}
+      />
+    </>
   )
 }
