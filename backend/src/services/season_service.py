@@ -14,7 +14,7 @@ from src.models.season import Season, SeasonActivateResponse, SeasonCreate, Seas
 from src.repositories.alliance_repository import AllianceRepository
 from src.repositories.season_repository import SeasonRepository
 from src.services.permission_service import PermissionService
-from src.services.subscription_service import SubscriptionService
+from src.services.season_quota_service import SeasonQuotaService
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class SeasonService:
         self._repo = SeasonRepository()
         self._alliance_repo = AllianceRepository()
         self._permission_service = PermissionService()
-        self._subscription_service = SubscriptionService()
+        self._season_quota_service = SeasonQuotaService()
 
     async def verify_user_access(self, user_id: UUID, season_id: UUID) -> UUID:
         """
@@ -216,7 +216,7 @@ class SeasonService:
             )
 
         # Verify can activate (has trial or seasons)
-        await self._subscription_service.require_season_activation(season.alliance_id)
+        await self._season_quota_service.require_season_activation(season.alliance_id)
 
         # Get alliance for trial check
         alliance = await self._alliance_repo.get_by_id(season.alliance_id)
@@ -224,10 +224,8 @@ class SeasonService:
             raise ValueError("Alliance not found")
 
         # Consume season (handles trial vs paid logic)
-        remaining = await self._subscription_service.consume_season(season.alliance_id)
-
-        # Check if trial was used
-        used_trial = self._subscription_service._is_trial_active(alliance)
+        # Returns tuple atomically to prevent race condition
+        remaining, used_trial = await self._season_quota_service.consume_season(season.alliance_id)
 
         # Update season status to activated
         updated_season = await self._repo.update(season_id, {"activation_status": "activated"})
@@ -387,12 +385,3 @@ class SeasonService:
             update_data["is_current"] = False
 
         return await self._repo.update(season_id, update_data)
-
-    # Backward compatibility alias
-    async def get_active_season(self, user_id: UUID) -> Season | None:
-        """Alias for get_current_season for backward compatibility"""
-        return await self.get_current_season(user_id)
-
-    async def set_active_season(self, user_id: UUID, season_id: UUID) -> Season:
-        """Alias for set_current_season for backward compatibility"""
-        return await self.set_current_season(user_id, season_id)

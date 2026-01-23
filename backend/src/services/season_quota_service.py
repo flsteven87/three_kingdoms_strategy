@@ -13,8 +13,8 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from src.core.exceptions import SubscriptionExpiredError
-from src.models.alliance import Alliance, SubscriptionStatusResponse
+from src.core.exceptions import SeasonQuotaExhaustedError
+from src.models.alliance import Alliance, SeasonQuotaStatus
 from src.repositories.alliance_repository import AllianceRepository
 
 logger = logging.getLogger(__name__)
@@ -159,7 +159,7 @@ class SeasonQuotaService:
         else:
             return "expired"
 
-    def _calculate_quota_status(self, alliance: Alliance) -> SubscriptionStatusResponse:
+    def _calculate_quota_status(self, alliance: Alliance) -> SeasonQuotaStatus:
         """
         Calculate detailed quota status for an alliance.
 
@@ -167,7 +167,7 @@ class SeasonQuotaService:
             alliance: Alliance model
 
         Returns:
-            SubscriptionStatusResponse with full status details
+            SeasonQuotaStatus with full status details
         """
         is_trial_active = self._is_trial_active(alliance)
         trial_days_remaining = self._calculate_trial_days_remaining(alliance)
@@ -178,7 +178,7 @@ class SeasonQuotaService:
         # is_active means user can perform actions (activate seasons)
         is_active = can_activate
 
-        return SubscriptionStatusResponse(
+        return SeasonQuotaStatus(
             status=status,
             is_active=is_active,
             is_trial=alliance.subscription_status == "trial",
@@ -193,7 +193,7 @@ class SeasonQuotaService:
             can_activate_season=can_activate,
         )
 
-    async def get_quota_status(self, user_id: UUID) -> SubscriptionStatusResponse:
+    async def get_quota_status(self, user_id: UUID) -> SeasonQuotaStatus:
         """
         Get season quota status for a user's alliance.
 
@@ -201,7 +201,7 @@ class SeasonQuotaService:
             user_id: User UUID
 
         Returns:
-            SubscriptionStatusResponse with full status details
+            SeasonQuotaStatus with full status details
 
         Raises:
             ValueError: If user has no alliance
@@ -215,7 +215,7 @@ class SeasonQuotaService:
 
     async def get_quota_status_by_alliance(
         self, alliance_id: UUID
-    ) -> SubscriptionStatusResponse:
+    ) -> SeasonQuotaStatus:
         """
         Get season quota status for a specific alliance.
 
@@ -223,7 +223,7 @@ class SeasonQuotaService:
             alliance_id: Alliance UUID
 
         Returns:
-            SubscriptionStatusResponse with full status details
+            SeasonQuotaStatus with full status details
 
         Raises:
             ValueError: If alliance not found
@@ -278,7 +278,7 @@ class SeasonQuotaService:
             action: Description of the action being attempted
 
         Raises:
-            SubscriptionExpiredError: If quota is exhausted
+            SeasonQuotaExhaustedError: If quota is exhausted
             ValueError: If alliance not found
         """
         status = await self.get_quota_status_by_alliance(alliance_id)
@@ -294,7 +294,7 @@ class SeasonQuotaService:
             else:
                 message = f"您的可用季數已用完，請購買季數以繼續{action}。"
 
-            raise SubscriptionExpiredError(message)
+            raise SeasonQuotaExhaustedError(message)
 
     async def require_season_activation(self, alliance_id: UUID) -> None:
         """
@@ -304,7 +304,7 @@ class SeasonQuotaService:
             alliance_id: Alliance UUID
 
         Raises:
-            SubscriptionExpiredError: If cannot activate season
+            SeasonQuotaExhaustedError: If cannot activate season
             ValueError: If alliance not found
         """
         status = await self.get_quota_status_by_alliance(alliance_id)
@@ -320,7 +320,7 @@ class SeasonQuotaService:
             else:
                 message = "您的可用季數已用完，請購買季數以啟用新賽季。"
 
-            raise SubscriptionExpiredError(message)
+            raise SeasonQuotaExhaustedError(message)
 
     async def consume_season(self, alliance_id: UUID) -> tuple[int, bool]:
         """
