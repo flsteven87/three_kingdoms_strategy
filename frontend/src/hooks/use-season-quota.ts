@@ -1,52 +1,41 @@
 /**
- * Subscription Query Hooks - Season Purchase System
+ * Season Quota Query Hooks
+ *
+ * Provides hooks for managing season quota status (trial + purchased seasons).
  *
  * 符合 CLAUDE.md 🟡:
  * - TanStack Query for server state
- * - Type-safe hooks
+ * - Type-safe hooks with explicit return types
  */
 
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { SubscriptionWarningLevel } from '@/types/subscription'
-import {
-  getSubscriptionWarningLevel,
-  getSubscriptionWarningMessage,
-} from '@/types/subscription'
+import type { QuotaWarningLevel, SeasonQuotaStatus } from '@/types/season-quota'
+import { getQuotaWarningLevel, getQuotaWarningMessage } from '@/types/season-quota'
 
 // Query Keys Factory
-export const subscriptionKeys = {
-  all: ['subscription'] as const,
-  status: () => [...subscriptionKeys.all, 'status'] as const,
+export const seasonQuotaKeys = {
+  all: ['season-quota'] as const,
+  status: () => [...seasonQuotaKeys.all, 'status'] as const,
 }
 
 /**
- * Hook to fetch current user's subscription status
+ * Hook to fetch current user's season quota status
  */
-export function useSubscription() {
+export function useSeasonQuota() {
   return useQuery({
-    queryKey: subscriptionKeys.status(),
-    queryFn: () => apiClient.getSubscriptionStatus(),
-    staleTime: 60 * 1000, // 1 minute - subscription status doesn't change often
-    retry: 1, // Only retry once for subscription checks
+    queryKey: seasonQuotaKeys.status(),
+    queryFn: () => apiClient.getSeasonQuotaStatus(),
+    staleTime: 60 * 1000, // 1 minute - quota status doesn't change often
+    retry: 1, // Only retry once for quota checks
   })
-}
-
-/**
- * Hook to check if user can perform write operations
- *
- * Returns true if trial/subscription is active
- */
-export function useCanWrite(): boolean {
-  const { data } = useSubscription()
-  return data?.is_active ?? false
 }
 
 /**
  * Hook to check if user can activate a new season
  */
 export function useCanActivateSeason(): boolean {
-  const { data } = useSubscription()
+  const { data } = useSeasonQuota()
   return data?.can_activate_season ?? false
 }
 
@@ -54,23 +43,23 @@ export function useCanActivateSeason(): boolean {
  * Hook to get available seasons count
  */
 export function useAvailableSeasons(): number {
-  const { data } = useSubscription()
+  const { data } = useSeasonQuota()
   return data?.available_seasons ?? 0
 }
 
 /**
- * Hook to get subscription warning information
+ * Hook to get quota warning information
  *
  * Returns warning level and message for UI display
  */
-export function useSubscriptionWarning(): {
-  level: SubscriptionWarningLevel
+export function useQuotaWarning(): {
+  level: QuotaWarningLevel
   message: string | null
   isExpired: boolean
   trialDaysRemaining: number | null
   availableSeasons: number
 } {
-  const { data } = useSubscription()
+  const { data } = useSeasonQuota()
 
   if (!data) {
     return {
@@ -82,9 +71,9 @@ export function useSubscriptionWarning(): {
     }
   }
 
-  const level = getSubscriptionWarningLevel(data)
-  const message = getSubscriptionWarningMessage(data)
-  const isExpired = !data.is_active
+  const level = getQuotaWarningLevel(data)
+  const message = getQuotaWarningMessage(data)
+  const isExpired = !data.can_activate_season && data.available_seasons === 0
 
   return {
     level,
@@ -96,18 +85,18 @@ export function useSubscriptionWarning(): {
 }
 
 /**
- * Hook to get subscription status for display
+ * Hook to get season quota status for display
  *
- * Returns formatted subscription information for UI
+ * Returns formatted quota information for UI
  */
-export function useSubscriptionDisplay(): {
+export function useSeasonQuotaDisplay(): {
   status: string
   statusColor: 'green' | 'yellow' | 'red' | 'gray'
   trialDaysRemaining: number | null
   availableSeasons: number
   canActivate: boolean
 } {
-  const { data } = useSubscription()
+  const { data } = useSeasonQuota()
 
   if (!data) {
     return {
@@ -122,7 +111,7 @@ export function useSubscriptionDisplay(): {
   let status: string
   let statusColor: 'green' | 'yellow' | 'red' | 'gray'
 
-  if (data.is_active) {
+  if (data.can_activate_season) {
     if (data.is_trial_active) {
       status = `試用中 (${data.trial_days_remaining} 天)`
       statusColor =
@@ -133,11 +122,11 @@ export function useSubscriptionDisplay(): {
       status = `可用 ${data.available_seasons} 季`
       statusColor = 'green'
     } else {
-      status = '已訂閱'
+      status = '可啟用'
       statusColor = 'green'
     }
   } else {
-    status = data.is_trial ? '試用已過期' : '已過期'
+    status = data.is_trial_active ? '試用已過期' : '無可用季數'
     statusColor = 'red'
   }
 
@@ -147,16 +136,5 @@ export function useSubscriptionDisplay(): {
     trialDaysRemaining: data.trial_days_remaining,
     availableSeasons: data.available_seasons,
     canActivate: data.can_activate_season,
-  }
-}
-
-// Legacy alias for backward compatibility
-export function useTrialWarning() {
-  const warning = useSubscriptionWarning()
-  return {
-    level: warning.level,
-    daysRemaining: warning.trialDaysRemaining,
-    isExpired: warning.isExpired,
-    message: warning.message,
   }
 }
