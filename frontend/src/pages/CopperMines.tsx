@@ -9,14 +9,14 @@
 import { Loader2, Gem } from 'lucide-react'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { useAlliance } from '@/hooks/use-alliance'
-import { useActiveSeason } from '@/hooks/use-seasons'
+import { useCurrentSeason } from '@/hooks/use-seasons'
 import { CopperMineRulesCard } from '@/components/copper-mines/CopperMineRulesCard'
 import { CopperMineListCard } from '@/components/copper-mines/CopperMineListCard'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export function CopperMines() {
   const { data: alliance, isLoading: isLoadingAlliance } = useAlliance()
-  const { data: activeSeason, isLoading: isLoadingSeason } = useActiveSeason()
+  const { data: activeSeason, isLoading: isLoadingSeason } = useCurrentSeason()
 
   const isLoading = isLoadingAlliance || isLoadingSeason
 

@@ -51,7 +51,7 @@ import {
   ChartContainer,
   ChartTooltip,
 } from '@/components/ui/chart'
-import { useActiveSeason } from '@/hooks/use-seasons'
+import { useCurrentSeason } from '@/hooks/use-seasons'
 import {
   useAnalyticsMembers,
   useMemberTrend,
@@ -1302,8 +1302,8 @@ function MemberPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
   const [viewMode, setViewMode] = useState<ViewMode>('latest')
 
-  // Fetch active season
-  const { data: activeSeason, isLoading: isLoadingSeason } = useActiveSeason()
+  // Fetch current season
+  const { data: activeSeason, isLoading: isLoadingSeason } = useCurrentSeason()
   const seasonId = activeSeason?.id
 
   // Fetch members list

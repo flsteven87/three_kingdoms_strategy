@@ -68,7 +68,7 @@ import {
   type DistributionBin,
 } from '@/lib/chart-utils'
 import { groupChartConfigs, MEDIAN_LINE_COLOR } from '@/lib/chart-configs'
-import { useActiveSeason } from '@/hooks/use-seasons'
+import { useCurrentSeason } from '@/hooks/use-seasons'
 import {
   useGroups,
   useGroupAnalytics,
@@ -848,8 +848,8 @@ function GroupAnalytics() {
   const [activeTab, setActiveTab] = useState('overview')
   const [viewMode, setViewMode] = useState<ViewMode>('latest')
 
-  // Get active season
-  const { data: activeSeason, isLoading: isSeasonLoading } = useActiveSeason()
+  // Get current season
+  const { data: activeSeason, isLoading: isSeasonLoading } = useCurrentSeason()
   const seasonId = activeSeason?.id
 
   // Fetch groups list
