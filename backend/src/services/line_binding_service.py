@@ -591,11 +591,11 @@ class LineBindingService:
         )
 
     # =========================================================================
-    # LIFF Notification Operations (Webhook - 3 分鐘 CD 機制)
+    # LIFF Notification Operations (Webhook - 30 分鐘群組層級 CD 機制)
     # =========================================================================
 
-    # Cooldown period for LIFF notifications (in minutes)
-    NOTIFICATION_COOLDOWN_MINUTES = 3
+    # Cooldown period for LIFF notifications (in minutes) - group level
+    NOTIFICATION_COOLDOWN_MINUTES = 30
 
     async def should_send_liff_notification(
         self,
@@ -603,12 +603,12 @@ class LineBindingService:
         line_user_id: str
     ) -> bool:
         """
-        Check if we should send LIFF notification to this user
+        Check if we should send LIFF notification for unregistered user message
 
         Conditions for sending:
         1. Group is bound to an alliance
         2. User has NOT registered any game ID
-        3. User has NOT been notified within the cooldown period (3 minutes)
+        3. Group has NOT been notified within the cooldown period (30 minutes)
 
         Args:
             line_group_id: LINE group ID
@@ -632,13 +632,47 @@ class LineBindingService:
         if is_registered:
             return False
 
-        # Check if user has been notified within cooldown period
+        # Check if group has been notified within cooldown period (group-level CD)
         cooldown_threshold = datetime.now(UTC) - timedelta(
             minutes=self.NOTIFICATION_COOLDOWN_MINUTES
         )
-        has_been_notified = await self.repository.has_user_been_notified_since(
+        has_been_notified = await self.repository.has_group_been_notified_since(
             line_group_id=line_group_id,
-            line_user_id=line_user_id,
+            since=cooldown_threshold
+        )
+        if has_been_notified:
+            return False
+
+        return True
+
+    async def should_send_member_joined_notification(
+        self,
+        line_group_id: str
+    ) -> bool:
+        """
+        Check if we should send welcome notification for new member joined
+
+        Conditions for sending:
+        1. Group is bound to an alliance
+        2. Group has NOT been notified within the cooldown period (30 minutes)
+
+        Args:
+            line_group_id: LINE group ID
+
+        Returns:
+            True if notification should be sent
+        """
+        # Check if group is bound
+        is_bound = await self.is_group_bound(line_group_id)
+        if not is_bound:
+            return False
+
+        # Check if group has been notified within cooldown period (group-level CD)
+        cooldown_threshold = datetime.now(UTC) - timedelta(
+            minutes=self.NOTIFICATION_COOLDOWN_MINUTES
+        )
+        has_been_notified = await self.repository.has_group_been_notified_since(
+            line_group_id=line_group_id,
             since=cooldown_threshold
         )
         if has_been_notified:
@@ -648,19 +682,16 @@ class LineBindingService:
 
     async def record_liff_notification(
         self,
-        line_group_id: str,
-        line_user_id: str
+        line_group_id: str
     ) -> None:
         """
-        Record that user has been notified in this group (updates timestamp for CD)
+        Record that group has been notified (group-level CD)
 
         Args:
             line_group_id: LINE group ID
-            line_user_id: LINE user ID
         """
-        await self.repository.record_user_notification(
-            line_group_id=line_group_id,
-            line_user_id=line_user_id
+        await self.repository.record_group_notification(
+            line_group_id=line_group_id
         )
 
     async def list_custom_commands(self, alliance_id: UUID) -> list[LineCustomCommandResponse]:

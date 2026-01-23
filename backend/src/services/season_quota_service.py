@@ -1,10 +1,12 @@
 """
-Subscription Service - Season Purchase System
+Season Quota Service - Season Purchase System
 
-符合 CLAUDE.md:
-- 🔴 Service Layer: Business logic for subscription/season purchase checking
-- 🔴 NO direct database calls (use Repository)
-- 🟡 Exception chaining with 'from e'
+Manages trial period and season quota for alliances.
+
+Follows CLAUDE.md:
+- Service Layer: Business logic for season quota checking
+- NO direct database calls (use Repository)
+- Exception chaining with 'from e'
 """
 
 import logging
@@ -18,16 +20,16 @@ from src.repositories.alliance_repository import AllianceRepository
 logger = logging.getLogger(__name__)
 
 
-class SubscriptionService:
+class SeasonQuotaService:
     """
-    Subscription service for managing trial/season purchase status.
+    Season quota service for managing trial/season purchase status.
 
-    Handles checking subscription validity and enforcing write access restrictions
+    Handles checking quota validity and enforcing write access restrictions
     based on trial period or available seasons.
     """
 
     def __init__(self):
-        """Initialize subscription service with repository"""
+        """Initialize season quota service with repository."""
         self._alliance_repo = AllianceRepository()
 
     async def get_alliance_by_user(self, user_id: UUID) -> Alliance | None:
@@ -137,9 +139,9 @@ class SubscriptionService:
         # Has available purchased seasons
         return self._calculate_available_seasons(alliance) > 0
 
-    def _determine_subscription_status(self, alliance: Alliance) -> str:
+    def _determine_quota_status(self, alliance: Alliance) -> str:
         """
-        Determine the subscription status based on trial and seasons.
+        Determine the quota status based on trial and seasons.
 
         Args:
             alliance: Alliance model
@@ -157,9 +159,9 @@ class SubscriptionService:
         else:
             return "expired"
 
-    def _calculate_subscription_status(self, alliance: Alliance) -> SubscriptionStatusResponse:
+    def _calculate_quota_status(self, alliance: Alliance) -> SubscriptionStatusResponse:
         """
-        Calculate detailed subscription status for an alliance.
+        Calculate detailed quota status for an alliance.
 
         Args:
             alliance: Alliance model
@@ -171,7 +173,7 @@ class SubscriptionService:
         trial_days_remaining = self._calculate_trial_days_remaining(alliance)
         available_seasons = self._calculate_available_seasons(alliance)
         can_activate = self._can_activate_season(alliance)
-        status = self._determine_subscription_status(alliance)
+        status = self._determine_quota_status(alliance)
 
         # is_active means user can perform actions (activate seasons)
         is_active = can_activate
@@ -191,9 +193,9 @@ class SubscriptionService:
             can_activate_season=can_activate,
         )
 
-    async def get_subscription_status(self, user_id: UUID) -> SubscriptionStatusResponse:
+    async def get_quota_status(self, user_id: UUID) -> SubscriptionStatusResponse:
         """
-        Get subscription status for a user's alliance.
+        Get season quota status for a user's alliance.
 
         Args:
             user_id: User UUID
@@ -209,13 +211,13 @@ class SubscriptionService:
         if not alliance:
             raise ValueError("No alliance found for user")
 
-        return self._calculate_subscription_status(alliance)
+        return self._calculate_quota_status(alliance)
 
-    async def get_subscription_status_by_alliance(
+    async def get_quota_status_by_alliance(
         self, alliance_id: UUID
     ) -> SubscriptionStatusResponse:
         """
-        Get subscription status for a specific alliance.
+        Get season quota status for a specific alliance.
 
         Args:
             alliance_id: Alliance UUID
@@ -231,7 +233,7 @@ class SubscriptionService:
         if not alliance:
             raise ValueError(f"Alliance not found: {alliance_id}")
 
-        return self._calculate_subscription_status(alliance)
+        return self._calculate_quota_status(alliance)
 
     async def check_write_access(self, alliance_id: UUID) -> bool:
         """
@@ -244,7 +246,7 @@ class SubscriptionService:
             True if write access is allowed, False otherwise
         """
         try:
-            status = await self.get_subscription_status_by_alliance(alliance_id)
+            status = await self.get_quota_status_by_alliance(alliance_id)
             return status.is_active
         except ValueError:
             return False
@@ -260,7 +262,7 @@ class SubscriptionService:
             True if can activate, False otherwise
         """
         try:
-            status = await self.get_subscription_status_by_alliance(alliance_id)
+            status = await self.get_quota_status_by_alliance(alliance_id)
             return status.can_activate_season
         except ValueError:
             return False
@@ -276,10 +278,10 @@ class SubscriptionService:
             action: Description of the action being attempted
 
         Raises:
-            SubscriptionExpiredError: If trial/subscription has expired
+            SubscriptionExpiredError: If quota is exhausted
             ValueError: If alliance not found
         """
-        status = await self.get_subscription_status_by_alliance(alliance_id)
+        status = await self.get_quota_status_by_alliance(alliance_id)
 
         if not status.is_active:
             logger.warning(
@@ -288,13 +290,9 @@ class SubscriptionService:
             )
 
             if status.is_trial:
-                message = (
-                    f"您的 14 天試用期已結束，請購買季數以繼續{action}。"
-                )
+                message = f"您的 14 天試用期已結束，請購買季數以繼續{action}。"
             else:
-                message = (
-                    f"您的可用季數已用完，請購買季數以繼續{action}。"
-                )
+                message = f"您的可用季數已用完，請購買季數以繼續{action}。"
 
             raise SubscriptionExpiredError(message)
 
@@ -309,7 +307,7 @@ class SubscriptionService:
             SubscriptionExpiredError: If cannot activate season
             ValueError: If alliance not found
         """
-        status = await self.get_subscription_status_by_alliance(alliance_id)
+        status = await self.get_quota_status_by_alliance(alliance_id)
 
         if not status.can_activate_season:
             logger.warning(
@@ -324,17 +322,20 @@ class SubscriptionService:
 
             raise SubscriptionExpiredError(message)
 
-    async def consume_season(self, alliance_id: UUID) -> int:
+    async def consume_season(self, alliance_id: UUID) -> tuple[int, bool]:
         """
         Consume one season from alliance's available seasons.
 
-        This should be called when activating a season (if not using trial).
+        This should be called when activating a season.
+        Returns atomically whether trial was used to prevent race conditions.
 
         Args:
             alliance_id: Alliance UUID
 
         Returns:
-            Remaining available seasons after consumption
+            Tuple of (remaining_seasons, used_trial)
+            - remaining_seasons: Available seasons after consumption
+            - used_trial: True if trial was used instead of purchased season
 
         Raises:
             ValueError: If alliance not found or no seasons available
@@ -347,7 +348,7 @@ class SubscriptionService:
         # If trial is active, don't consume seasons
         if self._is_trial_active(alliance):
             logger.info(f"Season activated using trial - alliance_id={alliance_id}")
-            return self._calculate_available_seasons(alliance)
+            return (self._calculate_available_seasons(alliance), True)
 
         # Check if has available seasons
         available = self._calculate_available_seasons(alliance)
@@ -356,9 +357,7 @@ class SubscriptionService:
 
         # Increment used_seasons
         new_used = alliance.used_seasons + 1
-        await self._alliance_repo.update(
-            alliance_id, {"used_seasons": new_used}
-        )
+        await self._alliance_repo.update(alliance_id, {"used_seasons": new_used})
 
         remaining = alliance.purchased_seasons - new_used
         logger.info(
@@ -366,7 +365,7 @@ class SubscriptionService:
             f"used={new_used}, remaining={remaining}"
         )
 
-        return remaining
+        return (remaining, False)
 
     async def add_purchased_seasons(self, alliance_id: UUID, seasons: int) -> int:
         """
