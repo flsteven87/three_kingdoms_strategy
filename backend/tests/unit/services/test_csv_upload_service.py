@@ -5,7 +5,7 @@ Tests cover:
 1. CSV upload workflow (upload_csv)
 2. Upload retrieval (get_uploads_by_season)
 3. Upload deletion (delete_upload)
-4. Permission and subscription checking
+4. Permission and quota checking
 5. Edge cases (duplicate date handling, custom snapshot date)
 
 符合 test-writing skill 規範:

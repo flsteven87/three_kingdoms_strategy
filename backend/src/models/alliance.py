@@ -69,6 +69,11 @@ class Alliance(AllianceBase):
 class SeasonQuotaStatus(BaseModel):
     """Response model for season quota status API - Season Purchase System"""
 
+    # Overall status
+    status: str = Field(description="Quota status: 'trial', 'active', or 'expired'")
+    is_active: bool = Field(description="Whether user can perform write actions")
+    is_trial: bool = Field(description="Whether alliance is in trial mode")
+
     # Trial information
     is_trial_active: bool = Field(description="Whether trial period is still valid")
     trial_days_remaining: int | None = Field(description="Days remaining in trial period")

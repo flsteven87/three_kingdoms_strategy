@@ -5,6 +5,11 @@
  */
 
 export interface SeasonQuotaStatus {
+  // Overall status
+  readonly status: 'trial' | 'active' | 'expired'
+  readonly is_active: boolean
+  readonly is_trial: boolean
+
   // Trial information
   readonly is_trial_active: boolean
   readonly trial_days_remaining: number | null

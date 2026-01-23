@@ -42,7 +42,7 @@ def mock_collaborator_repo() -> MagicMock:
 @pytest.fixture
 def permission_service(mock_collaborator_repo: MagicMock) -> PermissionService:
     """Create PermissionService with mocked repository"""
-    service = PermissionService(subscription_service=None)
+    service = PermissionService(quota_service=None)
     service._collaborator_repo = mock_collaborator_repo
     return service
 
@@ -452,18 +452,18 @@ class TestRequireWritePermission:
     """Tests for PermissionService.require_write_permission"""
 
     @pytest.mark.asyncio
-    async def test_should_check_role_and_subscription(
+    async def test_should_check_role_and_quota(
         self,
         mock_collaborator_repo: MagicMock,
         user_id: UUID,
         alliance_id: UUID,
     ):
-        """Should check both role and subscription when both configured"""
+        """Should check both role and quota when both configured"""
         # Arrange
-        mock_subscription_service = MagicMock()
-        mock_subscription_service.require_write_access = AsyncMock()
+        mock_quota_service = MagicMock()
+        mock_quota_service.require_write_access = AsyncMock()
 
-        service = PermissionService(subscription_service=mock_subscription_service)
+        service = PermissionService(quota_service=mock_quota_service)
         service._collaborator_repo = mock_collaborator_repo
         mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="collaborator")
 
@@ -472,23 +472,23 @@ class TestRequireWritePermission:
 
         # Assert - both checks should have been called
         mock_collaborator_repo.get_collaborator_role.assert_called_once()
-        mock_subscription_service.require_write_access.assert_called_once_with(
+        mock_quota_service.require_write_access.assert_called_once_with(
             alliance_id, "upload CSV"
         )
 
     @pytest.mark.asyncio
-    async def test_should_check_subscription_when_service_available(
+    async def test_should_check_quota_when_service_available(
         self,
         mock_collaborator_repo: MagicMock,
         user_id: UUID,
         alliance_id: UUID,
     ):
-        """Should check subscription when subscription service is available"""
+        """Should check quota when quota service is available"""
         # Arrange
-        mock_subscription_service = MagicMock()
-        mock_subscription_service.require_write_access = AsyncMock()
+        mock_quota_service = MagicMock()
+        mock_quota_service.require_write_access = AsyncMock()
 
-        service = PermissionService(subscription_service=mock_subscription_service)
+        service = PermissionService(quota_service=mock_quota_service)
         service._collaborator_repo = mock_collaborator_repo
         mock_collaborator_repo.get_collaborator_role = AsyncMock(return_value="owner")
 
@@ -496,6 +496,6 @@ class TestRequireWritePermission:
         await service.require_write_permission(user_id, alliance_id, "upload CSV")
 
         # Assert
-        mock_subscription_service.require_write_access.assert_called_once_with(
+        mock_quota_service.require_write_access.assert_called_once_with(
             alliance_id, "upload CSV"
         )
