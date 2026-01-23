@@ -126,13 +126,13 @@ class CopperMineService:
         """
         alliance_id = await self._get_alliance_id_from_group(line_group_id)
 
-        # 獲取當前活動賽季
-        # 如果沒有活躍賽季，active_season_id 為 None，會顯示所有銅礦（跨賽季歷史資料）
-        active_season_id = await self._get_active_season(alliance_id)
+        # 獲取當前選中的賽季
+        # 如果沒有當前賽季，current_season_id 為 None，會顯示所有銅礦（跨賽季歷史資料）
+        current_season_id = await self._get_current_season_id(alliance_id)
 
         # 只顯示當前賽季的銅礦（公開資訊）
-        # 當 active_season_id 為 None 時，repository 會返回所有銅礦
-        mines = await self.repository.get_mines_by_alliance(alliance_id, season_id=active_season_id)
+        # 當 current_season_id 為 None 時，repository 會返回所有銅礦
+        mines = await self.repository.get_mines_by_alliance(alliance_id, season_id=current_season_id)
 
         # P0 修復: 計算用戶銅礦申請狀態
         # 取得規則數量作為上限
@@ -156,9 +156,9 @@ class CopperMineService:
             max_allowed=max_allowed,
         )
 
-    async def _get_active_season(self, alliance_id: UUID) -> UUID | None:
-        """Get active season ID for an alliance"""
-        season = await self.season_repository.get_active_season(alliance_id)
+    async def _get_current_season_id(self, alliance_id: UUID) -> UUID | None:
+        """Get current (selected) season ID for an alliance."""
+        season = await self.season_repository.get_current_season(alliance_id)
         return season.id if season else None
 
     async def _match_member_id(self, alliance_id: UUID, game_id: str) -> UUID | None:
@@ -337,7 +337,7 @@ class CopperMineService:
         alliance_id = await self._get_alliance_id_from_group(line_group_id)
 
         # Auto-fill season_id and member_id first (needed for coord check)
-        season_id = await self._get_active_season(alliance_id)
+        season_id = await self._get_current_season_id(alliance_id)
         member_id = await self._match_member_id(alliance_id, game_id)
 
         # P0 修復: 使用統一的座標檢查方法

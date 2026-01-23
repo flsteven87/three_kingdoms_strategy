@@ -1302,9 +1302,9 @@ function MemberPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
   const [viewMode, setViewMode] = useState<ViewMode>('latest')
 
-  // Fetch current season
-  const { data: activeSeason, isLoading: isLoadingSeason } = useCurrentSeason()
-  const seasonId = activeSeason?.id
+  // Fetch current (selected) season
+  const { data: currentSeason, isLoading: isLoadingSeason } = useCurrentSeason()
+  const seasonId = currentSeason?.id
 
   // Fetch members list
   const {
@@ -1541,16 +1541,16 @@ function MemberPerformance() {
         )}
 
         {/* No Season State */}
-        {!isLoadingSeason && !activeSeason && (
+        {!isLoadingSeason && !currentSeason && (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">請先設定活躍賽季才能查看成員表現</p>
+              <p className="text-muted-foreground">請先設定當前賽季才能查看成員表現</p>
             </CardContent>
           </Card>
         )}
 
         {/* No Data State */}
-        {!isLoading && !hasError && activeSeason && selectedMemberId && !hasData && (
+        {!isLoading && !hasError && currentSeason && selectedMemberId && !hasData && (
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">此成員尚無表現數據</p>

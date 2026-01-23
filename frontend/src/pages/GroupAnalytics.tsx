@@ -848,9 +848,9 @@ function GroupAnalytics() {
   const [activeTab, setActiveTab] = useState('overview')
   const [viewMode, setViewMode] = useState<ViewMode>('latest')
 
-  // Get current season
-  const { data: activeSeason, isLoading: isSeasonLoading } = useCurrentSeason()
-  const seasonId = activeSeason?.id
+  // Get current (selected) season
+  const { data: currentSeason, isLoading: isSeasonLoading } = useCurrentSeason()
+  const seasonId = currentSeason?.id
 
   // Fetch groups list
   const { data: groups, isLoading: isGroupsLoading } = useGroups(seasonId)
@@ -879,12 +879,12 @@ function GroupAnalytics() {
   const isLoading = isSeasonLoading || isGroupsLoading || isGroupLoading
 
   // No season state
-  if (!isSeasonLoading && !activeSeason) {
+  if (!isSeasonLoading && !currentSeason) {
     return (
       <AllianceGuard>
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium">尚未設定活躍賽季</h3>
+          <h3 className="text-lg font-medium">尚未設定當前賽季</h3>
           <p className="text-sm text-muted-foreground mt-1">請先在設定頁面選擇或建立一個賽季</p>
         </div>
       </AllianceGuard>

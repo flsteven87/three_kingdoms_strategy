@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export function CopperMines() {
   const { data: alliance, isLoading: isLoadingAlliance } = useAlliance()
-  const { data: activeSeason, isLoading: isLoadingSeason } = useCurrentSeason()
+  const { data: currentSeason, isLoading: isLoadingSeason } = useCurrentSeason()
 
   const isLoading = isLoadingAlliance || isLoadingSeason
 
@@ -48,10 +48,10 @@ export function CopperMines() {
             <CopperMineRulesCard />
 
             {/* Ownership List Section (Season Level) */}
-            {activeSeason ? (
+            {currentSeason ? (
               <CopperMineListCard
-                seasonId={activeSeason.id}
-                seasonName={activeSeason.name}
+                seasonId={currentSeason.id}
+                seasonName={currentSeason.name}
               />
             ) : (
               <Alert>

@@ -891,16 +891,16 @@ function AllianceAnalytics() {
 
   // Get current season
   const { data: seasons, isLoading: seasonsLoading } = useSeasons()
-  const activeSeason = seasons?.find((s) => s.is_current)
+  const currentSeason = seasons?.find((s) => s.is_current)
 
   // Get alliance analytics data
   const { data: analyticsData, isLoading: analyticsLoading } = useAllianceAnalytics(
-    activeSeason?.id,
+    currentSeason?.id,
     viewMode
   )
 
   const isLoading = seasonsLoading || analyticsLoading
-  const hasData = activeSeason && analyticsData
+  const hasData = currentSeason && analyticsData
 
   return (
     <AllianceGuard>

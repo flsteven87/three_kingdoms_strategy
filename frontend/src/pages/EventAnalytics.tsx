@@ -137,12 +137,12 @@ function EventAnalytics() {
 
   // Data fetching
   const { data: seasons, isLoading: seasonsLoading } = useSeasons()
-  const activeSeason = seasons?.find((s) => s.is_current)
-  const { data: events, isLoading: eventsLoading } = useEvents(activeSeason?.id)
+  const currentSeason = seasons?.find((s) => s.is_current)
+  const { data: events, isLoading: eventsLoading } = useEvents(currentSeason?.id)
 
   // Mutations
   const uploadEventCsv = useUploadEventCsv()
-  const createEvent = useCreateEvent(activeSeason?.id)
+  const createEvent = useCreateEvent(currentSeason?.id)
   const processEvent = useProcessEvent()
 
   const isLoading = seasonsLoading || eventsLoading
@@ -185,7 +185,7 @@ function EventAnalytics() {
   }, [])
 
   const handleCreate = useCallback(async () => {
-    if (!activeSeason?.id || !formData.beforeFile || !formData.afterFile) {
+    if (!currentSeason?.id || !formData.beforeFile || !formData.afterFile) {
       setError('缺少必要資料')
       return
     }
@@ -196,13 +196,13 @@ function EventAnalytics() {
     try {
       // 1. Upload before CSV (uses event-specific endpoint, no period calculation)
       const beforeUpload = await uploadEventCsv.mutateAsync({
-        seasonId: activeSeason.id,
+        seasonId: currentSeason.id,
         file: formData.beforeFile,
       })
 
       // 2. Upload after CSV (uses event-specific endpoint, no period calculation)
       const afterUpload = await uploadEventCsv.mutateAsync({
-        seasonId: activeSeason.id,
+        seasonId: currentSeason.id,
         file: formData.afterFile,
       })
 
@@ -227,7 +227,7 @@ function EventAnalytics() {
     } finally {
       setIsProcessing(false)
     }
-  }, [activeSeason?.id, formData, uploadEventCsv, createEvent, processEvent, handleCancelCreate])
+  }, [currentSeason?.id, formData, uploadEventCsv, createEvent, processEvent, handleCancelCreate])
 
   return (
     <AllianceGuard>
@@ -238,9 +238,9 @@ function EventAnalytics() {
             <h2 className="text-2xl font-bold tracking-tight">事件分析</h2>
             <p className="text-muted-foreground mt-1">
               追蹤特定戰役或事件的成員表現
-              {activeSeason && (
+              {currentSeason && (
                 <span className="ml-2">
-                  · 賽季: <span className="font-medium text-foreground">{activeSeason.name}</span>
+                  · 賽季: <span className="font-medium text-foreground">{currentSeason.name}</span>
                 </span>
               )}
             </p>

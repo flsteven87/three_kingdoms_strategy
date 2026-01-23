@@ -105,12 +105,12 @@ function DonationMemberRow({
 
 function DonationAnalytics() {
     const { data: seasons } = useSeasons()
-    const activeSeason = seasons?.find((s) => s.is_current)
+    const currentSeason = seasons?.find((s) => s.is_current)
 
-    const { data: registeredMembers } = useAnalyticsMembers(activeSeason?.id, true)
+    const { data: registeredMembers } = useAnalyticsMembers(currentSeason?.id, true)
 
-    const { data: donations, isLoading } = useDonations(activeSeason?.alliance_id, activeSeason?.id)
-    const createMutation = useCreateDonation(activeSeason?.alliance_id, activeSeason?.id)
+    const { data: donations, isLoading } = useDonations(currentSeason?.alliance_id, currentSeason?.id)
+    const createMutation = useCreateDonation(currentSeason?.alliance_id, currentSeason?.id)
     const upsertTargetMutation = useUpsertMemberTargetOverride()
     const deleteTargetMutation = useDeleteMemberTargetOverride()
     const deleteDonationMutation = useDeleteDonation()
@@ -189,8 +189,8 @@ function DonationAnalytics() {
                         <h2 className="text-2xl font-bold tracking-tight">捐獻管理</h2>
                         <p className="text-muted-foreground mt-1">
                             設定成員捐獻目標與截止日
-                            {activeSeason && (
-                                <span className="ml-2">· 賽季: <span className="font-medium text-foreground">{activeSeason.name}</span></span>
+                            {currentSeason && (
+                                <span className="ml-2">· 賽季: <span className="font-medium text-foreground">{currentSeason.name}</span></span>
                             )}
                         </p>
                     </div>

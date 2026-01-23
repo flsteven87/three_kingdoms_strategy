@@ -698,11 +698,11 @@ class LineBindingService:
             # Game ID registered but not matched to member yet
             return MemberPerformanceResponse(has_data=False, game_id=game_id)
 
-        # Get active season
+        # Get current (selected) season
         season_repo = SeasonRepository()
-        active_season = await season_repo.get_active_season(alliance_id)
+        current_season = await season_repo.get_current_season(alliance_id)
 
-        if not active_season:
+        if not current_season:
             return MemberPerformanceResponse(has_data=False, game_id=game_id)
 
         # Get analytics data
@@ -710,17 +710,17 @@ class LineBindingService:
 
         # Get member trend data
         trend_data = await analytics_service.get_member_trend(
-            member_id=member_id, season_id=active_season.id
+            member_id=member_id, season_id=current_season.id
         )
 
         if not trend_data:
             return MemberPerformanceResponse(
-                has_data=False, game_id=game_id, season_name=active_season.name
+                has_data=False, game_id=game_id, season_name=current_season.name
             )
 
         # Get season summary
         season_summary = await analytics_service.get_season_summary(
-            member_id=member_id, season_id=active_season.id
+            member_id=member_id, season_id=current_season.id
         )
 
         # Get latest period data
@@ -784,7 +784,7 @@ class LineBindingService:
         return MemberPerformanceResponse(
             has_data=True,
             game_id=game_id,
-            season_name=active_season.name,
+            season_name=current_season.name,
             rank=rank,
             latest=latest_metrics,
             alliance_avg=alliance_avg,
