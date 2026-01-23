@@ -21,12 +21,12 @@ from src.api.v1.endpoints import (
     hegemony_weights,
     linebot,
     periods,
+    season_quota,
     seasons,
-    subscriptions,
     uploads,
 )
 from src.core.config import settings
-from src.core.exceptions import SubscriptionExpiredError
+from src.core.exceptions import SeasonQuotaExhaustedError
 
 # Create FastAPI app
 # 符合 CLAUDE.md 🔴: redirect_slashes=False for cloud deployment
@@ -61,7 +61,7 @@ app.include_router(events.router, prefix="/api/v1")
 app.include_router(donations.router, prefix="/api/v1")
 app.include_router(copper_mines.router, prefix="/api/v1")
 app.include_router(linebot.router, prefix="/api/v1")
-app.include_router(subscriptions.router, prefix="/api/v1")
+app.include_router(season_quota.router, prefix="/api/v1")
 
 
 # Global Exception Handlers
@@ -106,15 +106,15 @@ async def permission_error_handler(request: Request, exc: PermissionError) -> JS
     )
 
 
-@app.exception_handler(SubscriptionExpiredError)
-async def subscription_expired_handler(
-    request: Request, exc: SubscriptionExpiredError
+@app.exception_handler(SeasonQuotaExhaustedError)
+async def season_quota_exhausted_handler(
+    request: Request, exc: SeasonQuotaExhaustedError
 ) -> JSONResponse:
     """
-    Handle SubscriptionExpiredError exceptions globally
+    Handle SeasonQuotaExhaustedError exceptions globally
 
-    Converts SubscriptionExpiredError to HTTP 402 Payment Required
-    This indicates the user needs to upgrade their subscription to continue.
+    Converts SeasonQuotaExhaustedError to HTTP 402 Payment Required
+    This indicates the user needs to purchase season quota to continue.
     """
     return JSONResponse(
         status_code=status.HTTP_402_PAYMENT_REQUIRED,
