@@ -4,7 +4,13 @@
  * 符合 CLAUDE.md 🟡: snake_case naming matching backend schema
  */
 
-import type { SubscriptionStatus } from './subscription'
+/**
+ * Subscription status for season purchase system
+ * - trial: Within 14-day trial period
+ * - active: Trial active OR has available seasons
+ * - expired: Trial expired AND no available seasons
+ */
+export type SubscriptionStatus = 'trial' | 'active' | 'expired'
 
 export interface Alliance {
   readonly id: string

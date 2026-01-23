@@ -2,7 +2,7 @@
  * Seasons Page - Season Purchase System
  *
  * Supports the Season Purchase System:
- * - Create draft seasons (no subscription required)
+ * - Create draft seasons (no quota required)
  * - Activate seasons (consumes season credit or uses trial)
  * - Set activated seasons as current
  * - Complete seasons
@@ -24,7 +24,7 @@ import { SeasonCard } from '@/components/seasons/SeasonCard'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { RoleGuard } from '@/components/alliance/RoleGuard'
 import { useAlliance } from '@/hooks/use-alliance'
-import { useSubscriptionDisplay } from '@/hooks/use-subscription'
+import { useSeasonQuotaDisplay } from '@/hooks/use-season-quota'
 import {
   useSeasons,
   useCreateSeason,
@@ -51,8 +51,8 @@ function Seasons() {
   // Fetch seasons
   const { data: seasons, isLoading } = useSeasons()
 
-  // Subscription status for display
-  const subscriptionDisplay = useSubscriptionDisplay()
+  // Season quota status for display
+  const quotaDisplay = useSeasonQuotaDisplay()
 
   // Mutations
   const createMutation = useCreateSeason()
@@ -174,7 +174,7 @@ function Seasons() {
           </RoleGuard>
         </div>
 
-        {/* Subscription Status Card */}
+        {/* Season Quota Status Card */}
         <RoleGuard requiredRoles={['owner', 'collaborator']}>
           <Card className="border-muted">
             <CardHeader className="py-4">
@@ -182,17 +182,17 @@ function Seasons() {
                 <div>
                   <CardTitle className="text-base">賽季額度</CardTitle>
                   <CardDescription>
-                    {subscriptionDisplay.status}
+                    {quotaDisplay.status}
                   </CardDescription>
                 </div>
                 <div className="text-right">
-                  {subscriptionDisplay.availableSeasons > 0 ? (
+                  {quotaDisplay.availableSeasons > 0 ? (
                     <p className="text-2xl font-bold text-green-600">
-                      {subscriptionDisplay.availableSeasons}
+                      {quotaDisplay.availableSeasons}
                     </p>
-                  ) : subscriptionDisplay.trialDaysRemaining !== null ? (
+                  ) : quotaDisplay.trialDaysRemaining !== null ? (
                     <p className="text-sm text-muted-foreground">
-                      試用期剩餘 {subscriptionDisplay.trialDaysRemaining} 天
+                      試用期剩餘 {quotaDisplay.trialDaysRemaining} 天
                     </p>
                   ) : (
                     <p className="text-sm text-destructive">

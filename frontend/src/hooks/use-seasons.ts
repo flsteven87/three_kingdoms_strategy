@@ -194,7 +194,7 @@ export function useDeleteSeason() {
  * Hook to activate a draft season (consume season credit or use trial)
  *
  * Changes activation_status from 'draft' to 'activated'.
- * Also invalidates subscription status since season count changes.
+ * Also invalidates season quota status since season count changes.
  */
 export function useActivateSeason() {
   const queryClient = useQueryClient()

@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { useCanManageSeasons } from '@/hooks/use-user-role'
-import { useCanActivateSeason } from '@/hooks/use-subscription'
+import { useCanActivateSeason } from '@/hooks/use-season-quota'
 import type { Season } from '@/types/season'
 import {
   canActivate,

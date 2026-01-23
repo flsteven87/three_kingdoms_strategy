@@ -1,7 +1,7 @@
 /**
  * Quota Warning Banner Component
  *
- * Displays warning banner based on quota/subscription status:
+ * Displays warning banner based on season quota status:
  * - None: No banner shown
  * - Warning (7 days or less): Yellow banner
  * - Critical (3 days or less): Orange banner
