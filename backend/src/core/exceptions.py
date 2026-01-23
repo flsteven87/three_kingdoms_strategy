@@ -14,14 +14,13 @@ class AppException(Exception):
         super().__init__(message)
 
 
-class SubscriptionExpiredError(AppException):
+class SeasonQuotaExhaustedError(AppException):
     """
-    Raised when subscription/trial has expired.
+    Raised when season quota is exhausted.
 
-    This exception is used by SubscriptionService to indicate that the user's
-    trial period or subscription has ended and they need to upgrade to continue
-    using write features.
+    This exception is used by SeasonQuotaService to indicate that the user's
+    trial period has ended and they have no available seasons to activate.
     """
 
-    def __init__(self, message: str = "Subscription has expired. Please upgrade to continue."):
-        super().__init__(message, error_code="SUBSCRIPTION_EXPIRED")
+    def __init__(self, message: str = "Season quota exhausted. Please purchase more seasons."):
+        super().__init__(message, error_code="SEASON_QUOTA_EXHAUSTED")
