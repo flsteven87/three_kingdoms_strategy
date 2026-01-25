@@ -219,9 +219,9 @@ async def set_current_season(
     user_id: UserIdDep,
 ):
     """
-    Set an activated season as current (selected for display)
+    Set a season as current (selected for display)
 
-    Only activated seasons can be set as current.
+    Both activated and completed seasons can be set as current.
     This unsets the current flag on all other seasons for the alliance.
 
     Args:
@@ -233,7 +233,7 @@ async def set_current_season(
         Updated current season
 
     Raises:
-        ValueError: If season not found or not activated
+        ValueError: If season not found or is draft
         PermissionError: If user doesn't own the season
 
     符合 CLAUDE.md 🔴: API layer delegates to service
@@ -265,3 +265,29 @@ async def complete_season(
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
     return await service.complete_season(user_id, season_id)
+
+
+@router.post("/{season_id}/reopen", response_model=Season)
+async def reopen_season(
+    season_id: UUID,
+    service: SeasonServiceDep,
+    user_id: UserIdDep,
+):
+    """
+    Reopen a completed season back to activated status
+
+    Args:
+        season_id: Season UUID to reopen
+        service: Season service (injected)
+        user_id: User UUID (from JWT token)
+
+    Returns:
+        Updated season
+
+    Raises:
+        ValueError: If season not found or not completed
+        PermissionError: If user doesn't own the season
+
+    符合 CLAUDE.md 🔴: API layer delegates to service
+    """
+    return await service.reopen_season(user_id, season_id)

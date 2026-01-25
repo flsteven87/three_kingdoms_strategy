@@ -897,7 +897,7 @@ class TestCompleteSeason:
         assert update_args[1]["activation_status"] == "completed"
 
     @pytest.mark.asyncio
-    async def test_should_unset_current_when_completing_current_season(
+    async def test_should_keep_current_when_completing_current_season(
         self,
         season_service: SeasonService,
         mock_season_repo: MagicMock,
@@ -907,7 +907,7 @@ class TestCompleteSeason:
         alliance_id: UUID,
         season_id: UUID,
     ):
-        """Should unset is_current when completing the current season"""
+        """Should keep is_current when completing the current season (for viewing)"""
         # Arrange
         mock_alliance = create_mock_alliance(alliance_id)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
@@ -918,18 +918,19 @@ class TestCompleteSeason:
         )
         mock_season_repo.get_by_id = AsyncMock(return_value=current_season)
 
+        # Note: is_current remains True (completed seasons can still be viewed)
         completed_season = create_mock_season(
-            season_id, alliance_id, "S1", is_current=False, activation_status="completed"
+            season_id, alliance_id, "S1", is_current=True, activation_status="completed"
         )
         mock_season_repo.update = AsyncMock(return_value=completed_season)
 
         # Act
         await season_service.complete_season(user_id, season_id)
 
-        # Assert
+        # Assert - only activation_status should be updated, not is_current
         update_args = mock_season_repo.update.call_args[0]
-        assert update_args[1]["activation_status"] == "completed"
-        assert update_args[1]["is_current"] is False
+        assert update_args[1] == {"activation_status": "completed"}
+        assert "is_current" not in update_args[1]
 
     @pytest.mark.asyncio
     async def test_should_raise_when_completing_draft_season(

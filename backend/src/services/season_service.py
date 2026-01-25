@@ -464,7 +464,8 @@ class SeasonService:
         """
         Set a season as current (selected for display) and unset all others
 
-        Only activated seasons can be set as current.
+        Both activated and completed seasons can be set as current.
+        Draft seasons must be activated first.
 
         Permission: owner + collaborator
 
@@ -476,7 +477,7 @@ class SeasonService:
             Updated current season
 
         Raises:
-            ValueError: If season not found or not activated
+            ValueError: If season not found or is draft
             PermissionError: If user doesn't own the season
             HTTPException 403: If user doesn't have permission
         """
@@ -488,10 +489,10 @@ class SeasonService:
         # Verify user owns the season (raises error if not)
         season = await self.get_season(user_id, season_id)
 
-        # Only activated seasons can be set as current
-        if season.activation_status != "activated":
+        # Only non-draft seasons can be set as current (activated or completed)
+        if season.activation_status == "draft":
             raise ValueError(
-                f"Cannot set {season.activation_status} season as current. "
+                "Cannot set draft season as current. "
                 "Please activate the season first."
             )
 
@@ -510,6 +511,9 @@ class SeasonService:
     async def complete_season(self, user_id: UUID, season_id: UUID) -> Season:
         """
         Mark a season as completed
+
+        Completed seasons can still be set as current for viewing data.
+        Use reopen_season to change back to activated if needed.
 
         Permission: owner + collaborator
 
@@ -533,9 +537,33 @@ class SeasonService:
         # Verify write permission (role check)
         await self._permission_service.require_role_permission(user_id, season.alliance_id)
 
-        # If this was the current season, unset it
-        update_data = {"activation_status": "completed"}
-        if season.is_current:
-            update_data["is_current"] = False
+        # Keep is_current as-is (completed seasons can remain as current for viewing)
+        return await self._repo.update(season_id, {"activation_status": "completed"})
 
-        return await self._repo.update(season_id, update_data)
+    async def reopen_season(self, user_id: UUID, season_id: UUID) -> Season:
+        """
+        Reopen a completed season back to activated status
+
+        Permission: owner + collaborator
+
+        Args:
+            user_id: User UUID from authentication
+            season_id: Season UUID to reopen
+
+        Returns:
+            Updated season
+
+        Raises:
+            ValueError: If season not found or not completed
+            PermissionError: If user doesn't own the season
+        """
+        # Verify ownership
+        season = await self.get_season(user_id, season_id)
+
+        if season.activation_status != "completed":
+            raise ValueError("Only completed seasons can be reopened")
+
+        # Verify write permission (role check)
+        await self._permission_service.require_role_permission(user_id, season.alliance_id)
+
+        return await self._repo.update(season_id, {"activation_status": "activated"})

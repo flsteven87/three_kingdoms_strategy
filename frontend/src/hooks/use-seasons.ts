@@ -330,6 +330,7 @@ export function useCompleteSeason() {
       const previousSeasons = queryClient.getQueryData<Season[]>(seasonKeys.list(false))
 
       // Optimistically update season list (change activation_status to 'completed')
+      // Note: Keep is_current as-is since completed seasons can still be viewed
       if (previousSeasons) {
         queryClient.setQueryData<Season[]>(
           seasonKeys.list(false),
@@ -338,7 +339,6 @@ export function useCompleteSeason() {
               ? {
                   ...season,
                   activation_status: 'completed' as const,
-                  is_current: false, // Completed seasons cannot be current
                   updated_at: new Date().toISOString()
                 }
               : season
@@ -356,6 +356,57 @@ export function useCompleteSeason() {
     },
     onSuccess: (completedSeason) => {
       toast.success(`「${completedSeason.name}」已結束`)
+    },
+    onSettled: () => {
+      // Refetch all season data to sync with server
+      queryClient.invalidateQueries({ queryKey: seasonKeys.all })
+    }
+  })
+}
+
+/**
+ * Hook to reopen a completed season back to activated
+ *
+ * Changes activation_status from 'completed' to 'activated'.
+ */
+export function useReopenSeason() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (seasonId: string) => apiClient.reopenSeason(seasonId),
+    onMutate: async (seasonId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: seasonKeys.all })
+
+      // Snapshot previous values
+      const previousSeasons = queryClient.getQueryData<Season[]>(seasonKeys.list(false))
+
+      // Optimistically update season list (change activation_status to 'activated')
+      if (previousSeasons) {
+        queryClient.setQueryData<Season[]>(
+          seasonKeys.list(false),
+          previousSeasons.map(season =>
+            season.id === seasonId
+              ? {
+                  ...season,
+                  activation_status: 'activated' as const,
+                  updated_at: new Date().toISOString()
+                }
+              : season
+          )
+        )
+      }
+
+      return { previousSeasons }
+    },
+    onError: (_error, _variables, context) => {
+      // Rollback on error
+      if (context?.previousSeasons) {
+        queryClient.setQueryData(seasonKeys.list(false), context.previousSeasons)
+      }
+    },
+    onSuccess: (reopenedSeason) => {
+      toast.success(`「${reopenedSeason.name}」已重新開啟`)
     },
     onSettled: () => {
       // Refetch all season data to sync with server

@@ -74,6 +74,7 @@ export const apiClient = {
   activateSeason: seasonApi.activateSeason,
   setCurrentSeason: seasonApi.setCurrentSeason,
   completeSeason: seasonApi.completeSeason,
+  reopenSeason: seasonApi.reopenSeason,
 
   // CSV Upload
   getCsvUploads: uploadApi.getCsvUploads,

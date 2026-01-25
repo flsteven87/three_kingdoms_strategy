@@ -29,6 +29,7 @@ import type { Season } from '@/types/season'
 import {
   canActivate,
   canSetAsCurrent,
+  canReopen,
   getActivationStatusLabel,
   getActivationStatusColor,
 } from '@/types/season'
@@ -40,6 +41,7 @@ interface SeasonCardProps {
   readonly onActivate: (seasonId: string) => Promise<void>
   readonly onSetCurrent: (seasonId: string) => Promise<void>
   readonly onComplete?: (seasonId: string) => Promise<void>
+  readonly onReopen?: (seasonId: string) => Promise<void>
 }
 
 export function SeasonCard({
@@ -49,12 +51,14 @@ export function SeasonCard({
   onActivate,
   onSetCurrent,
   onComplete,
+  onReopen,
 }: SeasonCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [activateDialogOpen, setActivateDialogOpen] = useState(false)
   const [setCurrentDialogOpen, setSetCurrentDialogOpen] = useState(false)
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false)
   const [editData, setEditData] = useState({
     name: season.name,
     start_date: season.start_date,
@@ -118,6 +122,17 @@ export function SeasonCard({
     setCompleteDialogOpen(false)
   }, [season.id, onComplete])
 
+  const handleReopenClick = useCallback(() => {
+    setReopenDialogOpen(true)
+  }, [])
+
+  const handleConfirmReopen = useCallback(async () => {
+    if (onReopen) {
+      await onReopen(season.id)
+    }
+    setReopenDialogOpen(false)
+  }, [season.id, onReopen])
+
   const handleDeleteClick = useCallback(() => {
     setDeleteDialogOpen(true)
   }, [])
@@ -130,6 +145,7 @@ export function SeasonCard({
   const showActivateButton = canActivate(season) && canActivateSeasonStatus
   const showSetCurrentButton = canSetAsCurrent(season) && !season.is_current
   const showCompleteButton = season.activation_status === 'activated' && onComplete
+  const showReopenButton = canReopen(season) && onReopen
   // Only draft seasons can be deleted
   const canDelete = season.activation_status === 'draft'
 
@@ -311,6 +327,17 @@ export function SeasonCard({
                           結束賽季
                         </Button>
                       )}
+                      {showReopenButton && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleReopenClick}
+                          className="h-8 text-muted-foreground hover:text-foreground"
+                        >
+                          <Activity className="h-4 w-4 mr-1" />
+                          重新開啟
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -376,6 +403,19 @@ export function SeasonCard({
         itemName={season.name}
         warningMessage="結束賽季後，此賽季將標記為「已結束」。您仍可查看歷史數據，但無法再上傳新資料到此賽季。"
         confirmText="確定結束"
+        variant="default"
+      />
+
+      {/* Reopen Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={reopenDialogOpen}
+        onOpenChange={setReopenDialogOpen}
+        onConfirm={handleConfirmReopen}
+        title="重新開啟賽季"
+        description="確定要重新開啟此賽季嗎？"
+        itemName={season.name}
+        warningMessage="重新開啟後，此賽季將恢復為「已啟用」狀態。您可以繼續上傳 CSV 資料（需在賽季日期範圍內）。"
+        confirmText="確定開啟"
         variant="default"
       />
 

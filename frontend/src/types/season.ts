@@ -47,9 +47,10 @@ export interface SeasonActivateResponse {
 
 /**
  * Helper to check if a season can be set as current
+ * Both activated and completed seasons can be viewed
  */
 export function canSetAsCurrent(season: Season): boolean {
-  return season.activation_status === 'activated'
+  return season.activation_status !== 'draft'
 }
 
 /**
@@ -57,6 +58,62 @@ export function canSetAsCurrent(season: Season): boolean {
  */
 export function canActivate(season: Season): boolean {
   return season.activation_status === 'draft'
+}
+
+/**
+ * Helper to check if a season can be reopened
+ */
+export function canReopen(season: Season): boolean {
+  return season.activation_status === 'completed'
+}
+
+/**
+ * Helper to check if CSV can be uploaded to this season
+ * Requires: activated status + current date within season date range
+ */
+export function canUploadCsv(season: Season): boolean {
+  if (season.activation_status !== 'activated') {
+    return false
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+
+  // Must be on or after start_date
+  if (today < season.start_date) {
+    return false
+  }
+
+  // If end_date exists, must be on or before end_date
+  if (season.end_date && today > season.end_date) {
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Get the reason why CSV upload is disabled
+ */
+export function getUploadDisabledReason(season: Season): string | null {
+  if (season.activation_status === 'draft') {
+    return '請先啟用賽季'
+  }
+
+  if (season.activation_status === 'completed') {
+    return '此賽季已歸檔，如需上傳請先重新開啟'
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+
+  if (today < season.start_date) {
+    return '賽季尚未開始'
+  }
+
+  if (season.end_date && today > season.end_date) {
+    return '賽季已超過結束日期，如需上傳請先延長結束日期'
+  }
+
+  return null
 }
 
 /**

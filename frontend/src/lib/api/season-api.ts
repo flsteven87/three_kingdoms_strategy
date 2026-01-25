@@ -76,5 +76,15 @@ export async function completeSeason(seasonId: string): Promise<Season> {
   return response.data
 }
 
+/**
+ * Reopen a completed season back to activated status
+ *
+ * Changes activation_status from 'completed' to 'activated'.
+ */
+export async function reopenSeason(seasonId: string): Promise<Season> {
+  const response = await axiosInstance.post<Season>(`/api/v1/seasons/${seasonId}/reopen`)
+  return response.data
+}
+
 // Legacy alias for backward compatibility (will be removed)
 export const getActiveSeason = getCurrentSeason

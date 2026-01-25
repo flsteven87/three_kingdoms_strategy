@@ -33,7 +33,8 @@ import {
   useDeleteSeason,
   useActivateSeason,
   useSetCurrentSeason,
-  useCompleteSeason
+  useCompleteSeason,
+  useReopenSeason,
 } from '@/hooks/use-seasons'
 import type { Season } from '@/types/season'
 
@@ -62,6 +63,7 @@ function Seasons() {
   const activateMutation = useActivateSeason()
   const setCurrentMutation = useSetCurrentSeason()
   const completeMutation = useCompleteSeason()
+  const reopenMutation = useReopenSeason()
 
   /**
    * Sort seasons: current first, then activated, then draft, by start_date descending
@@ -142,6 +144,13 @@ function Seasons() {
   const handleComplete = useCallback(async (seasonId: string) => {
     await completeMutation.mutateAsync(seasonId)
   }, [completeMutation])
+
+  /**
+   * Handle reopen season
+   */
+  const handleReopen = useCallback(async (seasonId: string) => {
+    await reopenMutation.mutateAsync(seasonId)
+  }, [reopenMutation])
 
   /**
    * Cancel create mode
@@ -315,6 +324,7 @@ function Seasons() {
                 onActivate={handleActivate}
                 onSetCurrent={handleSetCurrent}
                 onComplete={handleComplete}
+                onReopen={handleReopen}
               />
             ))}
           </div>
