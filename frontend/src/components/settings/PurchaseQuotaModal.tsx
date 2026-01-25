@@ -1,11 +1,11 @@
 /**
  * Purchase Quota Modal Component
  *
- * Modal for purchasing season quota with +/- quantity selector.
- * Price: NT$ 999 / season
+ * Modal that guides users to the purchase page.
+ * Shows current quota status and provides navigation to /purchase.
  */
 
-import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Minus, Plus } from 'lucide-react'
+import { ShoppingCart } from 'lucide-react'
+import { PRICE_PER_SEASON } from '@/constants'
 
 interface PurchaseQuotaModalProps {
   readonly open: boolean
@@ -23,91 +24,45 @@ interface PurchaseQuotaModalProps {
   readonly currentAvailable: number
 }
 
-const PRICE_PER_SEASON = 999
-
 export function PurchaseQuotaModal({
   open,
   onOpenChange,
   currentAvailable,
 }: PurchaseQuotaModalProps) {
-  const [quantity, setQuantity] = useState(1)
+  const navigate = useNavigate()
 
-  const handleDecrease = () => {
-    if (quantity > 1) {
-      setQuantity(quantity - 1)
-    }
-  }
-
-  const handleIncrease = () => {
-    if (quantity < 99) {
-      setQuantity(quantity + 1)
-    }
-  }
-
-  const total = quantity * PRICE_PER_SEASON
-
-  const handlePurchase = () => {
-    // TODO: Integrate with payment gateway (Recur/綠界)
-    alert('金流整合即將推出')
+  const handleGoToPurchase = () => {
+    onOpenChange(false)
+    navigate('/purchase')
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>購買賽季額度</DialogTitle>
-          <DialogDescription>
-            選擇要購買的賽季數量
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <ShoppingCart className="h-6 w-6 text-primary" />
+          </div>
+          <DialogTitle className="text-center">購買賽季額度</DialogTitle>
+          <DialogDescription className="text-center">
+            每季 NT$ {PRICE_PER_SEASON.toLocaleString()}，永久有效
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Current Balance */}
-          <div className="text-center text-sm text-muted-foreground">
-            目前可用：<span className="font-medium text-foreground">{currentAvailable} 季</span>
-          </div>
-
-          {/* Quantity Selector */}
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleDecrease}
-              disabled={quantity <= 1}
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <span className="w-16 text-center text-3xl font-bold">{quantity}</span>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleIncrease}
-              disabled={quantity >= 99}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Price Breakdown */}
-          <div className="space-y-2 rounded-lg border p-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">單價</span>
-              <span>NT$ {PRICE_PER_SEASON.toLocaleString()} / 季</span>
-            </div>
-            <div className="flex justify-between border-t pt-2 font-medium">
-              <span>小計</span>
-              <span className="text-lg">NT$ {total.toLocaleString()}</span>
-            </div>
-          </div>
+        <div className="py-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            目前可用額度：
+            <span className="ml-1 font-semibold text-foreground">
+              {currentAvailable} 季
+            </span>
+          </p>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:justify-center">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消
           </Button>
-          <Button onClick={handlePurchase}>
-            前往付款
-          </Button>
+          <Button onClick={handleGoToPurchase}>前往購買</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
