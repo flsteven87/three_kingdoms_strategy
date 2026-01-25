@@ -1,9 +1,10 @@
 import { useState, type ComponentType } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Database, Trophy, Users, User, BarChart3, Settings, LogOut, Swords, MessageSquare, Gem, Coins, ChevronDown, ShoppingCart } from 'lucide-react'
+import { BarChart3, Calendar, ChevronDown, Coins, Database, Gem, LogOut, MessageSquare, Settings, ShoppingCart, Swords, Trophy, User, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
+import { SeasonSelector } from './SeasonSelector'
 
 interface SidebarProps {
   readonly className?: string
@@ -144,6 +145,9 @@ export function Sidebar({ className }: SidebarProps) {
           </div>
         </Link>
       </div>
+
+      {/* Season Selector - Global context indicator */}
+      <SeasonSelector />
 
       {/* Navigation Links */}
       <nav className="flex-1 space-y-1 px-3 py-4">

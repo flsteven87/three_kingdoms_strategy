@@ -5,19 +5,22 @@
  * - activation_status: draft → activated → completed (payment state)
  * - is_current: Whether this season is selected for display
  *
+ * UX Design Decisions:
+ * - "Current season" indicated by left border, not badge (visual hierarchy)
+ * - Edit/Delete/Complete buttons in expanded area (progressive disclosure)
+ * - Primary actions (Activate/Set Current) in header (quick access)
+ *
  * 符合 CLAUDE.md 🔴:
  * - JSX syntax only
  * - Type-safe component
- * - Inline editing without dialog
- * - Optimistic updates
+ * - Hyper-minimal UI - typography hierarchy over badges
  */
 
 import { useState, useCallback } from 'react'
-import { Calendar, Activity, Trash2, Check, X, Edit2, Star, CheckCircle } from 'lucide-react'
+import { Activity, Check, CheckCircle, Edit2, Star, Trash2, X } from 'lucide-react'
 import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { useCanManageSeasons } from '@/hooks/use-user-role'
@@ -130,104 +133,44 @@ export function SeasonCard({
   // Only draft seasons can be deleted
   const canDelete = season.activation_status === 'draft'
 
-  const actions = canManageSeasons ? (
+  // Header actions: Only primary actions (Activate, Set Current)
+  // Edit/Delete/Complete moved to expanded content for progressive disclosure
+  const headerActions = canManageSeasons ? (
     <div className="flex items-center gap-2">
-      {isEditing ? (
-        <>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleCancel}
-            className="h-8 px-2"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="default"
-            onClick={handleSave}
-            className="h-8 px-2"
-          >
-            <Check className="h-4 w-4" />
-          </Button>
-        </>
-      ) : (
-        <>
-          {/* Activate button for draft seasons */}
-          {showActivateButton && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleActivateClick}
-              className="h-8"
-            >
-              <Activity className="h-4 w-4 mr-1" />
-              啟用賽季
-            </Button>
-          )}
-          {/* Set as current button for activated but not current seasons */}
-          {showSetCurrentButton && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSetCurrentClick}
-              className="h-8"
-            >
-              <Star className="h-4 w-4 mr-1" />
-              設為目前
-            </Button>
-          )}
-          {/* Complete button for activated seasons */}
-          {showCompleteButton && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCompleteClick}
-              className="h-8"
-            >
-              <CheckCircle className="h-4 w-4 mr-1" />
-              結束賽季
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleEdit}
-            className="h-8 px-2"
-          >
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          {canDelete && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleDeleteClick}
-              className="h-8 px-2 text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </>
+      {showActivateButton && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleActivateClick}
+          className="h-8"
+        >
+          <Activity className="h-4 w-4 mr-1" />
+          啟用
+        </Button>
+      )}
+      {showSetCurrentButton && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleSetCurrentClick}
+          className="h-8"
+        >
+          <Star className="h-4 w-4 mr-1" />
+          設為目前
+        </Button>
       )}
     </div>
   ) : undefined
 
-  const icon = <Calendar className="h-4 w-4" />
-
   const title = season.name
 
-  // Build badges based on status
+  // Build badges: Only status + trial (current indicated by left border)
   const statusColor = getActivationStatusColor(season.activation_status)
   const statusVariant = statusColor === 'green' ? 'default' :
                         statusColor === 'blue' ? 'secondary' : 'outline'
 
   const badge = (
     <div className="flex items-center gap-2">
-      {season.is_current && (
-        <Badge variant="outline" className="text-xs">
-          目前賽季
-        </Badge>
-      )}
       {season.is_trial && (
         <Badge variant="secondary" className="text-xs">
           試用
@@ -239,117 +182,162 @@ export function SeasonCard({
     </div>
   )
 
-  const description = season.is_current
-    ? '目前選定的賽季，所有新上傳的數據將歸類至此賽季'
-    : season.activation_status === 'draft'
-      ? '草稿狀態 - 啟用後才能設為目前賽季'
-      : `${season.start_date}${season.end_date ? ` - ${season.end_date}` : ' - 進行中'}`
+  // Description shows date range for non-draft seasons
+  const description = season.activation_status === 'draft'
+    ? '草稿狀態 - 啟用後才能設為目前賽季'
+    : `${season.start_date}${season.end_date ? ` ~ ${season.end_date}` : ' ~ 進行中'}`
 
   return (
     <>
       <CollapsibleCard
-        icon={icon}
         title={title}
         badge={badge}
         description={description}
-        actions={actions}
+        actions={headerActions}
         collapsible={true}
         defaultExpanded={season.is_current}
+        className={season.is_current ? 'border-l-4 border-l-primary' : undefined}
       >
-        {isEditing ? (
-          <div className="space-y-4">
-            {/* Edit Mode */}
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor={`season-name-${season.id}`}>賽季名稱</Label>
+        <div className="space-y-4">
+          {/* Unified layout for both view and edit modes */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground mb-1">
+                開始日期
+                {isEditing && season.activation_status !== 'draft' && (
+                  <span className="ml-1 text-xs">（已鎖定）</span>
+                )}
+              </p>
+              {isEditing ? (
                 <Input
-                  id={`season-name-${season.id}`}
-                  value={editData.name}
-                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                  placeholder="例如：第一賽季、春季賽"
+                  type="date"
+                  value={editData.start_date}
+                  onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                  disabled={season.activation_status !== 'draft'}
+                  className="h-8 text-sm"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor={`season-start-${season.id}`}>
-                    開始日期
-                    {season.activation_status !== 'draft' && (
-                      <span className="ml-2 text-xs text-muted-foreground">（已鎖定）</span>
-                    )}
-                  </Label>
-                  <Input
-                    id={`season-start-${season.id}`}
-                    type="date"
-                    value={editData.start_date}
-                    onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
-                    disabled={season.activation_status !== 'draft'}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`season-end-${season.id}`}>
-                    結束日期
-                    {season.activation_status === 'completed' && (
-                      <span className="ml-2 text-xs text-muted-foreground">（已鎖定）</span>
-                    )}
-                  </Label>
-                  <Input
-                    id={`season-end-${season.id}`}
-                    type="date"
-                    value={editData.end_date}
-                    onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
-                    disabled={season.activation_status === 'completed'}
-                  />
-                </div>
-              </div>
-
-              {season.activation_status === 'activated' && (
-                <p className="text-xs text-muted-foreground">
-                  賽季已啟用：開始日期已鎖定，結束日期可延長（最長 120 天且不與其他賽季重疊）
-                </p>
+              ) : (
+                <p className="font-medium">{season.start_date}</p>
               )}
-
-              <div className="space-y-2">
-                <Label htmlFor={`season-desc-${season.id}`}>賽季說明</Label>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">
+                結束日期
+                {isEditing && season.activation_status === 'completed' && (
+                  <span className="ml-1 text-xs">（已鎖定）</span>
+                )}
+              </p>
+              {isEditing ? (
                 <Input
-                  id={`season-desc-${season.id}`}
+                  type="date"
+                  value={editData.end_date}
+                  onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
+                  disabled={season.activation_status === 'completed'}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <p className="font-medium">{season.end_date || '進行中'}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Description - always show in edit mode, conditional in view mode */}
+          {(isEditing || season.description) && (
+            <div className="text-sm">
+              <p className="text-muted-foreground mb-1">說明</p>
+              {isEditing ? (
+                <Input
                   value={editData.description}
                   onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                   placeholder="選填：補充說明或備註"
+                  className="h-8 text-sm"
                 />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* View Mode */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground mb-1">開始日期</p>
-                <p className="font-medium">{season.start_date}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">結束日期</p>
-                <p className="font-medium">{season.end_date || '進行中'}</p>
-              </div>
-            </div>
-
-            {season.description && (
-              <div className="text-sm">
-                <p className="text-muted-foreground mb-1">說明</p>
+              ) : (
                 <p className="text-foreground">{season.description}</p>
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            <div className="pt-4 border-t border-border/50">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+          {/* Help text for activated seasons in edit mode */}
+          {isEditing && season.activation_status === 'activated' && (
+            <p className="text-xs text-muted-foreground">
+              賽季已啟用：開始日期已鎖定，結束日期可延長（最長 120 天且不與其他賽季重疊）
+            </p>
+          )}
+
+          {/* Footer with timestamps and actions */}
+          <div className="pt-4 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
                 <span>建立於 {new Date(season.created_at).toLocaleDateString('zh-TW')}</span>
+                <span className="mx-2">·</span>
                 <span>更新於 {new Date(season.updated_at).toLocaleDateString('zh-TW')}</span>
               </div>
+
+              {/* Action buttons - different for edit vs view mode */}
+              {canManageSeasons && (
+                <div className="flex items-center gap-1">
+                  {isEditing ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancel}
+                        className="h-8 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        取消
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleSave}
+                        className="h-8"
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        儲存
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {showCompleteButton && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleCompleteClick}
+                          className="h-8 text-muted-foreground hover:text-foreground"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          結束賽季
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleEdit}
+                        className="h-8 text-muted-foreground hover:text-foreground"
+                      >
+                        <Edit2 className="h-4 w-4 mr-1" />
+                        編輯
+                      </Button>
+                      {canDelete && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleDeleteClick}
+                          className="h-8 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          刪除
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </CollapsibleCard>
 
       {/* Activate Confirmation Dialog */}

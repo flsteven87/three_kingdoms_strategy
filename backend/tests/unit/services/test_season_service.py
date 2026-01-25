@@ -462,12 +462,11 @@ class TestCreateSeason:
 # =============================================================================
 
 
-@pytest.mark.skip(reason="API changed: set_current_season now requires activated season status")
-class TestSetActiveSeason:
-    """Tests for SeasonService.set_current_season - NEEDS REWRITE"""
+class TestSetCurrentSeason:
+    """Tests for SeasonService.set_current_season"""
 
     @pytest.mark.asyncio
-    async def test_should_deactivate_other_seasons_and_activate_target(
+    async def test_should_set_activated_season_as_current(
         self,
         season_service: SeasonService,
         mock_season_repo: MagicMock,
@@ -477,44 +476,69 @@ class TestSetActiveSeason:
         alliance_id: UUID,
         season_id: UUID,
     ):
-        """Should deactivate all seasons and activate the target season"""
+        """Should set an activated season as current and unset others"""
         # Arrange
         mock_alliance = create_mock_alliance(alliance_id)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
 
-        target_season = create_mock_season(season_id, alliance_id, "S2", is_active=False)
-        other_season = create_mock_season(uuid4(), alliance_id, "S1", is_active=True)
+        other_season_id = uuid4()
+        target_season = create_mock_season(
+            season_id, alliance_id, "S2", is_current=False, activation_status="activated"
+        )
+        other_season = create_mock_season(
+            other_season_id, alliance_id, "S1", is_current=True, activation_status="activated"
+        )
 
         mock_season_repo.get_by_id = AsyncMock(return_value=target_season)
         mock_season_repo.get_by_alliance = AsyncMock(return_value=[target_season, other_season])
         mock_season_repo.update = AsyncMock(return_value=target_season)
-        mock_permission_service.require_owner_or_collaborator = AsyncMock()
-        mock_permission_service.require_write_permission = AsyncMock()
-
-        # Mock quota service (added to service for write operations)
-        mock_quota_service = MagicMock()
-        mock_quota_service.require_write_access = AsyncMock()
-        season_service._quota_service = mock_quota_service
+        mock_permission_service.require_role_permission = AsyncMock()
 
         # Act
         await season_service.set_current_season(user_id, season_id)
 
-        # Assert - other season should be deactivated
-        deactivate_calls = [
+        # Assert - other season should have is_current set to False
+        unset_calls = [
             call
             for call in mock_season_repo.update.call_args_list
-            if call[0][1] == {"is_active": False}
+            if call[0][1] == {"is_current": False}
         ]
-        assert len(deactivate_calls) >= 1
+        assert len(unset_calls) == 1
+        assert unset_calls[0][0][0] == other_season_id
 
-        # Assert - target season should be activated
-        activate_calls = [
+        # Assert - target season should have is_current set to True
+        set_calls = [
             call
             for call in mock_season_repo.update.call_args_list
-            if call[0][1] == {"is_active": True}
+            if call[0][1] == {"is_current": True}
         ]
-        assert len(activate_calls) == 1
-        assert activate_calls[0][0][0] == season_id
+        assert len(set_calls) == 1
+        assert set_calls[0][0][0] == season_id
+
+    @pytest.mark.asyncio
+    async def test_should_raise_valueerror_when_season_not_activated(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should raise ValueError when trying to set draft season as current"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+
+        draft_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="draft"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            await season_service.set_current_season(user_id, season_id)
+        assert "activate" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_should_raise_valueerror_when_user_has_no_alliance(
@@ -532,3 +556,402 @@ class TestSetActiveSeason:
         with pytest.raises(ValueError) as exc_info:
             await season_service.set_current_season(user_id, season_id)
         assert "no alliance" in str(exc_info.value)
+
+
+# =============================================================================
+# Tests for activate_season
+# =============================================================================
+
+
+class TestActivateSeason:
+    """Tests for SeasonService.activate_season"""
+
+    @pytest.fixture
+    def mock_season_quota_service(self) -> MagicMock:
+        """Create mock season quota service"""
+        return MagicMock()
+
+    @pytest.mark.asyncio
+    async def test_should_activate_draft_season_using_trial(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_season_quota_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should activate draft season and use trial for first activation"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+
+        draft_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="draft"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
+        mock_season_repo.get_by_alliance = AsyncMock(return_value=[])
+
+        activated_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="activated"
+        )
+        mock_season_repo.update = AsyncMock(return_value=activated_season)
+
+        # Mock quota service
+        mock_season_quota_service.require_season_activation = AsyncMock()
+        mock_season_quota_service.consume_season = AsyncMock(
+            return_value=(0, True, "2026-02-08T00:00:00+00:00")
+        )
+        season_service._season_quota_service = mock_season_quota_service
+
+        # Act
+        result = await season_service.activate_season(user_id, season_id)
+
+        # Assert
+        assert result.success is True
+        assert result.used_trial is True
+        assert result.trial_ends_at is not None
+        mock_season_quota_service.require_season_activation.assert_called_once_with(alliance_id)
+        mock_season_quota_service.consume_season.assert_called_once_with(alliance_id)
+
+    @pytest.mark.asyncio
+    async def test_should_activate_draft_season_using_purchased_quota(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_season_quota_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should activate draft season using purchased quota"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+
+        draft_season = create_mock_season(
+            season_id, alliance_id, "S2", is_current=False, activation_status="draft"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
+        mock_season_repo.get_by_alliance = AsyncMock(return_value=[])
+
+        activated_season = create_mock_season(
+            season_id, alliance_id, "S2", is_current=False, activation_status="activated"
+        )
+        mock_season_repo.update = AsyncMock(return_value=activated_season)
+
+        # Mock quota service - using purchased quota
+        mock_season_quota_service.require_season_activation = AsyncMock()
+        mock_season_quota_service.consume_season = AsyncMock(
+            return_value=(4, False, None)  # 4 remaining, not trial
+        )
+        season_service._season_quota_service = mock_season_quota_service
+
+        # Act
+        result = await season_service.activate_season(user_id, season_id)
+
+        # Assert
+        assert result.success is True
+        assert result.used_trial is False
+        assert result.remaining_seasons == 4
+        assert result.trial_ends_at is None
+
+    @pytest.mark.asyncio
+    async def test_should_raise_valueerror_when_season_already_activated(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should raise ValueError when trying to activate non-draft season"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+
+        activated_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=True, activation_status="activated"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=activated_season)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            await season_service.activate_season(user_id, season_id)
+        assert "already activated" in str(exc_info.value)
+
+
+# =============================================================================
+# Tests for update_season
+# =============================================================================
+
+
+class TestUpdateSeason:
+    """Tests for SeasonService.update_season"""
+
+    @pytest.mark.asyncio
+    async def test_should_update_draft_season_all_fields(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should allow updating all fields for draft season"""
+        # Arrange
+        from src.models.season import SeasonUpdate
+
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+        mock_permission_service.require_role_permission = AsyncMock()
+
+        draft_season = create_mock_season(
+            season_id, alliance_id, "Old Name", is_current=False, activation_status="draft"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
+        mock_season_repo.get_by_alliance = AsyncMock(return_value=[draft_season])
+
+        updated_season = create_mock_season(
+            season_id, alliance_id, "New Name", is_current=False, activation_status="draft"
+        )
+        mock_season_repo.update = AsyncMock(return_value=updated_season)
+
+        update_data = SeasonUpdate(name="New Name", start_date=date(2025, 2, 1))
+
+        # Act
+        result = await season_service.update_season(user_id, season_id, update_data)
+
+        # Assert
+        assert result.name == "New Name"
+        mock_season_repo.update.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_should_raise_when_updating_start_date_on_activated_season(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should raise ValueError when trying to update start_date on activated season"""
+        # Arrange
+        from src.models.season import SeasonUpdate
+
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+        mock_permission_service.require_role_permission = AsyncMock()
+
+        activated_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=True, activation_status="activated"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=activated_season)
+
+        update_data = SeasonUpdate(start_date=date(2025, 3, 1))
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            await season_service.update_season(user_id, season_id, update_data)
+        assert "無法修改開始日期" in str(exc_info.value)
+
+
+# =============================================================================
+# Tests for delete_season
+# =============================================================================
+
+
+class TestDeleteSeason:
+    """Tests for SeasonService.delete_season"""
+
+    @pytest.mark.asyncio
+    async def test_should_delete_draft_season(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should successfully delete a draft season"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+        mock_permission_service.require_role_permission = AsyncMock()
+
+        draft_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="draft"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
+        mock_season_repo.delete = AsyncMock(return_value=True)
+
+        # Act
+        result = await season_service.delete_season(user_id, season_id)
+
+        # Assert
+        assert result is True
+        mock_season_repo.delete.assert_called_once_with(season_id)
+
+    @pytest.mark.asyncio
+    async def test_should_raise_when_deleting_activated_season(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should raise ValueError when trying to delete activated season"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+
+        activated_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=True, activation_status="activated"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=activated_season)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            await season_service.delete_season(user_id, season_id)
+        assert "已啟用" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_should_raise_when_deleting_completed_season(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should raise ValueError when trying to delete completed season"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+
+        completed_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="completed"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=completed_season)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            await season_service.delete_season(user_id, season_id)
+        assert "已完成" in str(exc_info.value)
+
+
+# =============================================================================
+# Tests for complete_season
+# =============================================================================
+
+
+class TestCompleteSeason:
+    """Tests for SeasonService.complete_season"""
+
+    @pytest.mark.asyncio
+    async def test_should_complete_activated_season(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should successfully complete an activated season"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+        mock_permission_service.require_role_permission = AsyncMock()
+
+        activated_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="activated"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=activated_season)
+
+        completed_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="completed"
+        )
+        mock_season_repo.update = AsyncMock(return_value=completed_season)
+
+        # Act
+        result = await season_service.complete_season(user_id, season_id)
+
+        # Assert
+        assert result.activation_status == "completed"
+        mock_season_repo.update.assert_called_once()
+        update_args = mock_season_repo.update.call_args[0]
+        assert update_args[1]["activation_status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_should_unset_current_when_completing_current_season(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should unset is_current when completing the current season"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+        mock_permission_service.require_role_permission = AsyncMock()
+
+        current_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=True, activation_status="activated"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=current_season)
+
+        completed_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="completed"
+        )
+        mock_season_repo.update = AsyncMock(return_value=completed_season)
+
+        # Act
+        await season_service.complete_season(user_id, season_id)
+
+        # Assert
+        update_args = mock_season_repo.update.call_args[0]
+        assert update_args[1]["activation_status"] == "completed"
+        assert update_args[1]["is_current"] is False
+
+    @pytest.mark.asyncio
+    async def test_should_raise_when_completing_draft_season(
+        self,
+        season_service: SeasonService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should raise ValueError when trying to complete a draft season"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
+
+        draft_season = create_mock_season(
+            season_id, alliance_id, "S1", is_current=False, activation_status="draft"
+        )
+        mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            await season_service.complete_season(user_id, season_id)
+        assert "activated" in str(exc_info.value).lower()
