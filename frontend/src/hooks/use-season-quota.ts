@@ -126,7 +126,7 @@ export function useSeasonQuotaDisplay(): {
       statusColor = 'green'
     }
   } else {
-    status = data.is_trial_active ? '試用已過期' : '無可用季數'
+    status = data.is_trial_active ? '試用已過期' : '需購買賽季'
     statusColor = 'red'
   }
 

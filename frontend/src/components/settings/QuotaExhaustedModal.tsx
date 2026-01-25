@@ -44,7 +44,7 @@ export function QuotaExhaustedModal({
           </div>
           <DialogTitle className="text-center">無法啟用賽季</DialogTitle>
           <DialogDescription className="text-center">
-            你的賽季額度已用完
+            需要購買賽季才能繼續
           </DialogDescription>
         </DialogHeader>
 
@@ -56,16 +56,15 @@ export function QuotaExhaustedModal({
             </p>
           )}
           <p>
-            可用額度：<span className="font-medium text-foreground">0 季</span>
+            可開啟賽季：<span className="font-medium text-foreground">0</span>
           </p>
-          <p className="pt-2">購買額度後即可啟用此賽季</p>
         </div>
 
         <DialogFooter className="gap-2 sm:justify-center">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             稍後再說
           </Button>
-          <Button onClick={handlePurchase}>購買額度</Button>
+          <Button onClick={handlePurchase}>前往購買</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

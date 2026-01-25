@@ -127,6 +127,10 @@ export function SeasonCard({
   const showActivateButton = canActivate(season) && canActivateSeasonStatus
   const showSetCurrentButton = canSetAsCurrent(season) && !season.is_current
   const showCompleteButton = season.activation_status === 'activated' && onComplete
+  // Only draft seasons can be deleted
+  const canDelete = season.activation_status === 'draft'
+  // Check if activation is blocked due to missing end_date
+  const activationBlockedNoEndDate = canActivate(season) && !season.end_date
 
   const actions = canManageSeasons ? (
     <div className="flex items-center gap-2">
@@ -152,7 +156,7 @@ export function SeasonCard({
       ) : (
         <>
           {/* Activate button for draft seasons */}
-          {showActivateButton && (
+          {showActivateButton && !activationBlockedNoEndDate && (
             <Button
               size="sm"
               variant="outline"
@@ -162,6 +166,12 @@ export function SeasonCard({
               <Activity className="h-4 w-4 mr-1" />
               啟用賽季
             </Button>
+          )}
+          {/* Show hint when activation is blocked due to missing end_date */}
+          {activationBlockedNoEndDate && canActivateSeasonStatus && (
+            <span className="text-xs text-muted-foreground">
+              請先設定結束日期
+            </span>
           )}
           {/* Set as current button for activated but not current seasons */}
           {showSetCurrentButton && (
@@ -195,14 +205,16 @@ export function SeasonCard({
           >
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleDeleteClick}
-            className="h-8 px-2 text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {canDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleDeleteClick}
+              className="h-8 px-2 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </>
       )}
     </div>
@@ -263,26 +275,46 @@ export function SeasonCard({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor={`season-start-${season.id}`}>開始日期</Label>
+                  <Label htmlFor={`season-start-${season.id}`}>
+                    開始日期
+                    {season.activation_status !== 'draft' && (
+                      <span className="ml-2 text-xs text-muted-foreground">（已鎖定）</span>
+                    )}
+                  </Label>
                   <Input
                     id={`season-start-${season.id}`}
                     type="date"
                     value={editData.start_date}
                     onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                    disabled={season.activation_status !== 'draft'}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`season-end-${season.id}`}>結束日期</Label>
+                  <Label htmlFor={`season-end-${season.id}`}>
+                    結束日期
+                    {season.activation_status === 'completed' && (
+                      <span className="ml-2 text-xs text-muted-foreground">（已鎖定）</span>
+                    )}
+                    {season.activation_status === 'draft' && (
+                      <span className="ml-2 text-xs text-muted-foreground">（啟用前必填）</span>
+                    )}
+                  </Label>
                   <Input
                     id={`season-end-${season.id}`}
                     type="date"
                     value={editData.end_date}
                     onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
-                    placeholder="選填（留空表示進行中）"
+                    disabled={season.activation_status === 'completed'}
                   />
                 </div>
               </div>
+
+              {season.activation_status === 'activated' && (
+                <p className="text-xs text-muted-foreground">
+                  賽季已啟用：開始日期已鎖定，結束日期可延長（最長 120 天且不與其他賽季重疊）
+                </p>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor={`season-desc-${season.id}`}>賽季說明</Label>
@@ -334,7 +366,7 @@ export function SeasonCard({
         title="啟用賽季"
         description="確定要啟用此賽季嗎？"
         itemName={season.name}
-        warningMessage="啟用賽季將消耗一個季數額度（試用期間免費）。啟用後，此賽季可以設為「目前賽季」來進行數據分析。"
+        warningMessage="啟用後會消耗 1 季（試用期間免費），此賽季可設為「目前賽季」來進行數據分析。"
         confirmText="確定啟用"
         variant="default"
       />
@@ -373,7 +405,7 @@ export function SeasonCard({
         title="刪除賽季"
         description="確定要刪除此賽季嗎？"
         itemName={season.name}
-        warningMessage="此操作將永久刪除賽季及相關的所有數據（CSV 上傳記錄、成員快照等），且無法復原。已消耗的季數額度不會退還。"
+        warningMessage="此操作將永久刪除賽季及所有相關數據（CSV 上傳、成員快照等），無法復原。"
       />
     </>
   )

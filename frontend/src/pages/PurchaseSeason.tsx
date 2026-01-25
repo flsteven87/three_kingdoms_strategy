@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecur } from 'recur-tw'
-import { Minus, Plus, Lock, Zap, Infinity as InfinityIcon, Info } from 'lucide-react'
+import { Minus, Plus, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -28,36 +28,30 @@ interface FaqItem {
 
 const FAQ_ITEMS: readonly FaqItem[] = [
   {
-    question: '什麼是「賽季額度」？',
-    answer: '賽季額度是用來啟用新賽季的點數。每啟用一個賽季會消耗 1 點額度。',
+    question: '這裡的「賽季」是什麼意思？',
+    answer:
+      '對應遊戲中的賽季（S1、S2、S3...）。每開一個新賽季來追蹤盟友數據，就會消耗 1 季。',
   },
   {
-    question: '購買後多久生效？',
-    answer: '付款完成後立即生效，額度會自動加入你的帳戶。',
+    question: '試用期結束後會怎樣？',
+    answer:
+      '14 天試用期間可以無限使用。試用結束後，需要購買才能開啟新賽季，但已建立的賽季數據都會保留。',
   },
   {
-    question: '額度有使用期限嗎？',
-    answer: '沒有，購買的額度永久有效，可依你的需求隨時使用。',
+    question: '一季可以用多久？',
+    answer:
+      '沒有時間限制。一個賽季可以持續上傳 CSV、追蹤數據，直到你手動結束它。',
   },
   {
-    question: '可以退款嗎？',
-    answer: '已購買的額度不提供退款，但未使用的額度會永久保留。',
+    question: '換季時舊資料會消失嗎？',
+    answer:
+      '不會。每個賽季的數據獨立保存，你可以隨時切換查看不同賽季的歷史記錄。',
   },
   {
-    question: '如何取得發票/收據？',
-    answer: '付款完成後，電子收據會寄送至你的註冊信箱。如需統編發票，請聯繫客服。',
+    question: '可以讓其他幹部一起管理嗎？',
+    answer:
+      '可以。在設定中邀請協作者，他們就能一起上傳數據、查看分析，不需要額外購買。',
   },
-]
-
-interface TrustBadge {
-  readonly icon: React.ReactNode
-  readonly label: string
-}
-
-const TRUST_BADGES: readonly TrustBadge[] = [
-  { icon: <Lock className="h-4 w-4" />, label: '安全付款' },
-  { icon: <Zap className="h-4 w-4" />, label: '即時生效' },
-  { icon: <InfinityIcon className="h-4 w-4" />, label: '永久有效' },
 ]
 
 function PurchaseSeason() {
@@ -197,11 +191,8 @@ function PurchaseSeason() {
   return (
     <div className="mx-auto max-w-2xl space-y-12 py-8">
       {/* Page Header */}
-      <header className="text-center space-y-3">
+      <header className="text-center">
         <h1 className="text-4xl font-bold tracking-tight">購買賽季</h1>
-        <p className="text-muted-foreground text-lg">
-          選擇適合你的數量，永久有效，隨時啟用
-        </p>
       </header>
 
       {/* Purchase Card */}
@@ -274,23 +265,7 @@ function PurchaseSeason() {
           >
             {isCheckingOut ? '處理中...' : '立即購買'}
           </Button>
-
-          {/* Trust Badge (in card) */}
-          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-            <Lock className="h-3.5 w-3.5" />
-            <span>安全付款 by Recur</span>
-          </div>
         </div>
-      </div>
-
-      {/* Trust Badges */}
-      <div className="flex items-center justify-center gap-8">
-        {TRUST_BADGES.map((badge) => (
-          <div key={badge.label} className="flex items-center gap-2 text-muted-foreground">
-            {badge.icon}
-            <span className="text-sm">{badge.label}</span>
-          </div>
-        ))}
       </div>
 
       {/* Current Quota Status */}
@@ -301,7 +276,7 @@ function PurchaseSeason() {
         </span>
         {quotaStatus && !quotaStatus.can_activate_season && (
           <span className="text-sm text-destructive ml-1">
-            — 請購買額度以繼續使用
+            — 購買後即可開啟新賽季
           </span>
         )}
       </div>

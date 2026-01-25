@@ -95,7 +95,7 @@ async def delete_upload(
     upload_id: UUID,
 ):
     """
-    Delete a CSV upload (with cascading snapshots)
+    Delete a CSV upload (with cascading snapshots) and recalculate periods
 
     Args:
         upload_id: CSV upload UUID
@@ -103,13 +103,14 @@ async def delete_upload(
         user_id: User UUID (from JWT token)
 
     Returns:
-        Success message
+        Deletion result with recalculated periods count
 
     符合 CLAUDE.md 🔴: API layer delegates to service
     """
-    success = await service.delete_upload(user_id=user_id, upload_id=upload_id)
+    result = await service.delete_upload(user_id=user_id, upload_id=upload_id)
 
-    if not success:
-        raise ValueError("Failed to delete upload")
-
-    return {"message": "Upload deleted successfully", "upload_id": upload_id}
+    return {
+        "message": "Upload deleted successfully",
+        "upload_id": upload_id,
+        "recalculated_periods": result["recalculated_periods"],
+    }

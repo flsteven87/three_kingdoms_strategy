@@ -113,6 +113,21 @@ class CSVUploadService:
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
+        # Step 2.5: Validate snapshot date is within season date range
+        snapshot_date_only = snapshot_date.date()
+
+        if snapshot_date_only < season.start_date:
+            raise HTTPException(
+                status_code=400,
+                detail=f"CSV 日期 ({snapshot_date_only}) 早於賽季開始日期 ({season.start_date})",
+            )
+
+        if season.end_date and snapshot_date_only > season.end_date:
+            raise HTTPException(
+                status_code=400,
+                detail=f"CSV 日期 ({snapshot_date_only}) 晚於賽季結束日期 ({season.end_date})",
+            )
+
         # Step 3: Parse CSV content
         try:
             members_data = self._parser.parse_csv_content(csv_content)
@@ -254,9 +269,9 @@ class CSVUploadService:
             for upload in uploads
         ]
 
-    async def delete_upload(self, user_id: UUID, upload_id: UUID) -> bool:
+    async def delete_upload(self, user_id: UUID, upload_id: UUID) -> dict:
         """
-        Delete a CSV upload (with cascading snapshots)
+        Delete a CSV upload (with cascading snapshots) and recalculate periods
 
         Permission: owner + collaborator
 
@@ -265,7 +280,7 @@ class CSVUploadService:
             upload_id: CSV upload UUID
 
         Returns:
-            True if deleted successfully
+            Dict with deletion result and recalculated periods count
 
         Raises:
             HTTPException 403: If user doesn't have permission
@@ -287,5 +302,20 @@ class CSVUploadService:
             user_id, season.alliance_id, "delete CSV uploads"
         )
 
+        season_id = upload.season_id
+        upload_type = upload.upload_type
+
         # Delete upload (CASCADE will delete snapshots)
-        return await self._csv_upload_repo.delete(upload_id)
+        await self._csv_upload_repo.delete(upload_id)
+
+        # Recalculate periods for regular uploads
+        total_periods = 0
+        if upload_type == "regular":
+            periods = await self._period_metrics_service.calculate_periods_for_season(season_id)
+            total_periods = len(periods)
+
+        return {
+            "success": True,
+            "deleted_upload_id": upload_id,
+            "recalculated_periods": total_periods,
+        }

@@ -180,7 +180,7 @@ function Seasons() {
             <CardHeader className="py-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">賽季額度</CardTitle>
+                  <CardTitle className="text-base">可用賽季</CardTitle>
                   <CardDescription>
                     {quotaDisplay.status}
                   </CardDescription>
@@ -196,7 +196,7 @@ function Seasons() {
                     </p>
                   ) : (
                     <p className="text-sm text-destructive">
-                      無可用額度
+                      需購買
                     </p>
                   )}
                 </div>
@@ -212,7 +212,7 @@ function Seasons() {
               <CardHeader>
                 <CardTitle>建立新賽季</CardTitle>
                 <CardDescription>
-                  新賽季將建立為草稿狀態。啟用後才會消耗季數額度（試用期間免費）。
+                  新賽季會先建立為草稿，啟用後才會消耗 1 季（試用期間免費）。
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

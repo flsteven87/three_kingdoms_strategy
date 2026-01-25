@@ -43,15 +43,15 @@ export function PurchaseQuotaModal({
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <ShoppingCart className="h-6 w-6 text-primary" />
           </div>
-          <DialogTitle className="text-center">購買賽季額度</DialogTitle>
+          <DialogTitle className="text-center">購買賽季</DialogTitle>
           <DialogDescription className="text-center">
-            每季 NT$ {PRICE_PER_SEASON.toLocaleString()}，永久有效
+            NT$ {PRICE_PER_SEASON.toLocaleString()} / 季
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4 text-center">
           <p className="text-sm text-muted-foreground">
-            目前可用額度：
+            目前可開啟：
             <span className="ml-1 font-semibold text-foreground">
               {currentAvailable} 季
             </span>

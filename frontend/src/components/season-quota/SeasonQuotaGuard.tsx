@@ -37,10 +37,10 @@ function ExpiredOverlay({ message }: { readonly message: string }) {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
           <AlertCircle className="h-6 w-6 text-destructive" />
         </div>
-        <h3 className="text-lg font-semibold">無可用額度</h3>
+        <h3 className="text-lg font-semibold">需要購買賽季</h3>
         <p className="text-muted-foreground">{message}</p>
         <Button variant="default" disabled>
-          購買季數（即將推出）
+          購買賽季（即將推出）
         </Button>
       </div>
     </div>
@@ -54,7 +54,7 @@ function ExpiredInline({ message }: { readonly message: string }) {
   return (
     <Alert variant="destructive">
       <AlertCircle className="h-4 w-4" />
-      <AlertTitle>無可用額度</AlertTitle>
+      <AlertTitle>需要購買賽季</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
     </Alert>
   )
@@ -62,7 +62,7 @@ function ExpiredInline({ message }: { readonly message: string }) {
 
 export function SeasonQuotaGuard({
   children,
-  expiredMessage = '您的試用期已結束且無可用季數，請購買季數以繼續使用完整功能。',
+  expiredMessage = '試用期已結束，請購買賽季以繼續使用。',
   inline = false,
 }: SeasonQuotaGuardProps) {
   const { data, isLoading } = useSeasonQuota()

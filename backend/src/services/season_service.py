@@ -8,6 +8,7 @@ Season Service Layer - Season Purchase System
 """
 
 import logging
+from datetime import date
 from uuid import UUID
 
 from src.models.season import Season, SeasonActivateResponse, SeasonCreate, SeasonUpdate
@@ -17,6 +18,9 @@ from src.services.permission_service import PermissionService
 from src.services.season_quota_service import SeasonQuotaService
 
 logger = logging.getLogger(__name__)
+
+# Maximum season duration in days (4 months ≈ 120 days)
+MAX_SEASON_DAYS = 120
 
 
 class SeasonService:
@@ -36,6 +40,83 @@ class SeasonService:
         self._alliance_repo = AllianceRepository()
         self._permission_service = PermissionService()
         self._season_quota_service = SeasonQuotaService()
+
+    def _validate_season_duration(self, start_date: date, end_date: date | None) -> None:
+        """
+        Validate season duration does not exceed maximum allowed days.
+
+        Args:
+            start_date: Season start date
+            end_date: Season end date (can be None for drafts)
+
+        Raises:
+            ValueError: If duration exceeds MAX_SEASON_DAYS
+        """
+        if end_date is None:
+            return
+
+        duration = (end_date - start_date).days
+        if duration > MAX_SEASON_DAYS:
+            raise ValueError(f"賽季長度不能超過 {MAX_SEASON_DAYS} 天（約 4 個月）")
+
+    def _check_dates_overlap(
+        self,
+        start_a: date,
+        end_a: date | None,
+        start_b: date,
+        end_b: date | None,
+    ) -> bool:
+        """
+        Check if two date ranges overlap.
+
+        For seasons without end_date, we treat them as ongoing (use a far future date).
+
+        Args:
+            start_a, end_a: First date range
+            start_b, end_b: Second date range
+
+        Returns:
+            True if ranges overlap, False otherwise
+        """
+        # Use a far future date for ongoing seasons
+        far_future = date(2999, 12, 31)
+        actual_end_a = end_a if end_a else far_future
+        actual_end_b = end_b if end_b else far_future
+
+        # Two ranges overlap if: start_a <= end_b AND start_b <= end_a
+        # We use < instead of <= to allow adjacent seasons (end_date = next start_date - 1)
+        return start_a < actual_end_b and start_b < actual_end_a
+
+    async def _validate_no_date_overlap(
+        self,
+        alliance_id: UUID,
+        start_date: date,
+        end_date: date | None,
+        exclude_season_id: UUID | None = None,
+    ) -> None:
+        """
+        Validate that the date range does not overlap with any existing season.
+
+        Checks all seasons (draft, activated, completed) in the alliance.
+
+        Args:
+            alliance_id: Alliance UUID
+            start_date: New season start date
+            end_date: New season end date
+            exclude_season_id: Season ID to exclude (for updates)
+
+        Raises:
+            ValueError: If date range overlaps with another season
+        """
+        all_seasons = await self._repo.get_by_alliance(alliance_id)
+
+        for season in all_seasons:
+            # Skip the season being updated
+            if exclude_season_id and season.id == exclude_season_id:
+                continue
+
+            if self._check_dates_overlap(start_date, end_date, season.start_date, season.end_date):
+                raise ValueError(f"日期範圍與「{season.name}」重疊，請選擇不同的日期")
 
     async def verify_user_access(self, user_id: UUID, season_id: UUID) -> UUID:
         """
@@ -168,6 +249,14 @@ class SeasonService:
         # Verify write permission (role check only - creating draft doesn't require quota)
         await self._permission_service.require_role_permission(user_id, alliance.id)
 
+        # Validate season duration (if end_date is provided)
+        self._validate_season_duration(season_data.start_date, season_data.end_date)
+
+        # Validate no date overlap with existing seasons
+        await self._validate_no_date_overlap(
+            alliance.id, season_data.start_date, season_data.end_date
+        )
+
         # Create season as draft (not current)
         data = season_data.model_dump()
         data["alliance_id"] = str(alliance.id)
@@ -213,6 +302,18 @@ class SeasonService:
         if season.activation_status != "draft":
             raise ValueError(f"Season is already {season.activation_status}, cannot activate")
 
+        # Require end_date when activating
+        if season.end_date is None:
+            raise ValueError("啟用賽季前必須設定結束日期")
+
+        # Validate season duration
+        self._validate_season_duration(season.start_date, season.end_date)
+
+        # Validate no date overlap (re-check in case other seasons were created)
+        await self._validate_no_date_overlap(
+            season.alliance_id, season.start_date, season.end_date, exclude_season_id=season_id
+        )
+
         # Verify can activate (has trial or seasons)
         await self._season_quota_service.require_season_activation(season.alliance_id)
 
@@ -246,6 +347,12 @@ class SeasonService:
         """
         Update existing season
 
+        Edit restrictions based on activation_status:
+        - draft: all fields editable
+        - activated: name/description editable, start_date locked,
+                     end_date can extend (within limits)
+        - completed: name/description editable, dates locked
+
         Permission: owner + collaborator
 
         Args:
@@ -257,7 +364,7 @@ class SeasonService:
             Updated season instance
 
         Raises:
-            ValueError: If user has no alliance or season not found
+            ValueError: If user has no alliance, season not found, or edit not allowed
             PermissionError: If user doesn't own the season
             HTTPException 403: If user doesn't have permission
         """
@@ -269,6 +376,47 @@ class SeasonService:
 
         # Update only provided fields
         update_data = season_data.model_dump(exclude_unset=True)
+
+        # Apply edit restrictions based on status
+        if season.activation_status == "activated":
+            # start_date is locked after activation
+            if "start_date" in update_data:
+                raise ValueError("賽季啟用後無法修改開始日期")
+
+            # end_date can be extended but must respect limits
+            if "end_date" in update_data:
+                new_end_date = update_data["end_date"]
+                if new_end_date is not None:
+                    # Validate duration
+                    self._validate_season_duration(season.start_date, new_end_date)
+                    # Validate no overlap
+                    await self._validate_no_date_overlap(
+                        season.alliance_id,
+                        season.start_date,
+                        new_end_date,
+                        exclude_season_id=season_id,
+                    )
+
+        elif season.activation_status == "completed":
+            # Both dates are locked after completion
+            if "start_date" in update_data:
+                raise ValueError("已完成的賽季無法修改開始日期")
+            if "end_date" in update_data:
+                raise ValueError("已完成的賽季無法修改結束日期")
+
+        else:  # draft status
+            # All fields editable, but still need validation
+            new_start = update_data.get("start_date", season.start_date)
+            new_end = update_data.get("end_date", season.end_date)
+
+            # Validate duration if end_date is set
+            if new_end is not None:
+                self._validate_season_duration(new_start, new_end)
+
+            # Validate no overlap
+            await self._validate_no_date_overlap(
+                season.alliance_id, new_start, new_end, exclude_season_id=season_id
+            )
 
         # Convert date objects to ISO format strings for Supabase
         if "start_date" in update_data and update_data["start_date"]:
@@ -282,6 +430,9 @@ class SeasonService:
         """
         Delete season (hard delete, CASCADE will remove related data)
 
+        Only draft seasons can be deleted. Activated and completed seasons
+        are permanent records and cannot be deleted.
+
         Permission: owner + collaborator
 
         Args:
@@ -292,12 +443,17 @@ class SeasonService:
             True if deleted successfully
 
         Raises:
-            ValueError: If user has no alliance or season not found
+            ValueError: If user has no alliance, season not found, or not a draft
             PermissionError: If user doesn't own the season
             HTTPException 403: If user doesn't have permission
         """
         # Verify ownership through get_season
         season = await self.get_season(user_id, season_id)
+
+        # Only draft seasons can be deleted
+        if season.activation_status != "draft":
+            status_text = "已啟用" if season.activation_status == "activated" else "已完成"
+            raise ValueError(f"無法刪除{status_text}的賽季，只有草稿賽季可以刪除")
 
         # Verify write permission (role check)
         await self._permission_service.require_role_permission(user_id, season.alliance_id)
