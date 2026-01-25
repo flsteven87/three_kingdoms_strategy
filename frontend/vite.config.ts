@@ -28,20 +28,28 @@ export default defineConfig({
             '@radix-ui/react-slot',
             '@radix-ui/react-tabs',
           ],
-          // React core
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // React core + React-dependent libraries
+          'react-vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+            'lucide-react',
+            'cmdk',
+            'sonner',
+            'react-hook-form',
+            'recur-tw',
+          ],
           // Data fetching
           tanstack: ['@tanstack/react-query'],
           // Backend services
           supabase: ['@supabase/supabase-js'],
-          // Utility libraries
+          // Pure utility libraries (no React dependency)
           vendor: [
             'axios',
             'clsx',
             'tailwind-merge',
             'class-variance-authority',
-            'lucide-react',
-            'cmdk',
+            'zod',
           ],
         },
       },
