@@ -53,6 +53,12 @@ export function QuotaWarningBanner() {
   const config = bannerConfigs[level]
   const Icon = config.icon
 
+  const buttonStyles: Record<Exclude<QuotaWarningLevel, 'none'>, string> = {
+    warning: 'bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-600 dark:hover:bg-yellow-500 focus:ring-yellow-500',
+    critical: 'bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500 focus:ring-orange-500',
+    expired: 'bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 focus:ring-red-500',
+  }
+
   return (
     <div
       className={cn(
@@ -65,21 +71,18 @@ export function QuotaWarningBanner() {
     >
       <Icon className="h-4 w-4 shrink-0" />
       <p className="flex-1">{message}</p>
-      {level === 'expired' && (
-        <button
-          type="button"
-          className={cn(
-            'shrink-0 rounded-md px-3 py-1 text-xs font-medium',
-            'bg-red-600 text-white hover:bg-red-700',
-            'dark:bg-red-600 dark:hover:bg-red-500',
-            'focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2',
-            'transition-colors'
-          )}
-          onClick={() => navigate('/purchase')}
-        >
-          購買季數
-        </button>
-      )}
+      <button
+        type="button"
+        className={cn(
+          'shrink-0 rounded-md px-3 py-1 text-xs font-medium text-white',
+          'focus:outline-none focus:ring-2 focus:ring-offset-2',
+          'transition-colors',
+          buttonStyles[level]
+        )}
+        onClick={() => navigate('/purchase')}
+      >
+        購買賽季
+      </button>
     </div>
   )
 }

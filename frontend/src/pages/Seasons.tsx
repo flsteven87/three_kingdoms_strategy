@@ -259,6 +259,21 @@ function Seasons() {
                       placeholder="選填：補充說明或備註"
                     />
                   </div>
+
+                  {/* Existing seasons date reference */}
+                  {seasons && seasons.length > 0 && (
+                    <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">現有賽季日期</p>
+                      <div className="space-y-1">
+                        {seasons.map((s) => (
+                          <div key={s.id} className="flex justify-between text-xs text-muted-foreground">
+                            <span>{s.name}</span>
+                            <span>{s.start_date}{s.end_date ? ` ~ ${s.end_date}` : ' ~ 進行中'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-4">

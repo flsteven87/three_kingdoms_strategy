@@ -12,6 +12,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
 import type { Season, SeasonCreate, SeasonUpdate } from '@/types/season'
 import { seasonQuotaKeys } from './use-season-quota'
@@ -77,6 +78,7 @@ export function useCreateSeason() {
   return useMutation({
     mutationFn: (data: SeasonCreate) => apiClient.createSeason(data),
     onSuccess: (newSeason) => {
+      toast.success(`「${newSeason.name}」已建立`)
       queryClient.invalidateQueries({ queryKey: seasonKeys.lists() })
       if (newSeason.is_current) {
         queryClient.invalidateQueries({ queryKey: seasonKeys.current() })
@@ -139,6 +141,9 @@ export function useUpdateSeason() {
         queryClient.setQueryData(seasonKeys.detail(context.seasonId), context.previousSeason)
       }
     },
+    onSuccess: (updatedSeason) => {
+      toast.success(`「${updatedSeason.name}」已更新`)
+    },
     onSettled: () => {
       // Refetch all season data to sync with server
       queryClient.invalidateQueries({ queryKey: seasonKeys.all })
@@ -180,6 +185,7 @@ export function useDeleteSeason() {
       }
     },
     onSuccess: (_data, seasonId) => {
+      toast.success('賽季已刪除')
       // Remove season from detail cache
       queryClient.removeQueries({ queryKey: seasonKeys.detail(seasonId) })
     },
@@ -231,6 +237,9 @@ export function useActivateSeason() {
       if (context?.previousSeasons) {
         queryClient.setQueryData(seasonKeys.list(false), context.previousSeasons)
       }
+    },
+    onSuccess: (response) => {
+      toast.success(`「${response.season.name}」已啟用`)
     },
     onSettled: () => {
       // Refetch all season data to sync with server
@@ -293,6 +302,9 @@ export function useSetCurrentSeason() {
         queryClient.setQueryData(seasonKeys.current(), context.previousCurrent)
       }
     },
+    onSuccess: (updatedSeason) => {
+      toast.success(`已切換至「${updatedSeason.name}」`)
+    },
     onSettled: () => {
       // Refetch all season data to sync with server
       queryClient.invalidateQueries({ queryKey: seasonKeys.all })
@@ -341,6 +353,9 @@ export function useCompleteSeason() {
       if (context?.previousSeasons) {
         queryClient.setQueryData(seasonKeys.list(false), context.previousSeasons)
       }
+    },
+    onSuccess: (completedSeason) => {
+      toast.success(`「${completedSeason.name}」已結束`)
     },
     onSettled: () => {
       // Refetch all season data to sync with server

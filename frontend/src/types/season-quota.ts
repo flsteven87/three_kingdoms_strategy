@@ -63,15 +63,15 @@ export function getQuotaWarningMessage(
   switch (level) {
     case 'expired':
       if (status.trial_days_remaining === 0) {
-        return '您的 14 天試用期已結束，請購買季數以繼續使用。'
+        return '試用期已結束，歡迎購買賽季繼續使用'
       }
-      return '您的可用季數已用完，請購買季數以繼續使用。'
+      return '目前沒有可用賽季，歡迎購買以繼續使用'
 
     case 'critical':
-      return `試用期即將結束！還剩 ${status.trial_days_remaining} 天。`
+      return `試用期剩餘 ${status.trial_days_remaining} 天`
 
     case 'warning':
-      return `試用期還剩 ${status.trial_days_remaining} 天，請考慮購買季數。`
+      return `試用期剩餘 ${status.trial_days_remaining} 天`
 
     default:
       return null

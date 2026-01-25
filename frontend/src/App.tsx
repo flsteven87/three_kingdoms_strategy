@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './hooks/use-auth'
 import { DashboardLayout } from './components/layout/DashboardLayout'
@@ -44,6 +45,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Toaster position="top-center" richColors />
         <Routes>
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth/callback" element={<AuthCallback />} />

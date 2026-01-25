@@ -129,8 +129,6 @@ export function SeasonCard({
   const showCompleteButton = season.activation_status === 'activated' && onComplete
   // Only draft seasons can be deleted
   const canDelete = season.activation_status === 'draft'
-  // Check if activation is blocked due to missing end_date
-  const activationBlockedNoEndDate = canActivate(season) && !season.end_date
 
   const actions = canManageSeasons ? (
     <div className="flex items-center gap-2">
@@ -156,7 +154,7 @@ export function SeasonCard({
       ) : (
         <>
           {/* Activate button for draft seasons */}
-          {showActivateButton && !activationBlockedNoEndDate && (
+          {showActivateButton && (
             <Button
               size="sm"
               variant="outline"
@@ -166,12 +164,6 @@ export function SeasonCard({
               <Activity className="h-4 w-4 mr-1" />
               啟用賽季
             </Button>
-          )}
-          {/* Show hint when activation is blocked due to missing end_date */}
-          {activationBlockedNoEndDate && canActivateSeasonStatus && (
-            <span className="text-xs text-muted-foreground">
-              請先設定結束日期
-            </span>
           )}
           {/* Set as current button for activated but not current seasons */}
           {showSetCurrentButton && (
@@ -232,7 +224,7 @@ export function SeasonCard({
   const badge = (
     <div className="flex items-center gap-2">
       {season.is_current && (
-        <Badge variant="default" className="text-xs">
+        <Badge variant="outline" className="text-xs">
           目前賽季
         </Badge>
       )}
@@ -295,9 +287,6 @@ export function SeasonCard({
                     結束日期
                     {season.activation_status === 'completed' && (
                       <span className="ml-2 text-xs text-muted-foreground">（已鎖定）</span>
-                    )}
-                    {season.activation_status === 'draft' && (
-                      <span className="ml-2 text-xs text-muted-foreground">（啟用前必填）</span>
                     )}
                   </Label>
                   <Input
@@ -366,7 +355,7 @@ export function SeasonCard({
         title="啟用賽季"
         description="確定要啟用此賽季嗎？"
         itemName={season.name}
-        warningMessage="啟用後會消耗 1 季（試用期間免費），此賽季可設為「目前賽季」來進行數據分析。"
+        warningMessage="啟用後會消耗 1 季（試用期間免費），開始日期將鎖定不可更改。此賽季可設為「目前賽季」來進行數據分析。"
         confirmText="確定啟用"
         variant="default"
       />

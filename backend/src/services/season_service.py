@@ -302,12 +302,9 @@ class SeasonService:
         if season.activation_status != "draft":
             raise ValueError(f"Season is already {season.activation_status}, cannot activate")
 
-        # Require end_date when activating
-        if season.end_date is None:
-            raise ValueError("啟用賽季前必須設定結束日期")
-
-        # Validate season duration
-        self._validate_season_duration(season.start_date, season.end_date)
+        # Validate season duration if end_date is set
+        if season.end_date is not None:
+            self._validate_season_duration(season.start_date, season.end_date)
 
         # Validate no date overlap (re-check in case other seasons were created)
         await self._validate_no_date_overlap(
