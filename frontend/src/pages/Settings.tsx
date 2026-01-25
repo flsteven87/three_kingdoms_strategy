@@ -3,12 +3,13 @@
  *
  * Tab structure:
  * - 同盟管理: Alliance settings + Collaborator management
- * - 賽季額度: Season quota status and purchase (Owner/Collaborator only)
  * - 帳戶設定: Personal account settings
+ *
+ * Note: 賽季額度功能已移至獨立的 /purchase 頁面
  */
 
 import { useState } from 'react'
-import { Users, Coins, User } from 'lucide-react'
+import { Users, User } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Card,
@@ -27,18 +28,12 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { useAlliance } from '@/hooks/use-alliance'
-import { useUserRole } from '@/hooks/use-user-role'
 import { AllianceForm } from '@/components/alliance/AllianceForm'
 import { AllianceCollaboratorManager } from '@/components/alliance/AllianceCollaboratorManager'
-import { SeasonQuotaTab } from '@/components/settings'
 
 function Settings() {
   const { data: alliance } = useAlliance()
-  const { data: userRole } = useUserRole()
   const [activeTab, setActiveTab] = useState('alliance')
-
-  // Only Owner and Collaborator can see quota tab
-  const canSeeQuotaTab = userRole === 'owner' || userRole === 'collaborator'
 
   return (
     <div className="space-y-6">
@@ -52,17 +47,11 @@ function Settings() {
 
       {/* Tab Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${canSeeQuotaTab ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="alliance" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span>同盟管理</span>
           </TabsTrigger>
-          {canSeeQuotaTab && (
-            <TabsTrigger value="quota" className="flex items-center gap-2">
-              <Coins className="h-4 w-4" />
-              <span>賽季額度</span>
-            </TabsTrigger>
-          )}
           <TabsTrigger value="account" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             <span>帳戶設定</span>
@@ -193,13 +182,6 @@ function Settings() {
             </Card>
           )}
         </TabsContent>
-
-        {/* Season Quota Tab */}
-        {canSeeQuotaTab && (
-          <TabsContent value="quota" className="space-y-4">
-            <SeasonQuotaTab />
-          </TabsContent>
-        )}
 
         {/* Account Settings Tab */}
         <TabsContent value="account" className="space-y-4">

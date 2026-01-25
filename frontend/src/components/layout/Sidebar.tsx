@@ -1,6 +1,6 @@
 import { useState, type ComponentType } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Database, Trophy, Users, User, BarChart3, Settings, LogOut, Swords, MessageSquare, Gem, Coins, ChevronDown } from 'lucide-react'
+import { Calendar, Database, Trophy, Users, User, BarChart3, Settings, LogOut, Swords, MessageSquare, Gem, Coins, ChevronDown, ShoppingCart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -83,6 +83,11 @@ const navigation: readonly NavigationEntry[] = [
     name: 'LINE 三國小幫手',
     href: '/line-binding',
     icon: MessageSquare,
+  },
+  {
+    name: '購買賽季',
+    href: '/purchase',
+    icon: ShoppingCart,
   },
   {
     name: '設定',

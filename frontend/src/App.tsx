@@ -14,6 +14,7 @@ import { EventAnalytics } from './pages/EventAnalytics'
 import { EventDetail } from './pages/EventDetail'
 import { DonationAnalytics } from './pages/DonationAnalytics'
 import { Settings } from './pages/Settings'
+import { PurchaseSeason } from './pages/PurchaseSeason'
 import { LineBinding } from './pages/LineBinding'
 import { CopperMines } from './pages/CopperMines'
 import { LiffLayout } from './liff/components/LiffLayout'
@@ -67,6 +68,7 @@ function App() {
               <Route path="events" element={<EventAnalytics />} />
               <Route path="events/:eventId" element={<EventDetail />} />
               <Route path="line-binding" element={<LineBinding />} />
+              <Route path="purchase" element={<PurchaseSeason />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>

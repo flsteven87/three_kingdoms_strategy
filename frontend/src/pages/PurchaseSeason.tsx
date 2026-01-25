@@ -105,7 +105,15 @@ function PurchaseSeason() {
       return
     }
 
+    // customerEmail is REQUIRED for embedded/modal checkout
+    const customerEmail = user.email
+    if (!customerEmail) {
+      setError('無法取得您的電子郵件，請確認帳戶設定')
+      return
+    }
+
     try {
+      // Format: user_id:quantity - used by webhook to grant seasons
       const externalCustomerId = `${user.id}:${quantity}`
       const baseUrl = window.location.origin
       const successUrl = `${baseUrl}/purchase?payment=success`
@@ -113,7 +121,7 @@ function PurchaseSeason() {
 
       await checkout({
         productId,
-        customerEmail: user.email ?? undefined,
+        customerEmail,
         customerName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
         externalCustomerId,
         successUrl,
@@ -126,14 +134,27 @@ function PurchaseSeason() {
           setError(`付款錯誤：${checkoutError.message}`)
         },
         onPaymentComplete: async () => {
+          // Refresh quota status after successful payment
           await queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
         },
         onPaymentFailed: (err) => {
           console.error('[Recur] Payment failed:', err)
-          return { action: 'retry' as const }
+          // Provide appropriate actions based on error code
+          const errorCode = err?.code
+          switch (errorCode) {
+            case 'CARD_DECLINED':
+            case 'INSUFFICIENT_FUNDS':
+              return {
+                action: 'custom' as const,
+                customTitle: '付款失敗',
+                customMessage: '請確認卡片餘額或使用其他付款方式',
+              }
+            default:
+              return { action: 'retry' as const }
+          }
         },
         onPaymentCancel: () => {
-          console.log('[Recur] Payment cancelled')
+          console.log('[Recur] Payment cancelled by user')
         },
       })
     } catch (err: unknown) {

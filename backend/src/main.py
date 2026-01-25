@@ -24,6 +24,7 @@ from src.api.v1.endpoints import (
     season_quota,
     seasons,
     uploads,
+    webhooks,
 )
 from src.core.config import settings
 from src.core.exceptions import SeasonQuotaExhaustedError
@@ -62,6 +63,7 @@ app.include_router(donations.router, prefix="/api/v1")
 app.include_router(copper_mines.router, prefix="/api/v1")
 app.include_router(linebot.router, prefix="/api/v1")
 app.include_router(season_quota.router, prefix="/api/v1")
+app.include_router(webhooks.router, prefix="/api/v1")
 
 
 # Global Exception Handlers
