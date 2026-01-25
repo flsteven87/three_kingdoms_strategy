@@ -137,3 +137,45 @@ class SeasonRepository(SupabaseRepository[Season]):
         self._handle_supabase_result(result, allow_empty=True)
 
         return True
+
+    async def get_activated_seasons_count(self, alliance_id: UUID) -> int:
+        """
+        Get count of activated or completed seasons for an alliance.
+        Used to determine if trial is available.
+
+        Args:
+            alliance_id: Alliance UUID
+
+        Returns:
+            Count of activated/completed seasons
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("id", count="exact")
+            .eq("alliance_id", str(alliance_id))
+            .in_("activation_status", ["activated", "completed"])
+            .execute()
+        )
+        return result.count or 0
+
+    async def get_trial_season(self, alliance_id: UUID) -> Season | None:
+        """
+        Get the trial season for an alliance (if exists).
+        There should be at most one trial season per alliance.
+
+        Args:
+            alliance_id: Alliance UUID
+
+        Returns:
+            Trial season or None if not found
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("is_trial", True)
+            .limit(1)
+            .execute()
+        )
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return self._build_model(data[0]) if data else None

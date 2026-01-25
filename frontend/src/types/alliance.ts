@@ -1,33 +1,20 @@
 /**
  * Alliance API Types
  *
+ * Note: Trial system has moved to Season level (Season.is_trial, Season.activated_at)
  * 符合 CLAUDE.md 🟡: snake_case naming matching backend schema
  */
 
-/**
- * Season quota status (DB field: subscription_status)
- *
- * Note: Field name kept as 'subscription_status' to match DB schema.
- * - trial: Within 14-day trial period
- * - active: Trial active OR has available seasons
- * - expired: Trial expired AND no available seasons
- */
-export type SubscriptionStatus = 'trial' | 'active' | 'expired'
-
 export interface Alliance {
   readonly id: string
-  readonly user_id: string
   readonly name: string
   readonly server_name: string | null
   readonly created_at: string
   readonly updated_at: string
-  // Season quota fields (DB field names kept for schema compatibility)
-  readonly subscription_status: SubscriptionStatus
-  readonly trial_started_at: string | null
-  readonly trial_ends_at: string | null
-  readonly subscription_plan: string | null
-  readonly subscription_started_at: string | null
-  readonly subscription_ends_at: string | null
+  // Season purchase fields
+  readonly purchased_seasons: number
+  readonly used_seasons: number
+  readonly recur_customer_id: string | null
 }
 
 export interface AllianceCreate {

@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { SeasonCard } from '@/components/seasons/SeasonCard'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { RoleGuard } from '@/components/alliance/RoleGuard'
@@ -160,9 +161,22 @@ function Seasons() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight">賽季管理</h2>
-            <p className="text-muted-foreground mt-1">管理遊戲賽季與數據週期</p>
+            <RoleGuard requiredRoles={['owner', 'collaborator']}>
+              <Badge
+                variant={quotaDisplay.statusColor === 'red' ? 'destructive' : 'secondary'}
+                className="text-xs"
+              >
+                {quotaDisplay.hasTrialAvailable
+                  ? '可免費試用'
+                  : quotaDisplay.trialDaysRemaining !== null && quotaDisplay.trialDaysRemaining > 0
+                    ? `試用 ${quotaDisplay.trialDaysRemaining} 天`
+                    : quotaDisplay.availableSeasons > 0
+                      ? `剩餘 ${quotaDisplay.availableSeasons} 季`
+                      : '需購買'}
+              </Badge>
+            </RoleGuard>
           </div>
           <RoleGuard requiredRoles={['owner', 'collaborator']}>
             {!isCreating && (
@@ -173,37 +187,6 @@ function Seasons() {
             )}
           </RoleGuard>
         </div>
-
-        {/* Season Quota Status Card */}
-        <RoleGuard requiredRoles={['owner', 'collaborator']}>
-          <Card className="border-muted">
-            <CardHeader className="py-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">可用賽季</CardTitle>
-                  <CardDescription>
-                    {quotaDisplay.status}
-                  </CardDescription>
-                </div>
-                <div className="text-right">
-                  {quotaDisplay.availableSeasons > 0 ? (
-                    <p className="text-2xl font-bold text-green-600">
-                      {quotaDisplay.availableSeasons}
-                    </p>
-                  ) : quotaDisplay.trialDaysRemaining !== null ? (
-                    <p className="text-sm text-muted-foreground">
-                      試用期剩餘 {quotaDisplay.trialDaysRemaining} 天
-                    </p>
-                  ) : (
-                    <p className="text-sm text-destructive">
-                      需購買
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </RoleGuard>
 
         {/* Create New Season Card */}
         <RoleGuard requiredRoles={['owner', 'collaborator']}>

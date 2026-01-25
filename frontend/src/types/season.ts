@@ -17,6 +17,9 @@ export interface Season {
   readonly description: string | null
   readonly created_at: string
   readonly updated_at: string
+  // Trial fields (Season-based trial system)
+  readonly is_trial: boolean
+  readonly activated_at: string | null
 }
 
 export interface SeasonCreate {
@@ -39,6 +42,7 @@ export interface SeasonActivateResponse {
   readonly season: Season
   readonly remaining_seasons: number
   readonly used_trial: boolean
+  readonly trial_ends_at: string | null
 }
 
 /**

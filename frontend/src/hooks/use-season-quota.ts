@@ -2,6 +2,7 @@
  * Season Quota Query Hooks
  *
  * Provides hooks for managing season quota status (trial + purchased seasons).
+ * Trial system is Season-based: trial starts when user activates their first season.
  *
  * 符合 CLAUDE.md 🟡:
  * - TanStack Query for server state
@@ -73,7 +74,7 @@ export function useQuotaWarning(): {
 
   const level = getQuotaWarningLevel(data)
   const message = getQuotaWarningMessage(data)
-  const isExpired = !data.can_activate_season && data.available_seasons === 0
+  const isExpired = !data.can_write && !data.can_activate_season
 
   return {
     level,
@@ -95,6 +96,8 @@ export function useSeasonQuotaDisplay(): {
   trialDaysRemaining: number | null
   availableSeasons: number
   canActivate: boolean
+  canWrite: boolean
+  hasTrialAvailable: boolean
 } {
   const { data } = useSeasonQuota()
 
@@ -105,28 +108,30 @@ export function useSeasonQuotaDisplay(): {
       trialDaysRemaining: null,
       availableSeasons: 0,
       canActivate: false,
+      canWrite: false,
+      hasTrialAvailable: false,
     }
   }
 
   let status: string
   let statusColor: 'green' | 'yellow' | 'red' | 'gray'
 
-  if (data.can_activate_season) {
-    if (data.is_trial_active) {
+  if (data.can_activate_season || data.can_write) {
+    if (data.has_trial_available) {
+      status = '可免費試用'
+      statusColor = 'green'
+    } else if (data.current_season_is_trial && data.trial_days_remaining !== null) {
       status = `試用中 (${data.trial_days_remaining} 天)`
-      statusColor =
-        data.trial_days_remaining !== null && data.trial_days_remaining <= 3
-          ? 'yellow'
-          : 'green'
+      statusColor = data.trial_days_remaining <= 3 ? 'yellow' : 'green'
     } else if (data.available_seasons > 0) {
-      status = `可用 ${data.available_seasons} 季`
+      status = `剩餘 ${data.available_seasons} 季`
       statusColor = 'green'
     } else {
-      status = '可啟用'
+      status = '可使用'
       statusColor = 'green'
     }
   } else {
-    status = data.is_trial_active ? '試用已過期' : '需購買賽季'
+    status = data.current_season_is_trial ? '試用已過期' : '需購買賽季'
     statusColor = 'red'
   }
 
@@ -136,5 +141,7 @@ export function useSeasonQuotaDisplay(): {
     trialDaysRemaining: data.trial_days_remaining,
     availableSeasons: data.available_seasons,
     canActivate: data.can_activate_season,
+    canWrite: data.can_write,
+    hasTrialAvailable: data.has_trial_available,
   }
 }

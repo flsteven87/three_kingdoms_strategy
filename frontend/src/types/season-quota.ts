@@ -1,47 +1,41 @@
 /**
- * Season Quota API Types
+ * Season Quota API Types - Season-Based Trial System
  *
- * 符合 CLAUDE.md 🟡: snake_case naming matching backend schema
+ * Trial system is now based on Season activation, not Alliance creation.
+ * - Trial available: No activated/completed seasons exist
+ * - Can activate: has_trial_available OR available_seasons > 0
+ * - Can write: purchased_seasons > 0 OR (current_season.is_trial AND within 14 days)
  */
 
 export interface SeasonQuotaStatus {
-  // Overall status
-  readonly status: 'trial' | 'active' | 'expired'
-  readonly is_active: boolean
-  readonly is_trial: boolean
-
-  // Trial information
-  readonly is_trial_active: boolean
-  readonly trial_days_remaining: number | null
-  readonly trial_ends_at: string | null
-
-  // Season quota information
+  // Purchase information
   readonly purchased_seasons: number
   readonly used_seasons: number
   readonly available_seasons: number
 
-  // Activation capability
+  // Trial information (from current season)
+  readonly has_trial_available: boolean
+  readonly current_season_is_trial: boolean
+  readonly trial_days_remaining: number | null
+  readonly trial_ends_at: string | null
+
+  // Capabilities
   readonly can_activate_season: boolean
+  readonly can_write: boolean
 }
 
-/**
- * Helper type for quota warning levels
- */
 export type QuotaWarningLevel = 'none' | 'warning' | 'critical' | 'expired'
 
-/**
- * Helper function to determine quota warning level
- */
 export function getQuotaWarningLevel(
   status: SeasonQuotaStatus | null | undefined
 ): QuotaWarningLevel {
   if (!status) return 'none'
 
-  // Expired: trial ended and no available seasons
-  if (!status.can_activate_season) return 'expired'
+  // Can't write = expired
+  if (!status.can_write && !status.can_activate_season) return 'expired'
 
-  // Check trial warnings
-  if (status.is_trial_active && status.trial_days_remaining !== null) {
+  // Check trial warnings for current season
+  if (status.current_season_is_trial && status.trial_days_remaining !== null) {
     if (status.trial_days_remaining <= 0) return 'expired'
     if (status.trial_days_remaining <= 3) return 'critical'
     if (status.trial_days_remaining <= 7) return 'warning'
@@ -50,9 +44,6 @@ export function getQuotaWarningLevel(
   return 'none'
 }
 
-/**
- * Get warning message based on quota status
- */
 export function getQuotaWarningMessage(
   status: SeasonQuotaStatus | null | undefined
 ): string | null {
@@ -62,14 +53,12 @@ export function getQuotaWarningMessage(
 
   switch (level) {
     case 'expired':
-      if (status.trial_days_remaining === 0) {
+      if (status.current_season_is_trial) {
         return '試用期已結束，歡迎購買賽季繼續使用'
       }
       return '目前沒有可用賽季，歡迎購買以繼續使用'
 
     case 'critical':
-      return `試用期剩餘 ${status.trial_days_remaining} 天`
-
     case 'warning':
       return `試用期剩餘 ${status.trial_days_remaining} 天`
 

@@ -163,25 +163,33 @@ function PurchaseSeason() {
       return '載入中...'
     }
 
-    const { available_seasons, used_seasons, is_trial_active, trial_days_remaining } = quotaStatus
+    const { available_seasons, has_trial_available, current_season_is_trial, trial_days_remaining } = quotaStatus
 
-    if (is_trial_active && trial_days_remaining !== null) {
-      return `試用期剩餘 ${trial_days_remaining} 天，目前可用 ${available_seasons} 季`
+    if (has_trial_available) {
+      return '尚未使用試用，啟用第一個賽季即可開始 14 天試用'
     }
 
-    return `目前可用 ${available_seasons} 季（已使用 ${used_seasons} 季）`
+    if (current_season_is_trial && trial_days_remaining !== null && trial_days_remaining > 0) {
+      return `試用期剩餘 ${trial_days_remaining} 天`
+    }
+
+    if (available_seasons > 0) {
+      return `剩餘 ${available_seasons} 季`
+    }
+
+    return '已用完，購買後可開新賽季'
   }
 
   const getQuotaStatusColor = () => {
     if (!quotaStatus) return 'text-muted-foreground'
 
-    const { available_seasons, is_trial_active, trial_days_remaining } = quotaStatus
+    const { available_seasons, current_season_is_trial, trial_days_remaining, can_write } = quotaStatus
 
-    if (!quotaStatus.can_activate_season) {
+    if (!can_write && !quotaStatus.can_activate_season) {
       return 'text-destructive'
     }
 
-    if (available_seasons <= 2 || (is_trial_active && trial_days_remaining !== null && trial_days_remaining <= 3)) {
+    if (available_seasons <= 2 || (current_season_is_trial && trial_days_remaining !== null && trial_days_remaining <= 3)) {
       return 'text-orange-500'
     }
 

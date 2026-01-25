@@ -8,7 +8,7 @@ Season Service Layer - Season Purchase System
 """
 
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from src.models.season import Season, SeasonActivateResponse, SeasonCreate, SeasonUpdate
@@ -279,8 +279,8 @@ class SeasonService:
         Activate a draft season (consume season credit or use trial)
 
         This changes the season status from 'draft' to 'activated'.
-        - If trial is active: free activation
-        - If trial expired: consumes one purchased season
+        If this is the first season ever activated for the alliance,
+        it becomes a trial season with 14-day access.
 
         Permission: owner + collaborator
 
@@ -314,17 +314,19 @@ class SeasonService:
         # Verify can activate (has trial or seasons)
         await self._season_quota_service.require_season_activation(season.alliance_id)
 
-        # Get alliance for trial check
-        alliance = await self._alliance_repo.get_by_id(season.alliance_id)
-        if not alliance:
-            raise ValueError("Alliance not found")
-
         # Consume season (handles trial vs paid logic)
-        # Returns tuple atomically to prevent race condition
-        remaining, used_trial = await self._season_quota_service.consume_season(season.alliance_id)
+        # Returns tuple: (remaining_seasons, used_trial, trial_ends_at)
+        remaining, used_trial, trial_ends_at = await self._season_quota_service.consume_season(
+            season.alliance_id
+        )
 
-        # Update season status to activated
-        updated_season = await self._repo.update(season_id, {"activation_status": "activated"})
+        # Update season status with trial info
+        update_data = {
+            "activation_status": "activated",
+            "activated_at": datetime.now(UTC).isoformat(),
+            "is_trial": used_trial,
+        }
+        updated_season = await self._repo.update(season_id, update_data)
 
         logger.info(
             f"Season activated - season_id={season_id}, "
@@ -336,6 +338,7 @@ class SeasonService:
             season=updated_season,
             remaining_seasons=remaining,
             used_trial=used_trial,
+            trial_ends_at=trial_ends_at,
         )
 
     async def update_season(

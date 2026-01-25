@@ -228,6 +228,11 @@ export function SeasonCard({
           目前賽季
         </Badge>
       )}
+      {season.is_trial && (
+        <Badge variant="secondary" className="text-xs">
+          試用
+        </Badge>
+      )}
       <Badge variant={statusVariant} className="text-xs">
         {getActivationStatusLabel(season.activation_status)}
       </Badge>

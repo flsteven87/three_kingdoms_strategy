@@ -504,6 +504,7 @@ class TestDeleteUpload:
         mock_csv_upload_repo: MagicMock,
         mock_season_repo: MagicMock,
         mock_permission_service: MagicMock,
+        mock_period_metrics_service: MagicMock,
         user_id: UUID,
         season_id: UUID,
         alliance_id: UUID,
@@ -519,12 +520,14 @@ class TestDeleteUpload:
 
         mock_permission_service.require_write_permission = AsyncMock()
         mock_csv_upload_repo.delete = AsyncMock(return_value=True)
+        mock_period_metrics_service.calculate_periods_for_season = AsyncMock(return_value=[])
 
         # Act
         result = await csv_upload_service.delete_upload(user_id, upload_id)
 
         # Assert
-        assert result is True
+        assert result["success"] is True
+        assert result["deleted_upload_id"] == upload_id
         mock_permission_service.require_write_permission.assert_called_once_with(
             user_id, alliance_id, "delete CSV uploads"
         )

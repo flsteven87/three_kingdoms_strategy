@@ -25,6 +25,8 @@ class SeasonBase(BaseModel):
         "draft", description="Season activation status: draft/activated/completed"
     )
     description: str | None = Field(None, max_length=500, description="Season description")
+    is_trial: bool = Field(False, description="Whether this season was activated using trial")
+    activated_at: datetime | None = Field(None, description="When the season was activated")
 
     @field_validator("end_date")
     @classmethod
@@ -84,3 +86,4 @@ class SeasonActivateResponse(BaseModel):
     season: "Season"
     remaining_seasons: int = Field(description="Remaining available seasons after activation")
     used_trial: bool = Field(description="Whether trial was used for this activation")
+    trial_ends_at: str | None = Field(None, description="Trial end date if trial was used")

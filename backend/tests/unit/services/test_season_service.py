@@ -419,6 +419,7 @@ class TestCreateSeason:
 
         created_season = create_mock_season(uuid4(), alliance_id, "S1", activation_status="draft")
         mock_season_repo.create = AsyncMock(return_value=created_season)
+        mock_season_repo.get_by_alliance = AsyncMock(return_value=[])  # No existing seasons
 
         # Act
         result = await season_service.create_season(user_id, season_data)
