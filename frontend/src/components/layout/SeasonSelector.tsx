@@ -7,8 +7,8 @@
  * UX Design:
  * - Shows current season name prominently
  * - Date range as secondary info
- * - Select for switching between activated seasons
- * - Visual indicator for current selection
+ * - Select for switching between viewable seasons (activated + completed)
+ * - Status label to distinguish activated vs completed
  */
 
 import { Calendar } from 'lucide-react'
@@ -20,15 +20,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useSeasons, useSetCurrentSeason } from '@/hooks/use-seasons'
+import { getActivationStatusLabel } from '@/types/season'
 import { cn } from '@/lib/utils'
 
 export function SeasonSelector() {
   const { data: seasons, isLoading } = useSeasons()
   const setCurrentMutation = useSetCurrentSeason()
 
-  // Get current season and activated seasons for dropdown
+  // Get current season and viewable seasons (activated + completed) for dropdown
   const currentSeason = seasons?.find(s => s.is_current)
-  const activatedSeasons = seasons?.filter(s => s.activation_status === 'activated') ?? []
+  const viewableSeasons = seasons?.filter(s => s.activation_status !== 'draft') ?? []
 
   const handleSeasonChange = async (seasonId: string) => {
     if (seasonId === currentSeason?.id) return
@@ -44,13 +45,13 @@ export function SeasonSelector() {
     )
   }
 
-  // No seasons yet or no activated seasons
-  if (!seasons || seasons.length === 0 || activatedSeasons.length === 0) {
+  // No seasons yet or no viewable seasons
+  if (!seasons || seasons.length === 0 || viewableSeasons.length === 0) {
     return null
   }
 
-  // No current season selected but has activated seasons
-  if (!currentSeason && activatedSeasons.length > 0) {
+  // No current season selected but has viewable seasons
+  if (!currentSeason && viewableSeasons.length > 0) {
     return (
       <div className="px-3 py-2">
         <div className="rounded-lg border border-dashed border-amber-500/50 bg-amber-500/5 p-3">
@@ -100,7 +101,7 @@ export function SeasonSelector() {
           </SelectTrigger>
 
           <SelectContent>
-            {activatedSeasons.map((season) => {
+            {viewableSeasons.map((season) => {
               const dateRange = season.end_date
                 ? `${season.start_date} ~ ${season.end_date}`
                 : `${season.start_date} ~ 進行中`
@@ -118,11 +119,9 @@ export function SeasonSelector() {
                         {dateRange}
                       </p>
                     </div>
-                    {season.is_trial && (
-                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
-                        試用
-                      </span>
-                    )}
+                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+                      {season.is_trial ? '試用' : getActivationStatusLabel(season.activation_status)}
+                    </span>
                   </div>
                 </SelectItem>
               )
