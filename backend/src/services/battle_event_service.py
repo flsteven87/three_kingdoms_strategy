@@ -166,7 +166,7 @@ class BattleEventService:
             absent_count = None
 
             if event.status == EventStatus.COMPLETED:
-                summary = await self._calculate_event_summary(event.id)
+                summary = await self._calculate_event_summary(event.id, event.event_type)
                 participation_rate = summary.participation_rate
                 total_merit = summary.total_merit
                 mvp_name = summary.mvp_member_name
@@ -364,14 +364,20 @@ class BattleEventService:
         Returns:
             Event summary with participation stats and aggregates
         """
-        return await self._calculate_event_summary(event_id)
+        event = await self._event_repo.get_by_id(event_id)
+        if not event:
+            raise ValueError("Event not found")
+        return await self._calculate_event_summary(event_id, event.event_type)
 
-    async def _calculate_event_summary(self, event_id: UUID) -> EventSummary:
+    async def _calculate_event_summary(
+        self, event_id: UUID, event_type: EventCategory = EventCategory.BATTLE
+    ) -> EventSummary:
         """
         Calculate summary statistics for an event.
 
         Args:
             event_id: Event UUID
+            event_type: Event category for category-specific calculations
 
         Returns:
             EventSummary with all stats
@@ -393,6 +399,10 @@ class BattleEventService:
                 mvp_member_id=None,
                 mvp_member_name=None,
                 mvp_merit=None,
+                mvp_contribution=None,
+                mvp_assist=None,
+                mvp_combined_score=None,
+                violator_count=0,
             )
 
         # Count participation types
@@ -416,8 +426,40 @@ class BattleEventService:
         avg_merit = total_merit / participated_count if participated_count > 0 else 0.0
         avg_assist = total_assist / participated_count if participated_count > 0 else 0.0
 
-        # Find MVP (highest merit)
-        mvp = max(metrics, key=lambda m: m.merit_diff) if metrics else None
+        # Category-specific MVP calculation
+        mvp_member_id = None
+        mvp_member_name = None
+        mvp_merit = None
+        mvp_contribution = None
+        mvp_assist = None
+        mvp_combined_score = None
+        violator_count = 0
+
+        if event_type == EventCategory.SIEGE:
+            # MVP = highest contribution + assist combined
+            if metrics:
+                mvp = max(metrics, key=lambda m: m.contribution_diff + m.assist_diff)
+                combined = mvp.contribution_diff + mvp.assist_diff
+                if combined > 0:
+                    mvp_member_id = mvp.member_id
+                    mvp_member_name = mvp.member_name
+                    mvp_contribution = mvp.contribution_diff
+                    mvp_assist = mvp.assist_diff
+                    mvp_combined_score = combined
+
+        elif event_type == EventCategory.FORBIDDEN:
+            # Count violators (power_diff > 0)
+            violator_count = sum(1 for m in metrics if m.power_diff > 0)
+            # No MVP for forbidden zone
+
+        else:  # BATTLE
+            # MVP = highest merit
+            if metrics:
+                mvp = max(metrics, key=lambda m: m.merit_diff)
+                if mvp.merit_diff > 0:
+                    mvp_member_id = mvp.member_id
+                    mvp_member_name = mvp.member_name
+                    mvp_merit = mvp.merit_diff
 
         return EventSummary(
             total_members=total_members,
@@ -430,9 +472,13 @@ class BattleEventService:
             total_contribution=total_contribution,
             avg_merit=round(avg_merit, 1),
             avg_assist=round(avg_assist, 1),
-            mvp_member_id=mvp.member_id if mvp and mvp.merit_diff > 0 else None,
-            mvp_member_name=mvp.member_name if mvp and mvp.merit_diff > 0 else None,
-            mvp_merit=mvp.merit_diff if mvp and mvp.merit_diff > 0 else None,
+            mvp_member_id=mvp_member_id,
+            mvp_member_name=mvp_member_name,
+            mvp_merit=mvp_merit,
+            mvp_contribution=mvp_contribution,
+            mvp_assist=mvp_assist,
+            mvp_combined_score=mvp_combined_score,
+            violator_count=violator_count,
         )
 
     async def delete_event(self, event_id: UUID) -> bool:
