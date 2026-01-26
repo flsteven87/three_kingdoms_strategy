@@ -734,11 +734,11 @@ def build_event_list_carousel(
     """
     Build a Carousel Flex Message for event list.
 
-    Each bubble shows:
-    - Event name with type icon
-    - Event date and duration
-    - Key metric (based on type)
-    - Button to open LIFF event report
+    Design:
+    - Kilo size bubbles for better readability
+    - Colored hero section with event type icon
+    - Clear typography hierarchy
+    - Date/duration in readable format
 
     Args:
         events: List of BattleEvent objects
@@ -755,7 +755,6 @@ def build_event_list_carousel(
             FlexButton,
             FlexCarousel,
             FlexMessage,
-            FlexSeparator,
             FlexText,
             MessageAction,
             URIAction,
@@ -767,77 +766,119 @@ def build_event_list_carousel(
     if not events:
         return None
 
-    # Import here to avoid circular imports
     from src.core.line_auth import create_event_report_liff_url
 
     bubbles = []
     for event in events:
         config = _get_event_config(event.event_type)
 
-        # Build bubble content
+        # Hero section: colored background with large icon
+        hero = FlexBox(
+            layout="vertical",
+            contents=[
+                FlexText(
+                    text=config["icon"],
+                    size="3xl",
+                    align="center",
+                    gravity="center",
+                ),
+                FlexText(
+                    text=config["label"],
+                    size="sm",
+                    color="#ffffff",
+                    align="center",
+                    weight="bold",
+                    margin="sm",
+                ),
+            ],
+            backgroundColor=config["color"],
+            paddingAll="xl",
+            justifyContent="center",
+            alignItems="center",
+        )
+
+        # Body section: event name and time info
         body_contents = [
-            # Event name with icon
+            # Event name (without icon, icon is in hero)
             FlexText(
-                text=f"{config['icon']} {event.name}",
+                text=event.name,
                 weight="bold",
-                size="lg",
+                size="md",
                 color="#1a1a1a",
                 wrap=True,
+                maxLines=2,
             ),
-            # Type tag
-            FlexBox(
-                layout="horizontal",
-                contents=[
-                    FlexText(
-                        text=config["label"],
-                        size="xs",
-                        color="#ffffff",
-                        align="center",
-                    ),
-                ],
-                backgroundColor=config["color"],
-                cornerRadius="4px",
-                paddingAll="4px",
-                width="48px",
-                margin="sm",
-            ),
-            FlexSeparator(margin="lg"),
         ]
 
-        # Time info
-        time_str = format_event_time(event.event_start)
-        if time_str:
+        # Date and duration row
+        if event.event_start:
+            date_str = event.event_start.strftime("%m/%d")
+            time_str = event.event_start.strftime("%H:%M")
             duration_str = format_duration(event.event_start, event.event_end)
-            time_line = time_str
-            if duration_str:
-                time_line += f" · {duration_str}"
+
+            # Date row
             body_contents.append(
-                FlexText(
-                    text=time_line,
-                    size="sm",
-                    color="#666666",
-                    margin="md",
+                FlexBox(
+                    layout="horizontal",
+                    contents=[
+                        FlexText(
+                            text="📅",
+                            size="sm",
+                            flex=0,
+                        ),
+                        FlexText(
+                            text=f"{date_str} {time_str}",
+                            size="sm",
+                            color="#666666",
+                            margin="sm",
+                        ),
+                    ],
+                    margin="lg",
                 )
             )
 
-        # Button action: URIAction for LIFF if available, else MessageAction fallback
+            # Duration row (if available)
+            if duration_str:
+                body_contents.append(
+                    FlexBox(
+                        layout="horizontal",
+                        contents=[
+                            FlexText(
+                                text="⏱️",
+                                size="sm",
+                                flex=0,
+                            ),
+                            FlexText(
+                                text=duration_str,
+                                size="sm",
+                                color="#666666",
+                                margin="sm",
+                            ),
+                        ],
+                        margin="sm",
+                    )
+                )
+
+        # Button action
         if liff_id and group_id:
             button_action = URIAction(
-                label="查看報告",
+                label="📊 查看報告",
                 uri=create_event_report_liff_url(liff_id, group_id, str(event.id)),
             )
         else:
             button_action = MessageAction(
-                label="查看報告",
+                label="📊 查看報告",
                 text=f"@bot /戰役 {event.name}",
             )
 
         bubble = FlexBubble(
-            size="micro",
+            size="kilo",
+            hero=hero,
             body=FlexBox(
                 layout="vertical",
                 contents=body_contents,
                 paddingAll="lg",
+                spacing="none",
             ),
             footer=FlexBox(
                 layout="vertical",
@@ -846,8 +887,10 @@ def build_event_list_carousel(
                         action=button_action,
                         style="primary",
                         color=config["color"],
+                        height="sm",
                     ),
                 ],
+                paddingAll="md",
             ),
         )
         bubbles.append(bubble)
