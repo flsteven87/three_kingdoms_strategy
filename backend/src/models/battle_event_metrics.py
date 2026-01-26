@@ -82,10 +82,16 @@ class EventSummary(BaseModel):
     avg_merit: float = Field(..., description="Average merit per participant")
     avg_assist: float = Field(..., description="Average assist per participant")
 
-    # MVP info
+    # MVP info (category-specific)
     mvp_member_id: UUID | None = Field(None, description="Top performer member ID")
     mvp_member_name: str | None = Field(None, description="Top performer name")
-    mvp_merit: int | None = Field(None, description="Top performer merit")
+    mvp_merit: int | None = Field(None, description="Top performer merit (for BATTLE)")
+    mvp_contribution: int | None = Field(None, description="Top performer contribution (for SIEGE)")
+    mvp_assist: int | None = Field(None, description="Top performer assist (for SIEGE)")
+    mvp_combined_score: int | None = Field(None, description="MVP combined score (contribution + assist for SIEGE)")
+
+    # Forbidden zone specific
+    violator_count: int = Field(0, description="Members with power increase (for FORBIDDEN)")
 
 
 # =============================================================================
