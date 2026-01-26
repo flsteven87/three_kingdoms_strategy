@@ -106,9 +106,16 @@ class EventSummaryResponse(BaseModel):
     avg_merit: float
     avg_assist: float
 
+    # Category-specific MVP
     mvp_member_id: UUID | None
     mvp_member_name: str | None
-    mvp_merit: int | None
+    mvp_merit: int | None  # For BATTLE
+    mvp_contribution: int | None  # For SIEGE
+    mvp_assist: int | None  # For SIEGE
+    mvp_combined_score: int | None  # For SIEGE (contribution + assist)
+
+    # Forbidden zone specific
+    violator_count: int = 0  # Members with power increase
 
 
 class EventMemberMetricResponse(BaseModel):
