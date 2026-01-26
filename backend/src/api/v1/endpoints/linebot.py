@@ -20,7 +20,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from src.core.config import Settings, get_settings
+from src.core.config import GAME_TIMEZONE, Settings, get_settings
 from src.core.dependencies import (
     AllianceServiceDep,
     BattleEventServiceDep,
@@ -962,10 +962,14 @@ async def _handle_event_list(
     )
 
     if not flex_message:
-        # Fallback to text list
+        # Fallback to text list (with timezone conversion)
         lines = ["⚔️ 最近戰役："]
         for i, event in enumerate(events, start=1):
-            time_str = event.event_start.strftime("%m/%d") if event.event_start else ""
+            if event.event_start:
+                local_time = event.event_start.astimezone(GAME_TIMEZONE)
+                time_str = local_time.strftime("%m/%d")
+            else:
+                time_str = ""
             lines.append(f"{i}. {event.name} ({time_str})")
         lines.append("\n💡 輸入「/戰役 名稱」查看報告")
         await _reply_text(reply_token, "\n".join(lines))

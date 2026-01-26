@@ -5,8 +5,13 @@ Application configuration
 """
 
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Game server timezone (Taiwan/China server time is UTC+8)
+# Centralized constant for consistent timezone handling across the application
+GAME_TIMEZONE = ZoneInfo("Asia/Taipei")
 
 
 class Settings(BaseSettings):

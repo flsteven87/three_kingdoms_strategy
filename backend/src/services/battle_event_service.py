@@ -526,11 +526,11 @@ class BattleEventService:
 
     async def get_recent_completed_events_for_alliance(
         self, alliance_id: UUID, season_id: UUID | None = None, limit: int = 5
-    ) -> list[BattleEvent]:
+    ) -> list[BattleEventListItem]:
         """
-        Get the most recent completed battle events for an alliance.
+        Get the most recent completed battle events for an alliance with stats.
 
-        Used by LINE Bot to list recent events.
+        Used by LINE Bot to list recent events with participation rates.
 
         Args:
             alliance_id: Alliance UUID
@@ -538,9 +538,29 @@ class BattleEventService:
             limit: Maximum number of events to return (default 5)
 
         Returns:
-            List of completed battle events, ordered by event_end desc
+            List of BattleEventListItem with computed stats, ordered by event_end desc
         """
-        return await self._event_repo.get_recent_completed_events(alliance_id, season_id, limit)
+        events = await self._event_repo.get_recent_completed_events(alliance_id, season_id, limit)
+
+        result: list[BattleEventListItem] = []
+        for event in events:
+            summary = await self._calculate_event_summary(event.id, event.event_type)
+            result.append(
+                BattleEventListItem(
+                    id=event.id,
+                    name=event.name,
+                    event_type=event.event_type,
+                    status=event.status,
+                    event_start=event.event_start,
+                    event_end=event.event_end,
+                    created_at=event.created_at,
+                    participation_rate=summary.participation_rate,
+                    total_merit=summary.total_merit,
+                    mvp_name=summary.mvp_member_name,
+                    absent_count=summary.absent_count,
+                )
+            )
+        return result
 
     async def get_event_by_name_for_alliance(
         self, alliance_id: UUID, name: str, season_id: UUID | None = None

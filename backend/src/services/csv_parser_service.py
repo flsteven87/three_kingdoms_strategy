@@ -11,7 +11,8 @@ import csv
 import re
 from datetime import UTC, datetime
 from io import StringIO
-from zoneinfo import ZoneInfo
+
+from src.core.config import GAME_TIMEZONE
 
 
 class CSVParserService:
@@ -21,9 +22,6 @@ class CSVParserService:
     FILENAME_PATTERN = re.compile(
         r"同盟統計(\d{4})年(\d{2})月(\d{2})日(\d{2})时(\d{2})分(\d{2})秒\.csv"
     )
-
-    # Game server timezone (Taiwan/China server time is UTC+8)
-    GAME_TIMEZONE = ZoneInfo("Asia/Taipei")
 
     # Field name mapping: internal_name -> list of possible CSV column names
     # Supports multiple game versions with different field naming conventions
@@ -79,7 +77,7 @@ class CSVParserService:
 
         # Create datetime in game timezone (UTC+8), then convert to UTC
         local_dt = datetime(
-            year, month, day, hour, minute, second, tzinfo=cls.GAME_TIMEZONE
+            year, month, day, hour, minute, second, tzinfo=GAME_TIMEZONE
         )
         return local_dt.astimezone(UTC)
 

@@ -12,7 +12,8 @@ This module provides builders for various report types:
 import logging
 from datetime import datetime
 
-from src.models.battle_event import BattleEvent, EventCategory
+from src.core.config import GAME_TIMEZONE
+from src.models.battle_event import BattleEventListItem, EventCategory
 from src.models.battle_event_metrics import (
     EventGroupAnalytics,
     GroupEventStats,
@@ -109,17 +110,18 @@ def format_duration(start: datetime | None, end: datetime | None) -> str:
 
 def format_event_time(dt: datetime | None) -> str:
     """
-    Format datetime for event display.
+    Format datetime for event display in local timezone (UTC+8).
 
     Args:
-        dt: Datetime to format
+        dt: Datetime to format (assumed UTC from database)
 
     Returns:
-        Formatted string (e.g., "01/15 06:42")
+        Formatted string in local time (e.g., "01/15 14:42")
     """
     if not dt:
         return ""
-    return dt.strftime("%m/%d %H:%M")
+    local_dt = dt.astimezone(GAME_TIMEZONE)
+    return local_dt.strftime("%m/%d %H:%M")
 
 
 def _get_event_config(event_type: EventCategory | None) -> dict:
@@ -727,7 +729,7 @@ def _build_violator_list_section(violators: list[ViolatorItem], config: dict) ->
 
 
 def build_event_list_carousel(
-    events: list[BattleEvent],
+    events: list[BattleEventListItem],
     liff_id: str | None = None,
     group_id: str | None = None,
 ):
@@ -736,12 +738,12 @@ def build_event_list_carousel(
 
     Design:
     - Kilo size bubbles for better readability
-    - Colored hero section with event type icon
-    - Clear typography hierarchy
-    - Date/duration in readable format
+    - Compact hero section with event type icon only
+    - Clear typography hierarchy with participation rate
+    - Date/duration in readable format (UTC+8)
 
     Args:
-        events: List of BattleEvent objects
+        events: List of BattleEventListItem objects with stats
         liff_id: LIFF ID for generating event report URLs
         group_id: LINE group ID for generating event report URLs
 
@@ -772,34 +774,26 @@ def build_event_list_carousel(
     for event in events:
         config = _get_event_config(event.event_type)
 
-        # Hero section: colored background with large icon
+        # Hero section: compact - icon only, reduced padding
         hero = FlexBox(
             layout="vertical",
             contents=[
                 FlexText(
                     text=config["icon"],
-                    size="3xl",
+                    size="xxl",
                     align="center",
                     gravity="center",
                 ),
-                FlexText(
-                    text=config["label"],
-                    size="sm",
-                    color="#ffffff",
-                    align="center",
-                    weight="bold",
-                    margin="sm",
-                ),
             ],
             backgroundColor=config["color"],
-            paddingAll="xl",
+            paddingAll="lg",
             justifyContent="center",
             alignItems="center",
         )
 
-        # Body section: event name and time info
+        # Body section: event name, time info, and participation rate
         body_contents = [
-            # Event name (without icon, icon is in hero)
+            # Event name
             FlexText(
                 text=event.name,
                 weight="bold",
@@ -810,10 +804,11 @@ def build_event_list_carousel(
             ),
         ]
 
-        # Date and duration row
+        # Date and duration row (using timezone-aware formatting)
         if event.event_start:
-            date_str = event.event_start.strftime("%m/%d")
-            time_str = event.event_start.strftime("%H:%M")
+            local_start = event.event_start.astimezone(GAME_TIMEZONE)
+            date_str = local_start.strftime("%m/%d")
+            time_str = local_start.strftime("%H:%M")
             duration_str = format_duration(event.event_start, event.event_end)
 
             # Date row
@@ -858,6 +853,29 @@ def build_event_list_carousel(
                         margin="sm",
                     )
                 )
+
+        # Participation rate row (highlight feature)
+        if event.participation_rate is not None:
+            body_contents.append(
+                FlexBox(
+                    layout="horizontal",
+                    contents=[
+                        FlexText(
+                            text="📊",
+                            size="sm",
+                            flex=0,
+                        ),
+                        FlexText(
+                            text=f"出席率 {event.participation_rate:.0f}%",
+                            size="sm",
+                            color=LINE_GREEN,
+                            weight="bold",
+                            margin="sm",
+                        ),
+                    ],
+                    margin="sm",
+                )
+            )
 
         # Button action
         if liff_id and group_id:
