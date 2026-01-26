@@ -175,13 +175,16 @@ interface GroupAttendanceProps {
 function GroupAttendance({ groups }: GroupAttendanceProps) {
   if (groups.length === 0) return null
 
-  const sortedGroups = [...groups].sort((a, b) => b.participation_rate - a.participation_rate)
+  // NOTE: Do NOT re-sort here. Service layer already sorted by the correct metric:
+  // - BATTLE: total_merit
+  // - SIEGE: total_contribution + total_assist
+  // This ensures consistency with LINE Flex Message.
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4">
       <h4 className="font-semibold text-sm text-gray-700 mb-3">📊 分組出席率</h4>
       <div className="space-y-3">
-        {sortedGroups.map((group) => (
+        {groups.map((group) => (
           <div key={group.group_name}>
             <div className="flex justify-between items-center text-sm mb-1">
               <span className="text-gray-700 font-medium truncate max-w-[60%]">
@@ -292,14 +295,15 @@ function GroupMetricDistribution({ groups, eventType }: GroupMetricDistributionP
     return group.avg_merit
   }
 
-  const sortedGroups = [...groups].sort((a, b) => getAvgValue(b) - getAvgValue(a))
-  const maxAvg = Math.max(...sortedGroups.map(getAvgValue), 1)
+  // NOTE: Do NOT re-sort here. Service layer already sorted by the correct metric.
+  // This ensures consistency with LINE Flex Message.
+  const maxAvg = Math.max(...groups.map(getAvgValue), 1)
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4">
       <h4 className="font-semibold text-sm text-gray-700 mb-3">{title}</h4>
       <div className="space-y-3">
-        {sortedGroups.map((group) => {
+        {groups.map((group) => {
           const avgValue = getAvgValue(group)
           const barWidth = (avgValue / maxAvg) * 100
 

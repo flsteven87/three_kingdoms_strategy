@@ -341,7 +341,13 @@ def _build_compliance_section(summary) -> list:
 
 
 def _build_group_attendance_section(groups: list[GroupEventStats]) -> list:
-    """Build group attendance section with progress bars."""
+    """Build group attendance section with progress bars.
+
+    NOTE: Do NOT re-sort here. Service layer already sorted by the correct metric:
+    - BATTLE: total_merit
+    - SIEGE: total_contribution + total_assist
+    This ensures consistency with Preview/LIFF pages.
+    """
     from linebot.v3.messaging import FlexSeparator, FlexText
 
     contents = [
@@ -355,8 +361,8 @@ def _build_group_attendance_section(groups: list[GroupEventStats]) -> list:
         FlexSeparator(margin="sm"),
     ]
 
-    sorted_groups = sorted(groups, key=lambda g: g.participation_rate, reverse=True)
-    for group in sorted_groups:
+    # Use pre-sorted order from Service layer (do NOT re-sort)
+    for group in groups:
         contents.extend(_build_group_attendance_row(group))
 
     return contents
@@ -497,7 +503,11 @@ def _build_group_violator_section(groups: list[GroupEventStats]) -> list:
 def _build_group_metric_section(
     groups: list[GroupEventStats], event_type: EventCategory, config: dict
 ) -> list:
-    """Build group average metric section (BATTLE: merit, SIEGE: contribution+assist)."""
+    """Build group average metric section (BATTLE: merit, SIEGE: contribution+assist).
+
+    NOTE: Do NOT re-sort here. Service layer already sorted by the correct metric.
+    This ensures consistency with Preview/LIFF pages.
+    """
     from linebot.v3.messaging import FlexBox, FlexSeparator, FlexText
 
     is_siege = event_type == EventCategory.SIEGE
@@ -512,8 +522,8 @@ def _build_group_metric_section(
             return f"{format_number(g.combined_min)}~{format_number(g.combined_max)}"
         return f"{format_number(g.merit_min)}~{format_number(g.merit_max)}"
 
-    sorted_groups = sorted(groups, key=get_avg_value, reverse=True)
-    max_avg = max(get_avg_value(g) for g in sorted_groups) if sorted_groups else 1
+    # Use pre-sorted order from Service layer (do NOT re-sort)
+    max_avg = max(get_avg_value(g) for g in groups) if groups else 1
 
     contents = [
         FlexText(
@@ -526,7 +536,7 @@ def _build_group_metric_section(
         FlexSeparator(margin="sm"),
     ]
 
-    for i, group in enumerate(sorted_groups):
+    for i, group in enumerate(groups):
         avg_value = get_avg_value(group)
         bar_width = max(5, int((avg_value / max_avg) * 100)) if max_avg > 0 else 5
         name_text = f"{group.group_name} ⭐" if i == 0 else group.group_name

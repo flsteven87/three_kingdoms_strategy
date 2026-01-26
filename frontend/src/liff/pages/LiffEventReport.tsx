@@ -224,7 +224,8 @@ export function LiffEventReport({ session, eventId }: Props) {
               {isForbidden ? '⚠️ 分組違規統計' : '🏘️ 組別出席率'}
             </div>
             <div className="space-y-3">
-              {group_stats.slice(0, 5).map((group) => (
+              {/* Show ALL groups, not just 5 */}
+              {group_stats.map((group) => (
                 <GroupStatRow
                   key={group.group_name}
                   group={group}
