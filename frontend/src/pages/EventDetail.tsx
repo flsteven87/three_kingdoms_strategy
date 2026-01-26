@@ -636,7 +636,7 @@ function EventDetail() {
         </div>
 
         {/* KPI Grid - Category-aware */}
-        <div className="grid gap-4 grid-cols-3">
+        <div className={`grid gap-4 ${event.event_type === 'siege' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3'}`}>
           {/* First KPI: Participation Rate (BATTLE/SIEGE) or Compliance Rate (FORBIDDEN) */}
           {hasParticipationTracking(event.event_type) ? (
             <KpiCard
@@ -665,14 +665,24 @@ function EventDetail() {
               highlight
             />
           )}
+          {/* SIEGE: Dual MVP KPIs */}
           {event.event_type === 'siege' && (
-            <KpiCard
-              title="總貢獻"
-              value={formatNumberCompact(summary.total_contribution)}
-              subtitle={`助攻 ${formatNumberCompact(summary.total_assist)}`}
-              icon={<Castle className="h-5 w-5" />}
-              highlight
-            />
+            <>
+              <KpiCard
+                title="貢獻 MVP"
+                value={summary.contribution_mvp_name ?? '-'}
+                subtitle={summary.contribution_mvp_score ? formatNumberCompact(summary.contribution_mvp_score) : undefined}
+                icon={<Castle className="h-5 w-5" />}
+                highlight
+              />
+              <KpiCard
+                title="助攻 MVP"
+                value={summary.assist_mvp_name ?? '-'}
+                subtitle={summary.assist_mvp_score ? formatNumberCompact(summary.assist_mvp_score) : undefined}
+                icon={<Swords className="h-5 w-5" />}
+                highlight
+              />
+            </>
           )}
           {event.event_type === 'forbidden' && (
             <KpiCard
@@ -684,7 +694,7 @@ function EventDetail() {
             />
           )}
 
-          {/* Third KPI: Duration */}
+          {/* Third/Fourth KPI: Duration */}
           <KpiCard
             title="持續時間"
             value={formatDuration(event.event_start, event.event_end) ?? '-'}
@@ -694,21 +704,59 @@ function EventDetail() {
         </div>
 
         {/* Box Plot - Category-aware Distribution Overview */}
-        {(() => {
+        {/* SIEGE: Dual Box Plots (Contribution + Assist) */}
+        {event.event_type === 'siege' && (() => {
+          const contributionValues = metrics.filter((m) => m.participated).map((m) => m.contribution_diff)
+          const assistValues = metrics.filter((m) => m.participated).map((m) => m.assist_diff)
+          const contributionStats = calculateBoxPlotStats(contributionValues)
+          const assistStats = calculateBoxPlotStats(assistValues)
+
+          if (!contributionStats && !assistStats) return null
+
+          return (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {contributionStats && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Castle className="h-5 w-5" />
+                      貢獻分佈
+                    </CardTitle>
+                    <CardDescription>參與成員的貢獻統計 (Min / Q1 / Median / Q3 / Max)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <BoxPlot stats={contributionStats} showLabels={true} />
+                  </CardContent>
+                </Card>
+              )}
+              {assistStats && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Swords className="h-5 w-5" />
+                      助攻分佈
+                    </CardTitle>
+                    <CardDescription>參與成員的助攻統計 (Min / Q1 / Median / Q3 / Max)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <BoxPlot stats={assistStats} showLabels={true} />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* BATTLE / FORBIDDEN: Single Box Plot */}
+        {event.event_type !== 'siege' && (() => {
           const isForbidden = event.event_type === 'forbidden'
-          const isSiege = event.event_type === 'siege'
           const metricLabel = getPrimaryMetricLabel(event.event_type)
 
           // Calculate values based on event type
           let values: number[]
           if (isForbidden) {
-            // For FORBIDDEN: show violators' power increase distribution
             values = metrics.filter((m) => m.power_diff > 0).map((m) => m.power_diff)
-          } else if (isSiege) {
-            // For SIEGE: show contribution + assist
-            values = metrics.filter((m) => m.participated).map((m) => m.contribution_diff + m.assist_diff)
           } else {
-            // For BATTLE: show merit
             values = metrics.filter((m) => m.participated).map((m) => m.merit_diff)
           }
 

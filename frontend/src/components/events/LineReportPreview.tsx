@@ -335,23 +335,19 @@ function GroupMetricDistribution({ groups, eventType }: GroupMetricDistributionP
 }
 
 // ============================================================================
-// Top Ranking Section (BATTLE / SIEGE)
+// Top Ranking Section (BATTLE only)
 // ============================================================================
 
 interface TopRankingProps {
   readonly topMembers: readonly TopMemberItem[]
-  readonly eventType: EventCategory
 }
 
-function TopRanking({ topMembers, eventType }: TopRankingProps) {
+function TopRanking({ topMembers }: TopRankingProps) {
   if (topMembers.length === 0) return null
-
-  const isSiege = eventType === 'siege'
-  const title = isSiege ? '🏰 貢獻排行' : '🏆 戰功排行'
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <h4 className="font-semibold text-sm text-gray-700 mb-3">{title}</h4>
+      <h4 className="font-semibold text-sm text-gray-700 mb-3">🏆 戰功排行</h4>
       <div className="space-y-2">
         {topMembers.map((member, index) => (
           <div
@@ -369,15 +365,81 @@ function TopRanking({ topMembers, eventType }: TopRankingProps) {
             </div>
             <span className="text-sm font-semibold text-gray-700 tabular-nums">
               {formatNumberCompact(member.score)}
-              {isSiege && member.contribution_diff != null && member.assist_diff != null && (
-                <span className="text-xs text-gray-400 ml-1">
-                  ({formatNumberCompact(member.contribution_diff)}+{formatNumberCompact(member.assist_diff)})
-                </span>
-              )}
             </span>
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Dual Top Ranking Section (SIEGE only)
+// ============================================================================
+
+interface DualTopRankingProps {
+  readonly topContributors: readonly TopMemberItem[]
+  readonly topAssisters: readonly TopMemberItem[]
+}
+
+function DualTopRanking({ topContributors, topAssisters }: DualTopRankingProps) {
+  return (
+    <div className="space-y-3">
+      {/* Contribution Ranking */}
+      {topContributors.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 className="font-semibold text-sm text-gray-700 mb-3">🏰 貢獻排行</h4>
+          <div className="space-y-2">
+            {topContributors.map((member, index) => (
+              <div
+                key={`contrib-${member.rank}-${member.member_name}`}
+                className="flex items-center gap-2 py-1"
+              >
+                <span className="text-lg w-6 text-center">
+                  {MEDAL_EMOJIS[index] || `${member.rank}.`}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-800 truncate">{member.member_name}</p>
+                  {member.group_name && (
+                    <p className="text-xs text-gray-500 truncate">{member.group_name}</p>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-gray-700 tabular-nums">
+                  {formatNumberCompact(member.score)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Assist Ranking */}
+      {topAssisters.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 className="font-semibold text-sm text-gray-700 mb-3">⚔️ 助攻排行</h4>
+          <div className="space-y-2">
+            {topAssisters.map((member, index) => (
+              <div
+                key={`assist-${member.rank}-${member.member_name}`}
+                className="flex items-center gap-2 py-1"
+              >
+                <span className="text-lg w-6 text-center">
+                  {MEDAL_EMOJIS[index] || `${member.rank}.`}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-800 truncate">{member.member_name}</p>
+                  {member.group_name && (
+                    <p className="text-xs text-gray-500 truncate">{member.group_name}</p>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-gray-700 tabular-nums">
+                  {formatNumberCompact(member.score)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -443,10 +505,13 @@ export function LineReportPreview({ analytics, isLoading }: LineReportPreviewPro
     summary,
     group_stats,
     top_members,
+    top_contributors,
+    top_assisters,
     violators,
   } = analytics
 
   const isForbidden = event_type === 'forbidden'
+  const isSiege = event_type === 'siege'
 
   return (
     <div className="space-y-3 max-w-sm mx-auto">
@@ -483,7 +548,15 @@ export function LineReportPreview({ analytics, isLoading }: LineReportPreviewPro
               />
               <GroupAttendance groups={group_stats} />
               <GroupMetricDistribution groups={group_stats} eventType={event_type || 'battle'} />
-              <TopRanking topMembers={top_members} eventType={event_type || 'battle'} />
+              {/* Category-specific ranking */}
+              {isSiege ? (
+                <DualTopRanking
+                  topContributors={top_contributors}
+                  topAssisters={top_assisters}
+                />
+              ) : (
+                <TopRanking topMembers={top_members} />
+              )}
             </>
           )}
         </div>

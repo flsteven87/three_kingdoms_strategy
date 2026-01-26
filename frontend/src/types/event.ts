@@ -53,17 +53,28 @@ export interface EventSummary {
   readonly total_contribution: number
   readonly avg_merit: number
   readonly avg_assist: number
+  readonly avg_contribution: number
 
-  // MVP info (category-specific)
+  // MVP info for BATTLE events
   readonly mvp_member_id: string | null
   readonly mvp_member_name: string | null
-  readonly mvp_merit: number | null // For BATTLE
-  readonly mvp_contribution: number | null // For SIEGE
-  readonly mvp_assist: number | null // For SIEGE
-  readonly mvp_combined_score: number | null // For SIEGE (contribution + assist)
+  readonly mvp_merit: number | null
+
+  // Dual MVP for SIEGE events
+  readonly contribution_mvp_member_id: string | null
+  readonly contribution_mvp_name: string | null
+  readonly contribution_mvp_score: number | null
+  readonly assist_mvp_member_id: string | null
+  readonly assist_mvp_name: string | null
+  readonly assist_mvp_score: number | null
+
+  // Legacy fields (deprecated)
+  readonly mvp_contribution: number | null
+  readonly mvp_assist: number | null
+  readonly mvp_combined_score: number | null
 
   // Forbidden zone specific
-  readonly violator_count: number // For FORBIDDEN
+  readonly violator_count: number
 }
 
 /**
@@ -219,9 +230,13 @@ export interface EventGroupAnalytics {
   readonly summary: EventSummary
   readonly group_stats: readonly GroupEventStats[]
 
-  // Top performers (for BATTLE and SIEGE events)
+  // Top performers for BATTLE events
   readonly top_members: readonly TopMemberItem[]
 
-  // Violators (for FORBIDDEN events only)
+  // Dual rankings for SIEGE events
+  readonly top_contributors: readonly TopMemberItem[]
+  readonly top_assisters: readonly TopMemberItem[]
+
+  // Violators for FORBIDDEN events
   readonly violators: readonly ViolatorItem[]
 }

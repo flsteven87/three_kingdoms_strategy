@@ -83,14 +83,35 @@ class EventSummary(BaseModel):
     total_contribution: int = Field(..., description="Sum of all contribution diffs")
     avg_merit: float = Field(..., description="Average merit per participant")
     avg_assist: float = Field(..., description="Average assist per participant")
+    avg_contribution: float = Field(0, description="Average contribution per participant")
 
-    # MVP info (category-specific)
-    mvp_member_id: UUID | None = Field(None, description="Top performer member ID")
-    mvp_member_name: str | None = Field(None, description="Top performer name")
-    mvp_merit: int | None = Field(None, description="Top performer merit (for BATTLE)")
-    mvp_contribution: int | None = Field(None, description="Top performer contribution (for SIEGE)")
-    mvp_assist: int | None = Field(None, description="Top performer assist (for SIEGE)")
-    mvp_combined_score: int | None = Field(None, description="MVP combined score (contribution + assist for SIEGE)")
+    # MVP info for BATTLE events
+    mvp_member_id: UUID | None = Field(None, description="Top performer member ID (BATTLE)")
+    mvp_member_name: str | None = Field(None, description="Top performer name (BATTLE)")
+    mvp_merit: int | None = Field(None, description="Top performer merit (BATTLE)")
+
+    # Dual MVP for SIEGE events
+    contribution_mvp_member_id: UUID | None = Field(
+        None, description="Top contributor ID (SIEGE)"
+    )
+    contribution_mvp_name: str | None = Field(
+        None, description="Top contributor name (SIEGE)"
+    )
+    contribution_mvp_score: int | None = Field(
+        None, description="Top contribution score (SIEGE)"
+    )
+    assist_mvp_member_id: UUID | None = Field(None, description="Top assister ID (SIEGE)")
+    assist_mvp_name: str | None = Field(None, description="Top assister name (SIEGE)")
+    assist_mvp_score: int | None = Field(None, description="Top assist score (SIEGE)")
+
+    # Legacy fields for backward compatibility (deprecated, will be removed)
+    mvp_contribution: int | None = Field(
+        None, description="[Deprecated] Use contribution_mvp_score"
+    )
+    mvp_assist: int | None = Field(None, description="[Deprecated] Use assist_mvp_score")
+    mvp_combined_score: int | None = Field(
+        None, description="[Deprecated] Combined score"
+    )
 
     # Forbidden zone specific
     violator_count: int = Field(0, description="Members with power increase (for FORBIDDEN)")
@@ -170,8 +191,12 @@ class EventGroupAnalytics(BaseModel):
     # Group-level statistics (sorted by primary metric desc)
     group_stats: list[GroupEventStats] = []
 
-    # Top performers (for BATTLE and SIEGE events)
+    # Top performers for BATTLE events (single ranking)
     top_members: list[TopMemberItem] = []
+
+    # Dual rankings for SIEGE events
+    top_contributors: list[TopMemberItem] = []
+    top_assisters: list[TopMemberItem] = []
 
     # Violators (for FORBIDDEN events only)
     violators: list[ViolatorItem] = []
