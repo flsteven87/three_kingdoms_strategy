@@ -125,6 +125,47 @@ function ViolatorRow({ violator, index }: ViolatorRowProps) {
   )
 }
 
+interface GroupMetricRowProps {
+  readonly group: GroupEventStats
+  readonly eventType: EventCategory
+  readonly maxAvg: number
+  readonly isFirst: boolean
+}
+
+function GroupMetricRow({ group, eventType, maxAvg, isFirst }: GroupMetricRowProps) {
+  const isSiege = eventType === 'SIEGE'
+  const avgValue = isSiege
+    ? group.avg_contribution + group.avg_assist
+    : group.avg_merit
+  const rangeText = isSiege
+    ? `${formatNumber(group.combined_min)}~${formatNumber(group.combined_max)}`
+    : `${formatNumber(group.merit_min)}~${formatNumber(group.merit_max)}`
+  const barWidth = maxAvg > 0 ? Math.max(5, (avgValue / maxAvg) * 100) : 5
+  const color = isSiege ? '#E67E22' : '#4A90D9'
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm gap-2">
+        <span className="truncate flex-1">
+          {group.group_name}{isFirst && ' ⭐'}
+        </span>
+        <span className="font-medium shrink-0" style={{ color }}>
+          均 {formatNumber(Math.round(avgValue))}
+        </span>
+        <span className="text-xs text-muted-foreground shrink-0">
+          {rangeText}
+        </span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${barWidth}%`, backgroundColor: color }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function LiffEventReport({ session, eventId }: Props) {
   const context = { lineGroupId: session.lineGroupId! }
   const { data: report, isLoading, error } = useLiffEventReport(context, eventId)
@@ -224,19 +265,63 @@ export function LiffEventReport({ session, eventId }: Props) {
               {isForbidden ? '⚠️ 分組違規統計' : '🏘️ 組別出席率'}
             </div>
             <div className="space-y-3">
-              {/* Show ALL groups, not just 5 */}
-              {group_stats.map((group) => (
-                <GroupStatRow
-                  key={group.group_name}
-                  group={group}
-                  eventType={eventType}
-                  maxRate={maxViolatorCount}
-                />
-              ))}
+              {isForbidden
+                ? group_stats.filter(g => g.violator_count > 0).map((group) => (
+                    <GroupStatRow
+                      key={group.group_name}
+                      group={group}
+                      eventType={eventType}
+                      maxRate={maxViolatorCount}
+                    />
+                  ))
+                : group_stats.map((group) => (
+                    <GroupStatRow
+                      key={group.group_name}
+                      group={group}
+                      eventType={eventType}
+                      maxRate={maxViolatorCount}
+                    />
+                  ))
+              }
+              {isForbidden && group_stats.filter(g => g.violator_count > 0).length === 0 && (
+                <p className="text-sm text-green-600 text-center py-2">無違規記錄 ✓</p>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Group Average Metric (BATTLE/SIEGE only) */}
+      {!isForbidden && group_stats.length > 0 && (() => {
+        const participatingGroups = group_stats.filter(g => g.participated_count > 0)
+        if (participatingGroups.length === 0) return null
+        const isSiege = eventType === 'SIEGE'
+        const maxAvg = Math.max(
+          ...participatingGroups.map(g =>
+            isSiege ? g.avg_contribution + g.avg_assist : g.avg_merit
+          )
+        )
+        return (
+          <Card>
+            <CardContent className="py-3">
+              <div className="text-sm font-medium mb-3">
+                {isSiege ? '🏰 組別人均貢獻' : '⚔️ 組別人均戰功'}
+              </div>
+              <div className="space-y-3">
+                {participatingGroups.map((group, index) => (
+                  <GroupMetricRow
+                    key={group.group_name}
+                    group={group}
+                    eventType={eventType!}
+                    maxAvg={maxAvg}
+                    isFirst={index === 0}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Top Members or Violators */}
       {isForbidden ? (
