@@ -29,14 +29,19 @@ function formatNumber(n: number): string {
 
 function formatEventTime(dateStr: string | null): string {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
+  // Ensure UTC interpretation: append 'Z' if no timezone info
+  const utcStr = dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : `${dateStr}Z`
+  const date = new Date(utcStr)
   return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 function formatDuration(startStr: string | null, endStr: string | null): string {
   if (!startStr || !endStr) return ''
-  const start = new Date(startStr)
-  const end = new Date(endStr)
+  // Ensure UTC interpretation: append 'Z' if no timezone info
+  const startUtc = startStr.endsWith('Z') || startStr.includes('+') ? startStr : `${startStr}Z`
+  const endUtc = endStr.endsWith('Z') || endStr.includes('+') ? endStr : `${endStr}Z`
+  const start = new Date(startUtc)
+  const end = new Date(endUtc)
   const totalMinutes = Math.floor((end.getTime() - start.getTime()) / 60000)
   if (totalMinutes < 60) return `${totalMinutes}分鐘`
   const hours = Math.floor(totalMinutes / 60)

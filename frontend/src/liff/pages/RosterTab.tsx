@@ -16,7 +16,9 @@ interface Props {
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('zh-TW', {
+  // Ensure UTC interpretation: append 'Z' if no timezone info
+  const utcStr = dateString.endsWith('Z') || dateString.includes('+') ? dateString : `${dateString}Z`
+  return new Date(utcStr).toLocaleDateString('zh-TW', {
     month: 'numeric',
     day: 'numeric',
   })
