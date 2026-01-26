@@ -231,3 +231,61 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         if not data:
             return None
         return self._build_model(data[0])
+
+    async def get_recent_completed_events(
+        self, alliance_id: UUID, limit: int = 5
+    ) -> list[BattleEvent]:
+        """
+        Get the most recent completed battle events for an alliance.
+
+        Args:
+            alliance_id: Alliance UUID
+            limit: Maximum number of events to return (default 5)
+
+        Returns:
+            List of completed battle events, ordered by event_end desc
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("status", EventStatus.COMPLETED.value)
+            .order("event_end", desc=True)
+            .limit(limit)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return self._build_models(data)
+
+    async def get_event_by_name(
+        self, alliance_id: UUID, name: str
+    ) -> BattleEvent | None:
+        """
+        Get a completed battle event by exact name match.
+
+        Args:
+            alliance_id: Alliance UUID
+            name: Exact event name to match
+
+        Returns:
+            Battle event if found, None otherwise
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("status", EventStatus.COMPLETED.value)
+            .eq("name", name)
+            .limit(1)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        if not data:
+            return None
+        return self._build_model(data[0])

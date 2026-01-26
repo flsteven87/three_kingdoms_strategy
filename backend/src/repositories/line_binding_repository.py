@@ -537,6 +537,62 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .execute()
         )
 
+    async def get_last_notification_time(
+        self, line_group_id: str, line_user_id: str
+    ) -> datetime | None:
+        """
+        Get the last notification time for a specific group/user combination.
+
+        This is a generic method that supports different CD mechanisms by using
+        different line_user_id values (sentinel values for different CD types).
+
+        Args:
+            line_group_id: LINE group ID
+            line_user_id: LINE user ID or sentinel value (e.g., __EVENT_REPORT__)
+
+        Returns:
+            Last notification timestamp or None if no record exists
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_("line_user_notifications")
+            .select("sent_at")
+            .eq("line_group_id", line_group_id)
+            .eq("line_user_id", line_user_id)
+            .limit(1)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        if not data:
+            return None
+        return datetime.fromisoformat(data[0]["sent_at"].replace("Z", "+00:00"))
+
+    async def record_notification(self, line_group_id: str, line_user_id: str) -> None:
+        """
+        Record a notification timestamp for a specific group/user combination.
+
+        This is a generic method that supports different CD mechanisms by using
+        different line_user_id values (sentinel values for different CD types).
+
+        Uses upsert to update sent_at timestamp if record exists.
+
+        Args:
+            line_group_id: LINE group ID
+            line_user_id: LINE user ID or sentinel value (e.g., __EVENT_REPORT__)
+        """
+        await self._execute_async(
+            lambda: self.client.from_("line_user_notifications")
+            .upsert(
+                {
+                    "line_group_id": line_group_id,
+                    "line_user_id": line_user_id,
+                    "sent_at": datetime.now(UTC).isoformat(),
+                },
+                on_conflict="line_group_id,line_user_id",
+            )
+            .execute()
+        )
+
     async def is_user_registered_in_group(self, line_group_id: str, line_user_id: str) -> bool:
         """Check if a LINE user has any registered game IDs in the group's alliance"""
         group_binding = await self.get_group_binding_by_line_group_id(line_group_id)

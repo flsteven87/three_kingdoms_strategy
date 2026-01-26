@@ -646,6 +646,18 @@ async def _handle_group_message(
                 )
                 return
 
+            # Built-in command: /戰役 or /战役 (list events or show report)
+            if _is_event_command(args_text):
+                event_name = _extract_event_name(args_text)
+                await _handle_event_command(
+                    line_group_id=line_group_id,
+                    reply_token=reply_token,
+                    event_name=event_name,
+                    line_binding_service=service,
+                    battle_event_service=battle_event_service,
+                )
+                return
+
             # Check custom commands
             if command_keyword:
                 command = await service.get_custom_command_response(
@@ -737,6 +749,219 @@ def _extract_custom_command(text: str) -> str | None:
 def _is_bot_mentioned(mentionees: list, bot_user_id: str) -> bool:
     """檢查 Bot 是否被 @"""
     return any(m.get("userId") == bot_user_id for m in mentionees)
+
+
+def _is_event_command(text: str) -> bool:
+    """檢查是否為戰役指令 (/戰役 or /战役)"""
+    return text.startswith("/戰役") or text.startswith("/战役")
+
+
+def _extract_event_name(text: str) -> str | None:
+    """
+    從戰役指令中提取事件名稱。
+
+    "/戰役" -> None (列出列表)
+    "/戰役 資源洲開關" -> "資源洲開關"
+    """
+    # Remove the command keyword
+    for keyword in ["/戰役", "/战役"]:
+        if text.startswith(keyword):
+            remaining = text[len(keyword) :].strip()
+            return remaining if remaining else None
+    return None
+
+
+async def _handle_event_command(
+    line_group_id: str,
+    reply_token: str,
+    event_name: str | None,
+    line_binding_service: LineBindingService,
+    battle_event_service: BattleEventService,
+) -> None:
+    """
+    處理 /戰役 指令
+
+    - /戰役: 列出最近 5 場已完成戰役 (Carousel)
+    - /戰役 {名稱}: 發送該戰役的詳細報告 (有 5 分鐘群組 CD)
+    """
+    # 1. 查詢群組綁定的同盟
+    group_binding = await line_binding_service.repository.get_group_binding_by_line_group_id(
+        line_group_id
+    )
+
+    if not group_binding:
+        await _reply_text(
+            reply_token,
+            "❌ 此群組尚未綁定同盟\n\n"
+            "請盟主在 Web App 生成綁定碼，\n"
+            "然後發送「/綁定 XXXXXX」完成綁定",
+        )
+        return
+
+    alliance_id = group_binding.alliance_id
+
+    # 2. 根據是否有 event_name 決定行為
+    if event_name is None:
+        # 列出最近 5 場戰役
+        await _handle_event_list(
+            alliance_id=alliance_id,
+            reply_token=reply_token,
+            battle_event_service=battle_event_service,
+        )
+    else:
+        # 發送指定戰役的報告
+        await _handle_event_report(
+            alliance_id=alliance_id,
+            line_group_id=line_group_id,
+            reply_token=reply_token,
+            event_name=event_name,
+            line_binding_service=line_binding_service,
+            battle_event_service=battle_event_service,
+        )
+
+
+async def _handle_event_list(
+    alliance_id: UUID,
+    reply_token: str,
+    battle_event_service: BattleEventService,
+) -> None:
+    """列出最近 5 場已完成戰役 (Carousel Flex Message)"""
+    from src.lib.line_flex_builder import build_event_list_carousel
+
+    # 取得最近 5 場已完成戰役
+    events = await battle_event_service.get_recent_completed_events_for_alliance(
+        alliance_id, limit=5
+    )
+
+    if not events:
+        await _reply_text(
+            reply_token,
+            "📭 目前沒有已完成的戰役\n\n請先在 Web App 建立並完成戰役分析",
+        )
+        return
+
+    # 建構 Carousel Flex Message
+    flex_message = build_event_list_carousel(events)
+
+    if not flex_message:
+        # Fallback to text list
+        lines = ["⚔️ 最近戰役："]
+        for i, event in enumerate(events, start=1):
+            time_str = event.event_start.strftime("%m/%d") if event.event_start else ""
+            lines.append(f"{i}. {event.name} ({time_str})")
+        lines.append("\n💡 輸入「/戰役 名稱」查看報告")
+        await _reply_text(reply_token, "\n".join(lines))
+        return
+
+    line_bot = get_line_bot_api()
+    if not line_bot:
+        logger.error("LINE Bot API not available")
+        return
+
+    try:
+        from linebot.v3.messaging import ReplyMessageRequest
+
+        line_bot.reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[flex_message],
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send event list carousel: {e}")
+
+
+async def _handle_event_report(
+    alliance_id: UUID,
+    line_group_id: str,
+    reply_token: str,
+    event_name: str,
+    line_binding_service: LineBindingService,
+    battle_event_service: BattleEventService,
+) -> None:
+    """發送指定戰役的報告 (有 5 分鐘群組 CD)"""
+    from src.lib.line_flex_builder import build_event_report_flex
+
+    # 1. 檢查 CD
+    cd_remaining = await line_binding_service.get_event_report_cd_remaining(line_group_id)
+    if cd_remaining > 0:
+        await _reply_text(
+            reply_token,
+            f"⏳ 請稍候 {cd_remaining} 分鐘後再發送戰役報告\n\n"
+            "（為避免洗版，每 5 分鐘只能發送一次）",
+        )
+        return
+
+    # 2. 查詢戰役 (精確匹配名稱)
+    event = await battle_event_service.get_event_by_name_for_alliance(alliance_id, event_name)
+
+    if not event:
+        await _reply_text(
+            reply_token,
+            f"❌ 找不到戰役「{event_name}」\n\n"
+            "請確認名稱完全正確，或輸入「/戰役」查看列表",
+        )
+        return
+
+    # 3. 取得組別分析
+    analytics = await battle_event_service.get_event_group_analytics(event.id)
+
+    if not analytics:
+        await _reply_text(reply_token, "❌ 無法取得戰役分析資料")
+        return
+
+    # 4. 補充 Top Members / Violators 的 LINE 名稱
+    game_ids_to_lookup = []
+    if analytics.top_members:
+        game_ids_to_lookup.extend([m.member_name for m in analytics.top_members])
+    if analytics.violators:
+        game_ids_to_lookup.extend([v.member_name for v in analytics.violators])
+
+    if game_ids_to_lookup:
+        line_bindings = await line_binding_service.repository.get_member_bindings_by_game_ids(
+            alliance_id=alliance_id,
+            game_ids=game_ids_to_lookup,
+        )
+        line_name_map = {b.game_id: b.line_display_name for b in line_bindings}
+
+        for member in analytics.top_members:
+            member.line_display_name = line_name_map.get(member.member_name)
+        for violator in analytics.violators:
+            violator.line_display_name = line_name_map.get(violator.member_name)
+
+    # 5. 建構 Flex Message 並發送
+    flex_message = build_event_report_flex(analytics)
+
+    if not flex_message:
+        # Fallback to text
+        await _reply_text(
+            reply_token,
+            f"⚔️ {analytics.event_name}\n\n"
+            f"📊 出席率: {analytics.summary.participation_rate:.0f}%\n"
+            f"⚔️ 總戰功: {analytics.summary.total_merit:,}\n"
+            f"🏆 MVP: {analytics.summary.mvp_member_name or '-'}",
+        )
+        return
+
+    # 6. 記錄 CD
+    await line_binding_service.record_event_report_cd(line_group_id)
+
+    line_bot = get_line_bot_api()
+    if not line_bot:
+        logger.error("LINE Bot API not available")
+        return
+
+    try:
+        from linebot.v3.messaging import ReplyMessageRequest
+
+        line_bot.reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[flex_message],
+            )
+        )
+    except Exception as e:
+        logger.error(f"Failed to send event report: {e}")
 
 
 async def _handle_latest_event_report(

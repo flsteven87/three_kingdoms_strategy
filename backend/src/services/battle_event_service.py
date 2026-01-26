@@ -523,6 +523,40 @@ class BattleEventService:
         """
         return await self._event_repo.get_latest_completed_event(alliance_id)
 
+    async def get_recent_completed_events_for_alliance(
+        self, alliance_id: UUID, limit: int = 5
+    ) -> list[BattleEvent]:
+        """
+        Get the most recent completed battle events for an alliance.
+
+        Used by LINE Bot to list recent events.
+
+        Args:
+            alliance_id: Alliance UUID
+            limit: Maximum number of events to return (default 5)
+
+        Returns:
+            List of completed battle events, ordered by event_end desc
+        """
+        return await self._event_repo.get_recent_completed_events(alliance_id, limit)
+
+    async def get_event_by_name_for_alliance(
+        self, alliance_id: UUID, name: str
+    ) -> BattleEvent | None:
+        """
+        Get a completed battle event by exact name match.
+
+        Used by LINE Bot to find event by name.
+
+        Args:
+            alliance_id: Alliance UUID
+            name: Exact event name to match
+
+        Returns:
+            Battle event if found, None otherwise
+        """
+        return await self._event_repo.get_event_by_name(alliance_id, name)
+
     async def get_event_group_analytics(
         self, event_id: UUID, top_n: int = 5
     ) -> EventGroupAnalytics | None:

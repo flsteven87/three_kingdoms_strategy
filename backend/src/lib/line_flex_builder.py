@@ -4,15 +4,61 @@ LINE Flex Message Builder
 Utility functions for building LINE Flex Messages.
 
 This module provides builders for various report types:
-- Event group analytics report (戰役報告)
+- Event group analytics report (戰役報告) - category-aware
+- Event list carousel (戰役列表)
+- LIFF entry (熱血戰場風)
 """
 
 import logging
 from datetime import datetime
 
-from src.models.battle_event_metrics import EventGroupAnalytics, GroupEventStats
+from src.models.battle_event import BattleEvent, EventCategory
+from src.models.battle_event_metrics import (
+    EventGroupAnalytics,
+    GroupEventStats,
+    TopMemberItem,
+    ViolatorItem,
+)
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Constants
+# =============================================================================
+
+LINE_GREEN = "#06C755"
+LINE_RED = "#FF5555"
+SIEGE_ORANGE = "#E67E22"
+BATTLE_BLUE = "#4A90D9"
+
+EVENT_TYPE_CONFIG = {
+    EventCategory.BATTLE: {
+        "icon": "⚔️",
+        "label": "戰役",
+        "color": BATTLE_BLUE,
+        "metric_title": "組別人均戰功",
+        "ranking_title": "🏆 戰功 Top 5",
+    },
+    EventCategory.SIEGE: {
+        "icon": "🏰",
+        "label": "攻城",
+        "color": SIEGE_ORANGE,
+        "metric_title": "組別人均貢獻",
+        "ranking_title": "🏰 貢獻排行",
+    },
+    EventCategory.FORBIDDEN: {
+        "icon": "🚫",
+        "label": "禁地",
+        "color": LINE_RED,
+        "metric_title": None,  # No metric section for forbidden
+        "ranking_title": "⚠️ 違規名單",
+    },
+}
+
+
+# =============================================================================
+# Formatters
+# =============================================================================
 
 
 def format_number(n: int | float) -> str:
@@ -76,15 +122,30 @@ def format_event_time(dt: datetime | None) -> str:
     return dt.strftime("%m/%d %H:%M")
 
 
+def _get_event_config(event_type: EventCategory | None) -> dict:
+    """Get event type configuration, defaulting to BATTLE."""
+    return EVENT_TYPE_CONFIG.get(event_type or EventCategory.BATTLE, EVENT_TYPE_CONFIG[EventCategory.BATTLE])
+
+
+# =============================================================================
+# Event Report Flex Message Builder (Category-aware)
+# =============================================================================
+
+
 def build_event_report_flex(analytics: EventGroupAnalytics):
     """
-    Build a Flex Message for battle event report.
+    Build a category-aware Flex Message for battle event report.
+
+    Content varies by event_type:
+    - BATTLE: participation rate, group merit, top 5 merit
+    - SIEGE: participation rate, group contribution+assist, top 5 combined
+    - FORBIDDEN: compliance rate, group violator distribution, violator list
 
     Args:
         analytics: EventGroupAnalytics with all data
 
     Returns:
-        FlexMessage object ready to send
+        FlexMessage object ready to send, or None if SDK not available
     """
     try:
         from linebot.v3.messaging import (
@@ -99,16 +160,39 @@ def build_event_report_flex(analytics: EventGroupAnalytics):
         return None
 
     summary = analytics.summary
+    event_type = analytics.event_type or EventCategory.BATTLE
+    config = _get_event_config(event_type)
+    is_forbidden = event_type == EventCategory.FORBIDDEN
 
     # Build header section
     header_contents = [
         FlexText(
-            text=f"⚔️ {analytics.event_name}",
+            text=f"{config['icon']} {analytics.event_name}",
             weight="bold",
             size="xl",
             color="#1a1a1a",
         ),
     ]
+
+    # Add type tag
+    header_contents.append(
+        FlexBox(
+            layout="horizontal",
+            contents=[
+                FlexText(
+                    text=config["label"],
+                    size="xs",
+                    color="#ffffff",
+                    align="center",
+                ),
+            ],
+            backgroundColor=config["color"],
+            cornerRadius="4px",
+            paddingAll="4px",
+            width="48px",
+            margin="sm",
+        )
+    )
 
     # Add time info if available
     time_str = format_event_time(analytics.event_start)
@@ -124,91 +208,41 @@ def build_event_report_flex(analytics: EventGroupAnalytics):
     # Build body sections
     body_contents = []
 
-    # Section 1: Overall participation rate
-    body_contents.extend(
-        [
-            FlexText(
-                text="📊 整體出席率",
-                weight="bold",
-                size="md",
-                color="#1a1a1a",
-            ),
-            FlexSeparator(margin="sm"),
-            FlexText(
-                text=f"{summary.participation_rate:.0f}%",
-                weight="bold",
-                size="xxl",
-                color="#1DB446",
-                align="center",
-                margin="md",
-            ),
-            FlexText(
-                text=f"{summary.participated_count}/{summary.participated_count + summary.absent_count}人 參戰",
-                size="sm",
-                color="#666666",
-                align="center",
-            ),
-            FlexSeparator(margin="lg"),
-        ]
-    )
+    # Section 1: Overall rate (participation or compliance)
+    if is_forbidden:
+        body_contents.extend(_build_compliance_section(summary))
+    else:
+        body_contents.extend(_build_participation_section(summary))
 
-    # Section 2: Group attendance rates with progress bars
+    body_contents.append(FlexSeparator(margin="lg"))
+
+    # Section 2: Group statistics
     if analytics.group_stats:
-        body_contents.append(
-            FlexText(
-                text="🏘️ 組別出席率",
-                weight="bold",
-                size="md",
-                color="#1a1a1a",
-                margin="lg",
-            )
-        )
-        body_contents.append(FlexSeparator(margin="sm"))
-
-        for group in analytics.group_stats[:5]:
-            body_contents.extend(_build_group_attendance_row(group))
+        if is_forbidden:
+            body_contents.extend(_build_group_violator_section(analytics.group_stats[:5]))
+        else:
+            body_contents.extend(_build_group_attendance_section(analytics.group_stats[:5]))
 
         body_contents.append(FlexSeparator(margin="lg"))
 
-    # Section 3: Group average merit distribution
-    participating_groups = [g for g in analytics.group_stats[:5] if g.participated_count > 0]
-    if participating_groups:
-        body_contents.append(
-            FlexText(
-                text="⚔️ 組別人均戰功",
-                weight="bold",
-                size="md",
-                color="#1a1a1a",
-                margin="lg",
-            )
-        )
-        body_contents.append(FlexSeparator(margin="sm"))
-
-        # Find max avg_merit for bar scaling
-        max_avg_merit = max(g.avg_merit for g in participating_groups)
-
-        for i, group in enumerate(participating_groups):
+    # Section 3: Group average metric (BATTLE/SIEGE only)
+    if not is_forbidden:
+        participating_groups = [g for g in analytics.group_stats[:5] if g.participated_count > 0]
+        if participating_groups:
             body_contents.extend(
-                _build_group_merit_row(group, max_avg_merit, is_top=(i == 0))
+                _build_group_metric_section(participating_groups, event_type, config)
             )
+            body_contents.append(FlexSeparator(margin="lg"))
 
-        body_contents.append(FlexSeparator(margin="lg"))
-
-    # Section 4: Top 5 ranking
-    if analytics.top_members:
-        body_contents.append(
-            FlexText(
-                text="🏆 戰功 Top 5",
-                weight="bold",
-                size="md",
-                color="#1a1a1a",
-                margin="lg",
+    # Section 4: Ranking or violator list
+    if is_forbidden:
+        if analytics.violators:
+            body_contents.extend(_build_violator_list_section(analytics.violators, config))
+    else:
+        if analytics.top_members:
+            body_contents.extend(
+                _build_ranking_section(analytics.top_members, event_type, config)
             )
-        )
-        body_contents.append(FlexSeparator(margin="sm"))
-
-        for member in analytics.top_members:
-            body_contents.append(_build_ranking_row(member))
 
     # Build bubble
     bubble = FlexBubble(
@@ -226,20 +260,114 @@ def build_event_report_flex(analytics: EventGroupAnalytics):
     )
 
     return FlexMessage(
-        alt_text=f"⚔️ {analytics.event_name} 戰役報告",
+        alt_text=f"{config['icon']} {analytics.event_name} 報告",
         contents=bubble,
     )
+
+
+def _build_participation_section(summary) -> list:
+    """Build participation rate section for BATTLE/SIEGE events."""
+    from linebot.v3.messaging import FlexSeparator, FlexText
+
+    eligible_count = summary.participated_count + summary.absent_count
+    return [
+        FlexText(
+            text="📊 整體出席率",
+            weight="bold",
+            size="md",
+            color="#1a1a1a",
+        ),
+        FlexSeparator(margin="sm"),
+        FlexText(
+            text=f"{summary.participation_rate:.0f}%",
+            weight="bold",
+            size="xxl",
+            color=LINE_GREEN,
+            align="center",
+            margin="md",
+        ),
+        FlexText(
+            text=f"{summary.participated_count}/{eligible_count}人 參戰",
+            size="sm",
+            color="#666666",
+            align="center",
+        ),
+    ]
+
+
+def _build_compliance_section(summary) -> list:
+    """Build compliance rate section for FORBIDDEN events."""
+    from linebot.v3.messaging import FlexSeparator, FlexText
+
+    compliance_rate = (
+        ((summary.total_members - summary.violator_count) / summary.total_members * 100)
+        if summary.total_members > 0
+        else 100.0
+    )
+    has_violators = summary.violator_count > 0
+
+    status_text = (
+        f"{summary.violator_count} 人違規"
+        if has_violators
+        else "全員遵守規定 ✓"
+    )
+    status_color = LINE_RED if has_violators else LINE_GREEN
+
+    return [
+        FlexText(
+            text="🚫 禁地守規率",
+            weight="bold",
+            size="md",
+            color="#1a1a1a",
+        ),
+        FlexSeparator(margin="sm"),
+        FlexText(
+            text=f"{compliance_rate:.0f}%",
+            weight="bold",
+            size="xxl",
+            color=LINE_GREEN if not has_violators else LINE_RED,
+            align="center",
+            margin="md",
+        ),
+        FlexText(
+            text=status_text,
+            size="sm",
+            color=status_color,
+            align="center",
+            weight="bold" if has_violators else None,
+        ),
+    ]
+
+
+def _build_group_attendance_section(groups: list[GroupEventStats]) -> list:
+    """Build group attendance section with progress bars."""
+    from linebot.v3.messaging import FlexSeparator, FlexText
+
+    contents = [
+        FlexText(
+            text="🏘️ 組別出席率",
+            weight="bold",
+            size="md",
+            color="#1a1a1a",
+            margin="lg",
+        ),
+        FlexSeparator(margin="sm"),
+    ]
+
+    sorted_groups = sorted(groups, key=lambda g: g.participation_rate, reverse=True)
+    for group in sorted_groups:
+        contents.extend(_build_group_attendance_row(group))
+
+    return contents
 
 
 def _build_group_attendance_row(group: GroupEventStats) -> list:
     """Build attendance row with progress bar for a group."""
     from linebot.v3.messaging import FlexBox, FlexText
 
-    bar_color = "#06C755"  # LINE Green
     bar_width = max(2, int(group.participation_rate))
 
     return [
-        # Group name and stats row
         FlexBox(
             layout="horizontal",
             contents=[
@@ -259,7 +387,7 @@ def _build_group_attendance_row(group: GroupEventStats) -> list:
                 FlexText(
                     text=f"{group.participation_rate:.0f}%",
                     size="sm",
-                    color="#06C755",
+                    color=LINE_GREEN,
                     weight="bold",
                     align="end",
                     flex=1,
@@ -267,14 +395,13 @@ def _build_group_attendance_row(group: GroupEventStats) -> list:
             ],
             margin="md",
         ),
-        # Progress bar
         FlexBox(
             layout="horizontal",
             contents=[
                 FlexBox(
                     layout="vertical",
                     contents=[],
-                    backgroundColor=bar_color,
+                    backgroundColor=LINE_GREEN,
                     width=f"{bar_width}%",
                     height="6px",
                     cornerRadius="3px",
@@ -288,107 +415,418 @@ def _build_group_attendance_row(group: GroupEventStats) -> list:
     ]
 
 
-def _build_group_merit_row(
-    group: GroupEventStats, max_avg_merit: float, is_top: bool = False
-) -> list:
-    """Build merit distribution row with bar chart for a group."""
-    from linebot.v3.messaging import FlexBox, FlexText
+def _build_group_violator_section(groups: list[GroupEventStats]) -> list:
+    """Build group violator distribution section for FORBIDDEN events."""
+    from linebot.v3.messaging import FlexBox, FlexSeparator, FlexText
 
-    name_text = group.group_name
-    if is_top:
-        name_text += " ⭐"
+    # Filter groups with violators
+    groups_with_violators = [g for g in groups if g.violator_count > 0]
 
-    merit_range = f"{format_number(group.merit_min)}~{format_number(group.merit_max)}"
-    bar_color = "#06C755"  # LINE Green
-    bar_width = max(5, int((group.avg_merit / max_avg_merit) * 100)) if max_avg_merit > 0 else 5
-
-    return [
-        # Group name and avg merit row
-        FlexBox(
-            layout="horizontal",
-            contents=[
-                FlexText(
-                    text=name_text,
-                    size="sm",
-                    color="#1a1a1a",
-                    flex=3,
-                ),
-                FlexText(
-                    text=f"均 {format_number(int(group.avg_merit))}",
-                    size="sm",
-                    color="#06C755",
-                    weight="bold",
-                    align="end",
-                    flex=2,
-                ),
-                FlexText(
-                    text=merit_range,
-                    size="xs",
-                    color="#888888",
-                    align="end",
-                    flex=2,
-                ),
-            ],
-            margin="md",
+    contents = [
+        FlexText(
+            text="⚠️ 分組違規統計",
+            weight="bold",
+            size="md",
+            color="#1a1a1a",
+            margin="lg",
         ),
-        # Bar chart
-        FlexBox(
-            layout="horizontal",
-            contents=[
-                FlexBox(
-                    layout="vertical",
-                    contents=[],
-                    backgroundColor=bar_color,
-                    width=f"{bar_width}%",
-                    height="6px",
-                    cornerRadius="3px",
-                ),
-            ],
-            backgroundColor="#E8E8E8",
-            height="6px",
-            cornerRadius="3px",
-            margin="sm",
-        ),
+        FlexSeparator(margin="sm"),
     ]
 
-
-def _build_ranking_row(member):
-    """Build a ranking row for top members."""
-    from linebot.v3.messaging import FlexBox, FlexText
-
-    # Medal for top 3
-    rank_icons = {1: "🥇", 2: "🥈", 3: "🥉"}
-    rank_text = rank_icons.get(member.rank, f" {member.rank}")
-
-    # Display name: prefer LINE name if available
-    display_name = member.member_name
-    if member.line_display_name:
-        display_name = f"{member.member_name} ({member.line_display_name})"
-
-    return FlexBox(
-        layout="horizontal",
-        contents=[
+    if not groups_with_violators:
+        contents.append(
             FlexText(
-                text=rank_text,
+                text="無違規記錄 ✓",
                 size="sm",
-                flex=0,
+                color=LINE_GREEN,
+                align="center",
+                margin="md",
+            )
+        )
+        return contents
+
+    max_violators = max(g.violator_count for g in groups_with_violators)
+    sorted_groups = sorted(groups_with_violators, key=lambda g: g.violator_count, reverse=True)
+
+    for group in sorted_groups:
+        bar_width = max(5, int((group.violator_count / max_violators) * 100))
+        contents.extend([
+            FlexBox(
+                layout="horizontal",
+                contents=[
+                    FlexText(
+                        text=group.group_name,
+                        size="sm",
+                        color="#1a1a1a",
+                        flex=3,
+                    ),
+                    FlexText(
+                        text=f"{group.violator_count} 人違規",
+                        size="sm",
+                        color=LINE_RED,
+                        weight="bold",
+                        align="end",
+                        flex=2,
+                    ),
+                ],
+                margin="md",
             ),
-            FlexText(
-                text=display_name,
-                size="sm",
-                color="#1a1a1a",
-                flex=4,
+            FlexBox(
+                layout="horizontal",
+                contents=[
+                    FlexBox(
+                        layout="vertical",
+                        contents=[],
+                        backgroundColor=LINE_RED,
+                        width=f"{bar_width}%",
+                        height="6px",
+                        cornerRadius="3px",
+                    ),
+                ],
+                backgroundColor="#E8E8E8",
+                height="6px",
+                cornerRadius="3px",
                 margin="sm",
             ),
-            FlexText(
-                text=format_number(member.merit_diff),
-                size="sm",
-                color="#666666",
-                align="end",
-                flex=2,
+        ])
+
+    return contents
+
+
+def _build_group_metric_section(
+    groups: list[GroupEventStats], event_type: EventCategory, config: dict
+) -> list:
+    """Build group average metric section (BATTLE: merit, SIEGE: contribution+assist)."""
+    from linebot.v3.messaging import FlexBox, FlexSeparator, FlexText
+
+    is_siege = event_type == EventCategory.SIEGE
+
+    def get_avg_value(g: GroupEventStats) -> float:
+        if is_siege:
+            return g.avg_contribution + g.avg_assist
+        return g.avg_merit
+
+    def get_range_text(g: GroupEventStats) -> str:
+        if is_siege:
+            return f"{format_number(g.combined_min)}~{format_number(g.combined_max)}"
+        return f"{format_number(g.merit_min)}~{format_number(g.merit_max)}"
+
+    sorted_groups = sorted(groups, key=get_avg_value, reverse=True)
+    max_avg = max(get_avg_value(g) for g in sorted_groups) if sorted_groups else 1
+
+    contents = [
+        FlexText(
+            text=f"{config['icon']} {config['metric_title']}",
+            weight="bold",
+            size="md",
+            color="#1a1a1a",
+            margin="lg",
+        ),
+        FlexSeparator(margin="sm"),
+    ]
+
+    for i, group in enumerate(sorted_groups):
+        avg_value = get_avg_value(group)
+        bar_width = max(5, int((avg_value / max_avg) * 100)) if max_avg > 0 else 5
+        name_text = f"{group.group_name} ⭐" if i == 0 else group.group_name
+
+        contents.extend([
+            FlexBox(
+                layout="horizontal",
+                contents=[
+                    FlexText(
+                        text=name_text,
+                        size="sm",
+                        color="#1a1a1a",
+                        flex=3,
+                    ),
+                    FlexText(
+                        text=f"均 {format_number(int(avg_value))}",
+                        size="sm",
+                        color=config["color"],
+                        weight="bold",
+                        align="end",
+                        flex=2,
+                    ),
+                    FlexText(
+                        text=get_range_text(group),
+                        size="xs",
+                        color="#888888",
+                        align="end",
+                        flex=2,
+                    ),
+                ],
+                margin="md",
             ),
-        ],
-        margin="sm",
+            FlexBox(
+                layout="horizontal",
+                contents=[
+                    FlexBox(
+                        layout="vertical",
+                        contents=[],
+                        backgroundColor=config["color"],
+                        width=f"{bar_width}%",
+                        height="6px",
+                        cornerRadius="3px",
+                    ),
+                ],
+                backgroundColor="#E8E8E8",
+                height="6px",
+                cornerRadius="3px",
+                margin="sm",
+            ),
+        ])
+
+    return contents
+
+
+def _build_ranking_section(
+    top_members: list[TopMemberItem], event_type: EventCategory, config: dict
+) -> list:
+    """Build ranking section for BATTLE/SIEGE events."""
+    from linebot.v3.messaging import FlexBox, FlexSeparator, FlexText
+
+    is_siege = event_type == EventCategory.SIEGE
+
+    contents = [
+        FlexText(
+            text=config["ranking_title"],
+            weight="bold",
+            size="md",
+            color="#1a1a1a",
+            margin="lg",
+        ),
+        FlexSeparator(margin="sm"),
+    ]
+
+    rank_icons = {1: "🥇", 2: "🥈", 3: "🥉"}
+
+    for member in top_members:
+        rank_text = rank_icons.get(member.rank, f" {member.rank}")
+        display_name = member.member_name
+        if member.line_display_name:
+            display_name = f"{member.member_name} ({member.line_display_name})"
+
+        # Score display
+        if is_siege and member.contribution_diff is not None and member.assist_diff is not None:
+            score_text = f"{format_number(member.score)} ({format_number(member.contribution_diff)}+{format_number(member.assist_diff)})"
+        else:
+            score_text = format_number(member.score)
+
+        contents.append(
+            FlexBox(
+                layout="horizontal",
+                contents=[
+                    FlexText(
+                        text=rank_text,
+                        size="sm",
+                        flex=0,
+                    ),
+                    FlexText(
+                        text=display_name,
+                        size="sm",
+                        color="#1a1a1a",
+                        flex=4,
+                        margin="sm",
+                    ),
+                    FlexText(
+                        text=score_text,
+                        size="sm",
+                        color="#666666",
+                        align="end",
+                        flex=2,
+                    ),
+                ],
+                margin="sm",
+            )
+        )
+
+    return contents
+
+
+def _build_violator_list_section(violators: list[ViolatorItem], config: dict) -> list:
+    """Build violator list section for FORBIDDEN events."""
+    from linebot.v3.messaging import FlexBox, FlexSeparator, FlexText
+
+    contents = [
+        FlexText(
+            text=config["ranking_title"],
+            weight="bold",
+            size="md",
+            color="#1a1a1a",
+            margin="lg",
+        ),
+        FlexSeparator(margin="sm"),
+    ]
+
+    if not violators:
+        contents.append(
+            FlexText(
+                text="本次禁地期間無人違規 🎉",
+                size="sm",
+                color=LINE_GREEN,
+                align="center",
+                margin="md",
+            )
+        )
+        return contents
+
+    for i, violator in enumerate(violators):
+        display_name = violator.member_name
+        if violator.line_display_name:
+            display_name = f"{violator.member_name} ({violator.line_display_name})"
+
+        contents.append(
+            FlexBox(
+                layout="horizontal",
+                contents=[
+                    FlexText(
+                        text=f"{i + 1}.",
+                        size="sm",
+                        color=LINE_RED,
+                        weight="bold",
+                        flex=0,
+                    ),
+                    FlexText(
+                        text=display_name,
+                        size="sm",
+                        color="#1a1a1a",
+                        flex=4,
+                        margin="sm",
+                    ),
+                    FlexText(
+                        text=f"+{format_number(violator.power_diff)}",
+                        size="sm",
+                        color=LINE_RED,
+                        weight="bold",
+                        align="end",
+                        flex=2,
+                    ),
+                ],
+                margin="sm",
+            )
+        )
+
+    return contents
+
+
+# =============================================================================
+# Event List Carousel Builder
+# =============================================================================
+
+
+def build_event_list_carousel(events: list[BattleEvent]):
+    """
+    Build a Carousel Flex Message for event list.
+
+    Each bubble shows:
+    - Event name with type icon
+    - Event date and duration
+    - Key metric (based on type)
+    - Button to copy command
+
+    Args:
+        events: List of BattleEvent objects
+
+    Returns:
+        FlexMessage carousel, or None if SDK not available
+    """
+    try:
+        from linebot.v3.messaging import (
+            FlexBox,
+            FlexBubble,
+            FlexButton,
+            FlexCarousel,
+            FlexMessage,
+            FlexSeparator,
+            FlexText,
+            MessageAction,
+        )
+    except ImportError:
+        logger.error("linebot SDK not installed")
+        return None
+
+    if not events:
+        return None
+
+    bubbles = []
+    for event in events:
+        config = _get_event_config(event.event_type)
+
+        # Build bubble content
+        body_contents = [
+            # Event name with icon
+            FlexText(
+                text=f"{config['icon']} {event.name}",
+                weight="bold",
+                size="lg",
+                color="#1a1a1a",
+                wrap=True,
+            ),
+            # Type tag
+            FlexBox(
+                layout="horizontal",
+                contents=[
+                    FlexText(
+                        text=config["label"],
+                        size="xs",
+                        color="#ffffff",
+                        align="center",
+                    ),
+                ],
+                backgroundColor=config["color"],
+                cornerRadius="4px",
+                paddingAll="4px",
+                width="48px",
+                margin="sm",
+            ),
+            FlexSeparator(margin="lg"),
+        ]
+
+        # Time info
+        time_str = format_event_time(event.event_start)
+        if time_str:
+            duration_str = format_duration(event.event_start, event.event_end)
+            time_line = time_str
+            if duration_str:
+                time_line += f" · {duration_str}"
+            body_contents.append(
+                FlexText(
+                    text=time_line,
+                    size="sm",
+                    color="#666666",
+                    margin="md",
+                )
+            )
+
+        bubble = FlexBubble(
+            size="micro",
+            body=FlexBox(
+                layout="vertical",
+                contents=body_contents,
+                paddingAll="lg",
+            ),
+            footer=FlexBox(
+                layout="vertical",
+                contents=[
+                    FlexButton(
+                        action=MessageAction(
+                            label="查看報告",
+                            text=f"@bot /戰役 {event.name}",
+                        ),
+                        style="primary",
+                        color=config["color"],
+                    ),
+                ],
+            ),
+        )
+        bubbles.append(bubble)
+
+    carousel = FlexCarousel(contents=bubbles)
+
+    return FlexMessage(
+        alt_text="⚔️ 最近戰役列表",
+        contents=carousel,
     )
 
 

@@ -555,6 +555,43 @@ class LineBindingService:
         """Record that group has been notified (group-level CD)"""
         await self.repository.record_group_notification(line_group_id)
 
+    # =========================================================================
+    # Event Report CD Operations (5 分鐘群組層級 CD)
+    # =========================================================================
+
+    EVENT_REPORT_COOLDOWN_MINUTES = 5
+    EVENT_REPORT_CD_SENTINEL = "__EVENT_REPORT__"
+
+    async def get_event_report_cd_remaining(self, line_group_id: str) -> int:
+        """
+        Get remaining cooldown time in minutes for event report.
+
+        Returns:
+            Remaining minutes (0 if not in cooldown)
+        """
+        last_sent = await self.repository.get_last_notification_time(
+            line_group_id=line_group_id,
+            line_user_id=self.EVENT_REPORT_CD_SENTINEL,
+        )
+
+        if not last_sent:
+            return 0
+
+        elapsed = datetime.now(UTC) - last_sent
+        elapsed_minutes = int(elapsed.total_seconds() / 60)
+
+        if elapsed_minutes >= self.EVENT_REPORT_COOLDOWN_MINUTES:
+            return 0
+
+        return self.EVENT_REPORT_COOLDOWN_MINUTES - elapsed_minutes
+
+    async def record_event_report_cd(self, line_group_id: str) -> None:
+        """Record event report sent time for cooldown tracking."""
+        await self.repository.record_notification(
+            line_group_id=line_group_id,
+            line_user_id=self.EVENT_REPORT_CD_SENTINEL,
+        )
+
     async def list_custom_commands(self, alliance_id: UUID) -> list[LineCustomCommandResponse]:
         commands = await self.repository.list_custom_commands(alliance_id)
         return [self._to_custom_command_response(command) for command in commands]
