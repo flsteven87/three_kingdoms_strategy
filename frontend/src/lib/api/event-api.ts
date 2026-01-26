@@ -9,6 +9,7 @@ import type {
   BattleEvent,
   EventListItem,
   EventAnalyticsResponse,
+  EventGroupAnalytics,
   CreateEventRequest,
   EventUploadResponse,
 } from '@/types/event'
@@ -86,4 +87,14 @@ export async function processEvent(
 
 export async function deleteEvent(eventId: string): Promise<void> {
   await axiosInstance.delete(`/api/v1/events/${eventId}`)
+}
+
+/**
+ * Get group-level analytics for LINE Bot report preview
+ */
+export async function getEventGroupAnalytics(eventId: string): Promise<EventGroupAnalytics> {
+  const response = await axiosInstance.get<EventGroupAnalytics>(
+    `/api/v1/events/${eventId}/group-analytics`
+  )
+  return response.data
 }

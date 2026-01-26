@@ -153,3 +153,44 @@ class EventAnalyticsResponse(BaseModel):
     summary: EventSummaryResponse
     metrics: list[EventMemberMetricResponse]
     merit_distribution: list[DistributionBinResponse]
+
+
+# ============================================================================
+# Group Analytics Schemas (for LINE Bot report preview)
+# ============================================================================
+
+
+class GroupEventStatsResponse(BaseModel):
+    """Statistics for a single group in a battle event"""
+
+    group_name: str
+    member_count: int
+    participated_count: int
+    absent_count: int
+    participation_rate: float
+    total_merit: int
+    avg_merit: float
+    merit_min: int
+    merit_max: int
+
+
+class TopMemberResponse(BaseModel):
+    """Top performer item for ranking display"""
+
+    rank: int
+    member_name: str
+    group_name: str | None
+    merit_diff: int
+
+
+class EventGroupAnalyticsResponse(BaseModel):
+    """Complete group analytics for a battle event (used in LINE Bot report)"""
+
+    event_id: str
+    event_name: str
+    event_type: EventCategory | None = None
+    event_start: datetime | None = None
+    event_end: datetime | None = None
+    summary: EventSummaryResponse
+    group_stats: list[GroupEventStatsResponse]
+    top_members: list[TopMemberResponse]

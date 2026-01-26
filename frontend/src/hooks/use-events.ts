@@ -10,7 +10,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { BattleEvent, CreateEventRequest, EventAnalyticsResponse } from '@/types/event'
+import type { BattleEvent, CreateEventRequest, EventAnalyticsResponse, EventGroupAnalytics } from '@/types/event'
 
 // Query Keys Factory
 export const eventKeys = {
@@ -21,6 +21,7 @@ export const eventKeys = {
   detail: (eventId: string) => [...eventKeys.details(), eventId] as const,
   analytics: () => [...eventKeys.all, 'analytics'] as const,
   eventAnalytics: (eventId: string) => [...eventKeys.analytics(), eventId] as const,
+  groupAnalytics: (eventId: string) => [...eventKeys.all, 'group-analytics', eventId] as const,
 }
 
 /**
@@ -55,6 +56,18 @@ export function useEventAnalytics(eventId: string | undefined) {
     queryKey: eventKeys.eventAnalytics(eventId ?? ''),
     queryFn: () => apiClient.getEventAnalytics(eventId!),
     enabled: !!eventId,
+    staleTime: 2 * 60 * 1000,
+  })
+}
+
+/**
+ * Hook to fetch group-level analytics for LINE Bot report preview
+ */
+export function useEventGroupAnalytics(eventId: string | undefined, options?: { enabled?: boolean }) {
+  return useQuery<EventGroupAnalytics>({
+    queryKey: eventKeys.groupAnalytics(eventId ?? ''),
+    queryFn: () => apiClient.getEventGroupAnalytics(eventId!),
+    enabled: (options?.enabled ?? true) && !!eventId,
     staleTime: 2 * 60 * 1000,
   })
 }

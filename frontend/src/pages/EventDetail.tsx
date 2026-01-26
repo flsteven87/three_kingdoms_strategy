@@ -12,14 +12,23 @@
  * 5. Participation Summary - Visual breakdown of participation status
  */
 
-import { useState, useMemo, type ReactNode } from 'react'
+import { useState, useMemo, type ReactNode, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
-import { useEventAnalytics } from '@/hooks/use-events'
+import { LineReportPreview } from '@/components/events/LineReportPreview'
+import { useEventAnalytics, useEventGroupAnalytics } from '@/hooks/use-events'
 import {
   ArrowLeft,
   Users,
@@ -33,6 +42,7 @@ import {
   UserPlus,
   Medal,
   TrendingUp,
+  MessageSquare,
 } from 'lucide-react'
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { ChartContainer, ChartConfig, ChartTooltip } from '@/components/ui/chart'
@@ -438,11 +448,19 @@ function ParticipationSummary({ metrics }: ParticipationSummaryProps) {
 function EventDetail() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
+  const [previewOpen, setPreviewOpen] = useState(false)
+
   const { data: eventDetail, isLoading, isError } = useEventAnalytics(eventId)
 
-  const handleBack = () => {
+  // Fetch group analytics only when preview sheet is open
+  const { data: groupAnalytics, isLoading: isGroupAnalyticsLoading } = useEventGroupAnalytics(
+    eventId,
+    { enabled: previewOpen }
+  )
+
+  const handleBack = useCallback(() => {
     navigate('/events')
-  }
+  }, [navigate])
 
   if (isLoading) {
     return (
@@ -497,6 +515,30 @@ function EventDetail() {
                 </span>
               </div>
             </div>
+
+            {/* LINE Report Preview Button */}
+            <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  LINE 報告預覽
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>LINE 報告預覽</SheetTitle>
+                  <SheetDescription>
+                    預覽 LINE Bot 將發送的戰役報告格式
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-6">
+                  <LineReportPreview
+                    analytics={groupAnalytics}
+                    isLoading={isGroupAnalyticsLoading}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 

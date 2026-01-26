@@ -144,3 +144,46 @@ export interface EventUploadResponse {
   readonly file_name: string
   readonly total_members: number
 }
+
+// ============================================================================
+// Group Analytics Types (for LINE Bot report preview)
+// ============================================================================
+
+/**
+ * Statistics for a single group in a battle event
+ */
+export interface GroupEventStats {
+  readonly group_name: string
+  readonly member_count: number
+  readonly participated_count: number
+  readonly absent_count: number
+  readonly participation_rate: number
+  readonly total_merit: number
+  readonly avg_merit: number
+  readonly merit_min: number
+  readonly merit_max: number
+}
+
+/**
+ * Top performer item for ranking display
+ */
+export interface TopMemberItem {
+  readonly rank: number
+  readonly member_name: string
+  readonly group_name: string | null
+  readonly merit_diff: number
+}
+
+/**
+ * Complete group analytics for a battle event (used in LINE Bot report)
+ */
+export interface EventGroupAnalytics {
+  readonly event_id: string
+  readonly event_name: string
+  readonly event_type: EventCategory | null
+  readonly event_start: string | null
+  readonly event_end: string | null
+  readonly summary: EventSummary
+  readonly group_stats: readonly GroupEventStats[]
+  readonly top_members: readonly TopMemberItem[]
+}

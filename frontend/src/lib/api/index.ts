@@ -113,6 +113,7 @@ export const apiClient = {
   getEvents: eventApi.getEvents,
   getEvent: eventApi.getEvent,
   getEventAnalytics: eventApi.getEventAnalytics,
+  getEventGroupAnalytics: eventApi.getEventGroupAnalytics,
   createEvent: eventApi.createEvent,
   uploadEventCsv: eventApi.uploadEventCsv,
   processEvent: eventApi.processEvent,

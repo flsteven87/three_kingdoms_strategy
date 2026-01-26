@@ -20,11 +20,14 @@ from src.api.v1.schemas.events import (
     DistributionBinResponse,
     EventAnalyticsResponse,
     EventDetailResponse,
+    EventGroupAnalyticsResponse,
     EventListItemResponse,
     EventMemberMetricResponse,
     EventSummaryResponse,
     EventUploadResponse,
+    GroupEventStatsResponse,
     ProcessEventRequest,
+    TopMemberResponse,
 )
 from src.core.dependencies import (
     BattleEventServiceDep,
@@ -284,6 +287,63 @@ async def get_event_analytics(
         summary=EventSummaryResponse.model_validate(summary),
         metrics=[EventMemberMetricResponse.model_validate(m) for m in metrics],
         merit_distribution=merit_distribution,
+    )
+
+
+@router.get("/{event_id}/group-analytics", response_model=EventGroupAnalyticsResponse)
+async def get_event_group_analytics(
+    event_id: UUID,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
+) -> EventGroupAnalyticsResponse:
+    """
+    Get group-level analytics for a battle event.
+
+    Used for LINE Bot report preview with per-group statistics
+    and top performer rankings.
+
+    Path Parameters:
+        event_id: Event UUID
+
+    Returns:
+        Group analytics with event info, summary, group stats, and top members
+    """
+    await service.verify_user_access(user_id, event_id)
+
+    analytics = await service.get_event_group_analytics(event_id)
+    if not analytics:
+        raise ValueError("Event not found")
+
+    return EventGroupAnalyticsResponse(
+        event_id=str(analytics.event_id),
+        event_name=analytics.event_name,
+        event_type=analytics.event_type,
+        event_start=analytics.event_start,
+        event_end=analytics.event_end,
+        summary=EventSummaryResponse.model_validate(analytics.summary),
+        group_stats=[
+            GroupEventStatsResponse(
+                group_name=g.group_name,
+                member_count=g.member_count,
+                participated_count=g.participated_count,
+                absent_count=g.absent_count,
+                participation_rate=g.participation_rate,
+                total_merit=g.total_merit,
+                avg_merit=g.avg_merit,
+                merit_min=g.merit_min,
+                merit_max=g.merit_max,
+            )
+            for g in analytics.group_stats
+        ],
+        top_members=[
+            TopMemberResponse(
+                rank=m.rank,
+                member_name=m.member_name,
+                group_name=m.group_name,
+                merit_diff=m.merit_diff,
+            )
+            for m in analytics.top_members
+        ],
     )
 
 
