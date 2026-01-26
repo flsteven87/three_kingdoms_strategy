@@ -14,6 +14,11 @@ import type { DistributionBin } from './analytics'
 export type EventStatus = 'draft' | 'analyzing' | 'completed'
 
 /**
+ * Event category determines participation logic
+ */
+export type EventCategory = 'siege' | 'forbidden' | 'battle'
+
+/**
  * Battle event entity
  */
 export interface BattleEvent {
@@ -21,7 +26,7 @@ export interface BattleEvent {
   readonly alliance_id: string
   readonly season_id: string
   readonly name: string
-  readonly event_type: string | null
+  readonly event_type: EventCategory
   readonly description: string | null
   readonly before_upload_id: string | null
   readonly after_upload_id: string | null
@@ -49,10 +54,16 @@ export interface EventSummary {
   readonly avg_merit: number
   readonly avg_assist: number
 
-  // MVP info
+  // MVP info (category-specific)
   readonly mvp_member_id: string | null
   readonly mvp_member_name: string | null
-  readonly mvp_merit: number | null
+  readonly mvp_merit: number | null // For BATTLE
+  readonly mvp_contribution: number | null // For SIEGE
+  readonly mvp_assist: number | null // For SIEGE
+  readonly mvp_combined_score: number | null // For SIEGE (contribution + assist)
+
+  // Forbidden zone specific
+  readonly violator_count: number // For FORBIDDEN
 }
 
 /**
@@ -93,7 +104,7 @@ export interface EventAnalyticsResponse {
 export interface EventListItem {
   readonly id: string
   readonly name: string
-  readonly event_type: string | null
+  readonly event_type: EventCategory
   readonly status: EventStatus
   readonly event_start: string | null
   readonly event_end: string | null
@@ -109,7 +120,7 @@ export interface EventListItem {
  */
 export interface CreateEventRequest {
   readonly name: string
-  readonly event_type?: string | null
+  readonly event_type: EventCategory
   readonly description?: string
 }
 
