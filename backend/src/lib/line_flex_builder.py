@@ -217,18 +217,18 @@ def build_event_report_flex(analytics: EventGroupAnalytics):
 
     body_contents.append(FlexSeparator(margin="lg"))
 
-    # Section 2: Group statistics
+    # Section 2: Group statistics (show ALL groups, pre-sorted by Service layer)
     if analytics.group_stats:
         if is_forbidden:
-            body_contents.extend(_build_group_violator_section(analytics.group_stats[:5]))
+            body_contents.extend(_build_group_violator_section(analytics.group_stats))
         else:
-            body_contents.extend(_build_group_attendance_section(analytics.group_stats[:5]))
+            body_contents.extend(_build_group_attendance_section(analytics.group_stats))
 
         body_contents.append(FlexSeparator(margin="lg"))
 
-    # Section 3: Group average metric (BATTLE/SIEGE only)
+    # Section 3: Group average metric (BATTLE/SIEGE only, show ALL groups)
     if not is_forbidden:
-        participating_groups = [g for g in analytics.group_stats[:5] if g.participated_count > 0]
+        participating_groups = [g for g in analytics.group_stats if g.participated_count > 0]
         if participating_groups:
             body_contents.extend(
                 _build_group_metric_section(participating_groups, event_type, config)
