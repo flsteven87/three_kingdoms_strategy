@@ -14,6 +14,7 @@ Battle Event Service
 - NO direct database calls (delegates to repositories)
 """
 
+import asyncio
 from uuid import UUID
 
 from src.models.battle_event import (
@@ -542,25 +543,30 @@ class BattleEventService:
         """
         events = await self._event_repo.get_recent_completed_events(alliance_id, season_id, limit)
 
-        result: list[BattleEventListItem] = []
-        for event in events:
-            summary = await self._calculate_event_summary(event.id, event.event_type)
-            result.append(
-                BattleEventListItem(
-                    id=event.id,
-                    name=event.name,
-                    event_type=event.event_type,
-                    status=event.status,
-                    event_start=event.event_start,
-                    event_end=event.event_end,
-                    created_at=event.created_at,
-                    participation_rate=summary.participation_rate,
-                    total_merit=summary.total_merit,
-                    mvp_name=summary.mvp_member_name,
-                    absent_count=summary.absent_count,
-                )
+        if not events:
+            return []
+
+        # Parallel summary calculation to avoid reply token expiration
+        summaries = await asyncio.gather(
+            *[self._calculate_event_summary(e.id, e.event_type) for e in events]
+        )
+
+        return [
+            BattleEventListItem(
+                id=event.id,
+                name=event.name,
+                event_type=event.event_type,
+                status=event.status,
+                event_start=event.event_start,
+                event_end=event.event_end,
+                created_at=event.created_at,
+                participation_rate=summary.participation_rate,
+                total_merit=summary.total_merit,
+                mvp_name=summary.mvp_member_name,
+                absent_count=summary.absent_count,
             )
-        return result
+            for event, summary in zip(events, summaries, strict=True)
+        ]
 
     async def get_event_by_name_for_alliance(
         self, alliance_id: UUID, name: str, season_id: UUID | None = None
