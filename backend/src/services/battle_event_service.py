@@ -20,6 +20,7 @@ from src.models.battle_event import (
     BattleEvent,
     BattleEventCreate,
     BattleEventListItem,
+    EventCategory,
     EventStatus,
 )
 from src.models.battle_event_metrics import (
@@ -47,6 +48,41 @@ class BattleEventService:
         self._snapshot_repo = MemberSnapshotRepository()
         self._upload_repo = CsvUploadRepository()
         self._permission_service = PermissionService()
+
+    def _determine_participation(
+        self,
+        event_type: EventCategory,
+        contribution_diff: int,
+        merit_diff: int,
+        assist_diff: int,
+        power_diff: int,
+    ) -> tuple[bool, bool]:
+        """
+        Determine participation and absence based on event category.
+
+        Args:
+            event_type: Event category
+            contribution_diff: Contribution change
+            merit_diff: Merit change
+            assist_diff: Assist change
+            power_diff: Power change
+
+        Returns:
+            Tuple of (participated, is_absent)
+        """
+        if event_type == EventCategory.SIEGE:
+            # 攻城事件: 貢獻 > 0 OR 助攻 > 0
+            participated = contribution_diff > 0 or assist_diff > 0
+        elif event_type == EventCategory.FORBIDDEN:
+            # 禁地事件: 不計算出席，只標記違規者
+            # power_diff > 0 表示偷打地（違規）
+            participated = False  # Forbidden zone doesn't track participation
+        else:  # BATTLE
+            # 戰役事件: 戰功 > 0
+            participated = merit_diff > 0
+
+        is_absent = not participated if event_type != EventCategory.FORBIDDEN else False
+        return participated, is_absent
 
     async def verify_user_access(self, user_id: UUID, event_id: UUID) -> UUID:
         """
@@ -231,9 +267,14 @@ class BattleEventService:
                 donation_diff = max(0, after_snap.total_donation - before_snap.total_donation)
                 power_diff = after_snap.power_value - before_snap.power_value
 
-                # Participation: merit or contribution increased
-                participated = merit_diff > 0 or contribution_diff > 0 or assist_diff > 0
-                is_absent = not participated
+                # Participation based on event category
+                participated, is_absent = self._determine_participation(
+                    event.event_type,
+                    contribution_diff,
+                    merit_diff,
+                    assist_diff,
+                    power_diff,
+                )
 
                 metrics_list.append(
                     BattleEventMetricsCreate(
