@@ -463,7 +463,7 @@ function EventDetail() {
   }
 
   const { event, summary, metrics, merit_distribution } = eventDetail
-  const Icon = getEventIcon()
+  const Icon = getEventIcon(event.event_type)
   const eventTypeLabel = getEventTypeLabel(event.event_type)
 
   return (
