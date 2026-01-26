@@ -233,6 +233,22 @@ class TestParseCSVContent:
         # Assert
         assert result[0]["group_name"] is None
 
+    def test_should_handle_empty_numeric_fields(self):
+        """Empty numeric fields should be parsed as 0"""
+        # Arrange - contribution_rank is empty (common in game exports)
+        csv_with_empty_rank = """成員, 貢獻排行, 貢獻本週, 戰功本週, 助攻本週, 捐獻本週, 貢獻總量, 戰功總量, 助攻總量, 捐獻總量, 勢力值, 所屬州, 分組
+委皇叔, , 3024, 0, 2751, 0, 5414139, 0, 3101, 0, 12030, 南郡, 胖組"""
+
+        # Act
+        result = CSVParserService.parse_csv_content(csv_with_empty_rank)
+
+        # Assert
+        assert len(result) == 1
+        assert result[0]["member_name"] == "委皇叔"
+        assert result[0]["contribution_rank"] == 0  # Empty → 0
+        assert result[0]["weekly_contribution"] == 3024
+        assert result[0]["group_name"] == "胖組"
+
     # =========================================================================
     # Error Case Tests
     # =========================================================================

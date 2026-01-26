@@ -32,10 +32,11 @@ class MemberPeriodMetricsBase(BaseModel):
     daily_donation: Decimal = Field(Decimal("0"), ge=0, description="Daily average donation")
 
     # Ranking data
+    # Note: ranks can be 0 when game export has empty rank field
     start_rank: int | None = Field(
-        None, ge=1, description="Rank at period start (None for new members)"
+        None, ge=0, description="Rank at period start (None for new members, 0 if not ranked)"
     )
-    end_rank: int = Field(..., ge=1, description="Rank at period end")
+    end_rank: int = Field(..., ge=0, description="Rank at period end (0 if not ranked)")
     rank_change: int | None = Field(None, description="Rank change (positive = improved)")
 
     # End state snapshot

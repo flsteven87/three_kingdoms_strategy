@@ -19,7 +19,8 @@ class MemberSnapshotBase(BaseModel):
     group_name: str | None = Field(None, max_length=50, description="Group name (分組)")
 
     # Ranking and power
-    contribution_rank: int = Field(..., ge=1, description="Contribution ranking")
+    # Note: contribution_rank can be 0 when game export has empty rank field
+    contribution_rank: int = Field(..., ge=0, description="Contribution ranking (0 if not ranked)")
     power_value: int = Field(..., ge=0, description="Power value (勢力值)")
 
     # Weekly performance data

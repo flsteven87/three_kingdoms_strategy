@@ -7,7 +7,10 @@ Three Kingdoms Strategy Manager FastAPI Application
 - Global exception handlers (CLAUDE.md 🟡)
 """
 
+import logging
+
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -28,6 +31,8 @@ from src.api.v1.endpoints import (
 )
 from src.core.config import settings
 from src.core.exceptions import SeasonQuotaExhaustedError
+
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 # 符合 CLAUDE.md 🔴: redirect_slashes=False for cloud deployment
@@ -68,6 +73,18 @@ app.include_router(webhooks.router, prefix="/api/v1")
 
 # Global Exception Handlers
 # 符合 CLAUDE.md 🟡: Domain exceptions → Global handler converts to HTTP responses
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Handle FastAPI request validation errors."""
+    logger.warning(f"Validation error on {request.method} {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
+    )
+
+
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     """
@@ -76,6 +93,7 @@ async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse
     Converts ValueError (domain exceptions) to HTTP 400 Bad Request
     This eliminates the need for repetitive try/except blocks in endpoints
     """
+    logger.error(f"[ValueError] URL: {request.url}, Error: {exc}")
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
 
 

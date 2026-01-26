@@ -65,6 +65,8 @@ async def upload_event_csv(
 
     Returns:
         Upload result with upload_id and statistics
+
+    符合 CLAUDE.md 🟡: Global exception handlers eliminate try/except boilerplate
     """
     season_uuid = UUID(season_id)
 

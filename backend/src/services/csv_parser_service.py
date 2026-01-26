@@ -116,6 +116,22 @@ class CSVParserService:
         return None
 
     @classmethod
+    def _parse_int(cls, value: str | None, default: int = 0) -> int:
+        """
+        Safely parse string to int, returning default for empty/None values.
+
+        Args:
+            value: String value to parse
+            default: Default value if empty or None
+
+        Returns:
+            Parsed integer or default value
+        """
+        if value is None or value.strip() == "":
+            return default
+        return int(value)
+
+    @classmethod
     def parse_csv_content(cls, csv_content: str) -> list[dict]:
         """
         Parse CSV content into structured data
@@ -138,6 +154,7 @@ class CSVParserService:
 
         # Read CSV and strip whitespace from field names
         lines = csv_content.splitlines()
+
         if not lines:
             raise ValueError("CSV file is empty")
 
@@ -160,16 +177,16 @@ class CSVParserService:
 
             member_data = {
                 "member_name": cls._get_field_value(row, "member_name"),
-                "contribution_rank": int(cls._get_field_value(row, "contribution_rank")),
-                "weekly_contribution": int(cls._get_field_value(row, "weekly_contribution")),
-                "weekly_merit": int(cls._get_field_value(row, "weekly_merit")),
-                "weekly_assist": int(cls._get_field_value(row, "weekly_assist")),
-                "weekly_donation": int(cls._get_field_value(row, "weekly_donation")),
-                "total_contribution": int(cls._get_field_value(row, "total_contribution")),
-                "total_merit": int(cls._get_field_value(row, "total_merit")),
-                "total_assist": int(cls._get_field_value(row, "total_assist")),
-                "total_donation": int(cls._get_field_value(row, "total_donation")),
-                "power_value": int(cls._get_field_value(row, "power_value")),
+                "contribution_rank": cls._parse_int(cls._get_field_value(row, "contribution_rank", required=False), default=0),
+                "weekly_contribution": cls._parse_int(cls._get_field_value(row, "weekly_contribution", required=False), default=0),
+                "weekly_merit": cls._parse_int(cls._get_field_value(row, "weekly_merit", required=False), default=0),
+                "weekly_assist": cls._parse_int(cls._get_field_value(row, "weekly_assist", required=False), default=0),
+                "weekly_donation": cls._parse_int(cls._get_field_value(row, "weekly_donation", required=False), default=0),
+                "total_contribution": cls._parse_int(cls._get_field_value(row, "total_contribution", required=False), default=0),
+                "total_merit": cls._parse_int(cls._get_field_value(row, "total_merit", required=False), default=0),
+                "total_assist": cls._parse_int(cls._get_field_value(row, "total_assist", required=False), default=0),
+                "total_donation": cls._parse_int(cls._get_field_value(row, "total_donation", required=False), default=0),
+                "power_value": cls._parse_int(cls._get_field_value(row, "power_value", required=False), default=0),
                 "state": cls._get_field_value(row, "state", required=False) or "",
                 "group_name": group_name,
             }
