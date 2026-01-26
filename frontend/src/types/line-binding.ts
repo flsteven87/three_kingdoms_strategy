@@ -11,6 +11,7 @@
 export interface LineBindingCode {
   readonly code: string
   readonly expires_at: string
+  readonly is_test: boolean
   readonly created_at: string
 }
 
@@ -26,6 +27,7 @@ export interface LineGroupBinding {
   readonly group_picture_url: string | null
   readonly bound_at: string
   readonly is_active: boolean
+  readonly is_test: boolean
   readonly member_count: number
 }
 
@@ -91,6 +93,6 @@ export interface LineCustomCommandUpdate {
 
 export interface LineBindingStatusResponse {
   readonly is_bound: boolean
-  readonly binding: LineGroupBinding | null
+  readonly bindings: LineGroupBinding[]
   readonly pending_code: LineBindingCode | null
 }

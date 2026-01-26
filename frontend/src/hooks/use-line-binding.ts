@@ -62,7 +62,8 @@ export function useGenerateBindingCode() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (): Promise<LineBindingCode> => apiClient.generateLineBindingCode(),
+    mutationFn: (isTest: boolean = false): Promise<LineBindingCode> =>
+      apiClient.generateLineBindingCode(isTest),
     onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: lineBindingKeys.status()
@@ -78,7 +79,8 @@ export function useUnbindLineGroup() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (): Promise<void> => apiClient.unbindLineGroup(),
+    mutationFn: (isTest: boolean = false): Promise<void> =>
+      apiClient.unbindLineGroup(isTest),
     onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: lineBindingKeys.status()

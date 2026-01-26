@@ -21,15 +21,21 @@ export async function getLineBindingStatus(): Promise<LineBindingStatusResponse>
   return response.data
 }
 
-export async function generateLineBindingCode(): Promise<LineBindingCode> {
+export async function generateLineBindingCode(
+  isTest: boolean = false
+): Promise<LineBindingCode> {
   const response = await axiosInstance.post<LineBindingCode>(
-    '/api/v1/linebot/codes'
+    '/api/v1/linebot/codes',
+    null,
+    { params: { is_test: isTest } }
   )
   return response.data
 }
 
-export async function unbindLineGroup(): Promise<void> {
-  await axiosInstance.delete('/api/v1/linebot/binding')
+export async function unbindLineGroup(isTest: boolean = false): Promise<void> {
+  await axiosInstance.delete('/api/v1/linebot/binding', {
+    params: { is_test: isTest }
+  })
 }
 
 export async function getRegisteredMembers(): Promise<RegisteredMembersResponse> {
