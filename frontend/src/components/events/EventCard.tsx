@@ -15,16 +15,19 @@ import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MiniMetricCard } from '@/components/ui/MiniMetricCard.tsx'
-import { ChevronRight, CheckCircle, XCircle, UserPlus, Users, Swords, Clock, Trophy } from 'lucide-react'
+import { ChevronRight, CheckCircle, XCircle, UserPlus, Users, Swords, Clock, Trophy, Castle, ShieldAlert } from 'lucide-react'
 import { formatNumberCompact, formatNumber, calculateBoxPlotStats } from '@/lib/chart-utils'
 import { BoxPlot } from '@/components/analytics/BoxPlot'
 import {
   getEventIcon,
   formatEventTime,
-  getEventTypeBadgeVariant,
+  getEventCategoryBadgeVariant,
   getEventTypeLabel,
   formatDuration,
   formatTimeRange,
+  hasParticipationTracking,
+  hasMvp,
+  getPrimaryMetricLabel,
 } from '@/lib/event-utils'
 import type { EventListItem, EventSummary, EventMemberMetric } from '@/types/event'
 import type { DistributionBin } from '@/types/analytics'
@@ -53,6 +56,7 @@ interface InlineStatsProps {
 function InlineStats({ event }: InlineStatsProps) {
   const duration = formatDuration(event.event_start, event.event_end)
   const timeDisplay = formatEventTime(event.event_start, event.event_end)
+  const showParticipation = hasParticipationTracking(event.event_type)
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
@@ -67,24 +71,24 @@ function InlineStats({ event }: InlineStatsProps) {
         </span>
       )}
 
-      {/* Participation rate */}
-      {event.participation_rate != null && (
+      {/* Participation rate - only for siege/battle */}
+      {showParticipation && event.participation_rate != null && (
         <span className="flex items-center gap-1">
           <Users className="h-3.5 w-3.5" />
           {event.participation_rate}%
         </span>
       )}
 
-      {/* Total merit */}
-      {event.total_merit != null && (
+      {/* Total merit - only for battle */}
+      {event.event_type === 'battle' && event.total_merit != null && (
         <span className="flex items-center gap-1">
           <Swords className="h-3.5 w-3.5" />
           {formatNumberCompact(event.total_merit)}
         </span>
       )}
 
-      {/* Absent count - highlighted if > 0 */}
-      {event.absent_count != null && event.absent_count > 0 && (
+      {/* Absent count - only for siege/battle */}
+      {showParticipation && event.absent_count != null && event.absent_count > 0 && (
         <span className="flex items-center gap-1 text-destructive font-medium">
           <XCircle className="h-3.5 w-3.5" />
           {event.absent_count} 人缺席
@@ -111,30 +115,73 @@ function ExpandedContent({ event, eventDetail }: ExpandedContentProps) {
   const { summary, metrics } = eventDetail
   const duration = formatDuration(event.event_start, event.event_end)
   const timeRange = formatTimeRange(event.event_start, event.event_end)
+  const showParticipation = hasParticipationTracking(event.event_type)
+  const showMvp = hasMvp(event.event_type)
+  const isForbidden = event.event_type === 'forbidden'
 
-  // Calculate box plot stats from participated members' merit_diff
-  const meritStats = useMemo(() => {
+  // Calculate box plot stats based on event type
+  const distributionStats = useMemo(() => {
+    if (isForbidden) {
+      // For forbidden: show power_diff distribution of violators
+      const violatorValues = metrics
+        .filter((m) => m.power_diff > 0)
+        .map((m) => m.power_diff)
+      return calculateBoxPlotStats(violatorValues)
+    }
+    // For siege/battle: show relevant metric distribution
     const participatedValues = metrics
-      .filter((m) => m.merit_diff > 0)
-      .map((m) => m.merit_diff)
+      .filter((m) => m.participated)
+      .map((m) => event.event_type === 'siege'
+        ? m.contribution_diff + m.assist_diff
+        : m.merit_diff)
     return calculateBoxPlotStats(participatedValues)
-  }, [metrics])
+  }, [metrics, event.event_type, isForbidden])
 
   return (
     <div className="space-y-4">
-      {/* KPI Grid - 3 cards: Participation, Total Merit, Duration */}
+      {/* KPI Grid - varies by category */}
       <div className="grid gap-3 grid-cols-3">
-        <MiniMetricCard
-          title="參與率"
-          value={`${summary.participation_rate}%`}
-          subtitle={`${summary.participated_count}/${summary.total_members - summary.new_member_count} 人`}
-          icon={<Users className="h-4 w-4" />}
-        />
-        <MiniMetricCard
-          title="總戰功"
-          value={formatNumberCompact(summary.total_merit)}
-          icon={<Swords className="h-4 w-4" />}
-        />
+        {showParticipation ? (
+          <MiniMetricCard
+            title="參與率"
+            value={`${summary.participation_rate}%`}
+            subtitle={`${summary.participated_count}/${summary.total_members - summary.new_member_count} 人`}
+            icon={<Users className="h-4 w-4" />}
+          />
+        ) : (
+          <MiniMetricCard
+            title="違規人數"
+            value={String(summary.violator_count)}
+            subtitle={summary.violator_count > 0 ? '有人偷打地' : '全員遵守'}
+            icon={<ShieldAlert className="h-4 w-4" />}
+          />
+        )}
+
+        {event.event_type === 'battle' && (
+          <MiniMetricCard
+            title="總戰功"
+            value={formatNumberCompact(summary.total_merit)}
+            icon={<Swords className="h-4 w-4" />}
+          />
+        )}
+
+        {event.event_type === 'siege' && (
+          <MiniMetricCard
+            title="總貢獻"
+            value={formatNumberCompact(summary.total_contribution)}
+            subtitle={`助攻 ${formatNumberCompact(summary.total_assist)}`}
+            icon={<Castle className="h-4 w-4" />}
+          />
+        )}
+
+        {isForbidden && (
+          <MiniMetricCard
+            title="總成員"
+            value={String(summary.total_members)}
+            icon={<Users className="h-4 w-4" />}
+          />
+        )}
+
         <MiniMetricCard
           title="持續時間"
           value={duration ?? '-'}
@@ -143,39 +190,50 @@ function ExpandedContent({ event, eventDetail }: ExpandedContentProps) {
         />
       </div>
 
-      {/* Stats Row: Participation + Absent + New Members + MVP */}
+      {/* Stats Row */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <div className="flex items-center gap-1.5">
-          <CheckCircle className="h-4 w-4 text-primary" />
-          <span>參與 {summary.participated_count} 人</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <XCircle className="h-4 w-4 text-destructive" />
-          <span>缺席 {summary.absent_count} 人</span>
-        </div>
+        {showParticipation && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle className="h-4 w-4 text-primary" />
+              <span>參與 {summary.participated_count} 人</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <XCircle className="h-4 w-4 text-destructive" />
+              <span>缺席 {summary.absent_count} 人</span>
+            </div>
+          </>
+        )}
+
         {summary.new_member_count > 0 && (
           <div className="flex items-center gap-1.5">
             <UserPlus className="h-4 w-4 text-yellow-500" />
             <span>新成員 {summary.new_member_count} 人</span>
           </div>
         )}
-        {/* MVP inline instead of separate card */}
-        {summary.mvp_member_name && (
+
+        {/* MVP - category specific */}
+        {showMvp && summary.mvp_member_name && (
           <div className="flex items-center gap-1.5 ml-auto">
             <Trophy className="h-4 w-4 text-yellow-500" />
             <span className="font-medium">{summary.mvp_member_name}</span>
-            {summary.mvp_merit != null && (
+            {event.event_type === 'battle' && summary.mvp_merit != null && (
               <span className="text-muted-foreground">({formatNumber(summary.mvp_merit)})</span>
+            )}
+            {event.event_type === 'siege' && summary.mvp_combined_score != null && (
+              <span className="text-muted-foreground">({formatNumber(summary.mvp_combined_score)})</span>
             )}
           </div>
         )}
       </div>
 
-      {/* Compact Box Plot for merit distribution */}
-      {meritStats && (
+      {/* Distribution Box Plot */}
+      {distributionStats && (
         <div className="pt-2">
-          <p className="text-xs text-muted-foreground mb-2">戰功分佈</p>
-          <BoxPlot stats={meritStats} showLabels={true} />
+          <p className="text-xs text-muted-foreground mb-2">
+            {isForbidden ? '違規者勢力增加分佈' : `${getPrimaryMetricLabel(event.event_type)}分佈`}
+          </p>
+          <BoxPlot stats={distributionStats} showLabels={true} />
         </div>
       )}
 
@@ -203,7 +261,7 @@ function ExpandedContent({ event, eventDetail }: ExpandedContentProps) {
 
 export function EventCard({ event, eventDetail }: EventCardProps) {
   const navigate = useNavigate()
-  const Icon = getEventIcon()
+  const Icon = getEventIcon(event.event_type)
   const eventTypeLabel = getEventTypeLabel(event.event_type)
 
   const handleViewDetail = useCallback(() => {
@@ -212,12 +270,11 @@ export function EventCard({ event, eventDetail }: EventCardProps) {
 
   const icon = <Icon className="h-4 w-4" />
 
-  // Only show badge if event_type exists
-  const badge = eventTypeLabel ? (
-    <Badge variant={getEventTypeBadgeVariant()} className="text-xs">
+  const badge = (
+    <Badge variant={getEventCategoryBadgeVariant(event.event_type)} className="text-xs">
       {eventTypeLabel}
     </Badge>
-  ) : null
+  )
 
   const actions = (
     <Button
