@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { RoleGuard } from '@/components/alliance/RoleGuard'
 import { CsvDropZone } from '@/components/uploads/CsvDropZone'
@@ -28,7 +29,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { EventCard } from '@/components/events/EventCard'
-import type { EventListItem } from '@/types/event'
+import type { EventCategory, EventListItem } from '@/types/event'
 
 // ============================================================================
 // Types
@@ -36,7 +37,7 @@ import type { EventListItem } from '@/types/event'
 
 interface CreateFormData {
   name: string
-  eventType: string
+  eventType: EventCategory
   beforeFile: File | null
   afterFile: File | null
 }
@@ -128,7 +129,7 @@ function EventAnalytics() {
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState<CreateFormData>({
     name: '',
-    eventType: '',
+    eventType: 'battle',
     beforeFile: null,
     afterFile: null,
   })
@@ -173,7 +174,7 @@ function EventAnalytics() {
     setIsCreating(false)
     setFormData({
       name: '',
-      eventType: '',
+      eventType: 'battle',
       beforeFile: null,
       afterFile: null,
     })
@@ -209,7 +210,7 @@ function EventAnalytics() {
       // 3. Create event
       const event = await createEvent.mutateAsync({
         name: formData.name,
-        event_type: formData.eventType.trim() || undefined,
+        event_type: formData.eventType,
       })
 
       // 4. Process event with both upload IDs
@@ -285,16 +286,21 @@ function EventAnalytics() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="event-type">
-                      事件類型 <span className="text-muted-foreground text-xs">(選填)</span>
-                    </Label>
-                    <Input
-                      id="event-type"
+                    <Label htmlFor="event-type">事件類型 *</Label>
+                    <Select
                       value={formData.eventType}
-                      onChange={(e) => handleFormChange({ eventType: e.target.value })}
-                      placeholder="例如：攻城戰、領土戰"
+                      onValueChange={(value: EventCategory) => handleFormChange({ eventType: value })}
                       disabled={isProcessing}
-                    />
+                    >
+                      <SelectTrigger id="event-type">
+                        <SelectValue placeholder="選擇事件類型" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="battle">戰役事件 - 以戰功判定出席</SelectItem>
+                        <SelectItem value="siege">攻城事件 - 以貢獻/助攻判定出席</SelectItem>
+                        <SelectItem value="forbidden">禁地事件 - 監控勢力值違規</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* CSV Upload Areas - Side by Side */}
