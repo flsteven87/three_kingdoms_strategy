@@ -422,14 +422,12 @@ class TestBuildEventListCarousel:
 class TestEventCommandHelpers:
     """Test event command helper functions"""
 
-    def test_is_event_command_traditional(self):
-        """Test traditional Chinese command detection"""
+    def test_is_event_command(self):
+        """Test event command detection"""
         from src.api.v1.endpoints.linebot import _is_event_command
 
         assert _is_event_command("/戰役") is True
         assert _is_event_command("/戰役 資源洲開關") is True
-        assert _is_event_command("/战役") is True
-        assert _is_event_command("/战役 資源洲開關") is True
         assert _is_event_command("/其他指令") is False
         assert _is_event_command("戰役") is False
 
@@ -440,7 +438,6 @@ class TestEventCommandHelpers:
         assert _extract_event_name("/戰役") is None
         assert _extract_event_name("/戰役 ") is None
         assert _extract_event_name("/戰役 資源洲開關") == "資源洲開關"
-        assert _extract_event_name("/战役 徐州爭奪戰") == "徐州爭奪戰"
         assert _extract_event_name("/戰役  有空格的名稱  ") == "有空格的名稱"
 
 

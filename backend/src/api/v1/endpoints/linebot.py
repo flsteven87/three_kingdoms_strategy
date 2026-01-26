@@ -636,8 +636,8 @@ async def _handle_group_message(
             if command_keyword in {"/綁定", "/绑定"}:
                 command_keyword = None
 
-            # Built-in command: /最新戰役 or /最新战役
-            if command_keyword in {"/最新戰役", "/最新战役"}:
+            # Built-in command: /最新戰役
+            if command_keyword == "/最新戰役":
                 await _handle_latest_event_report(
                     line_group_id=line_group_id,
                     reply_token=reply_token,
@@ -646,7 +646,7 @@ async def _handle_group_message(
                 )
                 return
 
-            # Built-in command: /戰役 or /战役 (list events or show report)
+            # Built-in command: /戰役 (list events or show report)
             if _is_event_command(args_text):
                 event_name = _extract_event_name(args_text)
                 await _handle_event_command(
@@ -752,8 +752,8 @@ def _is_bot_mentioned(mentionees: list, bot_user_id: str) -> bool:
 
 
 def _is_event_command(text: str) -> bool:
-    """檢查是否為戰役指令 (/戰役 or /战役)"""
-    return text.startswith("/戰役") or text.startswith("/战役")
+    """檢查是否為戰役指令"""
+    return text.startswith("/戰役")
 
 
 def _extract_event_name(text: str) -> str | None:
@@ -763,12 +763,10 @@ def _extract_event_name(text: str) -> str | None:
     "/戰役" -> None (列出列表)
     "/戰役 資源洲開關" -> "資源洲開關"
     """
-    # Remove the command keyword
-    for keyword in ["/戰役", "/战役"]:
-        if text.startswith(keyword):
-            remaining = text[len(keyword) :].strip()
-            return remaining if remaining else None
-    return None
+    if not text.startswith("/戰役"):
+        return None
+    remaining = text[len("/戰役") :].strip()
+    return remaining if remaining else None
 
 
 async def _handle_event_command(
