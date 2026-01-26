@@ -152,14 +152,18 @@ class PeriodMetricsService:
             period_number: Should be 1
 
         Returns:
-            Created period or None if days <= 0
+            Created period or None if days < 0
         """
         end_date = end_upload.snapshot_date.date()
         days = (end_date - season_start_date).days
 
-        if days <= 0:
-            # Invalid period (upload date is before or same as season start)
+        if days < 0:
+            # Invalid period (upload date is before season start)
             return None
+
+        # Ensure minimum 1 day for same-day uploads (avoid division by zero)
+        if days == 0:
+            days = 1
 
         # Create period record
         period_data = {
@@ -213,15 +217,19 @@ class PeriodMetricsService:
             period_number: Period number within season
 
         Returns:
-            Created period or None if days <= 0
+            Created period or None if days < 0
         """
         start_date = start_upload.snapshot_date.date()
         end_date = end_upload.snapshot_date.date()
         days = (end_date - start_date).days
 
-        if days <= 0:
-            # Invalid period (same or earlier date)
+        if days < 0:
+            # Invalid period (earlier date)
             return None
+
+        # Ensure minimum 1 day for same-day uploads (avoid division by zero)
+        if days == 0:
+            days = 1
 
         # Create period record
         period_data = {

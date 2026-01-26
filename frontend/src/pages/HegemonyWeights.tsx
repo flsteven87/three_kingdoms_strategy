@@ -18,6 +18,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Scale } from 'lucide-react'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useSeasons } from '@/hooks/use-seasons'
 import { HegemonyWeightCard } from '@/components/hegemony-weights/HegemonyWeightCard'
 import { hegemonyWeightKeys } from '@/hooks/use-hegemony-weights'
@@ -105,13 +106,11 @@ function HegemonyWeights() {
 
       {/* Empty State */}
       {!isLoading && sortedSeasons.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-          <Scale className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground mb-4">尚未建立任何賽季</p>
-          <p className="text-sm text-muted-foreground max-w-md">
-            請先前往「賽季管理」頁面建立賽季，並上傳 CSV 數據快照後，再回到此處配置霸業權重。
-          </p>
-        </div>
+        <EmptyState
+          icon={Scale}
+          title="尚無賽季"
+          description="請先前往「賽季管理」頁面建立賽季，並上傳 CSV 數據快照後，再回到此處配置霸業權重。"
+        />
       )}
 
       {/* Season Weight Cards */}

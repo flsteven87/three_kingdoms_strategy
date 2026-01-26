@@ -1373,7 +1373,14 @@ class AnalyticsService:
 
         # Handle edge case where all values are the same
         if min_val == max_val:
-            return [{"range": self._format_range(min_val, max_val + 1), "count": len(values)}]
+            return [
+                {
+                    "range": self._format_range(min_val, max_val + 1),
+                    "min_value": min_val,
+                    "max_value": max_val + 1,
+                    "count": len(values),
+                }
+            ]
 
         # Calculate nice bin width (round to nearest "nice" number)
         data_range = max_val - min_val

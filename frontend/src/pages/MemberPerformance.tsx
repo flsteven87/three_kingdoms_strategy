@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
+import { EmptyState } from '@/components/ui/empty-state'
 import { RankChangeIndicator } from '@/components/analytics/RankChangeIndicator'
 import { ViewModeToggle, type ViewMode } from '@/components/analytics/ViewModeToggle'
 import { MemberCombobox } from '@/components/analytics/member-combobox'
@@ -1542,20 +1543,20 @@ function MemberPerformance() {
 
         {/* No Season State */}
         {!isLoadingSeason && !currentSeason && (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">請先設定當前賽季才能查看成員表現</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={Trophy}
+            title="尚無賽季"
+            description="請先設定當前賽季才能查看成員表現。"
+          />
         )}
 
         {/* No Data State */}
         {!isLoading && !hasError && currentSeason && selectedMemberId && !hasData && (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">此成員尚無表現數據</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            variant="compact"
+            title="此成員尚無表現數據"
+            description="此成員在當前賽季尚無數據記錄。"
+          />
         )}
 
         {/* Tabs - Only show when we have data */}

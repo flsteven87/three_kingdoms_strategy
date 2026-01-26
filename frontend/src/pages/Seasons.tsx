@@ -15,8 +15,9 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -298,18 +299,27 @@ function Seasons() {
 
         {/* Empty State */}
         {!isLoading && sortedSeasons.length === 0 && !isCreating && (
-          <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-            <p className="text-muted-foreground mb-4">尚未建立任何賽季</p>
-            <p className="text-sm text-muted-foreground max-w-md mb-6">
-              建立第一個賽季以開始追蹤盟友表現數據。每個賽季可以設定時間範圍，方便進行數據分析與比較。
-            </p>
-            <RoleGuard requiredRoles={['owner', 'collaborator']}>
-              <Button onClick={() => setIsCreating(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                建立第一個賽季
-              </Button>
-            </RoleGuard>
-          </div>
+          <RoleGuard
+            requiredRoles={['owner', 'collaborator']}
+            fallback={
+              <EmptyState
+                icon={Calendar}
+                title="尚無賽季"
+                description="目前沒有可用的賽季。請聯繫盟主或管理員建立賽季。"
+              />
+            }
+          >
+            <EmptyState
+              icon={Calendar}
+              title="尚無賽季"
+              description="建立第一個賽季以開始追蹤盟友表現數據。每個賽季可以設定時間範圍，方便進行數據分析與比較。"
+              action={{
+                label: '建立第一個賽季',
+                onClick: () => setIsCreating(true),
+                icon: Plus,
+              }}
+            />
+          </RoleGuard>
         )}
 
         {/* Season Cards */}

@@ -24,8 +24,9 @@ import { AllianceGuard } from '@/components/alliance/AllianceGuard'
 import { RankChangeIndicator } from '@/components/analytics/RankChangeIndicator'
 import { BoxPlotComparison } from '@/components/analytics/BoxPlot'
 import { ViewModeToggle, type ViewMode } from '@/components/analytics/ViewModeToggle'
-import { useSeasons } from '@/hooks/use-seasons'
+import { useCurrentSeason } from '@/hooks/use-seasons'
 import { useAllianceAnalytics } from '@/hooks/use-analytics'
+import { EmptyState } from '@/components/ui/empty-state'
 import type {
   AllianceAnalyticsResponse,
   AllianceTrendWithMedian,
@@ -890,8 +891,7 @@ function AllianceAnalytics() {
   const [viewMode, setViewMode] = useState<ViewMode>('latest')
 
   // Get current season
-  const { data: seasons, isLoading: seasonsLoading } = useSeasons()
-  const currentSeason = seasons?.find((s) => s.is_current)
+  const { data: currentSeason, isLoading: seasonsLoading } = useCurrentSeason()
 
   // Get alliance analytics data
   const { data: analyticsData, isLoading: analyticsLoading } = useAllianceAnalytics(
@@ -922,11 +922,11 @@ function AllianceAnalytics() {
 
         {/* No Data State */}
         {!isLoading && !hasData && (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              <p>尚無數據。請先創建賽季並上傳數據。</p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={LayoutDashboard}
+            title="尚無數據"
+            description="請先創建賽季並上傳 CSV 數據快照，以查看同盟分析。"
+          />
         )}
 
         {/* Tab Navigation */}

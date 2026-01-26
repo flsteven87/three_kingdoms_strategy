@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AllianceGuard } from '@/components/alliance/AllianceGuard'
+import { EmptyState } from '@/components/ui/empty-state'
 import { RankChangeIndicator } from '@/components/analytics/RankChangeIndicator'
 import { DetailedStripPlot } from '@/components/analytics/BoxPlot'
 import { ViewModeToggle, type ViewMode } from '@/components/analytics/ViewModeToggle'
@@ -895,13 +896,11 @@ function GroupAnalytics() {
   if (!isGroupsLoading && groups && groups.length === 0) {
     return (
       <AllianceGuard>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Users className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium">尚無組別資料</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            請先上傳 CSV 資料並確保成員有設定組別 (end_group)
-          </p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="尚無組別資料"
+          description="請先上傳 CSV 資料並確保成員有設定組別。"
+        />
       </AllianceGuard>
     )
   }

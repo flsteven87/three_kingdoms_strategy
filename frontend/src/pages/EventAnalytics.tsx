@@ -13,6 +13,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,30 +44,36 @@ interface CreateFormData {
 }
 
 // ============================================================================
-// Empty State Component
+// Empty State Component (uses unified EmptyState)
 // ============================================================================
 
-interface EmptyStateProps {
+interface EventEmptyStateProps {
   readonly onCreateEvent: () => void
 }
 
-function EmptyState({ onCreateEvent }: EmptyStateProps) {
+function EventEmptyState({ onCreateEvent }: EventEmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-      <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-        <Swords className="h-6 w-6 text-muted-foreground" />
-      </div>
-      <p className="text-muted-foreground mb-4">尚無事件記錄</p>
-      <p className="text-sm text-muted-foreground max-w-md mb-6">
-        建立戰役事件來追蹤成員在特定戰鬥中的表現，分析出席率和戰功貢獻。
-      </p>
-      <RoleGuard requiredRoles={['owner', 'collaborator']}>
-        <Button onClick={onCreateEvent}>
-          <Plus className="h-4 w-4 mr-2" />
-          新增事件
-        </Button>
-      </RoleGuard>
-    </div>
+    <RoleGuard
+      requiredRoles={['owner', 'collaborator']}
+      fallback={
+        <EmptyState
+          icon={Swords}
+          title="尚無事件記錄"
+          description="目前沒有戰役事件。請聯繫盟主或管理員建立事件。"
+        />
+      }
+    >
+      <EmptyState
+        icon={Swords}
+        title="尚無事件記錄"
+        description="建立戰役事件來追蹤成員在特定戰鬥中的表現，分析出席率和戰功貢獻。"
+        action={{
+          label: '新增事件',
+          onClick: onCreateEvent,
+          icon: Plus,
+        }}
+      />
+    </RoleGuard>
   )
 }
 
@@ -359,7 +366,7 @@ function EventAnalytics() {
 
         {/* Empty State */}
         {!isLoading && sortedEvents.length === 0 && !isCreating && (
-          <EmptyState onCreateEvent={handleStartCreate} />
+          <EventEmptyState onCreateEvent={handleStartCreate} />
         )}
 
         {/* Event List */}
