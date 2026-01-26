@@ -24,10 +24,21 @@ function getParamsFromLiffUrl(): Record<string, string> {
   const qs = new URLSearchParams(window.location.search)
   const state = qs.get('liff.state')
 
-  const raw = state ? decodeURIComponent(state) : window.location.href
-  const query = raw.includes('?') ? raw.split('?')[1] : ''
+  // Debug logging
+  console.log('[LIFF] window.location.href:', window.location.href)
+  console.log('[LIFF] window.location.search:', window.location.search)
+  console.log('[LIFF] liff.state:', state)
 
-  return Object.fromEntries(new URLSearchParams(query).entries())
+  const raw = state ? decodeURIComponent(state) : window.location.href
+  console.log('[LIFF] raw after decode:', raw)
+
+  const query = raw.includes('?') ? raw.split('?')[1] : ''
+  console.log('[LIFF] query string:', query)
+
+  const params = Object.fromEntries(new URLSearchParams(query).entries())
+  console.log('[LIFF] parsed params:', params)
+
+  return params
 }
 
 export function useLiffSession(liffId: string): LiffState {
