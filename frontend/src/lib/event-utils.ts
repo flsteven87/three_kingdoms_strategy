@@ -7,35 +7,39 @@
  * - EventAnalytics.tsx
  */
 
-import { Swords, type LucideIcon } from 'lucide-react'
+import type { EventCategory } from '@/types/event'
+import { Castle, ShieldAlert, Swords, type LucideIcon } from 'lucide-react'
 
 /**
- * Legacy event type labels for backward compatibility
+ * Event category display labels (Chinese)
  */
-const LEGACY_EVENT_TYPE_LABELS: Record<string, string> = {
-  siege: '攻城戰',
-  defense: '守城戰',
-  raid: '突襲',
-  territory: '領土爭奪',
-  boss: '世界BOSS',
-  custom: '自訂',
+const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {
+  siege: '攻城事件',
+  forbidden: '禁地事件',
+  battle: '戰役事件',
 }
 
 /**
- * Get display label for event type
- * Returns the label for legacy enum values, or the custom string as-is
+ * Event category icons
  */
-export function getEventTypeLabel(eventType: string | null): string | null {
-  if (!eventType) return null
-  return LEGACY_EVENT_TYPE_LABELS[eventType] ?? eventType
+const EVENT_CATEGORY_ICONS: Record<EventCategory, LucideIcon> = {
+  siege: Castle,
+  forbidden: ShieldAlert,
+  battle: Swords,
 }
 
 /**
- * Get the icon component for an event
- * Uses Swords as the default icon for all events
+ * Get display label for event category
  */
-export function getEventIcon(): LucideIcon {
-  return Swords
+export function getEventTypeLabel(eventType: EventCategory): string {
+  return EVENT_CATEGORY_LABELS[eventType]
+}
+
+/**
+ * Get the icon component for an event category
+ */
+export function getEventIcon(eventType: EventCategory): LucideIcon {
+  return EVENT_CATEGORY_ICONS[eventType]
 }
 
 /**
@@ -92,11 +96,47 @@ export function formatEventTime(
 }
 
 /**
- * Get badge variant for event type display
- * Returns 'secondary' for all event types (simplified)
+ * Get badge variant for event category
  */
-export function getEventTypeBadgeVariant(): 'secondary' {
-  return 'secondary'
+export function getEventCategoryBadgeVariant(
+  eventType: EventCategory
+): 'default' | 'secondary' | 'destructive' {
+  switch (eventType) {
+    case 'siege':
+      return 'default'
+    case 'forbidden':
+      return 'destructive'
+    case 'battle':
+      return 'secondary'
+  }
+}
+
+/**
+ * Check if event category tracks participation rate
+ */
+export function hasParticipationTracking(eventType: EventCategory): boolean {
+  return eventType !== 'forbidden'
+}
+
+/**
+ * Check if event category has MVP
+ */
+export function hasMvp(eventType: EventCategory): boolean {
+  return eventType !== 'forbidden'
+}
+
+/**
+ * Get the primary metric label for an event category
+ */
+export function getPrimaryMetricLabel(eventType: EventCategory): string {
+  switch (eventType) {
+    case 'siege':
+      return '貢獻+助攻'
+    case 'forbidden':
+      return '違規人數'
+    case 'battle':
+      return '戰功'
+  }
 }
 
 /**
