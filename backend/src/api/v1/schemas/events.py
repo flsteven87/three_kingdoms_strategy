@@ -14,7 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.models.battle_event import EventStatus
+from src.models.battle_event import EventCategory, EventStatus
 
 # ============================================================================
 # Request Schemas
@@ -25,7 +25,10 @@ class CreateEventRequest(BaseModel):
     """Request body for creating a new battle event"""
 
     name: str = Field(..., min_length=1, max_length=100, description="Event name")
-    event_type: str | None = Field(None, max_length=50, description="Optional event type label")
+    event_type: EventCategory = Field(
+        default=EventCategory.BATTLE,
+        description="Event category: siege (攻城), forbidden (禁地), battle (戰役)"
+    )
     description: str | None = Field(None, max_length=500, description="Event description")
 
 
@@ -58,7 +61,7 @@ class EventListItemResponse(BaseModel):
 
     id: UUID
     name: str
-    event_type: str | None
+    event_type: EventCategory
     status: EventStatus
     event_start: datetime | None
     event_end: datetime | None
@@ -76,7 +79,7 @@ class EventDetailResponse(BaseModel):
 
     id: UUID
     name: str
-    event_type: str | None
+    event_type: EventCategory
     description: str | None
     status: EventStatus
     event_start: datetime | None
