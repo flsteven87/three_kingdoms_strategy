@@ -43,20 +43,30 @@ import {
   Medal,
   TrendingUp,
   MessageSquare,
+  Castle,
+  ShieldAlert,
 } from 'lucide-react'
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { ChartContainer, ChartConfig, ChartTooltip } from '@/components/ui/chart'
 import { formatNumber, formatNumberCompact, calculateBoxPlotStats } from '@/lib/chart-utils'
 import { BoxPlot } from '@/components/analytics/BoxPlot'
-import { getEventIcon, formatEventTime, getEventTypeLabel, formatDuration, formatTimeRange } from '@/lib/event-utils'
-import type { EventMemberMetric } from '@/types/event'
+import {
+  getEventIcon,
+  formatEventTime,
+  getEventTypeLabel,
+  formatDuration,
+  formatTimeRange,
+  hasParticipationTracking,
+  getPrimaryMetricLabel,
+} from '@/lib/event-utils'
+import type { EventCategory, EventMemberMetric } from '@/types/event'
 import type { DistributionBin } from '@/types/analytics'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type SortField = 'member_name' | 'group_name' | 'merit_diff' | 'assist_diff' | 'contribution_diff'
+type SortField = 'member_name' | 'group_name' | 'merit_diff' | 'assist_diff' | 'contribution_diff' | 'power_diff'
 type SortDirection = 'asc' | 'desc'
 
 // ============================================================================
@@ -142,22 +152,25 @@ function KpiCard({ title, value, subtitle, icon, highlight }: KpiCardProps) {
 }
 
 // ============================================================================
-// Merit Distribution Section
+// Metric Distribution Section (Category-aware)
 // ============================================================================
 
-interface MeritDistributionProps {
+interface MetricDistributionProps {
   readonly distribution: readonly DistributionBin[]
+  readonly eventType: EventCategory
 }
 
-function MeritDistribution({ distribution }: MeritDistributionProps) {
+function MetricDistribution({ distribution, eventType }: MetricDistributionProps) {
   if (distribution.length === 0) return null
+
+  const metricLabel = getPrimaryMetricLabel(eventType)
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
-          戰功分佈
+          {metricLabel}分佈
         </CardTitle>
         <CardDescription>各區間成員數量分佈</CardDescription>
       </CardHeader>
@@ -186,7 +199,7 @@ function MeritDistribution({ distribution }: MeritDistributionProps) {
                   const d = payload[0].payload as DistributionBin
                   return (
                     <div className="rounded-lg border bg-background p-2.5 shadow-sm">
-                      <div className="font-medium">戰功 {d.range}</div>
+                      <div className="font-medium">{metricLabel} {d.range}</div>
                       <div className="text-sm text-muted-foreground">{d.count} 人</div>
                     </div>
                   )
@@ -202,19 +215,37 @@ function MeritDistribution({ distribution }: MeritDistributionProps) {
 }
 
 // ============================================================================
-// Member Ranking Section
+// Member Ranking Section (Category-aware)
 // ============================================================================
 
 interface MemberRankingProps {
   readonly metrics: readonly EventMemberMetric[]
+  readonly eventType: EventCategory
 }
 
-function MemberRanking({ metrics }: MemberRankingProps) {
-  const [sortField, setSortField] = useState<SortField>('merit_diff')
+function MemberRanking({ metrics, eventType }: MemberRankingProps) {
+  const isBattle = eventType === 'battle'
+  const isSiege = eventType === 'siege'
+  const isForbidden = eventType === 'forbidden'
+
+  // Default sort field based on event type
+  const defaultSortField: SortField = isForbidden ? 'power_diff' : isSiege ? 'contribution_diff' : 'merit_diff'
+  const [sortField, setSortField] = useState<SortField>(defaultSortField)
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const sortedMetrics = useMemo(() => {
     return [...metrics].sort((a, b) => {
+      // For FORBIDDEN, show violators (power_diff > 0) first
+      if (isForbidden && sortField === 'power_diff') {
+        const aIsViolator = a.power_diff > 0
+        const bIsViolator = b.power_diff > 0
+        if (aIsViolator !== bIsViolator) {
+          return sortDirection === 'desc'
+            ? (aIsViolator ? -1 : 1)
+            : (aIsViolator ? 1 : -1)
+        }
+      }
+
       const aVal = a[sortField]
       const bVal = b[sortField]
 
@@ -229,7 +260,7 @@ function MemberRanking({ metrics }: MemberRankingProps) {
 
       return sortDirection === 'asc' ? diff : -diff
     })
-  }, [metrics, sortField, sortDirection])
+  }, [metrics, sortField, sortDirection, isForbidden])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -250,6 +281,15 @@ function MemberRanking({ metrics }: MemberRankingProps) {
   }
 
   const getStatusBadge = (metric: EventMemberMetric) => {
+    // For FORBIDDEN, show violator status
+    if (isForbidden) {
+      if (metric.power_diff > 0) {
+        return <Badge variant="destructive">違規</Badge>
+      }
+      return <Badge variant="default">遵守</Badge>
+    }
+
+    // For BATTLE/SIEGE
     if (metric.is_new_member) {
       return (
         <Badge variant="outline" className="text-yellow-600 border-yellow-300">
@@ -266,8 +306,11 @@ function MemberRanking({ metrics }: MemberRankingProps) {
     return null
   }
 
-  const getMedalIcon = (index: number, participated: boolean) => {
-    if (!participated || index >= 3) return null
+  const getMedalIcon = (index: number, metric: EventMemberMetric) => {
+    // For FORBIDDEN, no medals (it's about compliance, not competition)
+    if (isForbidden) return null
+
+    if (!metric.participated || index >= 3) return null
     const colors = ['text-yellow-500', 'text-gray-400', 'text-amber-600']
     return <Medal className={`h-4 w-4 ${colors[index]}`} />
   }
@@ -277,7 +320,7 @@ function MemberRanking({ metrics }: MemberRankingProps) {
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Medal className="h-5 w-5" />
-          成員排行
+          {isForbidden ? '成員名單' : '成員排行'}
         </CardTitle>
         <CardDescription>點擊欄位標題排序</CardDescription>
       </CardHeader>
@@ -307,26 +350,57 @@ function MemberRanking({ metrics }: MemberRankingProps) {
                     {renderSortIcon('group_name')}
                   </button>
                 </th>
-                <th className="py-3 px-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => handleSort('merit_diff')}
-                    className="flex items-center justify-end w-full font-medium hover:text-primary transition-colors"
-                  >
-                    戰功
-                    {renderSortIcon('merit_diff')}
-                  </button>
-                </th>
-                <th className="py-3 px-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => handleSort('assist_diff')}
-                    className="flex items-center justify-end w-full font-medium hover:text-primary transition-colors"
-                  >
-                    助攻
-                    {renderSortIcon('assist_diff')}
-                  </button>
-                </th>
+                {/* BATTLE: 戰功 */}
+                {isBattle && (
+                  <th className="py-3 px-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleSort('merit_diff')}
+                      className="flex items-center justify-end w-full font-medium hover:text-primary transition-colors"
+                    >
+                      戰功
+                      {renderSortIcon('merit_diff')}
+                    </button>
+                  </th>
+                )}
+                {/* SIEGE: 貢獻 + 助攻 */}
+                {isSiege && (
+                  <>
+                    <th className="py-3 px-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleSort('contribution_diff')}
+                        className="flex items-center justify-end w-full font-medium hover:text-primary transition-colors"
+                      >
+                        貢獻
+                        {renderSortIcon('contribution_diff')}
+                      </button>
+                    </th>
+                    <th className="py-3 px-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleSort('assist_diff')}
+                        className="flex items-center justify-end w-full font-medium hover:text-primary transition-colors"
+                      >
+                        助攻
+                        {renderSortIcon('assist_diff')}
+                      </button>
+                    </th>
+                  </>
+                )}
+                {/* FORBIDDEN: 勢力增加 */}
+                {isForbidden && (
+                  <th className="py-3 px-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleSort('power_diff')}
+                      className="flex items-center justify-end w-full font-medium hover:text-primary transition-colors"
+                    >
+                      勢力增加
+                      {renderSortIcon('power_diff')}
+                    </button>
+                  </th>
+                )}
                 <th className="py-3 px-3 text-center">狀態</th>
               </tr>
             </thead>
@@ -336,15 +410,34 @@ function MemberRanking({ metrics }: MemberRankingProps) {
                   <td className="py-3 px-3 tabular-nums text-muted-foreground">{index + 1}</td>
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-2">
-                      {getMedalIcon(index, m.participated)}
+                      {getMedalIcon(index, m)}
                       <span className="font-medium">{m.member_name}</span>
                     </div>
                   </td>
                   <td className="py-3 px-3 text-muted-foreground">{m.group_name || '-'}</td>
-                  <td className="py-3 px-3 text-right tabular-nums font-medium">
-                    {formatNumber(m.merit_diff)}
-                  </td>
-                  <td className="py-3 px-3 text-right tabular-nums">{formatNumber(m.assist_diff)}</td>
+                  {/* BATTLE: 戰功 */}
+                  {isBattle && (
+                    <td className="py-3 px-3 text-right tabular-nums font-medium">
+                      {formatNumber(m.merit_diff)}
+                    </td>
+                  )}
+                  {/* SIEGE: 貢獻 + 助攻 */}
+                  {isSiege && (
+                    <>
+                      <td className="py-3 px-3 text-right tabular-nums font-medium">
+                        {formatNumber(m.contribution_diff)}
+                      </td>
+                      <td className="py-3 px-3 text-right tabular-nums">
+                        {formatNumber(m.assist_diff)}
+                      </td>
+                    </>
+                  )}
+                  {/* FORBIDDEN: 勢力增加 */}
+                  {isForbidden && (
+                    <td className={`py-3 px-3 text-right tabular-nums ${m.power_diff > 0 ? 'text-destructive font-medium' : ''}`}>
+                      {m.power_diff > 0 ? `+${formatNumber(m.power_diff)}` : formatNumber(m.power_diff)}
+                    </td>
+                  )}
                   <td className="py-3 px-3 text-center">{getStatusBadge(m)}</td>
                 </tr>
               ))}
@@ -542,21 +635,56 @@ function EventDetail() {
           </div>
         </div>
 
-        {/* KPI Grid - 3 cards: Participation, Total Merit, Duration */}
+        {/* KPI Grid - Category-aware */}
         <div className="grid gap-4 grid-cols-3">
-          <KpiCard
-            title="參與率"
-            value={`${summary.participation_rate}%`}
-            subtitle={`${summary.participated_count}/${summary.total_members - summary.new_member_count} 人`}
-            icon={<Users className="h-5 w-5" />}
-            highlight
-          />
-          <KpiCard
-            title="總戰功"
-            value={formatNumberCompact(summary.total_merit)}
-            icon={<Swords className="h-5 w-5" />}
-            highlight
-          />
+          {/* First KPI: Participation Rate (BATTLE/SIEGE) or Compliance Rate (FORBIDDEN) */}
+          {hasParticipationTracking(event.event_type) ? (
+            <KpiCard
+              title="參與率"
+              value={`${summary.participation_rate}%`}
+              subtitle={`${summary.participated_count}/${summary.total_members - summary.new_member_count} 人`}
+              icon={<Users className="h-5 w-5" />}
+              highlight
+            />
+          ) : (
+            <KpiCard
+              title="守規率"
+              value={`${summary.total_members > 0 ? (((summary.total_members - summary.violator_count) / summary.total_members) * 100).toFixed(1) : 100}%`}
+              subtitle={summary.violator_count > 0 ? `${summary.violator_count} 人違規` : '全員遵守'}
+              icon={<Users className="h-5 w-5" />}
+              highlight
+            />
+          )}
+
+          {/* Second KPI: Category-specific metric */}
+          {event.event_type === 'battle' && (
+            <KpiCard
+              title="總戰功"
+              value={formatNumberCompact(summary.total_merit)}
+              icon={<Swords className="h-5 w-5" />}
+              highlight
+            />
+          )}
+          {event.event_type === 'siege' && (
+            <KpiCard
+              title="總貢獻"
+              value={formatNumberCompact(summary.total_contribution)}
+              subtitle={`助攻 ${formatNumberCompact(summary.total_assist)}`}
+              icon={<Castle className="h-5 w-5" />}
+              highlight
+            />
+          )}
+          {event.event_type === 'forbidden' && (
+            <KpiCard
+              title="違規人數"
+              value={summary.violator_count}
+              subtitle={`共 ${summary.total_members} 人`}
+              icon={<ShieldAlert className="h-5 w-5" />}
+              highlight={summary.violator_count > 0}
+            />
+          )}
+
+          {/* Third KPI: Duration */}
           <KpiCard
             title="持續時間"
             value={formatDuration(event.event_start, event.event_end) ?? '-'}
@@ -565,37 +693,58 @@ function EventDetail() {
           />
         </div>
 
-        {/* Box Plot - Merit Distribution Overview */}
+        {/* Box Plot - Category-aware Distribution Overview */}
         {(() => {
-          const participatedValues = metrics
-            .filter((m) => m.participated)
-            .map((m) => m.merit_diff)
-          const meritStats = calculateBoxPlotStats(participatedValues)
-          if (!meritStats) return null
+          const isForbidden = event.event_type === 'forbidden'
+          const isSiege = event.event_type === 'siege'
+          const metricLabel = getPrimaryMetricLabel(event.event_type)
+
+          // Calculate values based on event type
+          let values: number[]
+          if (isForbidden) {
+            // For FORBIDDEN: show violators' power increase distribution
+            values = metrics.filter((m) => m.power_diff > 0).map((m) => m.power_diff)
+          } else if (isSiege) {
+            // For SIEGE: show contribution + assist
+            values = metrics.filter((m) => m.participated).map((m) => m.contribution_diff + m.assist_diff)
+          } else {
+            // For BATTLE: show merit
+            values = metrics.filter((m) => m.participated).map((m) => m.merit_diff)
+          }
+
+          const stats = calculateBoxPlotStats(values)
+          if (!stats) return null
+
           return (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
-                  戰功分佈概覽
+                  {isForbidden ? '違規者勢力增加分佈' : `${metricLabel}分佈概覽`}
                 </CardTitle>
-                <CardDescription>參與成員的戰功統計 (Min / Q1 / Median / Q3 / Max)</CardDescription>
+                <CardDescription>
+                  {isForbidden
+                    ? '違規成員的勢力增加統計 (Min / Q1 / Median / Q3 / Max)'
+                    : `參與成員的${metricLabel}統計 (Min / Q1 / Median / Q3 / Max)`}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <BoxPlot stats={meritStats} showLabels={true} />
+                <BoxPlot stats={stats} showLabels={true} />
               </CardContent>
             </Card>
           )
         })()}
 
-        {/* Merit Distribution */}
-        <MeritDistribution distribution={merit_distribution} />
+        {/* Metric Distribution (Category-aware) */}
+        <MetricDistribution distribution={merit_distribution} eventType={event.event_type} />
 
-        {/* Member Ranking */}
-        <MemberRanking metrics={metrics} />
+        {/* Member Ranking (Category-aware) */}
+        <MemberRanking metrics={metrics} eventType={event.event_type} />
 
-        {/* Participation Summary */}
-        <ParticipationSummary metrics={metrics} />
+        {/* Participation Summary (only for BATTLE/SIEGE) */}
+        {hasParticipationTracking(event.event_type) && (
+          <ParticipationSummary metrics={metrics} />
+        )}
       </div>
     </AllianceGuard>
   )

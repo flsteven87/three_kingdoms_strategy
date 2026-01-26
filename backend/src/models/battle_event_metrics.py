@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.models.battle_event import EventCategory
+
 
 class BattleEventMetricsBase(BaseModel):
     """Base battle event metrics model with common fields"""
@@ -100,7 +102,7 @@ class EventSummary(BaseModel):
 
 
 class GroupEventStats(BaseModel):
-    """Statistics for a single group in a battle event"""
+    """Statistics for a single group in a battle event (category-aware)"""
 
     group_name: str = Field(..., description="Group name (or '未分組' if null)")
     member_count: int = Field(..., ge=0, description="Total members in group")
@@ -108,20 +110,47 @@ class GroupEventStats(BaseModel):
     absent_count: int = Field(..., ge=0, description="Members who were absent")
     participation_rate: float = Field(..., ge=0, le=100, description="Group participation rate")
 
-    # Merit statistics (calculated from participants only)
+    # Merit statistics (for BATTLE events)
     total_merit: int = Field(0, ge=0, description="Sum of merit diffs")
     avg_merit: float = Field(0, ge=0, description="Average merit per participant")
     merit_min: int = Field(0, ge=0, description="Minimum merit")
     merit_max: int = Field(0, ge=0, description="Maximum merit")
 
+    # Contribution/Assist statistics (for SIEGE events)
+    total_contribution: int = Field(0, ge=0, description="Sum of contribution diffs")
+    avg_contribution: float = Field(0, ge=0, description="Average contribution per participant")
+    total_assist: int = Field(0, ge=0, description="Sum of assist diffs")
+    avg_assist: float = Field(0, ge=0, description="Average assist per participant")
+    combined_min: int = Field(0, ge=0, description="Minimum contribution+assist")
+    combined_max: int = Field(0, ge=0, description="Maximum contribution+assist")
+
+    # Violator statistics (for FORBIDDEN events)
+    violator_count: int = Field(0, ge=0, description="Members with power increase")
+
 
 class TopMemberItem(BaseModel):
-    """Top performer item for ranking display"""
+    """Top performer item for ranking display (category-aware)"""
 
     rank: int = Field(..., ge=1, description="Ranking position")
     member_name: str = Field(..., description="Member name (game ID)")
     group_name: str | None = Field(None, description="Member group")
-    merit_diff: int = Field(..., ge=0, description="Merit earned in event")
+
+    # Score fields (populated based on event category)
+    score: int = Field(..., ge=0, description="Primary score for ranking")
+    merit_diff: int | None = Field(None, description="Merit earned (BATTLE)")
+    contribution_diff: int | None = Field(None, description="Contribution earned (SIEGE)")
+    assist_diff: int | None = Field(None, description="Assist earned (SIEGE)")
+
+    line_display_name: str | None = Field(None, description="LINE display name if bound")
+
+
+class ViolatorItem(BaseModel):
+    """Violator item for FORBIDDEN events"""
+
+    rank: int = Field(..., ge=1, description="Ranking position by power increase")
+    member_name: str = Field(..., description="Member name (game ID)")
+    group_name: str | None = Field(None, description="Member group")
+    power_diff: int = Field(..., description="Power increase (violation amount)")
     line_display_name: str | None = Field(None, description="LINE display name if bound")
 
 
@@ -131,15 +160,18 @@ class EventGroupAnalytics(BaseModel):
     # Event info
     event_id: UUID
     event_name: str
-    event_type: str | None = None
+    event_type: EventCategory | None = None
     event_start: datetime | None = None
     event_end: datetime | None = None
 
     # Overall summary
     summary: EventSummary
 
-    # Group-level statistics (sorted by total_merit desc)
+    # Group-level statistics (sorted by primary metric desc)
     group_stats: list[GroupEventStats] = []
 
-    # Top performers
+    # Top performers (for BATTLE and SIEGE events)
     top_members: list[TopMemberItem] = []
+
+    # Violators (for FORBIDDEN events only)
+    violators: list[ViolatorItem] = []

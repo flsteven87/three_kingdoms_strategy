@@ -150,7 +150,7 @@ export interface EventUploadResponse {
 // ============================================================================
 
 /**
- * Statistics for a single group in a battle event
+ * Statistics for a single group in a battle event (category-aware)
  */
 export interface GroupEventStats {
   readonly group_name: string
@@ -158,20 +158,53 @@ export interface GroupEventStats {
   readonly participated_count: number
   readonly absent_count: number
   readonly participation_rate: number
+
+  // BATTLE event stats
   readonly total_merit: number
   readonly avg_merit: number
   readonly merit_min: number
   readonly merit_max: number
+
+  // SIEGE event stats
+  readonly total_contribution: number
+  readonly avg_contribution: number
+  readonly total_assist: number
+  readonly avg_assist: number
+  readonly combined_min: number
+  readonly combined_max: number
+
+  // FORBIDDEN event stats
+  readonly violator_count: number
 }
 
 /**
- * Top performer item for ranking display
+ * Top performer item for ranking display (category-aware)
  */
 export interface TopMemberItem {
   readonly rank: number
   readonly member_name: string
   readonly group_name: string | null
-  readonly merit_diff: number
+
+  // Primary score for ranking
+  readonly score: number
+
+  // Category-specific fields
+  readonly merit_diff: number | null // BATTLE
+  readonly contribution_diff: number | null // SIEGE
+  readonly assist_diff: number | null // SIEGE
+
+  readonly line_display_name?: string | null
+}
+
+/**
+ * Violator item for FORBIDDEN events
+ */
+export interface ViolatorItem {
+  readonly rank: number
+  readonly member_name: string
+  readonly group_name: string | null
+  readonly power_diff: number
+  readonly line_display_name?: string | null
 }
 
 /**
@@ -185,5 +218,10 @@ export interface EventGroupAnalytics {
   readonly event_end: string | null
   readonly summary: EventSummary
   readonly group_stats: readonly GroupEventStats[]
+
+  // Top performers (for BATTLE and SIEGE events)
   readonly top_members: readonly TopMemberItem[]
+
+  // Violators (for FORBIDDEN events only)
+  readonly violators: readonly ViolatorItem[]
 }

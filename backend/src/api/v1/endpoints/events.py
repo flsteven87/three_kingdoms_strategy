@@ -28,6 +28,7 @@ from src.api.v1.schemas.events import (
     GroupEventStatsResponse,
     ProcessEventRequest,
     TopMemberResponse,
+    ViolatorResponse,
 )
 from src.core.dependencies import (
     BattleEventServiceDep,
@@ -35,7 +36,7 @@ from src.core.dependencies import (
     SeasonServiceDep,
     UserIdDep,
 )
-from src.models.battle_event import BattleEventCreate
+from src.models.battle_event import BattleEventCreate, EventCategory
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -279,8 +280,18 @@ async def get_event_analytics(
     summary = await service.get_event_summary(event_id)
     metrics = await service.get_event_metrics(event_id)
 
-    # Calculate merit distribution
-    merit_distribution = _calculate_merit_distribution([m.merit_diff for m in metrics])
+    # Calculate distribution based on event type
+    if event.event_type == EventCategory.SIEGE:
+        # SIEGE: contribution + assist
+        values = [m.contribution_diff + m.assist_diff for m in metrics]
+    elif event.event_type == EventCategory.FORBIDDEN:
+        # FORBIDDEN: power_diff for violators
+        values = [m.power_diff for m in metrics if m.power_diff > 0]
+    else:
+        # BATTLE: merit_diff
+        values = [m.merit_diff for m in metrics]
+
+    merit_distribution = _calculate_metric_distribution(values)
 
     return EventAnalyticsResponse(
         event=EventDetailResponse.model_validate(event),
@@ -328,10 +339,20 @@ async def get_event_group_analytics(
                 participated_count=g.participated_count,
                 absent_count=g.absent_count,
                 participation_rate=g.participation_rate,
+                # BATTLE stats
                 total_merit=g.total_merit,
                 avg_merit=g.avg_merit,
                 merit_min=g.merit_min,
                 merit_max=g.merit_max,
+                # SIEGE stats
+                total_contribution=g.total_contribution,
+                avg_contribution=g.avg_contribution,
+                total_assist=g.total_assist,
+                avg_assist=g.avg_assist,
+                combined_min=g.combined_min,
+                combined_max=g.combined_max,
+                # FORBIDDEN stats
+                violator_count=g.violator_count,
             )
             for g in analytics.group_stats
         ],
@@ -340,9 +361,23 @@ async def get_event_group_analytics(
                 rank=m.rank,
                 member_name=m.member_name,
                 group_name=m.group_name,
+                score=m.score,
                 merit_diff=m.merit_diff,
+                contribution_diff=m.contribution_diff,
+                assist_diff=m.assist_diff,
+                line_display_name=m.line_display_name,
             )
             for m in analytics.top_members
+        ],
+        violators=[
+            ViolatorResponse(
+                rank=v.rank,
+                member_name=v.member_name,
+                group_name=v.group_name,
+                power_diff=v.power_diff,
+                line_display_name=v.line_display_name,
+            )
+            for v in analytics.violators
         ],
     )
 
@@ -363,30 +398,32 @@ async def delete_event(
     await service.delete_event(event_id)
 
 
-def _calculate_merit_distribution(merits: list[int]) -> list[DistributionBinResponse]:
+def _calculate_metric_distribution(values: list[int]) -> list[DistributionBinResponse]:
     """
-    Calculate dynamic merit distribution bins.
+    Calculate dynamic metric distribution bins.
+
+    Works for any metric type (merit, contribution+assist, power_diff).
 
     Args:
-        merits: List of merit diff values
+        values: List of metric values
 
     Returns:
         List of distribution bins
     """
-    if not merits:
+    if not values:
         return []
 
     # Filter out zeros for better distribution
-    positive_merits = [m for m in merits if m > 0]
-    if not positive_merits:
-        return [DistributionBinResponse(range="0", count=len(merits))]
+    positive_values = [v for v in values if v > 0]
+    if not positive_values:
+        return [DistributionBinResponse(range="0", count=len(values))]
 
-    min_val = min(positive_merits)
-    max_val = max(positive_merits)
+    min_val = min(positive_values)
+    max_val = max(positive_values)
 
     # Handle edge case where all values are the same
     if min_val == max_val:
-        return [DistributionBinResponse(range=_format_value(min_val), count=len(positive_merits))]
+        return [DistributionBinResponse(range=_format_value(min_val), count=len(positive_values))]
 
     # Calculate nice bin width
     data_range = max_val - min_val
@@ -417,17 +454,17 @@ def _calculate_merit_distribution(merits: list[int]) -> list[DistributionBinResp
         current = next_val
 
     # Count values in each bin
-    for merit in positive_merits:
+    for val in positive_values:
         for bin_data in bins:
-            if bin_data["min_value"] <= merit < bin_data["max_value"]:
+            if bin_data["min_value"] <= val < bin_data["max_value"]:
                 bin_data["count"] += 1
                 break
         else:
-            if bins and merit >= bins[-1]["min_value"]:
+            if bins and val >= bins[-1]["min_value"]:
                 bins[-1]["count"] += 1
 
     # Add zero count if any
-    zero_count = sum(1 for m in merits if m == 0)
+    zero_count = sum(1 for v in values if v == 0)
     result = []
     if zero_count > 0:
         result.append(DistributionBinResponse(range="0", count=zero_count))

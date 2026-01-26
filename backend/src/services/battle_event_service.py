@@ -30,6 +30,7 @@ from src.models.battle_event_metrics import (
     EventSummary,
     GroupEventStats,
     TopMemberItem,
+    ViolatorItem,
 )
 from src.repositories.battle_event_metrics_repository import BattleEventMetricsRepository
 from src.repositories.battle_event_repository import BattleEventRepository
@@ -526,19 +527,19 @@ class BattleEventService:
         self, event_id: UUID, top_n: int = 5
     ) -> EventGroupAnalytics | None:
         """
-        Get group-level analytics for a battle event.
+        Get group-level analytics for a battle event (category-aware).
 
         Calculates per-group statistics including:
-        - Participation rate
-        - Merit distribution (min/avg/max)
-        - Member counts
+        - Participation rate (BATTLE/SIEGE) or violator count (FORBIDDEN)
+        - Category-specific metric distribution
+        - Top performers (BATTLE/SIEGE) or violators (FORBIDDEN)
 
         Args:
             event_id: Event UUID
-            top_n: Number of top performers to include
+            top_n: Number of top performers/violators to include
 
         Returns:
-            EventGroupAnalytics with group stats and top members,
+            EventGroupAnalytics with group stats and top members/violators,
             or None if event not found
         """
         event = await self._event_repo.get_by_id(event_id)
@@ -551,7 +552,7 @@ class BattleEventService:
             return None
 
         # Get overall summary
-        summary = await self._calculate_event_summary(event_id)
+        summary = await self._calculate_event_summary(event_id, event.event_type)
 
         # Group metrics by group_name
         groups: dict[str, list[BattleEventMetricsWithMember]] = {}
@@ -561,28 +562,73 @@ class BattleEventService:
                 groups[group_name] = []
             groups[group_name].append(m)
 
-        # Calculate stats for each group
+        # Calculate stats for each group (category-aware)
         group_stats: list[GroupEventStats] = []
         for group_name, group_metrics in groups.items():
-            stats = self._calculate_group_stats(group_name, group_metrics)
+            stats = self._calculate_group_stats(group_name, group_metrics, event.event_type)
             group_stats.append(stats)
 
-        # Sort by total_merit descending
-        group_stats.sort(key=lambda g: g.total_merit, reverse=True)
+        # Sort groups by primary metric descending
+        if event.event_type == EventCategory.SIEGE:
+            group_stats.sort(key=lambda g: g.total_contribution + g.total_assist, reverse=True)
+        elif event.event_type == EventCategory.FORBIDDEN:
+            group_stats.sort(key=lambda g: g.violator_count, reverse=True)
+        else:  # BATTLE
+            group_stats.sort(key=lambda g: g.total_merit, reverse=True)
 
-        # Get top performers (exclude new members)
-        participants = [m for m in metrics if m.participated]
-        participants.sort(key=lambda m: m.merit_diff, reverse=True)
+        # Build top performers or violators based on event type
+        top_members: list[TopMemberItem] = []
+        violators: list[ViolatorItem] = []
 
-        top_members = [
-            TopMemberItem(
-                rank=i + 1,
-                member_name=m.member_name,
-                group_name=m.group_name,
-                merit_diff=m.merit_diff,
+        if event.event_type == EventCategory.FORBIDDEN:
+            # FORBIDDEN: Return violators (power_diff > 0)
+            violation_list = [m for m in metrics if m.power_diff > 0]
+            violation_list.sort(key=lambda m: m.power_diff, reverse=True)
+
+            violators = [
+                ViolatorItem(
+                    rank=i + 1,
+                    member_name=m.member_name,
+                    group_name=m.group_name,
+                    power_diff=m.power_diff,
+                )
+                for i, m in enumerate(violation_list[:top_n])
+            ]
+
+        elif event.event_type == EventCategory.SIEGE:
+            # SIEGE: Rank by contribution + assist
+            participants = [m for m in metrics if m.participated]
+            participants.sort(
+                key=lambda m: m.contribution_diff + m.assist_diff, reverse=True
             )
-            for i, m in enumerate(participants[:top_n])
-        ]
+
+            top_members = [
+                TopMemberItem(
+                    rank=i + 1,
+                    member_name=m.member_name,
+                    group_name=m.group_name,
+                    score=m.contribution_diff + m.assist_diff,
+                    contribution_diff=m.contribution_diff,
+                    assist_diff=m.assist_diff,
+                )
+                for i, m in enumerate(participants[:top_n])
+            ]
+
+        else:  # BATTLE
+            # BATTLE: Rank by merit
+            participants = [m for m in metrics if m.participated]
+            participants.sort(key=lambda m: m.merit_diff, reverse=True)
+
+            top_members = [
+                TopMemberItem(
+                    rank=i + 1,
+                    member_name=m.member_name,
+                    group_name=m.group_name,
+                    score=m.merit_diff,
+                    merit_diff=m.merit_diff,
+                )
+                for i, m in enumerate(participants[:top_n])
+            ]
 
         return EventGroupAnalytics(
             event_id=event.id,
@@ -593,19 +639,22 @@ class BattleEventService:
             summary=summary,
             group_stats=group_stats,
             top_members=top_members,
+            violators=violators,
         )
 
     def _calculate_group_stats(
         self,
         group_name: str,
         metrics: list[BattleEventMetricsWithMember],
+        event_type: EventCategory = EventCategory.BATTLE,
     ) -> GroupEventStats:
         """
-        Calculate statistics for a single group.
+        Calculate statistics for a single group based on event category.
 
         Args:
             group_name: Name of the group
             metrics: All metrics for members in this group
+            event_type: Event category for category-specific calculations
 
         Returns:
             GroupEventStats with calculated values
@@ -619,14 +668,48 @@ class BattleEventService:
 
         participation_rate = (participated_count / member_count * 100) if member_count > 0 else 0.0
 
-        # Merit stats from participants only
+        # Participants for metric calculations
         participants = [m for m in eligible if m.participated]
-        merit_values = [m.merit_diff for m in participants]
 
-        total_merit = sum(merit_values)
-        avg_merit = total_merit / len(merit_values) if merit_values else 0.0
-        merit_min = min(merit_values) if merit_values else 0
-        merit_max = max(merit_values) if merit_values else 0
+        # Initialize all stats
+        total_merit = 0
+        avg_merit = 0.0
+        merit_min = 0
+        merit_max = 0
+        total_contribution = 0
+        avg_contribution = 0.0
+        total_assist = 0
+        avg_assist = 0.0
+        combined_min = 0
+        combined_max = 0
+        violator_count = 0
+
+        if event_type == EventCategory.BATTLE:
+            # BATTLE: Merit-focused stats
+            merit_values = [m.merit_diff for m in participants]
+            if merit_values:
+                total_merit = sum(merit_values)
+                avg_merit = total_merit / len(merit_values)
+                merit_min = min(merit_values)
+                merit_max = max(merit_values)
+
+        elif event_type == EventCategory.SIEGE:
+            # SIEGE: Contribution + Assist stats
+            contribution_values = [m.contribution_diff for m in participants]
+            assist_values = [m.assist_diff for m in participants]
+            combined_values = [m.contribution_diff + m.assist_diff for m in participants]
+
+            if contribution_values:
+                total_contribution = sum(contribution_values)
+                avg_contribution = total_contribution / len(contribution_values)
+                total_assist = sum(assist_values)
+                avg_assist = total_assist / len(assist_values)
+                combined_min = min(combined_values)
+                combined_max = max(combined_values)
+
+        else:  # FORBIDDEN
+            # FORBIDDEN: Violator count (power_diff > 0)
+            violator_count = sum(1 for m in eligible if m.power_diff > 0)
 
         return GroupEventStats(
             group_name=group_name,
@@ -634,8 +717,18 @@ class BattleEventService:
             participated_count=participated_count,
             absent_count=absent_count,
             participation_rate=round(participation_rate, 1),
+            # BATTLE stats
             total_merit=total_merit,
             avg_merit=round(avg_merit, 1),
             merit_min=merit_min,
             merit_max=merit_max,
+            # SIEGE stats
+            total_contribution=total_contribution,
+            avg_contribution=round(avg_contribution, 1),
+            total_assist=total_assist,
+            avg_assist=round(avg_assist, 1),
+            combined_min=combined_min,
+            combined_max=combined_max,
+            # FORBIDDEN stats
+            violator_count=violator_count,
         )

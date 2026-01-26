@@ -145,9 +145,9 @@ class TestEventGroupAnalytics:
         ]
 
         top_members = [
-            TopMemberItem(rank=1, member_name="張飛", group_name="前鋒隊", merit_diff=85000),
-            TopMemberItem(rank=2, member_name="關羽", group_name="前鋒隊", merit_diff=72000),
-            TopMemberItem(rank=3, member_name="趙雲", group_name="前鋒隊", merit_diff=65000),
+            TopMemberItem(rank=1, member_name="張飛", group_name="前鋒隊", score=85000, merit_diff=85000),
+            TopMemberItem(rank=2, member_name="關羽", group_name="前鋒隊", score=72000, merit_diff=72000),
+            TopMemberItem(rank=3, member_name="趙雲", group_name="前鋒隊", score=65000, merit_diff=65000),
         ]
 
         analytics = EventGroupAnalytics(
@@ -226,11 +226,11 @@ class TestBuildEventReportFlex:
         ]
 
         top_members = [
-            TopMemberItem(rank=1, member_name="張飛", group_name="前鋒隊", merit_diff=85000),
-            TopMemberItem(rank=2, member_name="關羽", group_name="前鋒隊", merit_diff=72000),
-            TopMemberItem(rank=3, member_name="趙雲", group_name="前鋒隊", merit_diff=65000),
-            TopMemberItem(rank=4, member_name="馬超", group_name="後勤隊", merit_diff=35000),
-            TopMemberItem(rank=5, member_name="黃忠", group_name="後勤隊", merit_diff=32000),
+            TopMemberItem(rank=1, member_name="張飛", group_name="前鋒隊", score=85000, merit_diff=85000),
+            TopMemberItem(rank=2, member_name="關羽", group_name="前鋒隊", score=72000, merit_diff=72000),
+            TopMemberItem(rank=3, member_name="趙雲", group_name="前鋒隊", score=65000, merit_diff=65000),
+            TopMemberItem(rank=4, member_name="馬超", group_name="後勤隊", score=35000, merit_diff=35000),
+            TopMemberItem(rank=5, member_name="黃忠", group_name="後勤隊", score=32000, merit_diff=32000),
         ]
 
         return EventGroupAnalytics(

@@ -161,26 +161,58 @@ class EventAnalyticsResponse(BaseModel):
 
 
 class GroupEventStatsResponse(BaseModel):
-    """Statistics for a single group in a battle event"""
+    """Statistics for a single group in a battle event (category-aware)"""
 
     group_name: str
     member_count: int
     participated_count: int
     absent_count: int
     participation_rate: float
-    total_merit: int
-    avg_merit: float
-    merit_min: int
-    merit_max: int
+
+    # BATTLE event stats
+    total_merit: int = 0
+    avg_merit: float = 0
+    merit_min: int = 0
+    merit_max: int = 0
+
+    # SIEGE event stats
+    total_contribution: int = 0
+    avg_contribution: float = 0
+    total_assist: int = 0
+    avg_assist: float = 0
+    combined_min: int = 0
+    combined_max: int = 0
+
+    # FORBIDDEN event stats
+    violator_count: int = 0
 
 
 class TopMemberResponse(BaseModel):
-    """Top performer item for ranking display"""
+    """Top performer item for ranking display (category-aware)"""
 
     rank: int
     member_name: str
     group_name: str | None
-    merit_diff: int
+
+    # Primary score for ranking (used by all types)
+    score: int
+
+    # Category-specific fields
+    merit_diff: int | None = None  # BATTLE
+    contribution_diff: int | None = None  # SIEGE
+    assist_diff: int | None = None  # SIEGE
+
+    line_display_name: str | None = None
+
+
+class ViolatorResponse(BaseModel):
+    """Violator item for FORBIDDEN events"""
+
+    rank: int
+    member_name: str
+    group_name: str | None
+    power_diff: int
+    line_display_name: str | None = None
 
 
 class EventGroupAnalyticsResponse(BaseModel):
@@ -193,4 +225,9 @@ class EventGroupAnalyticsResponse(BaseModel):
     event_end: datetime | None = None
     summary: EventSummaryResponse
     group_stats: list[GroupEventStatsResponse]
-    top_members: list[TopMemberResponse]
+
+    # Top performers (for BATTLE and SIEGE events)
+    top_members: list[TopMemberResponse] = []
+
+    # Violators (for FORBIDDEN events only)
+    violators: list[ViolatorResponse] = []
