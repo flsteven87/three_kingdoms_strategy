@@ -214,6 +214,99 @@ export async function deleteCopperMine(
   }
 }
 
+// Event Report API
+
+export type EventCategory = 'BATTLE' | 'SIEGE' | 'FORBIDDEN'
+
+export interface GroupEventStats {
+  group_name: string
+  member_count: number
+  participated_count: number
+  absent_count: number
+  participation_rate: number
+  total_merit: number
+  avg_merit: number
+  merit_min: number
+  merit_max: number
+  total_contribution: number
+  avg_contribution: number
+  total_assist: number
+  avg_assist: number
+  combined_min: number
+  combined_max: number
+  violator_count: number
+}
+
+export interface TopMemberItem {
+  rank: number
+  member_name: string
+  group_name: string | null
+  score: number
+  merit_diff: number | null
+  contribution_diff: number | null
+  assist_diff: number | null
+  line_display_name: string | null
+}
+
+export interface ViolatorItem {
+  rank: number
+  member_name: string
+  group_name: string | null
+  power_diff: number
+  line_display_name: string | null
+}
+
+export interface EventSummary {
+  total_members: number
+  participated_count: number
+  absent_count: number
+  new_member_count: number
+  participation_rate: number
+  total_merit: number
+  total_assist: number
+  total_contribution: number
+  avg_merit: number
+  avg_assist: number
+  mvp_member_id: string | null
+  mvp_member_name: string | null
+  mvp_merit: number | null
+  mvp_contribution: number | null
+  mvp_assist: number | null
+  mvp_combined_score: number | null
+  violator_count: number
+}
+
+export interface EventReportResponse {
+  event_id: string
+  event_name: string
+  event_type: EventCategory | null
+  event_start: string | null
+  event_end: string | null
+  summary: EventSummary
+  group_stats: GroupEventStats[]
+  top_members: TopMemberItem[]
+  violators: ViolatorItem[]
+}
+
+export async function getEventReport(
+  options: Pick<LiffApiOptions, 'lineGroupId'> & { eventId: string }
+): Promise<EventReportResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/linebot/event/report`)
+  url.searchParams.set('g', options.lineGroupId)
+  url.searchParams.set('e', options.eventId)
+
+  const response = await fetch(url.toString(), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }))
+    throw new Error(error.detail || 'Request failed')
+  }
+
+  return response.json()
+}
+
 // Performance API
 
 export interface PerformanceRank {

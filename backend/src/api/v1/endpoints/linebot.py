@@ -30,6 +30,7 @@ from src.core.dependencies import (
     UserIdDep,
 )
 from src.core.line_auth import WebhookBodyDep, create_liff_url, get_group_info, get_line_bot_api
+from src.models.battle_event_metrics import EventGroupAnalytics
 from src.models.copper_mine import (
     CopperMineCreate,
     CopperMineListResponse,
@@ -352,6 +353,94 @@ async def unregister_game_id(
 
 
 # =============================================================================
+# Event Report LIFF Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/event/report",
+    response_model=EventGroupAnalytics,
+    summary="Get event report for LIFF",
+    description="Get battle event group analytics for LIFF display",
+)
+async def get_event_report_for_liff(
+    service: LineBindingServiceDep,
+    battle_event_service: BattleEventServiceDep,
+    g: Annotated[str, Query(description="LINE group ID")],
+    e: Annotated[str, Query(description="Event ID (UUID)")],
+) -> EventGroupAnalytics:
+    """
+    Get event report for LIFF page.
+
+    This endpoint returns group analytics for a specific battle event,
+    to be displayed in the LIFF event report page.
+    """
+    from uuid import UUID as UUIDType
+
+    # 1. Validate group binding
+    group_binding = await service.repository.get_group_binding_by_line_group_id(g)
+    if not group_binding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="此群組尚未綁定同盟",
+        )
+
+    alliance_id = group_binding.alliance_id
+
+    # 2. Parse and validate event ID
+    try:
+        event_id = UUIDType(e)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="無效的戰役 ID 格式",
+        ) from err
+
+    # 3. Get event and verify it belongs to this alliance
+    event = await battle_event_service.get_event(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到此戰役",
+        )
+
+    if event.alliance_id != alliance_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="您無權查看此戰役",
+        )
+
+    # 4. Get group analytics
+    analytics = await battle_event_service.get_event_group_analytics(event_id)
+    if not analytics:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="無法取得戰役分析資料",
+        )
+
+    # 5. Enrich with LINE display names for top members and violators
+    game_ids_to_lookup = []
+    if analytics.top_members:
+        game_ids_to_lookup.extend([m.member_name for m in analytics.top_members])
+    if analytics.violators:
+        game_ids_to_lookup.extend([v.member_name for v in analytics.violators])
+
+    if game_ids_to_lookup:
+        line_bindings = await service.repository.get_member_bindings_by_game_ids(
+            alliance_id=alliance_id,
+            game_ids=game_ids_to_lookup,
+        )
+        line_name_map = {b.game_id: b.line_display_name for b in line_bindings}
+
+        for member in analytics.top_members:
+            member.line_display_name = line_name_map.get(member.member_name)
+        for violator in analytics.violators:
+            violator.line_display_name = line_name_map.get(violator.member_name)
+
+    return analytics
+
+
+# =============================================================================
 # Copper Mine LIFF Endpoints
 # =============================================================================
 
@@ -655,6 +744,7 @@ async def _handle_group_message(
                     event_name=event_name,
                     line_binding_service=service,
                     battle_event_service=battle_event_service,
+                    settings=settings,
                 )
                 return
 
@@ -775,6 +865,7 @@ async def _handle_event_command(
     event_name: str | None,
     line_binding_service: LineBindingService,
     battle_event_service: BattleEventService,
+    settings: Settings,
 ) -> None:
     """
     處理 /戰役 指令
@@ -782,6 +873,8 @@ async def _handle_event_command(
     - /戰役: 列出最近 5 場已完成戰役 (Carousel)
     - /戰役 {名稱}: 發送該戰役的詳細報告 (有 5 分鐘群組 CD)
     """
+    from src.repositories.season_repository import SeasonRepository
+
     # 1. 查詢群組綁定的同盟
     group_binding = await line_binding_service.repository.get_group_binding_by_line_group_id(
         line_group_id
@@ -798,18 +891,27 @@ async def _handle_event_command(
 
     alliance_id = group_binding.alliance_id
 
+    # 1.5 取得當前賽季（嚴格限制只顯示當前賽季的戰役）
+    season_repo = SeasonRepository()
+    current_season = await season_repo.get_current_season(alliance_id)
+    season_id = current_season.id if current_season else None
+
     # 2. 根據是否有 event_name 決定行為
     if event_name is None:
         # 列出最近 5 場戰役
         await _handle_event_list(
             alliance_id=alliance_id,
+            season_id=season_id,
+            line_group_id=line_group_id,
             reply_token=reply_token,
             battle_event_service=battle_event_service,
+            settings=settings,
         )
     else:
         # 發送指定戰役的報告
         await _handle_event_report(
             alliance_id=alliance_id,
+            season_id=season_id,
             line_group_id=line_group_id,
             reply_token=reply_token,
             event_name=event_name,
@@ -820,15 +922,18 @@ async def _handle_event_command(
 
 async def _handle_event_list(
     alliance_id: UUID,
+    season_id: UUID | None,
+    line_group_id: str,
     reply_token: str,
     battle_event_service: BattleEventService,
+    settings: Settings,
 ) -> None:
     """列出最近 5 場已完成戰役 (Carousel Flex Message)"""
     from src.lib.line_flex_builder import build_event_list_carousel
 
-    # 取得最近 5 場已完成戰役
+    # 取得最近 5 場已完成戰役（限制當前賽季）
     events = await battle_event_service.get_recent_completed_events_for_alliance(
-        alliance_id, limit=5
+        alliance_id, season_id=season_id, limit=5
     )
 
     if not events:
@@ -838,8 +943,12 @@ async def _handle_event_list(
         )
         return
 
-    # 建構 Carousel Flex Message
-    flex_message = build_event_list_carousel(events)
+    # 建構 Carousel Flex Message（傳遞 LIFF 參數以生成 URIAction）
+    flex_message = build_event_list_carousel(
+        events,
+        liff_id=settings.liff_id,
+        group_id=line_group_id,
+    )
 
     if not flex_message:
         # Fallback to text list
@@ -871,6 +980,7 @@ async def _handle_event_list(
 
 async def _handle_event_report(
     alliance_id: UUID,
+    season_id: UUID | None,
     line_group_id: str,
     reply_token: str,
     event_name: str,
@@ -890,8 +1000,10 @@ async def _handle_event_report(
         )
         return
 
-    # 2. 查詢戰役 (精確匹配名稱)
-    event = await battle_event_service.get_event_by_name_for_alliance(alliance_id, event_name)
+    # 2. 查詢戰役 (精確匹配名稱，限制當前賽季)
+    event = await battle_event_service.get_event_by_name_for_alliance(
+        alliance_id, event_name, season_id=season_id
+    )
 
     if not event:
         await _reply_text(
@@ -974,6 +1086,7 @@ async def _handle_latest_event_report(
     查詢該群組綁定同盟的最新已完成戰役，並發送分析報告。
     """
     from src.lib.line_flex_builder import build_event_report_flex
+    from src.repositories.season_repository import SeasonRepository
 
     # 1. 查詢群組綁定的同盟
     group_binding = await line_binding_service.repository.get_group_binding_by_line_group_id(
@@ -991,8 +1104,15 @@ async def _handle_latest_event_report(
 
     alliance_id = group_binding.alliance_id
 
-    # 2. 查詢最新已完成戰役
-    latest_event = await battle_event_service.get_latest_completed_event_for_alliance(alliance_id)
+    # 1.5 取得當前賽季（嚴格限制只顯示當前賽季的戰役）
+    season_repo = SeasonRepository()
+    current_season = await season_repo.get_current_season(alliance_id)
+    season_id = current_season.id if current_season else None
+
+    # 2. 查詢最新已完成戰役（限制當前賽季）
+    latest_event = await battle_event_service.get_latest_completed_event_for_alliance(
+        alliance_id, season_id=season_id
+    )
 
     if not latest_event:
         await _reply_text(

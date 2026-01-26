@@ -129,6 +129,21 @@ def create_liff_url(liff_id: str, group_id: str) -> str:
     return f"https://liff.line.me/{liff_id}?g={group_id}"
 
 
+def create_event_report_liff_url(liff_id: str, group_id: str, event_id: str) -> str:
+    """
+    Create LIFF URL for event report page
+
+    Args:
+        liff_id: LIFF ID
+        group_id: LINE group ID
+        event_id: Battle event UUID
+
+    Returns:
+        Full LIFF URL with group and event parameters
+    """
+    return f"https://liff.line.me/{liff_id}?g={group_id}&e={event_id}"
+
+
 class LineGroupInfo:
     """LINE group information from API"""
 

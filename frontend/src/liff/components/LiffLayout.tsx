@@ -3,10 +3,15 @@
  *
  * Compact layout for LIFF Tall mode (bottom sheet style).
  * Optimized for ~70% viewport height.
+ *
+ * Conditional rendering:
+ * - If eventId is present: render LiffEventReport
+ * - Otherwise: render normal LIFF home via Outlet
  */
 
 import { Outlet } from 'react-router-dom'
 import { useLiffSession, type LiffSession } from '../hooks/use-liff-session'
+import { LiffEventReport } from '../pages/LiffEventReport'
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || ''
 
@@ -53,6 +58,15 @@ export function LiffLayout() {
             請從 LINE 群組中開啟此頁面
           </p>
         </div>
+      </div>
+    )
+  }
+
+  // If eventId is present, render the event report page directly
+  if (state.session.eventId) {
+    return (
+      <div className="h-full bg-background overflow-auto">
+        <LiffEventReport session={state.session} eventId={state.session.eventId} />
       </div>
     )
   }

@@ -205,26 +205,33 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         self._handle_supabase_result(result, allow_empty=True)
         return True
 
-    async def get_latest_completed_event(self, alliance_id: UUID) -> BattleEvent | None:
+    async def get_latest_completed_event(
+        self, alliance_id: UUID, season_id: UUID | None = None
+    ) -> BattleEvent | None:
         """
         Get the most recent completed battle event for an alliance
 
         Args:
             alliance_id: Alliance UUID
+            season_id: Optional season UUID to filter by current season
 
         Returns:
             Latest completed battle event or None if not found
 
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
-        result = await self._execute_async(
-            lambda: self.client.from_(self.table_name)
+        query = (
+            self.client.from_(self.table_name)
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("status", EventStatus.COMPLETED.value)
-            .order("event_end", desc=True)
-            .limit(1)
-            .execute()
+        )
+
+        if season_id:
+            query = query.eq("season_id", str(season_id))
+
+        result = await self._execute_async(
+            lambda: query.order("event_end", desc=True).limit(1).execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True)
@@ -233,13 +240,14 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         return self._build_model(data[0])
 
     async def get_recent_completed_events(
-        self, alliance_id: UUID, limit: int = 5
+        self, alliance_id: UUID, season_id: UUID | None = None, limit: int = 5
     ) -> list[BattleEvent]:
         """
         Get the most recent completed battle events for an alliance.
 
         Args:
             alliance_id: Alliance UUID
+            season_id: Optional season UUID to filter by current season
             limit: Maximum number of events to return (default 5)
 
         Returns:
@@ -247,21 +255,25 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
 
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
-        result = await self._execute_async(
-            lambda: self.client.from_(self.table_name)
+        query = (
+            self.client.from_(self.table_name)
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("status", EventStatus.COMPLETED.value)
-            .order("event_end", desc=True)
-            .limit(limit)
-            .execute()
+        )
+
+        if season_id:
+            query = query.eq("season_id", str(season_id))
+
+        result = await self._execute_async(
+            lambda: query.order("event_end", desc=True).limit(limit).execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return self._build_models(data)
 
     async def get_event_by_name(
-        self, alliance_id: UUID, name: str
+        self, alliance_id: UUID, name: str, season_id: UUID | None = None
     ) -> BattleEvent | None:
         """
         Get a completed battle event by exact name match.
@@ -269,21 +281,25 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         Args:
             alliance_id: Alliance UUID
             name: Exact event name to match
+            season_id: Optional season UUID to filter by current season
 
         Returns:
             Battle event if found, None otherwise
 
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
-        result = await self._execute_async(
-            lambda: self.client.from_(self.table_name)
+        query = (
+            self.client.from_(self.table_name)
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("status", EventStatus.COMPLETED.value)
             .eq("name", name)
-            .limit(1)
-            .execute()
         )
+
+        if season_id:
+            query = query.eq("season_id", str(season_id))
+
+        result = await self._execute_async(lambda: query.limit(1).execute())
 
         data = self._handle_supabase_result(result, allow_empty=True)
         if not data:

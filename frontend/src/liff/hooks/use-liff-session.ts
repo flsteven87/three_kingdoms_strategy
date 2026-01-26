@@ -12,6 +12,7 @@ export interface LiffSession {
   lineUserId: string
   lineDisplayName: string
   lineGroupId: string | null
+  eventId: string | null
 }
 
 type LiffState =
@@ -47,6 +48,7 @@ export function useLiffSession(liffId: string): LiffState {
         const profile = await liff.getProfile()
         const params = getParamsFromLiffUrl()
         const groupId = params.g || params.groupId || null
+        const eventId = params.e || params.eventId || null
 
         if (!cancelled) {
           setState({
@@ -55,6 +57,7 @@ export function useLiffSession(liffId: string): LiffState {
               lineUserId: profile.userId,
               lineDisplayName: profile.displayName,
               lineGroupId: groupId,
+              eventId: eventId,
             },
           })
         }

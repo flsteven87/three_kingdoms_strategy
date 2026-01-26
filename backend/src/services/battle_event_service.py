@@ -510,21 +510,22 @@ class BattleEventService:
         return await self._event_repo.delete(event_id)
 
     async def get_latest_completed_event_for_alliance(
-        self, alliance_id: UUID
+        self, alliance_id: UUID, season_id: UUID | None = None
     ) -> BattleEvent | None:
         """
         Get the most recent completed battle event for an alliance.
 
         Args:
             alliance_id: Alliance UUID
+            season_id: Optional season UUID to filter by current season
 
         Returns:
             Latest completed battle event or None
         """
-        return await self._event_repo.get_latest_completed_event(alliance_id)
+        return await self._event_repo.get_latest_completed_event(alliance_id, season_id)
 
     async def get_recent_completed_events_for_alliance(
-        self, alliance_id: UUID, limit: int = 5
+        self, alliance_id: UUID, season_id: UUID | None = None, limit: int = 5
     ) -> list[BattleEvent]:
         """
         Get the most recent completed battle events for an alliance.
@@ -533,15 +534,16 @@ class BattleEventService:
 
         Args:
             alliance_id: Alliance UUID
+            season_id: Optional season UUID to filter by current season
             limit: Maximum number of events to return (default 5)
 
         Returns:
             List of completed battle events, ordered by event_end desc
         """
-        return await self._event_repo.get_recent_completed_events(alliance_id, limit)
+        return await self._event_repo.get_recent_completed_events(alliance_id, season_id, limit)
 
     async def get_event_by_name_for_alliance(
-        self, alliance_id: UUID, name: str
+        self, alliance_id: UUID, name: str, season_id: UUID | None = None
     ) -> BattleEvent | None:
         """
         Get a completed battle event by exact name match.
@@ -551,11 +553,12 @@ class BattleEventService:
         Args:
             alliance_id: Alliance UUID
             name: Exact event name to match
+            season_id: Optional season UUID to filter by current season
 
         Returns:
             Battle event if found, None otherwise
         """
-        return await self._event_repo.get_event_by_name(alliance_id, name)
+        return await self._event_repo.get_event_by_name(alliance_id, name, season_id)
 
     async def get_event_group_analytics(
         self, event_id: UUID, top_n: int = 5

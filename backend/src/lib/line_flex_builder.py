@@ -171,6 +171,7 @@ def build_event_report_flex(analytics: EventGroupAnalytics):
             weight="bold",
             size="xl",
             color="#1a1a1a",
+            wrap=True,
         ),
     ]
 
@@ -715,7 +716,11 @@ def _build_violator_list_section(violators: list[ViolatorItem], config: dict) ->
 # =============================================================================
 
 
-def build_event_list_carousel(events: list[BattleEvent]):
+def build_event_list_carousel(
+    events: list[BattleEvent],
+    liff_id: str | None = None,
+    group_id: str | None = None,
+):
     """
     Build a Carousel Flex Message for event list.
 
@@ -723,10 +728,12 @@ def build_event_list_carousel(events: list[BattleEvent]):
     - Event name with type icon
     - Event date and duration
     - Key metric (based on type)
-    - Button to copy command
+    - Button to open LIFF event report
 
     Args:
         events: List of BattleEvent objects
+        liff_id: LIFF ID for generating event report URLs
+        group_id: LINE group ID for generating event report URLs
 
     Returns:
         FlexMessage carousel, or None if SDK not available
@@ -741,6 +748,7 @@ def build_event_list_carousel(events: list[BattleEvent]):
             FlexSeparator,
             FlexText,
             MessageAction,
+            URIAction,
         )
     except ImportError:
         logger.error("linebot SDK not installed")
@@ -748,6 +756,9 @@ def build_event_list_carousel(events: list[BattleEvent]):
 
     if not events:
         return None
+
+    # Import here to avoid circular imports
+    from src.core.line_auth import create_event_report_liff_url
 
     bubbles = []
     for event in events:
@@ -799,6 +810,18 @@ def build_event_list_carousel(events: list[BattleEvent]):
                 )
             )
 
+        # Button action: URIAction for LIFF if available, else MessageAction fallback
+        if liff_id and group_id:
+            button_action = URIAction(
+                label="查看報告",
+                uri=create_event_report_liff_url(liff_id, group_id, str(event.id)),
+            )
+        else:
+            button_action = MessageAction(
+                label="查看報告",
+                text=f"@bot /戰役 {event.name}",
+            )
+
         bubble = FlexBubble(
             size="micro",
             body=FlexBox(
@@ -810,10 +833,7 @@ def build_event_list_carousel(events: list[BattleEvent]):
                 layout="vertical",
                 contents=[
                     FlexButton(
-                        action=MessageAction(
-                            label="查看報告",
-                            text=f"@bot /戰役 {event.name}",
-                        ),
+                        action=button_action,
                         style="primary",
                         color=config["color"],
                     ),
