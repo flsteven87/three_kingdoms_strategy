@@ -57,7 +57,7 @@ class LineBindingService:
     # =========================================================================
 
     async def generate_binding_code(
-        self, alliance_id: UUID, user_id: UUID
+        self, alliance_id: UUID, user_id: UUID, is_test: bool = False
     ) -> LineBindingCodeResponse:
         """
         Generate a new binding code for an alliance
@@ -65,20 +65,24 @@ class LineBindingService:
         Args:
             alliance_id: Alliance UUID
             user_id: User UUID who is generating the code
+            is_test: Whether this code is for a test group binding
 
         Returns:
             LineBindingCodeResponse with code and expiry
 
         Raises:
-            HTTPException 400: If alliance already has active LINE group binding
+            HTTPException 400: If alliance already has same-type group binding
             HTTPException 429: If rate limit exceeded
         """
-        # Check if alliance already has active binding
-        existing_binding = await self.repository.get_active_group_binding_by_alliance(alliance_id)
+        # Check if alliance already has same-type binding (production or test)
+        existing_binding = await self.repository.get_active_group_binding_by_alliance(
+            alliance_id, is_test=is_test
+        )
         if existing_binding:
+            binding_type = "測試" if is_test else "正式"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Alliance already has active LINE group binding",
+                detail=f"同盟已有{binding_type}群組綁定",
             )
 
         # Rate limiting: max 3 codes per hour
@@ -96,14 +100,19 @@ class LineBindingService:
         # Calculate expiry time
         expires_at = datetime.utcnow() + timedelta(minutes=BINDING_CODE_EXPIRY_MINUTES)
 
-        # Create code in database
+        # Create code in database with is_test flag
         binding_code = await self.repository.create_binding_code(
-            alliance_id=alliance_id, code=code, created_by=user_id, expires_at=expires_at
+            alliance_id=alliance_id,
+            code=code,
+            created_by=user_id,
+            expires_at=expires_at,
+            is_test=is_test,
         )
 
         return LineBindingCodeResponse(
             code=binding_code.code,
             expires_at=binding_code.expires_at,
+            is_test=binding_code.is_test,
             created_at=binding_code.created_at,
         )
 
@@ -115,72 +124,85 @@ class LineBindingService:
             alliance_id: Alliance UUID
 
         Returns:
-            LineBindingStatusResponse with binding info or pending code
+            LineBindingStatusResponse with bindings list and pending code
         """
-        # Check for active group binding
-        group_binding = await self.repository.get_active_group_binding_by_alliance(alliance_id)
+        # Get all active group bindings (production + test)
+        group_bindings = await self.repository.get_all_active_group_bindings_by_alliance(alliance_id)
 
-        if group_binding:
-            # Get member count
+        bindings_response = []
+        if group_bindings:
+            # Get member count (shared across all bindings)
             member_count = await self.repository.count_member_bindings_by_alliance(alliance_id)
 
-            return LineBindingStatusResponse(
-                is_bound=True,
-                binding=LineGroupBindingResponse(
-                    id=group_binding.id,
-                    alliance_id=group_binding.alliance_id,
-                    line_group_id=group_binding.line_group_id,
-                    group_name=group_binding.group_name,
-                    group_picture_url=group_binding.group_picture_url,
-                    bound_at=group_binding.bound_at,
-                    is_active=group_binding.is_active,
-                    member_count=member_count,
-                ),
-                pending_code=None,
-            )
+            for binding in group_bindings:
+                bindings_response.append(
+                    LineGroupBindingResponse(
+                        id=binding.id,
+                        alliance_id=binding.alliance_id,
+                        line_group_id=binding.line_group_id,
+                        group_name=binding.group_name,
+                        group_picture_url=binding.group_picture_url,
+                        bound_at=binding.bound_at,
+                        is_active=binding.is_active,
+                        is_test=binding.is_test,
+                        member_count=member_count,
+                    )
+                )
 
         # Check for pending code
         pending_code = await self.repository.get_pending_code_by_alliance(alliance_id)
+        pending_code_response = None
 
         if pending_code:
-            return LineBindingStatusResponse(
-                is_bound=False,
-                binding=None,
-                pending_code=LineBindingCodeResponse(
-                    code=pending_code.code,
-                    expires_at=pending_code.expires_at,
-                    created_at=pending_code.created_at,
-                ),
+            pending_code_response = LineBindingCodeResponse(
+                code=pending_code.code,
+                expires_at=pending_code.expires_at,
+                is_test=pending_code.is_test,
+                created_at=pending_code.created_at,
             )
 
-        # No binding and no pending code
-        return LineBindingStatusResponse(is_bound=False, binding=None, pending_code=None)
+        return LineBindingStatusResponse(
+            is_bound=len(bindings_response) > 0,
+            bindings=bindings_response,
+            pending_code=pending_code_response,
+        )
 
-    async def unbind_group(self, alliance_id: UUID) -> None:
+    async def unbind_group(self, alliance_id: UUID, is_test: bool | None = None) -> None:
         """
         Unbind LINE group from alliance
 
         Args:
             alliance_id: Alliance UUID
+            is_test: If specified, unbind only production (False) or test (True) group.
+                     If None, unbind the first active binding found.
 
         Raises:
             HTTPException 404: If no active binding found
         """
-        group_binding = await self.repository.get_active_group_binding_by_alliance(alliance_id)
+        group_binding = await self.repository.get_active_group_binding_by_alliance(
+            alliance_id, is_test=is_test
+        )
 
         if not group_binding:
+            binding_type = ""
+            if is_test is not None:
+                binding_type = "測試" if is_test else "正式"
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="No active LINE group binding found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"找不到{binding_type}群組綁定",
             )
 
         await self.repository.deactivate_group_binding(group_binding.id)
 
-    async def refresh_group_info(self, alliance_id: UUID) -> LineGroupBindingResponse:
+    async def refresh_group_info(
+        self, alliance_id: UUID, is_test: bool | None = None
+    ) -> LineGroupBindingResponse:
         """
         Refresh group name and picture from LINE API for an existing binding
 
         Args:
             alliance_id: Alliance UUID
+            is_test: If specified, refresh only production (False) or test (True) group.
 
         Returns:
             Updated LineGroupBindingResponse
@@ -191,11 +213,17 @@ class LineBindingService:
         """
         from src.core.line_auth import get_group_info
 
-        group_binding = await self.repository.get_active_group_binding_by_alliance(alliance_id)
+        group_binding = await self.repository.get_active_group_binding_by_alliance(
+            alliance_id, is_test=is_test
+        )
 
         if not group_binding:
+            binding_type = ""
+            if is_test is not None:
+                binding_type = "測試" if is_test else "正式"
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="No active LINE group binding found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"找不到{binding_type}群組綁定",
             )
 
         # Fetch group info from LINE API
@@ -225,6 +253,7 @@ class LineBindingService:
             group_picture_url=updated_binding.group_picture_url,
             bound_at=updated_binding.bound_at,
             is_active=updated_binding.is_active,
+            is_test=updated_binding.is_test,
             member_count=member_count,
         )
 
@@ -299,31 +328,37 @@ class LineBindingService:
         if not binding_code:
             return False, "綁定碼無效或已過期", None
 
-        # Check if group is already bound
+        # Get is_test from the binding code
+        is_test = binding_code.is_test
+
+        # Check if group is already bound (regardless of is_test)
         existing_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
         if existing_binding:
             return False, "此群組已綁定到其他同盟", None
 
-        # Check if alliance already has active binding
+        # Check if alliance already has same-type binding (production or test)
         alliance_binding = await self.repository.get_active_group_binding_by_alliance(
-            binding_code.alliance_id
+            binding_code.alliance_id, is_test=is_test
         )
         if alliance_binding:
-            return False, "此同盟已綁定其他 LINE 群組", None
+            binding_type = "測試" if is_test else "正式"
+            return False, f"此同盟已有{binding_type}群組綁定", None
 
-        # Create group binding
+        # Create group binding with is_test from code
         await self.repository.create_group_binding(
             alliance_id=binding_code.alliance_id,
             line_group_id=line_group_id,
             bound_by_line_user_id=line_user_id,
             group_name=group_name,
             group_picture_url=group_picture_url,
+            is_test=is_test,
         )
 
         # Mark code as used
         await self.repository.mark_code_used(binding_code.id)
 
-        return True, "綁定成功！", binding_code.alliance_id
+        binding_type = "測試" if is_test else ""
+        return True, f"{binding_type}綁定成功！", binding_code.alliance_id
 
     # =========================================================================
     # Member Registration Operations (LIFF)

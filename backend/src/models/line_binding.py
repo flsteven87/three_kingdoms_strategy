@@ -19,9 +19,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class LineBindingCodeCreate(BaseModel):
-    """Request to generate a binding code (no fields needed, alliance_id from auth)"""
+    """Request to generate a binding code"""
 
-    pass
+    is_test: bool = False
 
 
 class LineBindingCode(BaseModel):
@@ -35,6 +35,7 @@ class LineBindingCode(BaseModel):
     created_by: UUID
     expires_at: datetime
     used_at: datetime | None = None
+    is_test: bool = False
     created_at: datetime
 
 
@@ -43,6 +44,7 @@ class LineBindingCodeResponse(BaseModel):
 
     code: str
     expires_at: datetime
+    is_test: bool = False
     created_at: datetime
 
 
@@ -73,6 +75,7 @@ class LineGroupBinding(BaseModel):
     group_picture_url: str | None = None
     bound_by_line_user_id: str
     is_active: bool = True
+    is_test: bool = False
     bound_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -88,6 +91,7 @@ class LineGroupBindingResponse(BaseModel):
     group_picture_url: str | None = None
     bound_at: datetime
     is_active: bool
+    is_test: bool = False
     member_count: int = 0
 
 
@@ -212,10 +216,15 @@ class LineCustomCommandResponse(BaseModel):
 
 
 class LineBindingStatusResponse(BaseModel):
-    """Combined binding status response for Settings page"""
+    """Combined binding status response for Settings page
+
+    Changed in test mode feature:
+    - `bindings` is now a list to support both production and test groups
+    - An alliance can have max 1 production + 1 test group binding
+    """
 
     is_bound: bool
-    binding: LineGroupBindingResponse | None = None
+    bindings: list[LineGroupBindingResponse] = []
     pending_code: LineBindingCodeResponse | None = None
 
 

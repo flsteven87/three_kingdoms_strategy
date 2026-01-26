@@ -43,7 +43,12 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     # =========================================================================
 
     async def create_binding_code(
-        self, alliance_id: UUID, code: str, created_by: UUID, expires_at: datetime
+        self,
+        alliance_id: UUID,
+        code: str,
+        created_by: UUID,
+        expires_at: datetime,
+        is_test: bool = False,
     ) -> LineBindingCode:
         """Create a new binding code"""
         result = await self._execute_async(
@@ -54,6 +59,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
                     "code": code,
                     "created_by": str(created_by),
                     "expires_at": expires_at.isoformat(),
+                    "is_test": is_test,
                 }
             )
             .execute()
@@ -122,21 +128,47 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     # =========================================================================
 
     async def get_active_group_binding_by_alliance(
-        self, alliance_id: UUID
+        self, alliance_id: UUID, is_test: bool | None = None
     ) -> LineGroupBinding | None:
-        """Get active group binding for an alliance"""
-        result = await self._execute_async(
-            lambda: self.client.from_("line_group_bindings")
+        """Get active group binding for an alliance
+
+        Args:
+            alliance_id: Alliance UUID
+            is_test: Filter by test mode. If None, returns the first active binding.
+                     If True/False, filters by is_test value.
+        """
+        query = (
+            self.client.from_("line_group_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .eq("is_active", True)
-            .execute()
         )
+
+        if is_test is not None:
+            query = query.eq("is_test", is_test)
+
+        result = await self._execute_async(lambda: query.limit(1).execute())
 
         data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
         if not data:
             return None
         return LineGroupBinding(**data)
+
+    async def get_all_active_group_bindings_by_alliance(
+        self, alliance_id: UUID
+    ) -> list[LineGroupBinding]:
+        """Get all active group bindings for an alliance (production + test)"""
+        result = await self._execute_async(
+            lambda: self.client.from_("line_group_bindings")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("is_active", True)
+            .order("is_test")  # Production (false) first, then test (true)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return [LineGroupBinding(**row) for row in data]
 
     async def get_group_binding_by_line_group_id(
         self, line_group_id: str
@@ -162,6 +194,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         bound_by_line_user_id: str,
         group_name: str | None = None,
         group_picture_url: str | None = None,
+        is_test: bool = False,
     ) -> LineGroupBinding:
         """Create a new group binding"""
         result = await self._execute_async(
@@ -174,6 +207,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
                     "group_picture_url": group_picture_url,
                     "bound_by_line_user_id": bound_by_line_user_id,
                     "is_active": True,
+                    "is_test": is_test,
                 }
             )
             .execute()

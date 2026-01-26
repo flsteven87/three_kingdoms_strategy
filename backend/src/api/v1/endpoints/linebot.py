@@ -79,6 +79,9 @@ async def generate_binding_code(
     service: LineBindingServiceDep,
     alliance_service: AllianceServiceDep,
     permission_service: PermissionServiceDep,
+    is_test: Annotated[
+        bool, Query(description="Generate code for test group binding")
+    ] = False,
 ) -> LineBindingCodeResponse:
     """Generate a new binding code for the user's alliance"""
     alliance = await alliance_service.get_user_alliance(user_id)
@@ -89,7 +92,9 @@ async def generate_binding_code(
         user_id, alliance.id, "generate LINE binding code"
     )
 
-    return await service.generate_binding_code(alliance_id=alliance.id, user_id=user_id)
+    return await service.generate_binding_code(
+        alliance_id=alliance.id, user_id=user_id, is_test=is_test
+    )
 
 
 @router.get(
@@ -122,6 +127,9 @@ async def unbind_line_group(
     service: LineBindingServiceDep,
     alliance_service: AllianceServiceDep,
     permission_service: PermissionServiceDep,
+    is_test: Annotated[
+        bool | None, Query(description="Unbind test group (True) or production group (False)")
+    ] = None,
 ) -> Response:
     """Unbind LINE group from alliance"""
     alliance = await alliance_service.get_user_alliance(user_id)
@@ -132,7 +140,7 @@ async def unbind_line_group(
         user_id, alliance.id, "unbind LINE group"
     )
 
-    await service.unbind_group(alliance.id)
+    await service.unbind_group(alliance.id, is_test=is_test)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -147,6 +155,9 @@ async def refresh_group_info(
     service: LineBindingServiceDep,
     alliance_service: AllianceServiceDep,
     permission_service: PermissionServiceDep,
+    is_test: Annotated[
+        bool | None, Query(description="Refresh test group (True) or production group (False)")
+    ] = None,
 ) -> LineGroupBindingResponse:
     """Refresh LINE group name and picture from LINE API"""
     alliance = await alliance_service.get_user_alliance(user_id)
@@ -157,7 +168,7 @@ async def refresh_group_info(
         user_id, alliance.id, "refresh LINE group info"
     )
 
-    return await service.refresh_group_info(alliance.id)
+    return await service.refresh_group_info(alliance.id, is_test=is_test)
 
 
 @router.get(
