@@ -12,11 +12,14 @@ Business logic for LINE Bot integration:
 - Exception handling with proper chaining
 """
 
+import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 from src.models.line_binding import (
     LineBindingCodeResponse,
@@ -324,9 +327,13 @@ class LineBindingService:
             Tuple of (success, message, alliance_id)
         """
         # Validate code
-        binding_code = await self.repository.get_valid_code(code.upper())
+        code_upper = code.upper()
+        logger.info(f"[BIND] Attempting to validate code: {code_upper}")
+        binding_code = await self.repository.get_valid_code(code_upper)
         if not binding_code:
+            logger.warning(f"[BIND] Code not found or expired: {code_upper}")
             return False, "綁定碼無效或已過期", None
+        logger.info(f"[BIND] Code valid: {code_upper}, is_test={binding_code.is_test}, expires_at={binding_code.expires_at}")
 
         # Get is_test from the binding code
         is_test = binding_code.is_test

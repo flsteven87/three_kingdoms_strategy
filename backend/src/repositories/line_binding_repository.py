@@ -12,8 +12,11 @@ Data access layer for LINE Bot integration tables:
 - No business logic (belongs in Service layer)
 """
 
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from src.models.line_binding import (
     LineBindingCode,
@@ -70,18 +73,31 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
     async def get_valid_code(self, code: str) -> LineBindingCode | None:
         """Get a valid (unused, not expired) binding code"""
+        now_iso = datetime.now(UTC).isoformat()
+        logger.info(f"[REPO] get_valid_code: code={code}, now={now_iso}")
+
         result = await self._execute_async(
             lambda: self.client.from_("line_binding_codes")
             .select("*")
             .eq("code", code)
             .is_("used_at", "null")
-            .gt("expires_at", datetime.utcnow().isoformat())
+            .gt("expires_at", now_iso)
             .execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
         if not data:
+            # Debug: also check if code exists at all
+            debug_result = await self._execute_async(
+                lambda: self.client.from_("line_binding_codes")
+                .select("code, expires_at, used_at, is_test")
+                .eq("code", code)
+                .execute()
+            )
+            debug_data = self._handle_supabase_result(debug_result, allow_empty=True)
+            logger.warning(f"[REPO] Code not valid. Debug info: {debug_data}")
             return None
+        logger.info(f"[REPO] Code found: {data}")
         return LineBindingCode(**data)
 
     async def get_pending_code_by_alliance(self, alliance_id: UUID) -> LineBindingCode | None:
