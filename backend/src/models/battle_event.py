@@ -21,11 +21,22 @@ class EventStatus(str, Enum):
     COMPLETED = "completed"
 
 
+class EventCategory(str, Enum):
+    """Event category determines participation logic and report focus"""
+
+    SIEGE = "siege"           # 攻城事件: 貢獻/助攻為主
+    FORBIDDEN = "forbidden"   # 禁地事件: 勢力值監控
+    BATTLE = "battle"         # 戰役事件: 戰功為主
+
+
 class BattleEventBase(BaseModel):
     """Base battle event model with common fields"""
 
     name: str = Field(..., min_length=1, max_length=100, description="Event name")
-    event_type: str | None = Field(None, max_length=50, description="Optional event type label")
+    event_type: EventCategory = Field(
+        default=EventCategory.BATTLE,
+        description="Event category determining participation logic"
+    )
     description: str | None = Field(None, max_length=500, description="Event description")
     event_start: datetime | None = Field(None, description="Event start timestamp")
     event_end: datetime | None = Field(None, description="Event end timestamp")
@@ -43,7 +54,7 @@ class BattleEventUpdate(BaseModel):
     """Battle event update model - all fields optional"""
 
     name: str | None = Field(None, min_length=1, max_length=100)
-    event_type: str | None = Field(None, max_length=50)
+    event_type: EventCategory | None = None
     description: str | None = None
     event_start: datetime | None = None
     event_end: datetime | None = None
@@ -74,7 +85,7 @@ class BattleEventListItem(BaseModel):
 
     id: UUID
     name: str
-    event_type: str | None
+    event_type: EventCategory
     status: EventStatus
     event_start: datetime | None
     event_end: datetime | None
