@@ -9,6 +9,7 @@
 
 import type { EventCategory } from '@/types/event'
 import { Castle, ShieldAlert, Swords, type LucideIcon } from 'lucide-react'
+import { GAME_TIMEZONE } from '@/lib/date-utils'
 
 /**
  * Event category display labels (Chinese)
@@ -61,11 +62,13 @@ export function formatEventTime(
 
   const startDate = new Date(start)
   const dateStr = startDate.toLocaleDateString('zh-TW', {
+    timeZone: GAME_TIMEZONE,
     year: includeYear ? 'numeric' : undefined,
     month: 'numeric',
     day: 'numeric',
   })
   const startTime = startDate.toLocaleTimeString('zh-TW', {
+    timeZone: GAME_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -75,6 +78,7 @@ export function formatEventTime(
 
   const endDate = new Date(end)
   const endTime = endDate.toLocaleTimeString('zh-TW', {
+    timeZone: GAME_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -172,6 +176,7 @@ export function formatTimeRange(start: string | null, end: string | null): strin
 
   const startDate = new Date(start)
   const startTime = startDate.toLocaleTimeString('zh-TW', {
+    timeZone: GAME_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -181,6 +186,7 @@ export function formatTimeRange(start: string | null, end: string | null): strin
 
   const endDate = new Date(end)
   const endTime = endDate.toLocaleTimeString('zh-TW', {
+    timeZone: GAME_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,

@@ -24,6 +24,14 @@ import { useCanUploadData } from '@/hooks/use-user-role'
 import { useRecalculateSeasonPeriods } from '@/hooks/use-periods'
 import type { CsvUpload } from '@/types/csv-upload'
 import type { Season } from '@/types/season'
+import {
+  parseCsvFilenameDate,
+  isDateInRange,
+  formatDateTW,
+  formatTimeTW,
+  formatDateTimeTW,
+  GAME_TIMEZONE,
+} from '@/lib/date-utils'
 
 interface CSVUploadCardProps {
   readonly season: Season
@@ -53,37 +61,19 @@ export function CSVUploadCard({
   const recalculateMutation = useRecalculateSeasonPeriods(season.id)
 
   /**
-   * Extract date from CSV filename
-   * Format: 同盟統計YYYY年MM月DD日HH时MM分SS秒.csv
+   * Extract date from CSV filename using centralized date utility.
+   * CSV filename contains game server time (UTC+8), converted to UTC Date.
    */
   const extractDateFromFilename = useCallback((filename: string): Date | null => {
-    const match = filename.match(/(\d{4})年(\d{2})月(\d{2})日(\d{2})时(\d{2})分(\d{2})秒/)
-    if (!match) return null
-
-    const [, year, month, day, hour, minute, second] = match
-    return new Date(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      parseInt(hour),
-      parseInt(minute),
-      parseInt(second)
-    )
+    return parseCsvFilenameDate(filename)
   }, [])
 
   /**
-   * Validate if date is within season range
+   * Validate if date is within season range using Taiwan timezone comparison.
+   * This ensures consistent validation regardless of user's browser timezone.
    */
   const validateDateInSeason = useCallback((fileDate: Date): boolean => {
-    const seasonStart = new Date(season.start_date)
-    seasonStart.setHours(0, 0, 0, 0)
-
-    const seasonEnd = season.end_date
-      ? new Date(season.end_date)
-      : new Date()
-    seasonEnd.setHours(23, 59, 59, 999)
-
-    return fileDate >= seasonStart && fileDate <= seasonEnd
+    return isDateInRange(fileDate, season.start_date, season.end_date)
   }, [season.start_date, season.end_date])
 
   /**
@@ -111,12 +101,13 @@ export function CSVUploadCard({
 
     // Validate date is within season range
     if (!validateDateInSeason(fileDate)) {
-      const seasonStart = new Date(season.start_date).toLocaleDateString('zh-TW')
-      const seasonEnd = season.end_date
-        ? new Date(season.end_date).toLocaleDateString('zh-TW')
-        : '進行中'
+      const seasonStart = formatDateTW(season.start_date)
+      const seasonEnd = season.end_date ? formatDateTW(season.end_date) : '進行中'
+      const fileDateDisplay = fileDate.toLocaleDateString('zh-TW', {
+        timeZone: GAME_TIMEZONE,
+      })
       setDateError(
-        `檔案日期 (${fileDate.toLocaleDateString('zh-TW')}) 不在賽季範圍內 (${seasonStart} - ${seasonEnd})`
+        `檔案日期 (${fileDateDisplay}) 不在賽季範圍內 (${seasonStart} - ${seasonEnd})`
       )
       setSelectedFile(null)
       setParsedDate(null)
@@ -333,7 +324,7 @@ export function CSVUploadCard({
             {/* Upload Guidelines */}
             {!selectedFile && (
               <div className="text-xs text-muted-foreground space-y-1 px-1">
-                <p>📌 檔案日期必須在賽季範圍內（{new Date(season.start_date).toLocaleDateString('zh-TW')} - {season.end_date ? new Date(season.end_date).toLocaleDateString('zh-TW') : '進行中'}）</p>
+                <p>📌 檔案日期必須在賽季範圍內（{formatDateTW(season.start_date)} - {season.end_date ? formatDateTW(season.end_date) : '進行中'}）</p>
                 <p>📌 同一天只能上傳一次，重複上傳會覆蓋舊資料</p>
               </div>
             )}
@@ -393,9 +384,15 @@ export function CSVUploadCard({
                   new Date(b.snapshot_date).getTime() - new Date(a.snapshot_date).getTime()
                 )
                 .map((upload) => {
-                  const snapshotDate = new Date(upload.snapshot_date)
-                  const uploadDate = new Date(upload.uploaded_at)
-                  const isToday = new Date().toDateString() === snapshotDate.toDateString()
+                  // Check if snapshot is today (compare in game timezone)
+                  const todayStr = new Date().toLocaleDateString('en-CA', {
+                    timeZone: GAME_TIMEZONE,
+                  })
+                  const snapshotStr = new Date(upload.snapshot_date).toLocaleDateString(
+                    'en-CA',
+                    { timeZone: GAME_TIMEZONE }
+                  )
+                  const isToday = todayStr === snapshotStr
 
                   return (
                     <div
@@ -406,17 +403,10 @@ export function CSVUploadCard({
                       <div className="flex-1 space-y-2">
                         <div className="flex items-baseline gap-3">
                           <time className="text-lg font-semibold text-foreground">
-                            {snapshotDate.toLocaleDateString('zh-TW', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            })}
+                            {formatDateTW(upload.snapshot_date, { padded: true })}
                           </time>
                           <span className="text-sm text-muted-foreground">
-                            {snapshotDate.toLocaleTimeString('zh-TW', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                            {formatTimeTW(upload.snapshot_date)}
                           </span>
                           {isToday && (
                             <Badge variant="default" className="text-xs">
@@ -433,7 +423,7 @@ export function CSVUploadCard({
                           </span>
                           <span className="flex items-center gap-1">
                             <Upload className="h-3 w-3" />
-                            {uploadDate.toLocaleDateString('zh-TW')}
+                            {formatDateTW(upload.uploaded_at)}
                           </span>
                         </div>
 
@@ -478,13 +468,7 @@ export function CSVUploadCard({
         description="確定要刪除此數據快照嗎？"
         itemName={
           uploadToDelete
-            ? new Date(uploadToDelete.snapshot_date).toLocaleString('zh-TW', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-              })
+            ? formatDateTimeTW(uploadToDelete.snapshot_date)
             : undefined
         }
         warningMessage="此操作將永久刪除快照資料及相關的成員記錄，且無法復原。"

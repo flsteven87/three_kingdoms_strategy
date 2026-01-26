@@ -16,7 +16,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
     UV_CACHE_DIR=/tmp/uv-cache \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    TZ=UTC
 
 # Default port (can be overridden by Zeabur)
 ENV PORT=8087

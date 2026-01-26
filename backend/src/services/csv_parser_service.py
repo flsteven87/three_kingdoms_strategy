@@ -9,8 +9,9 @@ CSV Parser Service
 
 import csv
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from io import StringIO
+from zoneinfo import ZoneInfo
 
 
 class CSVParserService:
@@ -20,6 +21,9 @@ class CSVParserService:
     FILENAME_PATTERN = re.compile(
         r"同盟統計(\d{4})年(\d{2})月(\d{2})日(\d{2})时(\d{2})分(\d{2})秒\.csv"
     )
+
+    # Game server timezone (Taiwan/China server time is UTC+8)
+    GAME_TIMEZONE = ZoneInfo("Asia/Taipei")
 
     # Field name mapping: internal_name -> list of possible CSV column names
     # Supports multiple game versions with different field naming conventions
@@ -39,27 +43,31 @@ class CSVParserService:
         "group_name": ["分組", "分组", "組別", "组别", "小組", "小组"],
     }
 
-    @staticmethod
-    def extract_datetime_from_filename(filename: str) -> datetime:
+    @classmethod
+    def extract_datetime_from_filename(cls, filename: str) -> datetime:
         """
-        Extract datetime from Three Kingdoms CSV filename
+        Extract datetime from Three Kingdoms CSV filename.
+
+        CSV filenames contain game server time (UTC+8 Taiwan/China timezone).
+        Returns UTC-aware datetime for consistent database storage.
 
         Args:
             filename: CSV filename (e.g., "同盟統計2025年10月09日10时13分09秒.csv")
 
         Returns:
-            Datetime object parsed from filename
+            UTC-aware datetime object parsed from filename
 
         Raises:
             ValueError: If filename format is invalid
 
         Example:
-            >>> CSVParserService.extract_datetime_from_filename(
+            >>> dt = CSVParserService.extract_datetime_from_filename(
             ...     "同盟統計2025年10月09日10时13分09秒.csv"
             ... )
-            datetime(2025, 10, 9, 10, 13, 9)
+            >>> dt.tzinfo  # UTC
+            datetime.timezone.utc
         """
-        match = CSVParserService.FILENAME_PATTERN.match(filename)
+        match = cls.FILENAME_PATTERN.match(filename)
 
         if not match:
             raise ValueError(
@@ -69,7 +77,11 @@ class CSVParserService:
 
         year, month, day, hour, minute, second = map(int, match.groups())
 
-        return datetime(year, month, day, hour, minute, second)
+        # Create datetime in game timezone (UTC+8), then convert to UTC
+        local_dt = datetime(
+            year, month, day, hour, minute, second, tzinfo=cls.GAME_TIMEZONE
+        )
+        return local_dt.astimezone(UTC)
 
     @classmethod
     def _get_field_value(

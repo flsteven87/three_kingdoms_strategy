@@ -4,7 +4,7 @@ User authentication models.
 Pydantic models for JWT validation and user session management.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
@@ -28,18 +28,18 @@ class TokenClaims(BaseModel):
 
     @property
     def expires_at(self) -> datetime:
-        """Get expiration datetime."""
-        return datetime.fromtimestamp(self.exp)
+        """Get expiration datetime (UTC-aware)."""
+        return datetime.fromtimestamp(self.exp, tz=UTC)
 
     @property
     def issued_at(self) -> datetime:
-        """Get issued at datetime."""
-        return datetime.fromtimestamp(self.iat)
+        """Get issued at datetime (UTC-aware)."""
+        return datetime.fromtimestamp(self.iat, tz=UTC)
 
     @property
     def is_expired(self) -> bool:
-        """Check if token is expired."""
-        return datetime.now() > self.expires_at
+        """Check if token is expired (UTC-aware comparison)."""
+        return datetime.now(UTC) > self.expires_at
 
     def to_authenticated_user(self) -> "AuthenticatedUser":
         """Convert token claims to authenticated user."""

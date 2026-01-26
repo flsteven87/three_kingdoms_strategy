@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
+import { formatDateTW } from '@/lib/date-utils'
 
 interface QuotaExhaustedModalProps {
   readonly open: boolean
@@ -51,8 +52,7 @@ export function QuotaExhaustedModal({
         <div className="space-y-3 py-4 text-center text-sm text-muted-foreground">
           {trialEndedAt && (
             <p>
-              試用期已於 {new Date(trialEndedAt).toLocaleDateString('zh-TW')}{' '}
-              結束
+              試用期已於 {formatDateTW(trialEndedAt)} 結束
             </p>
           )}
           <p>

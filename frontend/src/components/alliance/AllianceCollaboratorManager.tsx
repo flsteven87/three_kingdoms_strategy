@@ -28,6 +28,7 @@ import {
 } from '@/hooks/use-alliance-collaborators'
 import { useCanManageCollaborators } from '@/hooks/use-user-role'
 import { RoleGuard } from '@/components/alliance/RoleGuard'
+import { formatDateTW } from '@/lib/date-utils'
 
 interface AllianceCollaboratorManagerProps {
   readonly allianceId: string
@@ -255,7 +256,7 @@ export function AllianceCollaboratorManager({
                         )}
                         {collaborator.joined_at && (
                           <span className="whitespace-nowrap">
-                            加入於 {new Date(collaborator.joined_at).toLocaleDateString('zh-TW')}
+                            加入於 {formatDateTW(collaborator.joined_at)}
                           </span>
                         )}
                       </div>

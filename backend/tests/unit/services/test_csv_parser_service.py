@@ -10,9 +10,12 @@ Tests cover:
 - AAA pattern (Arrange-Act-Assert)
 - Clear naming: test_[method]_should_[behavior]_when_[condition]
 - Coverage: happy path + edge cases + error cases
+
+Note: CSV filenames contain game server time (UTC+8 Taiwan timezone).
+The parser converts this to UTC for consistent database storage.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -20,44 +23,58 @@ from src.services.csv_parser_service import CSVParserService
 
 
 class TestExtractDatetimeFromFilename:
-    """Tests for CSVParserService.extract_datetime_from_filename"""
+    """Tests for CSVParserService.extract_datetime_from_filename
+
+    CSV filenames contain game server time (UTC+8 Taiwan timezone).
+    The parser converts this to UTC for database storage.
+
+    Example: "同盟統計2025年10月09日10时13分09秒.csv"
+    - Game time: 2025-10-09 10:13:09 UTC+8
+    - UTC result: 2025-10-09 02:13:09 UTC
+    """
 
     # =========================================================================
     # Happy Path Tests
     # =========================================================================
 
     def test_should_extract_datetime_when_valid_filename(self):
-        """Standard filename format should be parsed correctly"""
+        """Standard filename format should be parsed and converted to UTC"""
         # Arrange
         filename = "同盟統計2025年10月09日10时13分09秒.csv"
+        # Game time: 10:13:09 UTC+8 → UTC: 02:13:09
 
         # Act
         result = CSVParserService.extract_datetime_from_filename(filename)
 
         # Assert
-        assert result == datetime(2025, 10, 9, 10, 13, 9)
+        assert result == datetime(2025, 10, 9, 2, 13, 9, tzinfo=UTC)
+        assert result.tzinfo == UTC
 
     def test_should_extract_datetime_when_midnight(self):
-        """Midnight timestamp should be parsed correctly"""
+        """Midnight UTC+8 timestamp should be converted to previous day in UTC"""
         # Arrange
         filename = "同盟統計2025年01月01日00时00分00秒.csv"
+        # Game time: 2025-01-01 00:00:00 UTC+8 → UTC: 2024-12-31 16:00:00
 
         # Act
         result = CSVParserService.extract_datetime_from_filename(filename)
 
         # Assert
-        assert result == datetime(2025, 1, 1, 0, 0, 0)
+        assert result == datetime(2024, 12, 31, 16, 0, 0, tzinfo=UTC)
+        assert result.tzinfo == UTC
 
     def test_should_extract_datetime_when_end_of_day(self):
-        """End of day timestamp should be parsed correctly"""
+        """End of day UTC+8 timestamp should be converted correctly"""
         # Arrange
         filename = "同盟統計2025年12月31日23时59分59秒.csv"
+        # Game time: 2025-12-31 23:59:59 UTC+8 → UTC: 2025-12-31 15:59:59
 
         # Act
         result = CSVParserService.extract_datetime_from_filename(filename)
 
         # Assert
-        assert result == datetime(2025, 12, 31, 23, 59, 59)
+        assert result == datetime(2025, 12, 31, 15, 59, 59, tzinfo=UTC)
+        assert result.tzinfo == UTC
 
     # =========================================================================
     # Edge Case Tests
@@ -67,12 +84,14 @@ class TestExtractDatetimeFromFilename:
         """Single digit values with leading zeros should parse correctly"""
         # Arrange
         filename = "同盟統計2025年01月05日05时05分05秒.csv"
+        # Game time: 2025-01-05 05:05:05 UTC+8 → UTC: 2025-01-04 21:05:05
 
         # Act
         result = CSVParserService.extract_datetime_from_filename(filename)
 
         # Assert
-        assert result == datetime(2025, 1, 5, 5, 5, 5)
+        assert result == datetime(2025, 1, 4, 21, 5, 5, tzinfo=UTC)
+        assert result.tzinfo == UTC
 
     # =========================================================================
     # Error Case Tests

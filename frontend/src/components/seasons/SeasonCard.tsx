@@ -33,6 +33,7 @@ import {
   getActivationStatusLabel,
   getActivationStatusColor,
 } from '@/types/season'
+import { formatDateTW } from '@/lib/date-utils'
 
 interface SeasonCardProps {
   readonly season: Season
@@ -285,9 +286,9 @@ export function SeasonCard({
           <div className="pt-4 border-t border-border/50">
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
-                <span>建立於 {new Date(season.created_at).toLocaleDateString('zh-TW')}</span>
+                <span>建立於 {formatDateTW(season.created_at)}</span>
                 <span className="mx-2">·</span>
-                <span>更新於 {new Date(season.updated_at).toLocaleDateString('zh-TW')}</span>
+                <span>更新於 {formatDateTW(season.updated_at)}</span>
               </div>
 
               {/* Action buttons - different for edit vs view mode */}
