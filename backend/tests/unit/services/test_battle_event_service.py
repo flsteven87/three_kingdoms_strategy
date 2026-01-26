@@ -21,7 +21,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from src.models.battle_event import BattleEvent, BattleEventCreate, EventStatus
+from src.models.battle_event import BattleEvent, BattleEventCreate, EventCategory, EventStatus
 from src.models.battle_event_metrics import BattleEventMetricsWithMember
 from src.services.battle_event_service import BattleEventService
 
@@ -107,6 +107,7 @@ def create_mock_event(
     alliance_id: UUID,
     name: str = "Test Battle",
     status: EventStatus = EventStatus.DRAFT,
+    event_type: EventCategory = EventCategory.BATTLE,
 ) -> BattleEvent:
     """Factory for creating mock BattleEvent objects"""
     return BattleEvent(
@@ -114,7 +115,7 @@ def create_mock_event(
         alliance_id=alliance_id,
         season_id=uuid4(),
         name=name,
-        event_type="battle",
+        event_type=event_type,
         status=status,
         event_start=datetime(2025, 1, 1),
         event_end=datetime(2025, 1, 2),
@@ -134,6 +135,9 @@ def create_mock_metrics_with_member(
     participated: bool,
     is_new_member: bool = False,
     is_absent: bool = False,
+    contribution_diff: int = 1000,
+    assist_diff: int = 50,
+    power_diff: int = 500,
 ) -> BattleEventMetricsWithMember:
     """Factory for creating mock BattleEventMetricsWithMember"""
     return BattleEventMetricsWithMember(
@@ -143,11 +147,11 @@ def create_mock_metrics_with_member(
         alliance_id=uuid4(),
         start_snapshot_id=uuid4(),
         end_snapshot_id=uuid4(),
-        contribution_diff=1000,
+        contribution_diff=contribution_diff,
         merit_diff=merit_diff,
-        assist_diff=50,
+        assist_diff=assist_diff,
         donation_diff=100,
-        power_diff=500,
+        power_diff=power_diff,
         participated=participated,
         is_new_member=is_new_member,
         is_absent=is_absent,
@@ -249,7 +253,7 @@ class TestCreateEvent:
             alliance_id=alliance_id,
             season_id=season_id,
             name="Test Battle",
-            event_type="battle",
+            event_type=EventCategory.BATTLE,
         )
         expected_event = create_mock_event(uuid4(), alliance_id, "Test Battle")
 
@@ -282,7 +286,7 @@ class TestCreateEvent:
             alliance_id=alliance_id,
             season_id=season_id,
             name="Test Battle",
-            event_type="battle",
+            event_type=EventCategory.BATTLE,
         )
         mock_permission_service.require_active_quota = AsyncMock(
             side_effect=SeasonQuotaExhaustedError()
@@ -531,3 +535,114 @@ class TestCalculateGroupStats:
         assert result.member_count == 0
         assert result.participation_rate == 0.0
         assert result.total_merit == 0
+
+
+# =============================================================================
+# Tests for _determine_participation
+# =============================================================================
+
+
+class TestDetermineParticipation:
+    """Tests for category-specific participation logic"""
+
+    def test_siege_participation_with_contribution(
+        self, battle_event_service: BattleEventService
+    ):
+        """SIEGE: Should mark as participated when contribution > 0"""
+        # Act
+        participated, is_absent = battle_event_service._determine_participation(
+            EventCategory.SIEGE,
+            contribution_diff=1000,
+            merit_diff=0,
+            assist_diff=0,
+            power_diff=0,
+        )
+
+        # Assert
+        assert participated is True
+        assert is_absent is False
+
+    def test_siege_participation_with_assist(
+        self, battle_event_service: BattleEventService
+    ):
+        """SIEGE: Should mark as participated when assist > 0"""
+        # Act
+        participated, is_absent = battle_event_service._determine_participation(
+            EventCategory.SIEGE,
+            contribution_diff=0,
+            merit_diff=0,
+            assist_diff=500,
+            power_diff=0,
+        )
+
+        # Assert
+        assert participated is True
+        assert is_absent is False
+
+    def test_siege_absent_when_no_contribution_or_assist(
+        self, battle_event_service: BattleEventService
+    ):
+        """SIEGE: Should mark as absent when no contribution and no assist"""
+        # Act
+        participated, is_absent = battle_event_service._determine_participation(
+            EventCategory.SIEGE,
+            contribution_diff=0,
+            merit_diff=5000,  # Merit doesn't count for siege
+            assist_diff=0,
+            power_diff=0,
+        )
+
+        # Assert
+        assert participated is False
+        assert is_absent is True
+
+    def test_forbidden_never_marks_participation(
+        self, battle_event_service: BattleEventService
+    ):
+        """FORBIDDEN: Should never mark participation (only tracks violators)"""
+        # Act
+        participated, is_absent = battle_event_service._determine_participation(
+            EventCategory.FORBIDDEN,
+            contribution_diff=1000,
+            merit_diff=5000,
+            assist_diff=500,
+            power_diff=100,  # Violator
+        )
+
+        # Assert
+        assert participated is False
+        assert is_absent is False  # No absent tracking for forbidden
+
+    def test_battle_participation_with_merit(
+        self, battle_event_service: BattleEventService
+    ):
+        """BATTLE: Should mark as participated when merit > 0"""
+        # Act
+        participated, is_absent = battle_event_service._determine_participation(
+            EventCategory.BATTLE,
+            contribution_diff=1000,  # Doesn't count for battle
+            merit_diff=5000,
+            assist_diff=500,  # Doesn't count for battle
+            power_diff=0,
+        )
+
+        # Assert
+        assert participated is True
+        assert is_absent is False
+
+    def test_battle_absent_when_no_merit(
+        self, battle_event_service: BattleEventService
+    ):
+        """BATTLE: Should mark as absent when merit = 0"""
+        # Act
+        participated, is_absent = battle_event_service._determine_participation(
+            EventCategory.BATTLE,
+            contribution_diff=1000,
+            merit_diff=0,
+            assist_diff=500,
+            power_diff=0,
+        )
+
+        # Assert
+        assert participated is False
+        assert is_absent is True
