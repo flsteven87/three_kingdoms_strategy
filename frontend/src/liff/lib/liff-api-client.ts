@@ -216,7 +216,7 @@ export async function deleteCopperMine(
 
 // Event Report API
 
-export type EventCategory = 'BATTLE' | 'SIEGE' | 'FORBIDDEN'
+export type EventCategory = 'battle' | 'siege' | 'forbidden'
 
 export interface GroupEventStats {
   group_name: string

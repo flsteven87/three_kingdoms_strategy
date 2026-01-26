@@ -16,9 +16,9 @@ interface Props {
 }
 
 const EVENT_TYPE_CONFIG: Record<EventCategory, { icon: string; label: string; color: string }> = {
-  BATTLE: { icon: '⚔️', label: '戰役', color: '#4A90D9' },
-  SIEGE: { icon: '🏰', label: '攻城', color: '#E67E22' },
-  FORBIDDEN: { icon: '🚫', label: '禁地', color: '#FF5555' },
+  battle: { icon: '⚔️', label: '戰役', color: '#4A90D9' },
+  siege: { icon: '🏰', label: '攻城', color: '#E67E22' },
+  forbidden: { icon: '🚫', label: '禁地', color: '#FF5555' },
 }
 
 function formatNumber(n: number): string {
@@ -51,7 +51,7 @@ interface GroupStatRowProps {
 }
 
 function GroupStatRow({ group, eventType, maxRate }: GroupStatRowProps) {
-  const isForbidden = eventType === 'FORBIDDEN'
+  const isForbidden = eventType === 'forbidden'
   const barWidth = isForbidden
     ? Math.max(5, (group.violator_count / Math.max(1, maxRate)) * 100)
     : Math.max(2, group.participation_rate)
@@ -87,7 +87,7 @@ interface TopMemberRowProps {
 function TopMemberRow({ member, eventType }: TopMemberRowProps) {
   const rankIcons: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
   const rankDisplay = rankIcons[member.rank] || `${member.rank}.`
-  const isSiege = eventType === 'SIEGE'
+  const isSiege = eventType === 'siege'
 
   const displayName = member.line_display_name
     ? `${member.member_name} (${member.line_display_name})`
@@ -133,7 +133,7 @@ interface GroupMetricRowProps {
 }
 
 function GroupMetricRow({ group, eventType, maxAvg, isFirst }: GroupMetricRowProps) {
-  const isSiege = eventType === 'SIEGE'
+  const isSiege = eventType === 'siege'
   const avgValue = isSiege
     ? group.avg_contribution + group.avg_assist
     : group.avg_merit
@@ -191,8 +191,8 @@ export function LiffEventReport({ session, eventId }: Props) {
   }
 
   const eventType = report.event_type
-  const config = eventType ? EVENT_TYPE_CONFIG[eventType] : EVENT_TYPE_CONFIG.BATTLE
-  const isForbidden = eventType === 'FORBIDDEN'
+  const config = eventType ? EVENT_TYPE_CONFIG[eventType] : EVENT_TYPE_CONFIG.battle
+  const isForbidden = eventType === 'forbidden'
   const { summary, group_stats, top_members, violators } = report
 
   // Calculate compliance rate for forbidden events
@@ -295,7 +295,7 @@ export function LiffEventReport({ session, eventId }: Props) {
       {!isForbidden && group_stats.length > 0 && (() => {
         const participatingGroups = group_stats.filter(g => g.participated_count > 0)
         if (participatingGroups.length === 0) return null
-        const isSiege = eventType === 'SIEGE'
+        const isSiege = eventType === 'siege'
         const maxAvg = Math.max(
           ...participatingGroups.map(g =>
             isSiege ? g.avg_contribution + g.avg_assist : g.avg_merit
@@ -342,7 +342,7 @@ export function LiffEventReport({ session, eventId }: Props) {
           <Card>
             <CardContent className="py-3">
               <div className="text-sm font-medium mb-2">
-                {eventType === 'SIEGE' ? '🏰 貢獻排行' : '🏆 戰功 Top 5'}
+                {eventType === 'siege' ? '🏰 貢獻排行' : '🏆 戰功 Top 5'}
               </div>
               <div className="divide-y">
                 {top_members.slice(0, 5).map((m) => (
