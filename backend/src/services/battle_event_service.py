@@ -586,7 +586,7 @@ class BattleEventService:
         events = await self._event_repo.get_recent_completed_events(
             alliance_id=alliance_id,
             season_id=season_id,
-            event_types=[EventCategory.BATTLE, EventCategory.SIEGE],
+            event_types=["battle", "siege"],
             limit=limit)
 
         if not events:
