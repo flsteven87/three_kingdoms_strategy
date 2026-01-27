@@ -673,19 +673,29 @@ class BattleEventService:
             EventGroupAnalytics with group stats and top members/violators,
             or None if event not found
         """
+        t_start = time.perf_counter()
+        
+        # Step 1: Get event
+        t_event = time.perf_counter()
         event = await self._event_repo.get_by_id(event_id)
         if not event:
             return None
+        event_ms = (time.perf_counter() - t_event) * 1000
 
-        # Get all metrics with group info
+        # Step 2: Get all metrics with group info
+        t_metrics = time.perf_counter()
         metrics = await self._metrics_repo.get_by_event_with_member_and_group(event_id)
         if not metrics:
             return None
+        metrics_ms = (time.perf_counter() - t_metrics) * 1000
 
-        # Get overall summary
+        # Step 3: Get overall summary
+        t_summary = time.perf_counter()
         summary = await self._calculate_event_summary(event_id, event.event_type)
+        summary_ms = (time.perf_counter() - t_summary) * 1000
 
-        # Group metrics by group_name
+        # Step 4: Group metrics by group_name
+        t_group = time.perf_counter()
         groups: dict[str, list[BattleEventMetricsWithMember]] = {}
         for m in metrics:
             group_name = m.group_name or "未分組"
@@ -706,8 +716,10 @@ class BattleEventService:
             group_stats.sort(key=lambda g: g.violator_count, reverse=True)
         else:  # BATTLE
             group_stats.sort(key=lambda g: g.total_merit, reverse=True)
+        group_ms = (time.perf_counter() - t_group) * 1000
 
-        # Build top performers or violators based on event type
+        # Step 5: Build top performers or violators based on event type
+        t_top = time.perf_counter()
         top_members: list[TopMemberItem] = []
         top_contributors: list[TopMemberItem] = []
         top_assisters: list[TopMemberItem] = []
@@ -777,6 +789,18 @@ class BattleEventService:
                 )
                 for i, m in enumerate(participants[:top_n])
             ]
+        top_ms = (time.perf_counter() - t_top) * 1000
+
+        total_ms = (time.perf_counter() - t_start) * 1000
+        
+        print(
+            f"⏱️ get_event_group_analytics: {total_ms:.2f}ms total | "
+            f"event: {event_ms:.2f}ms | "
+            f"metrics ({len(metrics)} members): {metrics_ms:.2f}ms | "
+            f"summary: {summary_ms:.2f}ms | "
+            f"groups ({len(groups)} groups): {group_ms:.2f}ms | "
+            f"top-{top_n}: {top_ms:.2f}ms"
+        )
 
         return EventGroupAnalytics(
             event_id=event.id,
