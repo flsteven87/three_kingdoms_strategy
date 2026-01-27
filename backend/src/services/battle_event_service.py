@@ -15,7 +15,11 @@ Battle Event Service
 """
 
 import asyncio
+import logging
+import time
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from src.models.battle_event import (
     BattleEvent,
@@ -583,21 +587,31 @@ class BattleEventService:
         Returns:
             List of BattleEventListItem with computed stats, ordered by event_end desc
         """
+        t_start = time.perf_counter()
+        
+        # Step 1: Query events from database
+        t_query = time.perf_counter()
         events = await self._event_repo.get_recent_completed_events(
             alliance_id=alliance_id,
             season_id=season_id,
             event_types=["battle", "siege"],
             limit=limit)
-
+        query_ms = (time.perf_counter() - t_query) * 1000
+        
         if not events:
+            logger.info(f"⏱️ get_recent_completed_events: {query_ms:.2f}ms (no events)")
             return []
 
-        # Parallel summary calculation to avoid reply token expiration
+        # Step 2: Parallel summary calculation to avoid reply token expiration
+        t_summary = time.perf_counter()
         summaries = await asyncio.gather(
             *[self._calculate_event_summary(e.id, e.event_type) for e in events]
         )
-
-        return [
+        summary_ms = (time.perf_counter() - t_summary) * 1000
+        
+        # Step 3: Build response
+        t_build = time.perf_counter()
+        result = [
             BattleEventListItem(
                 id=event.id,
                 name=event.name,
@@ -613,6 +627,18 @@ class BattleEventService:
             )
             for event, summary in zip(events, summaries, strict=True)
         ]
+        build_ms = (time.perf_counter() - t_build) * 1000
+        
+        total_ms = (time.perf_counter() - t_start) * 1000
+        
+        logger.info(
+            f"⏱️ get_recent_completed_events: {total_ms:.2f}ms total | "
+            f"query: {query_ms:.2f}ms | "
+            f"summaries ({len(events)} events): {summary_ms:.2f}ms | "
+            f"build: {build_ms:.2f}ms"
+        )
+        
+        return result
 
     async def get_event_by_name_for_alliance(
         self, alliance_id: UUID, name: str, season_id: UUID | None = None
