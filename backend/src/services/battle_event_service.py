@@ -15,11 +15,8 @@ Battle Event Service
 """
 
 import asyncio
-import logging
 import time
 from uuid import UUID
-
-logger = logging.getLogger(__name__)
 
 from src.models.battle_event import (
     BattleEvent,
@@ -599,7 +596,6 @@ class BattleEventService:
         query_ms = (time.perf_counter() - t_query) * 1000
         
         if not events:
-            logger.info(f"⏱️ get_recent_completed_events: {query_ms:.2f}ms (no events)")
             return []
 
         # Step 2: Parallel summary calculation to avoid reply token expiration
@@ -631,7 +627,7 @@ class BattleEventService:
         
         total_ms = (time.perf_counter() - t_start) * 1000
         
-        logger.info(
+        print(
             f"⏱️ get_recent_completed_events: {total_ms:.2f}ms total | "
             f"query: {query_ms:.2f}ms | "
             f"summaries ({len(events)} events): {summary_ms:.2f}ms | "
