@@ -583,7 +583,11 @@ class BattleEventService:
         Returns:
             List of BattleEventListItem with computed stats, ordered by event_end desc
         """
-        events = await self._event_repo.get_recent_completed_events(alliance_id, season_id, limit)
+        events = await self._event_repo.get_recent_completed_events(
+            alliance_id=alliance_id,
+            season_id=season_id,
+            event_types=[EventCategory.BATTLE, EventCategory.SIEGE],
+            limit=limit)
 
         if not events:
             return []

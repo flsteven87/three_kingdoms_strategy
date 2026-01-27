@@ -240,7 +240,7 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         return self._build_model(data[0])
 
     async def get_recent_completed_events(
-        self, alliance_id: UUID, season_id: UUID | None = None, limit: int = 5
+        self, alliance_id: UUID, season_id: UUID | None = None, event_types: list[str] | None = None, limit: int = 5
     ) -> list[BattleEvent]:
         """
         Get the most recent completed battle events for an alliance.
@@ -248,6 +248,7 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         Args:
             alliance_id: Alliance UUID
             season_id: Optional season UUID to filter by current season
+            event_types: Optional list of event types to filter by (e.g., ['battle', 'siege'])
             limit: Maximum number of events to return (default 5)
 
         Returns:
@@ -264,6 +265,9 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
 
         if season_id:
             query = query.eq("season_id", str(season_id))
+
+        if event_types:
+            query = query.in_("event_type", event_types)
 
         result = await self._execute_async(
             lambda: query.order("event_end", desc=True).limit(limit).execute()
