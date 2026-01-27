@@ -270,7 +270,7 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
             query = query.in_("event_type", event_types)
 
         result = await self._execute_async(
-            lambda: query.order("event_end", desc=True).limit(limit).execute()
+            lambda: query.order("event_start", desc=True).limit(limit).execute()
         )
 
         data = self._handle_supabase_result(result, allow_empty=True)
