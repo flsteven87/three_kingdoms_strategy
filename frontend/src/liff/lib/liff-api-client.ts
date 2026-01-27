@@ -284,7 +284,12 @@ export interface EventReportResponse {
   event_end: string | null
   summary: EventSummary
   group_stats: GroupEventStats[]
+  // BATTLE: uses top_members
   top_members: TopMemberItem[]
+  // SIEGE: uses dual rankings
+  top_contributors: TopMemberItem[]
+  top_assisters: TopMemberItem[]
+  // FORBIDDEN: uses violators
   violators: ViolatorItem[]
 }
 

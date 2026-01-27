@@ -86,21 +86,18 @@ function GroupStatRow({ group, eventType, maxRate }: GroupStatRowProps) {
 
 interface TopMemberRowProps {
   readonly member: TopMemberItem
-  readonly eventType: EventCategory | null
 }
 
-function TopMemberRow({ member, eventType }: TopMemberRowProps) {
+function TopMemberRow({ member }: TopMemberRowProps) {
   const rankIcons: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
   const rankDisplay = rankIcons[member.rank] || `${member.rank}.`
-  const isSiege = eventType === 'siege'
 
   const displayName = member.line_display_name
     ? `${member.member_name} (${member.line_display_name})`
     : member.member_name
 
-  const scoreDisplay = isSiege && member.contribution_diff != null && member.assist_diff != null
-    ? `${formatNumber(member.score)} (${formatNumber(member.contribution_diff)}+${formatNumber(member.assist_diff)})`
-    : formatNumber(member.score)
+  // Score is always the primary ranking metric (merit for BATTLE, contribution/assist for SIEGE)
+  const scoreDisplay = formatNumber(member.score)
 
   return (
     <div className="flex items-center gap-2 py-1.5">
@@ -198,7 +195,8 @@ export function LiffEventReport({ session, eventId }: Props) {
   const eventType = report.event_type
   const config = eventType ? EVENT_TYPE_CONFIG[eventType] : EVENT_TYPE_CONFIG.battle
   const isForbidden = eventType === 'forbidden'
-  const { summary, group_stats, top_members, violators } = report
+  const isSiege = eventType === 'siege'
+  const { summary, group_stats, top_members, top_contributors, top_assisters, violators } = report
 
   // Calculate compliance rate for forbidden events
   const complianceRate = isForbidden && summary.total_members > 0
@@ -300,7 +298,6 @@ export function LiffEventReport({ session, eventId }: Props) {
       {!isForbidden && group_stats.length > 0 && (() => {
         const participatingGroups = group_stats.filter(g => g.participated_count > 0)
         if (participatingGroups.length === 0) return null
-        const isSiege = eventType === 'siege'
         const maxAvg = Math.max(
           ...participatingGroups.map(g =>
             isSiege ? g.avg_contribution + g.avg_assist : g.avg_merit
@@ -328,8 +325,9 @@ export function LiffEventReport({ session, eventId }: Props) {
         )
       })()}
 
-      {/* Top Members or Violators */}
+      {/* Top Members or Violators - category-aware rendering */}
       {isForbidden ? (
+        // FORBIDDEN: Show violator list
         violators.length > 0 && (
           <Card>
             <CardContent className="py-3">
@@ -342,16 +340,43 @@ export function LiffEventReport({ session, eventId }: Props) {
             </CardContent>
           </Card>
         )
+      ) : isSiege ? (
+        // SIEGE: Show dual rankings (contribution + assist)
+        <>
+          {top_contributors.length > 0 && (
+            <Card>
+              <CardContent className="py-3">
+                <div className="text-sm font-medium mb-2">🏰 貢獻排行</div>
+                <div className="divide-y">
+                  {top_contributors.slice(0, 5).map((m) => (
+                    <TopMemberRow key={`contrib-${m.member_name}`} member={m} />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {top_assisters.length > 0 && (
+            <Card>
+              <CardContent className="py-3">
+                <div className="text-sm font-medium mb-2">⚔️ 助攻排行</div>
+                <div className="divide-y">
+                  {top_assisters.slice(0, 5).map((m) => (
+                    <TopMemberRow key={`assist-${m.member_name}`} member={m} />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       ) : (
+        // BATTLE: Show single merit ranking
         top_members.length > 0 && (
           <Card>
             <CardContent className="py-3">
-              <div className="text-sm font-medium mb-2">
-                {eventType === 'siege' ? '🏰 貢獻排行' : '🏆 戰功 Top 5'}
-              </div>
+              <div className="text-sm font-medium mb-2">🏆 戰功 Top 5</div>
               <div className="divide-y">
                 {top_members.slice(0, 5).map((m) => (
-                  <TopMemberRow key={m.member_name} member={m} eventType={eventType} />
+                  <TopMemberRow key={m.member_name} member={m} />
                 ))}
               </div>
             </CardContent>

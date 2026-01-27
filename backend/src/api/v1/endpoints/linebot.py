@@ -429,22 +429,39 @@ async def get_event_report_for_liff(
             detail="無法取得戰役分析資料",
         )
 
-    # 5. Enrich with LINE display names for top members and violators
-    game_ids_to_lookup = []
+    # 5. Enrich with LINE display names for all ranking types
+    game_ids_to_lookup: list[str] = []
+
+    # BATTLE: top_members
     if analytics.top_members:
         game_ids_to_lookup.extend([m.member_name for m in analytics.top_members])
+
+    # SIEGE: top_contributors and top_assisters
+    if analytics.top_contributors:
+        game_ids_to_lookup.extend([m.member_name for m in analytics.top_contributors])
+    if analytics.top_assisters:
+        game_ids_to_lookup.extend([m.member_name for m in analytics.top_assisters])
+
+    # FORBIDDEN: violators
     if analytics.violators:
         game_ids_to_lookup.extend([v.member_name for v in analytics.violators])
 
     if game_ids_to_lookup:
+        # Deduplicate game_ids for efficiency
+        unique_game_ids = list(set(game_ids_to_lookup))
         line_bindings = await service.repository.get_member_bindings_by_game_ids(
             alliance_id=alliance_id,
-            game_ids=game_ids_to_lookup,
+            game_ids=unique_game_ids,
         )
         line_name_map = {b.game_id: b.line_display_name for b in line_bindings}
 
+        # Enrich all ranking lists
         for member in analytics.top_members:
             member.line_display_name = line_name_map.get(member.member_name)
+        for contributor in analytics.top_contributors:
+            contributor.line_display_name = line_name_map.get(contributor.member_name)
+        for assister in analytics.top_assisters:
+            assister.line_display_name = line_name_map.get(assister.member_name)
         for violator in analytics.violators:
             violator.line_display_name = line_name_map.get(violator.member_name)
 
