@@ -5,10 +5,11 @@
  * Design: Single price card with quantity selector, trust badges, status, FAQ.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecur } from 'recur-tw'
-import { Minus, Plus, Info } from 'lucide-react'
+import { Minus, Plus, Info, CheckCircle, X, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -24,6 +25,82 @@ import { PRICE_PER_SEASON, MIN_QUANTITY, MAX_QUANTITY } from '@/constants'
 interface FaqItem {
   readonly question: string
   readonly answer: string
+}
+
+type PaymentStatus = 'success' | 'cancelled' | null
+
+interface PaymentResultBannerProps {
+  readonly status: PaymentStatus
+  readonly purchasedQuantity?: number
+  readonly onClose: () => void
+  readonly onNavigateToSeasons: () => void
+}
+
+function PaymentResultBanner({
+  status,
+  purchasedQuantity,
+  onClose,
+  onNavigateToSeasons,
+}: PaymentResultBannerProps) {
+  if (!status) return null
+
+  const isSuccess = status === 'success'
+
+  return (
+    <div
+      className={cn(
+        'mx-auto max-w-md rounded-xl border p-4 animate-in fade-in slide-in-from-top-2 duration-300',
+        isSuccess
+          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'
+          : 'border-border bg-secondary/50'
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {isSuccess ? (
+          <CheckCircle className="h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-400" />
+        ) : (
+          <XCircle className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+        )}
+        <div className="flex-1 space-y-2">
+          <p
+            className={cn(
+              'font-medium',
+              isSuccess ? 'text-green-800 dark:text-green-200' : 'text-foreground'
+            )}
+          >
+            {isSuccess ? '付款成功' : '付款未完成'}
+          </p>
+          <p className={cn('text-sm', isSuccess ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground')}>
+            {isSuccess
+              ? `已新增 ${purchasedQuantity ?? 1} 季額度`
+              : '您可以隨時重新購買'}
+          </p>
+          {isSuccess && (
+            <button
+              type="button"
+              onClick={onNavigateToSeasons}
+              className="mt-1 text-sm font-medium text-green-700 underline-offset-4 hover:underline dark:text-green-300"
+            >
+              開始新賽季 →
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className={cn(
+            'flex-shrink-0 rounded-md p-1 transition-colors',
+            isSuccess
+              ? 'text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900'
+              : 'text-muted-foreground hover:bg-secondary'
+          )}
+          aria-label="關閉"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 const FAQ_ITEMS: readonly FaqItem[] = [
@@ -57,14 +134,47 @@ const FAQ_ITEMS: readonly FaqItem[] = [
 function PurchaseSeason() {
   const [quantity, setQuantity] = useState(1)
   const [error, setError] = useState<string | null>(null)
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(null)
+  const [purchasedQuantity, setPurchasedQuantity] = useState<number | undefined>()
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { data: quotaStatus, isLoading: isQuotaLoading } = useSeasonQuota()
   const { checkout, isCheckingOut } = useRecur()
 
+  // Handle payment result from URL parameters
+  useEffect(() => {
+    const payment = searchParams.get('payment') as PaymentStatus
+    const qty = searchParams.get('quantity')
+
+    if (payment === 'success' || payment === 'cancelled') {
+      setPaymentStatus(payment)
+      if (qty) {
+        setPurchasedQuantity(parseInt(qty, 10))
+      }
+      // Refresh quota on success
+      if (payment === 'success') {
+        queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
+      }
+    }
+  }, [searchParams, queryClient])
+
   const total = quantity * PRICE_PER_SEASON
   const productId = import.meta.env.VITE_RECUR_PRODUCT_ID
+
+  const closeBanner = () => {
+    setPaymentStatus(null)
+    setPurchasedQuantity(undefined)
+    // Clear URL parameters
+    setSearchParams({}, { replace: true })
+  }
+
+  const handleNavigateToSeasons = () => {
+    closeBanner()
+    navigate('/seasons')
+  }
 
   const decrementQuantity = () => {
     setQuantity((prev) => Math.max(MIN_QUANTITY, prev - 1))
@@ -110,7 +220,7 @@ function PurchaseSeason() {
       // Format: user_id:quantity - used by webhook to grant seasons
       const externalCustomerId = `${user.id}:${quantity}`
       const baseUrl = window.location.origin
-      const successUrl = `${baseUrl}/purchase?payment=success`
+      const successUrl = `${baseUrl}/purchase?payment=success&quantity=${quantity}`
       const cancelUrl = `${baseUrl}/purchase?payment=cancelled`
 
       await checkout({
@@ -202,6 +312,14 @@ function PurchaseSeason() {
       <header className="text-center">
         <h1 className="text-4xl font-bold tracking-tight">購買賽季</h1>
       </header>
+
+      {/* Payment Result Banner */}
+      <PaymentResultBanner
+        status={paymentStatus}
+        purchasedQuantity={purchasedQuantity}
+        onClose={closeBanner}
+        onNavigateToSeasons={handleNavigateToSeasons}
+      />
 
       {/* Purchase Card */}
       <div className="mx-auto max-w-md">
