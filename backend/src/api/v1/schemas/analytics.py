@@ -447,16 +447,16 @@ class AttentionItem(BaseModel):
 
 
 class PeriodInfo(BaseModel):
-    """Current period metadata"""
+    """Current period metadata (values are 0 when no period data exists)"""
 
     model_config = ConfigDict(from_attributes=True)
 
-    period_id: str = Field(..., description="Period UUID as string")
-    period_number: int = Field(..., ge=1)
-    period_label: str = Field(..., description="Display label")
-    start_date: str = Field(..., description="ISO date string")
-    end_date: str = Field(..., description="ISO date string")
-    days: int = Field(..., ge=1)
+    period_id: str = Field(..., description="Period UUID as string (empty if no data)")
+    period_number: int = Field(..., ge=0, description="Period number (0 if no data)")
+    period_label: str = Field(..., description="Display label (empty if no data)")
+    start_date: str = Field(..., description="ISO date string (empty if no data)")
+    end_date: str = Field(..., description="ISO date string (empty if no data)")
+    days: int = Field(..., ge=0, description="Number of days (0 if no data)")
 
 
 class AllianceAnalyticsResponse(BaseModel):

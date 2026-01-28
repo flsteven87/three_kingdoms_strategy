@@ -56,7 +56,8 @@ class Settings(BaseSettings):
     liff_id: str | None = None
 
     # Recur Payment Configuration
-    recur_webhook_secret: str | None = None
+    recur_secret_key: str | None = None  # sk_test_* or sk_live_* for backend API calls
+    recur_webhook_secret: str | None = None  # Webhook signing secret for signature verification
 
     @property
     def line_bot_enabled(self) -> bool:
