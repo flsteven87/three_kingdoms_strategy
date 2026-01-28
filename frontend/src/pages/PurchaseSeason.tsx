@@ -5,8 +5,8 @@
  * Design: Single price card with quantity selector, trust badges, status, FAQ.
  */
 
-import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecur } from 'recur-tw'
 import { Minus, Plus, Info, CheckCircle, X, XCircle } from 'lucide-react'
@@ -137,29 +137,11 @@ function PurchaseSeason() {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(null)
   const [purchasedQuantity, setPurchasedQuantity] = useState<number | undefined>()
 
-  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { data: quotaStatus, isLoading: isQuotaLoading } = useSeasonQuota()
   const { checkout, isCheckingOut } = useRecur()
-
-  // Handle payment result from URL parameters
-  useEffect(() => {
-    const payment = searchParams.get('payment') as PaymentStatus
-    const qty = searchParams.get('quantity')
-
-    if (payment === 'success' || payment === 'cancelled') {
-      setPaymentStatus(payment)
-      if (qty) {
-        setPurchasedQuantity(parseInt(qty, 10))
-      }
-      // Refresh quota on success
-      if (payment === 'success') {
-        queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
-      }
-    }
-  }, [searchParams, queryClient])
 
   const total = quantity * PRICE_PER_SEASON
   const productId = import.meta.env.VITE_RECUR_PRODUCT_ID
@@ -167,8 +149,6 @@ function PurchaseSeason() {
   const closeBanner = () => {
     setPaymentStatus(null)
     setPurchasedQuantity(undefined)
-    // Clear URL parameters
-    setSearchParams({}, { replace: true })
   }
 
   const handleNavigateToSeasons = () => {
@@ -216,20 +196,18 @@ function PurchaseSeason() {
       return
     }
 
+    // Store quantity for success callback
+    const purchaseQuantity = quantity
+
     try {
       // Format: user_id:quantity - used by webhook to grant seasons
-      const externalCustomerId = `${user.id}:${quantity}`
-      const baseUrl = window.location.origin
-      const successUrl = `${baseUrl}/purchase?payment=success&quantity=${quantity}`
-      const cancelUrl = `${baseUrl}/purchase?payment=cancelled`
+      const externalCustomerId = `${user.id}:${purchaseQuantity}`
 
       await checkout({
         productId,
         customerEmail,
         customerName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
         externalCustomerId,
-        successUrl,
-        cancelUrl,
         onSuccess: (result) => {
           console.log('[Recur] Checkout session created:', result)
         },
@@ -238,27 +216,14 @@ function PurchaseSeason() {
           setError(`付款錯誤：${checkoutError.message}`)
         },
         onPaymentComplete: async () => {
-          // Refresh quota status after successful payment
+          // Refresh quota status and show success banner
           await queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
-        },
-        onPaymentFailed: (err) => {
-          console.error('[Recur] Payment failed:', err)
-          // Provide appropriate actions based on error code
-          const errorCode = err?.code
-          switch (errorCode) {
-            case 'CARD_DECLINED':
-            case 'INSUFFICIENT_FUNDS':
-              return {
-                action: 'custom' as const,
-                customTitle: '付款失敗',
-                customMessage: '請確認卡片餘額或使用其他付款方式',
-              }
-            default:
-              return { action: 'retry' as const }
-          }
+          setPaymentStatus('success')
+          setPurchasedQuantity(purchaseQuantity)
         },
         onPaymentCancel: () => {
           console.log('[Recur] Payment cancelled by user')
+          setPaymentStatus('cancelled')
         },
       })
     } catch (err: unknown) {
