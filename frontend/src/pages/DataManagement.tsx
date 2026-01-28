@@ -26,10 +26,10 @@ function DataManagement() {
    */
   const sortedSeasons = seasons
     ? [...seasons].sort((a, b) => {
-        if (a.is_current && !b.is_current) return -1
-        if (!a.is_current && b.is_current) return 1
-        return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-      })
+      if (a.is_current && !b.is_current) return -1
+      if (!a.is_current && b.is_current) return 1
+      return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+    })
     : []
 
   /**
@@ -51,35 +51,36 @@ function DataManagement() {
           <p className="text-muted-foreground mt-1">CSV 數據上傳與管理</p>
         </div>
 
-      {/* Loading State */}
-      {seasonsLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      )}
+        {/* Loading State */}
+        {seasonsLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
 
-      {/* Empty State */}
-      {!seasonsLoading && sortedSeasons.length === 0 && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            請先在「賽季管理」建立賽季，才能上傳 CSV 數據。
-          </AlertDescription>
-        </Alert>
-      )}
+        {/* Empty State */}
+        {!seasonsLoading && sortedSeasons.length === 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              請先在「賽季管理」建立賽季，才能上傳 CSV 數據。
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {/* CSV Upload Cards by Season */}
-      {!seasonsLoading && sortedSeasons.length > 0 && (
-        <div className="space-y-4">
-          {sortedSeasons.map((season) => (
-            <SeasonUploadCard
-              key={season.id}
-              season={season}
-              onUpload={handleUpload}
-            />
-          ))}
-        </div>
-      )}
+        {/* CSV Upload Cards by Season */}
+        {!seasonsLoading && sortedSeasons.length > 0 && (
+          <div className="space-y-4">
+            {sortedSeasons.map((season) => (
+              <SeasonUploadCard
+                key={season.id}
+                season={season}
+                onUpload={handleUpload}
+                isUploading={uploadMutation.isPending}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </AllianceGuard>
   )
@@ -91,9 +92,10 @@ function DataManagement() {
 interface SeasonUploadCardProps {
   readonly season: Season
   readonly onUpload: (seasonId: string, file: File, snapshotDate?: string) => Promise<void>
+  readonly isUploading: boolean
 }
 
-function SeasonUploadCard({ season, onUpload }: SeasonUploadCardProps) {
+function SeasonUploadCard({ season, onUpload, isUploading }: SeasonUploadCardProps) {
   const { data: uploads = [], isLoading } = useCsvUploads(season.id)
   const deleteMutation = useDeleteCsvUpload(season.id)
 
@@ -125,6 +127,7 @@ function SeasonUploadCard({ season, onUpload }: SeasonUploadCardProps) {
       uploads={uploads}
       onUpload={handleUpload}
       onDelete={handleDelete}
+      isUploading={isUploading}
     />
   )
 }

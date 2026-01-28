@@ -315,7 +315,11 @@ export function CSVUploadCard({
                   className="w-full"
                   size="lg"
                 >
-                  <Upload className="h-4 w-4 mr-2" />
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
                   {isUploading ? '上傳中...' : '確認上傳'}
                 </Button>
               </div>
