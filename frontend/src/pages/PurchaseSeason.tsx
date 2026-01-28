@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecur } from 'recur-tw'
-import { Info, CheckCircle, X, XCircle } from 'lucide-react'
+import { Info, CheckCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -31,69 +31,38 @@ interface FaqItem {
   readonly answer: string
 }
 
-type PaymentStatus = 'success' | 'cancelled' | null
-
-interface PaymentResultBannerProps {
-  readonly status: PaymentStatus
+interface PaymentSuccessBannerProps {
+  readonly visible: boolean
   readonly onClose: () => void
   readonly onNavigateToSeasons: () => void
 }
 
-function PaymentResultBanner({
-  status,
+function PaymentSuccessBanner({
+  visible,
   onClose,
   onNavigateToSeasons,
-}: PaymentResultBannerProps) {
-  if (!status) return null
-
-  const isSuccess = status === 'success'
+}: PaymentSuccessBannerProps) {
+  if (!visible) return null
 
   return (
-    <div
-      className={cn(
-        'mx-auto max-w-md rounded-xl border p-4 animate-in fade-in slide-in-from-top-2 duration-300',
-        isSuccess
-          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'
-          : 'border-border bg-secondary/50'
-      )}
-    >
+    <div className="mx-auto max-w-md rounded-xl border border-green-200 bg-green-50 p-4 animate-in fade-in slide-in-from-top-2 duration-300 dark:border-green-800 dark:bg-green-950">
       <div className="flex items-start gap-3">
-        {isSuccess ? (
-          <CheckCircle className="h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-400" />
-        ) : (
-          <XCircle className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-        )}
+        <CheckCircle className="h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-400" />
         <div className="flex-1 space-y-2">
-          <p
-            className={cn(
-              'font-medium',
-              isSuccess ? 'text-green-800 dark:text-green-200' : 'text-foreground'
-            )}
+          <p className="font-medium text-green-800 dark:text-green-200">付款成功</p>
+          <p className="text-sm text-green-700 dark:text-green-300">已新增 1 季額度</p>
+          <button
+            type="button"
+            onClick={onNavigateToSeasons}
+            className="mt-1 text-sm font-medium text-green-700 underline-offset-4 hover:underline dark:text-green-300"
           >
-            {isSuccess ? '付款成功' : '付款未完成'}
-          </p>
-          <p className={cn('text-sm', isSuccess ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground')}>
-            {isSuccess ? '已新增 1 季額度' : '您可以隨時重新購買'}
-          </p>
-          {isSuccess && (
-            <button
-              type="button"
-              onClick={onNavigateToSeasons}
-              className="mt-1 text-sm font-medium text-green-700 underline-offset-4 hover:underline dark:text-green-300"
-            >
-              開始新賽季 →
-            </button>
-          )}
+            開始新賽季 →
+          </button>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className={cn(
-            'flex-shrink-0 rounded-md p-1 transition-colors',
-            isSuccess
-              ? 'text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900'
-              : 'text-muted-foreground hover:bg-secondary'
-          )}
+          className="flex-shrink-0 rounded-md p-1 text-green-600 transition-colors hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900"
           aria-label="關閉"
         >
           <X className="h-4 w-4" />
@@ -133,7 +102,7 @@ const FAQ_ITEMS: readonly FaqItem[] = [
 
 function PurchaseSeason() {
   const [error, setError] = useState<string | null>(null)
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(null)
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
 
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -142,23 +111,20 @@ function PurchaseSeason() {
   const { data: quotaStatus, isLoading: isQuotaLoading } = useSeasonQuota()
   const { checkout, isCheckingOut } = useRecur()
 
-  // Handle payment result from URL parameters (redirect from Recur)
+  // Handle payment success from URL parameters (redirect from Recur)
   useEffect(() => {
-    const payment = searchParams.get('payment') as PaymentStatus
-    if (payment === 'success' || payment === 'cancelled') {
-      setPaymentStatus(payment)
-      if (payment === 'success') {
-        queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
-      }
+    if (searchParams.get('payment') === 'success') {
+      setShowSuccessBanner(true)
+      queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
+      // Clear URL parameters
+      setSearchParams({}, { replace: true })
     }
-  }, [searchParams, queryClient])
+  }, [searchParams, queryClient, setSearchParams])
 
   const productId = import.meta.env.VITE_RECUR_PRODUCT_ID
 
   const closeBanner = () => {
-    setPaymentStatus(null)
-    // Clear URL parameters
-    setSearchParams({}, { replace: true })
+    setShowSuccessBanner(false)
   }
 
   const handleNavigateToSeasons = () => {
@@ -199,7 +165,6 @@ function PurchaseSeason() {
         customerName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
         externalCustomerId,
         successUrl: `${baseUrl}/purchase?payment=success`,
-        cancelUrl: `${baseUrl}/purchase?payment=cancelled`,
         onSuccess: (result) => {
           console.log('[Recur] Checkout session created:', result)
         },
@@ -210,7 +175,7 @@ function PurchaseSeason() {
         onPaymentComplete: async () => {
           // Refresh quota status and show success banner
           await queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
-          setPaymentStatus('success')
+          setShowSuccessBanner(true)
         },
         onPaymentFailed: (err) => {
           console.error('[Recur] Payment failed:', err)
@@ -226,10 +191,6 @@ function PurchaseSeason() {
             default:
               return { action: 'retry' as const }
           }
-        },
-        onPaymentCancel: () => {
-          console.log('[Recur] Payment cancelled by user')
-          setPaymentStatus('cancelled')
         },
       })
     } catch (err: unknown) {
@@ -284,9 +245,9 @@ function PurchaseSeason() {
         <h1 className="text-4xl font-bold tracking-tight">購買賽季</h1>
       </header>
 
-      {/* Payment Result Banner */}
-      <PaymentResultBanner
-        status={paymentStatus}
+      {/* Payment Success Banner */}
+      <PaymentSuccessBanner
+        visible={showSuccessBanner}
         onClose={closeBanner}
         onNavigateToSeasons={handleNavigateToSeasons}
       />
