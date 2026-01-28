@@ -2,14 +2,18 @@
  * Purchase Season Page
  *
  * Standalone page for purchasing season quota.
- * Design: Single price card with quantity selector, trust badges, status, FAQ.
+ * Design: Single price card for 1 season, trust badges, status, FAQ.
+ *
+ * Note: Recur SDK ONE_TIME products do not support quantity parameter,
+ * so we limit purchases to 1 season at a time. Users can purchase multiple
+ * times if they need more seasons.
  */
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecur } from 'recur-tw'
-import { Minus, Plus, Info, CheckCircle, X, XCircle } from 'lucide-react'
+import { Info, CheckCircle, X, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Accordion,
@@ -20,7 +24,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { useSeasonQuota, seasonQuotaKeys } from '@/hooks/use-season-quota'
-import { PRICE_PER_SEASON, MIN_QUANTITY, MAX_QUANTITY } from '@/constants'
+import { PRICE_PER_SEASON } from '@/constants'
 
 interface FaqItem {
   readonly question: string
@@ -31,14 +35,12 @@ type PaymentStatus = 'success' | 'cancelled' | null
 
 interface PaymentResultBannerProps {
   readonly status: PaymentStatus
-  readonly purchasedQuantity?: number
   readonly onClose: () => void
   readonly onNavigateToSeasons: () => void
 }
 
 function PaymentResultBanner({
   status,
-  purchasedQuantity,
   onClose,
   onNavigateToSeasons,
 }: PaymentResultBannerProps) {
@@ -71,9 +73,7 @@ function PaymentResultBanner({
             {isSuccess ? '付款成功' : '付款未完成'}
           </p>
           <p className={cn('text-sm', isSuccess ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground')}>
-            {isSuccess
-              ? `已新增 ${purchasedQuantity ?? 1} 季額度`
-              : '您可以隨時重新購買'}
+            {isSuccess ? '已新增 1 季額度' : '您可以隨時重新購買'}
           </p>
           {isSuccess && (
             <button
@@ -132,10 +132,8 @@ const FAQ_ITEMS: readonly FaqItem[] = [
 ]
 
 function PurchaseSeason() {
-  const [quantity, setQuantity] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(null)
-  const [purchasedQuantity, setPurchasedQuantity] = useState<number | undefined>()
 
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -155,12 +153,10 @@ function PurchaseSeason() {
     }
   }, [searchParams, queryClient])
 
-  const total = quantity * PRICE_PER_SEASON
   const productId = import.meta.env.VITE_RECUR_PRODUCT_ID
 
   const closeBanner = () => {
     setPaymentStatus(null)
-    setPurchasedQuantity(undefined)
     // Clear URL parameters
     setSearchParams({}, { replace: true })
   }
@@ -168,26 +164,6 @@ function PurchaseSeason() {
   const handleNavigateToSeasons = () => {
     closeBanner()
     navigate('/seasons')
-  }
-
-  const decrementQuantity = () => {
-    setQuantity((prev) => Math.max(MIN_QUANTITY, prev - 1))
-  }
-
-  const incrementQuantity = () => {
-    setQuantity((prev) => Math.min(MAX_QUANTITY, prev + 1))
-  }
-
-  const handleQuantityInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    if (value === '') {
-      setQuantity(MIN_QUANTITY)
-      return
-    }
-    const num = parseInt(value, 10)
-    if (!isNaN(num)) {
-      setQuantity(Math.max(MIN_QUANTITY, Math.min(MAX_QUANTITY, num)))
-    }
   }
 
   const handlePurchase = async () => {
@@ -210,13 +186,12 @@ function PurchaseSeason() {
       return
     }
 
-    // Store quantity for success callback
-    const purchaseQuantity = quantity
     const baseUrl = window.location.origin
 
     try {
       // Format: user_id:quantity - used by webhook to grant seasons
-      const externalCustomerId = `${user.id}:${purchaseQuantity}`
+      // Fixed to 1 season per purchase (Recur ONE_TIME products don't support quantity)
+      const externalCustomerId = `${user.id}:1`
 
       await checkout({
         productId,
@@ -236,7 +211,6 @@ function PurchaseSeason() {
           // Refresh quota status and show success banner
           await queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
           setPaymentStatus('success')
-          setPurchasedQuantity(purchaseQuantity)
         },
         onPaymentFailed: (err) => {
           console.error('[Recur] Payment failed:', err)
@@ -313,7 +287,6 @@ function PurchaseSeason() {
       {/* Payment Result Banner */}
       <PaymentResultBanner
         status={paymentStatus}
-        purchasedQuantity={purchasedQuantity}
         onClose={closeBanner}
         onNavigateToSeasons={handleNavigateToSeasons}
       />
@@ -329,48 +302,10 @@ function PurchaseSeason() {
             <div className="text-lg text-muted-foreground">/ 賽季</div>
           </div>
 
-          {/* Quantity Selector */}
-          <div className="space-y-3">
-            <label className="block text-center text-sm font-medium text-muted-foreground">
-              購買數量
-            </label>
-            <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={decrementQuantity}
-                disabled={quantity <= MIN_QUANTITY}
-                className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="減少數量"
-              >
-                <Minus className="h-5 w-5" />
-              </button>
-              <input
-                type="number"
-                value={quantity}
-                onChange={handleQuantityInput}
-                min={MIN_QUANTITY}
-                max={MAX_QUANTITY}
-                className="h-13 w-20 rounded-xl border bg-background text-center text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <button
-                type="button"
-                onClick={incrementQuantity}
-                disabled={quantity >= MAX_QUANTITY}
-                className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="增加數量"
-              >
-                <Plus className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Subtotal */}
-          <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-5 py-4">
-            <span className="text-muted-foreground">小計</span>
-            <span className="text-2xl font-semibold">
-              NT$ {total.toLocaleString()}
-            </span>
-          </div>
+          {/* Product Description */}
+          <p className="text-center text-sm text-muted-foreground">
+            每次購買可開啟一個新賽季，需要更多可重複購買
+          </p>
 
           {/* Error Message */}
           {error && (
