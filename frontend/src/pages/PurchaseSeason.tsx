@@ -5,8 +5,8 @@
  * Design: Single price card with quantity selector, trust badges, status, FAQ.
  */
 
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecur } from 'recur-tw'
 import { Minus, Plus, Info, CheckCircle, X, XCircle } from 'lucide-react'
@@ -137,11 +137,23 @@ function PurchaseSeason() {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(null)
   const [purchasedQuantity, setPurchasedQuantity] = useState<number | undefined>()
 
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { data: quotaStatus, isLoading: isQuotaLoading } = useSeasonQuota()
   const { checkout, isCheckingOut } = useRecur()
+
+  // Handle payment result from URL parameters (redirect from Recur)
+  useEffect(() => {
+    const payment = searchParams.get('payment') as PaymentStatus
+    if (payment === 'success' || payment === 'cancelled') {
+      setPaymentStatus(payment)
+      if (payment === 'success') {
+        queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
+      }
+    }
+  }, [searchParams, queryClient])
 
   const total = quantity * PRICE_PER_SEASON
   const productId = import.meta.env.VITE_RECUR_PRODUCT_ID
@@ -149,6 +161,8 @@ function PurchaseSeason() {
   const closeBanner = () => {
     setPaymentStatus(null)
     setPurchasedQuantity(undefined)
+    // Clear URL parameters
+    setSearchParams({}, { replace: true })
   }
 
   const handleNavigateToSeasons = () => {
@@ -209,9 +223,8 @@ function PurchaseSeason() {
         customerEmail,
         customerName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
         externalCustomerId,
-        // Required by Recur SDK for redirect after payment
-        successUrl: `${baseUrl}/purchase`,
-        cancelUrl: `${baseUrl}/purchase`,
+        successUrl: `${baseUrl}/purchase?payment=success`,
+        cancelUrl: `${baseUrl}/purchase?payment=cancelled`,
         onSuccess: (result) => {
           console.log('[Recur] Checkout session created:', result)
         },
@@ -224,6 +237,21 @@ function PurchaseSeason() {
           await queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
           setPaymentStatus('success')
           setPurchasedQuantity(purchaseQuantity)
+        },
+        onPaymentFailed: (err) => {
+          console.error('[Recur] Payment failed:', err)
+          const errorCode = err?.code
+          switch (errorCode) {
+            case 'CARD_DECLINED':
+            case 'INSUFFICIENT_FUNDS':
+              return {
+                action: 'custom' as const,
+                customTitle: '付款失敗',
+                customMessage: '請確認卡片餘額或使用其他付款方式',
+              }
+            default:
+              return { action: 'retry' as const }
+          }
         },
         onPaymentCancel: () => {
           console.log('[Recur] Payment cancelled by user')
