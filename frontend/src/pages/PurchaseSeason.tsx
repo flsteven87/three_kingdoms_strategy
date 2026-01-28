@@ -198,6 +198,7 @@ function PurchaseSeason() {
 
     // Store quantity for success callback
     const purchaseQuantity = quantity
+    const baseUrl = window.location.origin
 
     try {
       // Format: user_id:quantity - used by webhook to grant seasons
@@ -208,6 +209,9 @@ function PurchaseSeason() {
         customerEmail,
         customerName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
         externalCustomerId,
+        // Required by Recur SDK for redirect after payment
+        successUrl: `${baseUrl}/purchase`,
+        cancelUrl: `${baseUrl}/purchase`,
         onSuccess: (result) => {
           console.log('[Recur] Checkout session created:', result)
         },
