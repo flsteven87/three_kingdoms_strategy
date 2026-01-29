@@ -39,6 +39,17 @@ class ProcessEventRequest(BaseModel):
     after_upload_id: UUID = Field(..., description="After snapshot upload UUID")
 
 
+class UpdateEventRequest(BaseModel):
+    """Request body for updating a battle event's basic information"""
+
+    name: str | None = Field(None, min_length=1, max_length=100, description="Event name")
+    event_type: EventCategory | None = Field(
+        None,
+        description="Event category: siege (攻城), forbidden (禁地), battle (戰役)"
+    )
+    description: str | None = Field(None, max_length=500, description="Event description")
+
+
 # ============================================================================
 # Response Schemas
 # ============================================================================
@@ -226,8 +237,12 @@ class EventGroupAnalyticsResponse(BaseModel):
     summary: EventSummaryResponse
     group_stats: list[GroupEventStatsResponse]
 
-    # Top performers (for BATTLE and SIEGE events)
+    # Top performers for BATTLE events
     top_members: list[TopMemberResponse] = []
 
-    # Violators (for FORBIDDEN events only)
+    # Dual rankings for SIEGE events
+    top_contributors: list[TopMemberResponse] = []
+    top_assisters: list[TopMemberResponse] = []
+
+    # Violators for FORBIDDEN events only
     violators: list[ViolatorResponse] = []

@@ -21,6 +21,7 @@ from src.models.battle_event import (
     BattleEvent,
     BattleEventCreate,
     BattleEventListItem,
+    BattleEventUpdate,
     EventCategory,
     EventStatus,
 )
@@ -524,6 +525,58 @@ class BattleEventService:
             mvp_combined_score=mvp_combined_score,
             violator_count=violator_count,
         )
+
+    async def update_event(
+        self,
+        event_id: UUID,
+        update_data: BattleEventUpdate,
+        user_id: UUID,
+    ) -> BattleEvent:
+        """
+        Update a battle event's basic information.
+
+        Only owner or collaborator can update events.
+        Only name, event_type, and description can be updated.
+
+        Args:
+            event_id: Event UUID
+            update_data: Fields to update
+            user_id: User performing the update
+
+        Returns:
+            Updated battle event
+
+        Raises:
+            ValueError: If event not found
+            PermissionError: If user is not owner/collaborator
+            SeasonQuotaExhaustedError: If trial/season quota has expired
+
+        符合 CLAUDE.md 🔴: Service layer orchestration with permission check
+        """
+        # Get event to verify it exists and get alliance_id
+        event = await self._event_repo.get_by_id(event_id)
+        if not event:
+            raise ValueError("Event not found")
+
+        # Check user has edit permission (owner or collaborator)
+        role = await self._permission_service.get_user_role(user_id, event.alliance_id)
+        if role not in ("owner", "collaborator"):
+            raise PermissionError("Only owner or collaborator can edit events")
+
+        # Verify quota: trial or available seasons required
+        await self._permission_service.require_active_quota(
+            event.alliance_id, "update battle events"
+        )
+
+        # Only allow updating specific fields (name, event_type, description)
+        # Ignore other fields like status, upload_ids, event times
+        safe_update = BattleEventUpdate(
+            name=update_data.name,
+            event_type=update_data.event_type,
+            description=update_data.description,
+        )
+
+        return await self._event_repo.update(event_id, safe_update)
 
     async def delete_event(self, event_id: UUID) -> bool:
         """

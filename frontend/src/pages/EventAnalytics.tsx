@@ -10,37 +10,45 @@
  * - Event detail sheet with full member rankings
  */
 
-import { useState, useMemo, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { EmptyState } from '@/components/ui/empty-state'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AllianceGuard } from '@/components/alliance/AllianceGuard'
-import { RoleGuard } from '@/components/alliance/RoleGuard'
-import { CsvDropZone } from '@/components/uploads/CsvDropZone'
-import { useSeasons } from '@/hooks/use-seasons'
-import { useEvents, useEventAnalytics, useCreateEvent, useProcessEvent, useUploadEventCsv } from '@/hooks/use-events'
+import { useState, useMemo, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Plus,
-  Swords,
-  Loader2,
-  AlertCircle,
-} from 'lucide-react'
-import { EventCard } from '@/components/events/EventCard'
-import type { EventCategory, EventListItem } from '@/types/event'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { AllianceGuard } from "@/components/alliance/AllianceGuard";
+import { RoleGuard } from "@/components/alliance/RoleGuard";
+import { CsvDropZone } from "@/components/uploads/CsvDropZone";
+import { useSeasons } from "@/hooks/use-seasons";
+import {
+  useEvents,
+  useEventAnalytics,
+  useCreateEvent,
+  useProcessEvent,
+  useUploadEventCsv,
+} from "@/hooks/use-events";
+import { Plus, Swords, Loader2, AlertCircle } from "lucide-react";
+import { EventCard } from "@/components/events/EventCard";
+import { EventEditSheet } from "@/components/events/EventEditSheet";
+import type { EventCategory, EventListItem } from "@/types/event";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface CreateFormData {
-  name: string
-  eventType: EventCategory
-  beforeFile: File | null
-  afterFile: File | null
+  name: string;
+  eventType: EventCategory;
+  beforeFile: File | null;
+  afterFile: File | null;
 }
 
 // ============================================================================
@@ -48,13 +56,13 @@ interface CreateFormData {
 // ============================================================================
 
 interface EventEmptyStateProps {
-  readonly onCreateEvent: () => void
+  readonly onCreateEvent: () => void;
 }
 
 function EventEmptyState({ onCreateEvent }: EventEmptyStateProps) {
   return (
     <RoleGuard
-      requiredRoles={['owner', 'collaborator']}
+      requiredRoles={["owner", "collaborator"]}
       fallback={
         <EmptyState
           icon={Swords}
@@ -68,13 +76,13 @@ function EventEmptyState({ onCreateEvent }: EventEmptyStateProps) {
         title="尚無事件記錄"
         description="建立戰役事件來追蹤成員在特定戰鬥中的表現，分析出席率和戰功貢獻。"
         action={{
-          label: '新增事件',
+          label: "新增事件",
           onClick: onCreateEvent,
           icon: Plus,
         }}
       />
     </RoleGuard>
-  )
+  );
 }
 
 // ============================================================================
@@ -99,22 +107,24 @@ function LoadingSkeleton() {
         </Card>
       ))}
     </div>
-  )
+  );
 }
-
 
 // ============================================================================
 // Event Card with Data Fetching
 // ============================================================================
 
 interface EventCardWithDataProps {
-  readonly eventId: string
-  readonly event: EventListItem
+  readonly eventId: string;
+  readonly event: EventListItem;
+  readonly onEdit: (event: EventListItem) => void;
 }
 
-function EventCardWithData({ eventId, event }: EventCardWithDataProps) {
-  const shouldFetch = event.status === 'completed'
-  const { data: eventAnalytics } = useEventAnalytics(shouldFetch ? eventId : undefined)
+function EventCardWithData({ eventId, event, onEdit }: EventCardWithDataProps) {
+  const shouldFetch = event.status === "completed";
+  const { data: eventAnalytics } = useEventAnalytics(
+    shouldFetch ? eventId : undefined,
+  );
 
   const eventDetail = eventAnalytics
     ? {
@@ -122,9 +132,9 @@ function EventCardWithData({ eventId, event }: EventCardWithDataProps) {
         metrics: eventAnalytics.metrics,
         merit_distribution: eventAnalytics.merit_distribution,
       }
-    : null
+    : null;
 
-  return <EventCard event={event} eventDetail={eventDetail} />
+  return <EventCard event={event} eventDetail={eventDetail} onEdit={onEdit} />;
 }
 
 // ============================================================================
@@ -133,109 +143,124 @@ function EventCardWithData({ eventId, event }: EventCardWithDataProps) {
 
 function EventAnalytics() {
   // UI State
-  const [isCreating, setIsCreating] = useState(false)
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<CreateFormData>({
-    name: '',
-    eventType: 'battle',
+    name: "",
+    eventType: "battle",
     beforeFile: null,
     afterFile: null,
-  })
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventListItem | null>(null);
 
   // Data fetching
-  const { data: seasons, isLoading: seasonsLoading } = useSeasons()
-  const currentSeason = seasons?.find((s) => s.is_current)
-  const { data: events, isLoading: eventsLoading } = useEvents(currentSeason?.id)
+  const { data: seasons, isLoading: seasonsLoading } = useSeasons();
+  const currentSeason = seasons?.find((s) => s.is_current);
+  const { data: events, isLoading: eventsLoading } = useEvents(
+    currentSeason?.id,
+  );
 
   // Mutations
-  const uploadEventCsv = useUploadEventCsv()
-  const createEvent = useCreateEvent(currentSeason?.id)
-  const processEvent = useProcessEvent()
+  const uploadEventCsv = useUploadEventCsv();
+  const createEvent = useCreateEvent(currentSeason?.id);
+  const processEvent = useProcessEvent();
 
-  const isLoading = seasonsLoading || eventsLoading
+  const isLoading = seasonsLoading || eventsLoading;
 
   // Sort events by date (newest first)
   const sortedEvents = useMemo(() => {
-    if (!events) return []
+    if (!events) return [];
     return [...events].sort((a, b) => {
-      const aDate = a.event_start ? new Date(a.event_start).getTime() : 0
-      const bDate = b.event_start ? new Date(b.event_start).getTime() : 0
-      return bDate - aDate
-    })
-  }, [events])
+      const aDate = a.event_start ? new Date(a.event_start).getTime() : 0;
+      const bDate = b.event_start ? new Date(b.event_start).getTime() : 0;
+      return bDate - aDate;
+    });
+  }, [events]);
 
   // Validation
-  const canSubmit = formData.name.trim().length > 0 &&
+  const canSubmit =
+    formData.name.trim().length > 0 &&
     formData.beforeFile !== null &&
     formData.afterFile !== null &&
-    !isProcessing
+    !isProcessing;
 
   // Handlers
   const handleStartCreate = useCallback(() => {
-    setIsCreating(true)
-    setError(null)
-  }, [])
+    setIsCreating(true);
+    setError(null);
+  }, []);
 
   const handleCancelCreate = useCallback(() => {
-    setIsCreating(false)
+    setIsCreating(false);
     setFormData({
-      name: '',
-      eventType: 'battle',
+      name: "",
+      eventType: "battle",
       beforeFile: null,
       afterFile: null,
-    })
-    setError(null)
-  }, [])
+    });
+    setError(null);
+  }, []);
 
   const handleFormChange = useCallback((updates: Partial<CreateFormData>) => {
-    setFormData((prev) => ({ ...prev, ...updates }))
-  }, [])
+    setFormData((prev) => ({ ...prev, ...updates }));
+  }, []);
+
+  const handleEdit = useCallback((event: EventListItem) => {
+    setEditingEvent(event);
+  }, []);
 
   const handleCreate = useCallback(async () => {
     if (!currentSeason?.id || !formData.beforeFile || !formData.afterFile) {
-      setError('缺少必要資料')
-      return
+      setError("缺少必要資料");
+      return;
     }
 
-    setIsProcessing(true)
-    setError(null)
+    setIsProcessing(true);
+    setError(null);
 
     try {
       // 1. Upload before CSV (uses event-specific endpoint, no period calculation)
       const beforeUpload = await uploadEventCsv.mutateAsync({
         seasonId: currentSeason.id,
         file: formData.beforeFile,
-      })
+      });
 
       // 2. Upload after CSV (uses event-specific endpoint, no period calculation)
       const afterUpload = await uploadEventCsv.mutateAsync({
         seasonId: currentSeason.id,
         file: formData.afterFile,
-      })
+      });
 
       // 3. Create event
       const event = await createEvent.mutateAsync({
         name: formData.name,
         event_type: formData.eventType,
-      })
+      });
 
       // 4. Process event with both upload IDs
       await processEvent.mutateAsync({
         eventId: event.id,
         beforeUploadId: beforeUpload.upload_id,
         afterUploadId: afterUpload.upload_id,
-      })
+      });
 
       // Success - reset form
-      handleCancelCreate()
+      handleCancelCreate();
     } catch (err) {
-      const message = err instanceof Error ? err.message : '建立事件時發生錯誤'
-      setError(message)
+      const message = err instanceof Error ? err.message : "建立事件時發生錯誤";
+      setError(message);
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }, [currentSeason?.id, formData, uploadEventCsv, createEvent, processEvent, handleCancelCreate])
+  }, [
+    currentSeason?.id,
+    formData,
+    uploadEventCsv,
+    createEvent,
+    processEvent,
+    handleCancelCreate,
+  ]);
 
   return (
     <AllianceGuard>
@@ -248,12 +273,15 @@ function EventAnalytics() {
               追蹤特定戰役或事件的成員表現
               {currentSeason && (
                 <span className="ml-2">
-                  · 賽季: <span className="font-medium text-foreground">{currentSeason.name}</span>
+                  · 賽季:{" "}
+                  <span className="font-medium text-foreground">
+                    {currentSeason.name}
+                  </span>
                 </span>
               )}
             </p>
           </div>
-          <RoleGuard requiredRoles={['owner', 'collaborator']}>
+          <RoleGuard requiredRoles={["owner", "collaborator"]}>
             {!isCreating && (
               <Button onClick={handleStartCreate}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -264,7 +292,7 @@ function EventAnalytics() {
         </div>
 
         {/* Create New Event Card (Inline) */}
-        <RoleGuard requiredRoles={['owner', 'collaborator']}>
+        <RoleGuard requiredRoles={["owner", "collaborator"]}>
           {isCreating && (
             <Card className="border-primary/50 shadow-sm">
               <CardHeader>
@@ -286,7 +314,9 @@ function EventAnalytics() {
                     <Input
                       id="event-name"
                       value={formData.name}
-                      onChange={(e) => handleFormChange({ name: e.target.value })}
+                      onChange={(e) =>
+                        handleFormChange({ name: e.target.value })
+                      }
                       placeholder="例如：徐州爭奪戰"
                       disabled={isProcessing}
                     />
@@ -296,16 +326,24 @@ function EventAnalytics() {
                     <Label htmlFor="event-type">事件類型 *</Label>
                     <Select
                       value={formData.eventType}
-                      onValueChange={(value: EventCategory) => handleFormChange({ eventType: value })}
+                      onValueChange={(value: EventCategory) =>
+                        handleFormChange({ eventType: value })
+                      }
                       disabled={isProcessing}
                     >
                       <SelectTrigger id="event-type">
                         <SelectValue placeholder="選擇事件類型" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="battle">戰役事件 - 以戰功判定出席</SelectItem>
-                        <SelectItem value="siege">攻城事件 - 以貢獻/助攻判定出席</SelectItem>
-                        <SelectItem value="forbidden">禁地事件 - 監控勢力值違規</SelectItem>
+                        <SelectItem value="battle">
+                          戰役事件 - 以戰功判定出席
+                        </SelectItem>
+                        <SelectItem value="siege">
+                          攻城事件 - 以貢獻/助攻判定出席
+                        </SelectItem>
+                        <SelectItem value="forbidden">
+                          禁地事件 - 監控勢力值違規
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -317,7 +355,9 @@ function EventAnalytics() {
                       description="事件開始前的數據"
                       helperText="拖放或點擊選擇 CSV"
                       file={formData.beforeFile}
-                      onFileChange={(file) => handleFormChange({ beforeFile: file })}
+                      onFileChange={(file) =>
+                        handleFormChange({ beforeFile: file })
+                      }
                       disabled={isProcessing}
                       compact
                     />
@@ -326,7 +366,9 @@ function EventAnalytics() {
                       description="事件結束後的數據"
                       helperText="拖放或點擊選擇 CSV"
                       file={formData.afterFile}
-                      onFileChange={(file) => handleFormChange({ afterFile: file })}
+                      onFileChange={(file) =>
+                        handleFormChange({ afterFile: file })
+                      }
                       disabled={isProcessing}
                       compact
                     />
@@ -342,17 +384,14 @@ function EventAnalytics() {
                   >
                     取消
                   </Button>
-                  <Button
-                    onClick={handleCreate}
-                    disabled={!canSubmit}
-                  >
+                  <Button onClick={handleCreate} disabled={!canSubmit}>
                     {isProcessing ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         處理中...
                       </>
                     ) : (
-                      '建立事件'
+                      "建立事件"
                     )}
                   </Button>
                 </div>
@@ -373,13 +412,28 @@ function EventAnalytics() {
         {!isLoading && sortedEvents.length > 0 && (
           <div className="space-y-4">
             {sortedEvents.map((event) => (
-              <EventCardWithData key={event.id} eventId={event.id} event={event} />
+              <EventCardWithData
+                key={event.id}
+                eventId={event.id}
+                event={event}
+                onEdit={handleEdit}
+              />
             ))}
           </div>
         )}
+
+        {/* Edit Event Sheet */}
+        <EventEditSheet
+          event={editingEvent}
+          seasonId={currentSeason?.id}
+          open={editingEvent !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditingEvent(null);
+          }}
+        />
       </div>
     </AllianceGuard>
-  )
+  );
 }
 
-export { EventAnalytics }
+export { EventAnalytics };

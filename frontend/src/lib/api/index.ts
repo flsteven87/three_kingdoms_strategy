@@ -14,32 +14,32 @@
  */
 
 // Re-export base client utilities
-export { setAuthToken } from './base-client'
+export { setAuthToken } from "./base-client";
 
 // Re-export all API functions for modular usage
-export * from './alliance-api'
-export * from './season-api'
-export * from './upload-api'
-export * from './hegemony-api'
-export * from './analytics-api'
-export * from './event-api'
-export * from './donation-api'
-export * from './line-api'
-export * from './copper-mine-api'
-export * from './season-quota-api'
+export * from "./alliance-api";
+export * from "./season-api";
+export * from "./upload-api";
+export * from "./hegemony-api";
+export * from "./analytics-api";
+export * from "./event-api";
+export * from "./donation-api";
+export * from "./line-api";
+export * from "./copper-mine-api";
+export * from "./season-quota-api";
 
 // Import all functions for backward-compatible apiClient object
-import { setAuthToken } from './base-client'
-import * as allianceApi from './alliance-api'
-import * as seasonApi from './season-api'
-import * as uploadApi from './upload-api'
-import * as hegemonyApi from './hegemony-api'
-import * as analyticsApi from './analytics-api'
-import * as eventApi from './event-api'
-import * as donationApi from './donation-api'
-import * as lineApi from './line-api'
-import * as copperMineApi from './copper-mine-api'
-import * as seasonQuotaApi from './season-quota-api'
+import { setAuthToken } from "./base-client";
+import * as allianceApi from "./alliance-api";
+import * as seasonApi from "./season-api";
+import * as uploadApi from "./upload-api";
+import * as hegemonyApi from "./hegemony-api";
+import * as analyticsApi from "./analytics-api";
+import * as eventApi from "./event-api";
+import * as donationApi from "./donation-api";
+import * as lineApi from "./line-api";
+import * as copperMineApi from "./copper-mine-api";
+import * as seasonQuotaApi from "./season-quota-api";
 
 /**
  * Backward-compatible API client object
@@ -115,6 +115,7 @@ export const apiClient = {
   getEventAnalytics: eventApi.getEventAnalytics,
   getEventGroupAnalytics: eventApi.getEventGroupAnalytics,
   createEvent: eventApi.createEvent,
+  updateEvent: eventApi.updateEvent,
   uploadEventCsv: eventApi.uploadEventCsv,
   processEvent: eventApi.processEvent,
   deleteEvent: eventApi.deleteEvent,
@@ -149,4 +150,4 @@ export const apiClient = {
 
   // Season Quota
   getSeasonQuotaStatus: seasonQuotaApi.getSeasonQuotaStatus,
-}
+};

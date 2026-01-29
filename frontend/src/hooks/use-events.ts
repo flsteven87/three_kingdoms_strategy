@@ -8,32 +8,40 @@
  * - Proper staleTime configuration
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiClient } from '@/lib/api-client'
-import type { BattleEvent, CreateEventRequest, EventAnalyticsResponse, EventGroupAnalytics } from '@/types/event'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
+import type {
+  BattleEvent,
+  CreateEventRequest,
+  UpdateEventRequest,
+  EventAnalyticsResponse,
+  EventGroupAnalytics,
+} from "@/types/event";
 
 // Query Keys Factory
 export const eventKeys = {
-  all: ['events'] as const,
-  lists: () => [...eventKeys.all, 'list'] as const,
+  all: ["events"] as const,
+  lists: () => [...eventKeys.all, "list"] as const,
   list: (seasonId: string) => [...eventKeys.lists(), { seasonId }] as const,
-  details: () => [...eventKeys.all, 'detail'] as const,
+  details: () => [...eventKeys.all, "detail"] as const,
   detail: (eventId: string) => [...eventKeys.details(), eventId] as const,
-  analytics: () => [...eventKeys.all, 'analytics'] as const,
-  eventAnalytics: (eventId: string) => [...eventKeys.analytics(), eventId] as const,
-  groupAnalytics: (eventId: string) => [...eventKeys.all, 'group-analytics', eventId] as const,
-}
+  analytics: () => [...eventKeys.all, "analytics"] as const,
+  eventAnalytics: (eventId: string) =>
+    [...eventKeys.analytics(), eventId] as const,
+  groupAnalytics: (eventId: string) =>
+    [...eventKeys.all, "group-analytics", eventId] as const,
+};
 
 /**
  * Hook to fetch events list for a season
  */
 export function useEvents(seasonId: string | undefined) {
   return useQuery({
-    queryKey: eventKeys.list(seasonId ?? ''),
+    queryKey: eventKeys.list(seasonId ?? ""),
     queryFn: () => apiClient.getEvents(seasonId!),
     enabled: !!seasonId,
     staleTime: 2 * 60 * 1000, // 2 minutes
-  })
+  });
 }
 
 /**
@@ -41,11 +49,11 @@ export function useEvents(seasonId: string | undefined) {
  */
 export function useEvent(eventId: string | undefined) {
   return useQuery({
-    queryKey: eventKeys.detail(eventId ?? ''),
+    queryKey: eventKeys.detail(eventId ?? ""),
     queryFn: () => apiClient.getEvent(eventId!),
     enabled: !!eventId,
     staleTime: 2 * 60 * 1000,
-  })
+  });
 }
 
 /**
@@ -53,39 +61,43 @@ export function useEvent(eventId: string | undefined) {
  */
 export function useEventAnalytics(eventId: string | undefined) {
   return useQuery({
-    queryKey: eventKeys.eventAnalytics(eventId ?? ''),
+    queryKey: eventKeys.eventAnalytics(eventId ?? ""),
     queryFn: () => apiClient.getEventAnalytics(eventId!),
     enabled: !!eventId,
     staleTime: 2 * 60 * 1000,
-  })
+  });
 }
 
 /**
  * Hook to fetch group-level analytics for LINE Bot report preview
  */
-export function useEventGroupAnalytics(eventId: string | undefined, options?: { enabled?: boolean }) {
+export function useEventGroupAnalytics(
+  eventId: string | undefined,
+  options?: { enabled?: boolean },
+) {
   return useQuery<EventGroupAnalytics>({
-    queryKey: eventKeys.groupAnalytics(eventId ?? ''),
+    queryKey: eventKeys.groupAnalytics(eventId ?? ""),
     queryFn: () => apiClient.getEventGroupAnalytics(eventId!),
     enabled: (options?.enabled ?? true) && !!eventId,
     staleTime: 2 * 60 * 1000,
-  })
+  });
 }
 
 /**
  * Hook to create a new event
  */
 export function useCreateEvent(seasonId: string | undefined) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateEventRequest) => apiClient.createEvent(seasonId!, data),
+    mutationFn: (data: CreateEventRequest) =>
+      apiClient.createEvent(seasonId!, data),
     onSuccess: () => {
       if (seasonId) {
-        queryClient.invalidateQueries({ queryKey: eventKeys.list(seasonId) })
+        queryClient.invalidateQueries({ queryKey: eventKeys.list(seasonId) });
       }
     },
-  })
+  });
 }
 
 /**
@@ -103,18 +115,18 @@ export function useUploadEventCsv() {
       file,
       snapshotDate,
     }: {
-      seasonId: string
-      file: File
-      snapshotDate?: string
+      seasonId: string;
+      file: File;
+      snapshotDate?: string;
     }) => apiClient.uploadEventCsv(seasonId, file, snapshotDate),
-  })
+  });
 }
 
 /**
  * Hook to process event snapshots
  */
 export function useProcessEvent() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({
@@ -122,49 +134,89 @@ export function useProcessEvent() {
       beforeUploadId,
       afterUploadId,
     }: {
-      eventId: string
-      beforeUploadId: string
-      afterUploadId: string
+      eventId: string;
+      beforeUploadId: string;
+      afterUploadId: string;
     }) => apiClient.processEvent(eventId, beforeUploadId, afterUploadId),
     onSuccess: (event: BattleEvent) => {
       // Invalidate the event detail and analytics
-      queryClient.invalidateQueries({ queryKey: eventKeys.detail(event.id) })
-      queryClient.invalidateQueries({ queryKey: eventKeys.eventAnalytics(event.id) })
+      queryClient.invalidateQueries({ queryKey: eventKeys.detail(event.id) });
+      queryClient.invalidateQueries({
+        queryKey: eventKeys.eventAnalytics(event.id),
+      });
       // Invalidate the events list
-      queryClient.invalidateQueries({ queryKey: eventKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: eventKeys.lists() });
     },
-  })
+  });
+}
+
+/**
+ * Hook to update an event's basic information
+ *
+ * Updates name, event_type, and description.
+ * Follows CLAUDE.md: includes onSettled for cache consistency.
+ */
+export function useUpdateEvent(seasonId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      eventId,
+      data,
+    }: {
+      eventId: string;
+      data: UpdateEventRequest;
+    }) => apiClient.updateEvent(eventId, data),
+    onSuccess: (event: BattleEvent) => {
+      // Invalidate event detail and analytics
+      queryClient.invalidateQueries({ queryKey: eventKeys.detail(event.id) });
+      queryClient.invalidateQueries({
+        queryKey: eventKeys.eventAnalytics(event.id),
+      });
+    },
+    onSettled: () => {
+      // Ensure cache consistency - CLAUDE.md requirement
+      if (seasonId) {
+        queryClient.invalidateQueries({ queryKey: eventKeys.list(seasonId) });
+      }
+    },
+  });
 }
 
 /**
  * Hook to delete an event
  */
 export function useDeleteEvent(seasonId: string | undefined) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (eventId: string) => apiClient.deleteEvent(eventId),
     onMutate: async (eventId) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: eventKeys.list(seasonId ?? '') })
+      await queryClient.cancelQueries({
+        queryKey: eventKeys.list(seasonId ?? ""),
+      });
 
       // Snapshot previous values
       const previousEvents = queryClient.getQueryData<EventAnalyticsResponse[]>(
-        eventKeys.list(seasonId ?? '')
-      )
+        eventKeys.list(seasonId ?? ""),
+      );
 
-      return { previousEvents, eventId }
+      return { previousEvents, eventId };
     },
     onError: (_error, _variables, context) => {
       // Rollback on error
       if (context?.previousEvents && seasonId) {
-        queryClient.setQueryData(eventKeys.list(seasonId), context.previousEvents)
+        queryClient.setQueryData(
+          eventKeys.list(seasonId),
+          context.previousEvents,
+        );
       }
     },
     onSettled: () => {
       if (seasonId) {
-        queryClient.invalidateQueries({ queryKey: eventKeys.list(seasonId) })
+        queryClient.invalidateQueries({ queryKey: eventKeys.list(seasonId) });
       }
     },
-  })
+  });
 }

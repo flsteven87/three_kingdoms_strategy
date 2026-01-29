@@ -28,6 +28,7 @@ from src.api.v1.schemas.events import (
     GroupEventStatsResponse,
     ProcessEventRequest,
     TopMemberResponse,
+    UpdateEventRequest,
     ViolatorResponse,
 )
 from src.core.dependencies import (
@@ -36,7 +37,7 @@ from src.core.dependencies import (
     SeasonServiceDep,
     UserIdDep,
 )
-from src.models.battle_event import BattleEventCreate, EventCategory
+from src.models.battle_event import BattleEventCreate, BattleEventUpdate, EventCategory
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -371,6 +372,32 @@ async def get_event_group_analytics(
             )
             for m in analytics.top_members
         ],
+        top_contributors=[
+            TopMemberResponse(
+                rank=m.rank,
+                member_name=m.member_name,
+                group_name=m.group_name,
+                score=m.score,
+                merit_diff=m.merit_diff,
+                contribution_diff=m.contribution_diff,
+                assist_diff=m.assist_diff,
+                line_display_name=m.line_display_name,
+            )
+            for m in analytics.top_contributors
+        ],
+        top_assisters=[
+            TopMemberResponse(
+                rank=m.rank,
+                member_name=m.member_name,
+                group_name=m.group_name,
+                score=m.score,
+                merit_diff=m.merit_diff,
+                contribution_diff=m.contribution_diff,
+                assist_diff=m.assist_diff,
+                line_display_name=m.line_display_name,
+            )
+            for m in analytics.top_assisters
+        ],
         violators=[
             ViolatorResponse(
                 rank=v.rank,
@@ -382,6 +409,45 @@ async def get_event_group_analytics(
             for v in analytics.violators
         ],
     )
+
+
+@router.patch("/{event_id}", response_model=EventDetailResponse)
+async def update_event(
+    event_id: UUID,
+    body: UpdateEventRequest,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
+) -> EventDetailResponse:
+    """
+    Update an event's basic information.
+
+    Only owner or collaborator can update events.
+    Only name, event_type, and description can be updated.
+
+    Path Parameters:
+        event_id: Event UUID
+
+    Request Body:
+        name: Optional new event name
+        event_type: Optional new event type
+        description: Optional new description
+
+    Returns:
+        Updated event details
+
+    Raises:
+        ValueError: Event not found
+        PermissionError: User is not owner/collaborator
+    """
+    # Convert request to update model
+    update_data = BattleEventUpdate(
+        name=body.name,
+        event_type=body.event_type,
+        description=body.description,
+    )
+
+    event = await service.update_event(event_id, update_data, user_id)
+    return EventDetailResponse.model_validate(event)
 
 
 @router.delete("/{event_id}", status_code=204)

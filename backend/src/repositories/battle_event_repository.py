@@ -9,7 +9,7 @@ Battle Event Repository
 from datetime import datetime
 from uuid import UUID
 
-from src.models.battle_event import BattleEvent, BattleEventCreate, EventStatus
+from src.models.battle_event import BattleEvent, BattleEventCreate, BattleEventUpdate, EventStatus
 from src.repositories.base import SupabaseRepository
 
 
@@ -181,6 +181,38 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         result = await self._execute_async(
             lambda: self.client.from_(self.table_name)
             .update(update_data)
+            .eq("id", str(event_id))
+            .execute()
+        )
+        data = self._handle_supabase_result(result, expect_single=True)
+        return self._build_model(data)
+
+    async def update(self, event_id: UUID, update_data: BattleEventUpdate) -> BattleEvent:
+        """
+        Update battle event fields
+
+        Args:
+            event_id: Event UUID
+            update_data: Fields to update (only non-None fields will be updated)
+
+        Returns:
+            Updated battle event instance
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        # Only include non-None fields in the update
+        data_dict = update_data.model_dump(mode="json", exclude_none=True)
+
+        if not data_dict:
+            # No fields to update, return existing event
+            event = await self.get_by_id(event_id)
+            if not event:
+                raise ValueError(f"Event {event_id} not found")
+            return event
+
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .update(data_dict)
             .eq("id", str(event_id))
             .execute()
         )
