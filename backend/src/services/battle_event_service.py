@@ -166,6 +166,7 @@ class BattleEventService:
             total_merit = None
             mvp_name = None
             absent_count = None
+            absent_names = None
 
             if event.status == EventStatus.COMPLETED:
                 summary = await self._calculate_event_summary(event.id, event.event_type)
@@ -173,6 +174,10 @@ class BattleEventService:
                 total_merit = summary.total_merit
                 mvp_name = summary.mvp_member_name
                 absent_count = summary.absent_count
+                
+                # Get absent member names
+                metrics = await self._metrics_repo.get_by_event_with_member(event.id)
+                absent_names = [m.member_name for m in metrics if m.is_absent]
 
             result.append(
                 BattleEventListItem(
@@ -187,6 +192,7 @@ class BattleEventService:
                     total_merit=total_merit,
                     mvp_name=mvp_name,
                     absent_count=absent_count,
+                    absent_names=absent_names,
                 )
             )
 
@@ -592,9 +598,12 @@ class BattleEventService:
         if not events:
             return []
 
-        # Parallel summary calculation to avoid reply token expiration
+        # Parallel summary and metrics calculation to avoid reply token expiration
         summaries = await asyncio.gather(
             *[self._calculate_event_summary(e.id, e.event_type) for e in events]
+        )
+        all_metrics = await asyncio.gather(
+            *[self._metrics_repo.get_by_event_with_member(e.id) for e in events]
         )
 
         return [
@@ -610,8 +619,9 @@ class BattleEventService:
                 total_merit=summary.total_merit,
                 mvp_name=summary.mvp_member_name,
                 absent_count=summary.absent_count,
+                absent_names=[m.member_name for m in metrics if m.is_absent],
             )
-            for event, summary in zip(events, summaries, strict=True)
+            for event, summary, metrics in zip(events, summaries, all_metrics, strict=True)
         ]
 
     async def get_event_by_name_for_alliance(
