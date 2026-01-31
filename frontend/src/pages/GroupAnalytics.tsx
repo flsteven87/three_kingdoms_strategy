@@ -13,7 +13,7 @@
  * This normalizes for both time and group size, enabling fair comparison.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
@@ -36,6 +36,8 @@ import {
   useGroupAnalytics,
   useGroupsComparison,
 } from '@/hooks/use-analytics'
+import { useEvents } from '@/hooks/use-events'
+import type { EventListItem } from '@/types/event'
 
 // ============================================================================
 // Main Component
@@ -67,11 +69,75 @@ function GroupAnalytics() {
   // Fetch groups comparison (responds to viewMode)
   const { data: groupsComparison } = useGroupsComparison(seasonId, viewMode)
 
+  // Fetch events for participation calculation
+  const { data: events } = useEvents(seasonId)
+
+  // Calculate participation rates for a group
+  const calculateGroupParticipation = (
+    memberNames: readonly string[],
+    eventsList: readonly EventListItem[] | undefined
+  ): { overall: number; siege: number; battle: number } => {
+    if (!eventsList || eventsList.length === 0 || memberNames.length === 0) {
+      return { overall: 0, siege: 0, battle: 0 }
+    }
+
+    const allEvents = eventsList.filter(e => e.event_type !== 'forbidden')
+    const siegeEvents = eventsList.filter(e => e.event_type === 'siege')
+    const battleEvents = eventsList.filter(e => e.event_type === 'battle')
+
+    const calculateRate = (eventSubset: readonly EventListItem[]) => {
+      if (eventSubset.length === 0) return 0
+
+      const totalRate = eventSubset.reduce((sum, event) => {
+        const participants = (event.participant_names || []).filter(name => memberNames.includes(name))
+        const absents = (event.absent_names || []).filter(name => memberNames.includes(name))
+
+        const totalTracked = participants.length + absents.length
+        if (totalTracked === 0) {
+          return sum + 0 // Skip events with no tracked members
+        }
+
+        const participationRate = (participants.length / totalTracked) * 100
+        return sum + participationRate
+      }, 0)
+
+      return totalRate / eventSubset.length
+    }
+
+    return {
+      overall: calculateRate(allEvents),
+      siege: calculateRate(siegeEvents),
+      battle: calculateRate(battleEvents),
+    }
+  }
+
   // Derived data
   const groupStats = groupData?.stats
   const groupMembers = groupData?.members ?? []
   const periodTrends = groupData?.trends ?? []
   const allianceAverages = groupData?.alliance_averages
+
+  // Calculate participation for all groups in one loop
+  const allGroupsParticipation = useMemo(() => {
+    const participationMap = new Map<string, { overall: number; siege: number; battle: number }>()
+
+    if (!groupsComparison || !events) {
+      return participationMap
+    }
+
+    groupsComparison.forEach(group => {
+      // Calculate even if member_names is empty - will return 0s
+      const rates = calculateGroupParticipation(group.member_names || [], events)
+      participationMap.set(group.name, rates)
+    })
+
+    return participationMap
+  }, [groupsComparison, events])
+
+  // Extract current group's participation from the map
+  const groupParticipationRates = groupStats
+    ? allGroupsParticipation.get(groupStats.group_name) ?? { overall: 0, siege: 0, battle: 0 }
+    : { overall: 0, siege: 0, battle: 0 }
 
   // Loading state
   const isLoading = isSeasonLoading || isGroupsLoading || isGroupLoading
@@ -178,6 +244,9 @@ function GroupAnalytics() {
                 groupStats={groupStats}
                 allianceAverages={allianceAverages}
                 allGroupsData={groupsComparison ?? []}
+                groupParticipationRates={groupParticipationRates}
+                allGroupsParticipation={allGroupsParticipation}
+                events={events ?? []}
               />
             </TabsContent>
 

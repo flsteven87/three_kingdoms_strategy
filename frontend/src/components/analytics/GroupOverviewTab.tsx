@@ -18,14 +18,25 @@ import {
 import { formatNumber, formatNumberCompact, calculatePercentDiff } from '@/lib/chart-utils'
 import { groupChartConfigs, MEDIAN_LINE_COLOR } from '@/lib/chart-configs'
 import type { GroupStats, GroupComparisonItem, AllianceAveragesResponse } from '@/types/analytics'
+import type { EventListItem } from '@/types/event'
 
 interface GroupOverviewTabProps {
     readonly groupStats: GroupStats
     readonly allianceAverages: AllianceAveragesResponse
     readonly allGroupsData: readonly GroupComparisonItem[]
+    readonly groupParticipationRates: { overall: number; siege: number; battle: number }
+    readonly allGroupsParticipation: Map<string, { overall: number; siege: number; battle: number }>
+    readonly events: readonly EventListItem[]
 }
 
-export function GroupOverviewTab({ groupStats, allianceAverages, allGroupsData }: GroupOverviewTabProps) {
+export function GroupOverviewTab({
+    groupStats,
+    allianceAverages,
+    allGroupsData,
+    groupParticipationRates,
+    allGroupsParticipation,
+    events
+}: GroupOverviewTabProps) {
     // Note: groupStats already contains correct values based on viewMode
     // Backend returns latest period data for 'latest' view, season-weighted data for 'season' view
     // No need to calculate season averages on frontend - backend handles this
@@ -97,6 +108,28 @@ export function GroupOverviewTab({ groupStats, allianceAverages, allGroupsData }
         })),
         [allGroupsData]
     )
+
+    // Participation by event type data
+    const participationByTypeData = useMemo(() => [
+        { type: '整體', rate: groupParticipationRates.overall },
+        { type: '攻城', rate: groupParticipationRates.siege },
+        { type: '會戰', rate: groupParticipationRates.battle },
+    ], [groupParticipationRates])
+
+    // All groups participation comparison data
+    const participationComparisonData = useMemo(() => {
+        return allGroupsData
+            .map(g => {
+                const participation = allGroupsParticipation.get(g.name)
+                return {
+                    name: g.name,
+                    overall: participation?.overall ?? 0,
+                    siege: participation?.siege ?? 0,
+                    battle: participation?.battle ?? 0,
+                }
+            })
+            .sort((a, b) => b.overall - a.overall)
+    }, [allGroupsData, allGroupsParticipation])
 
     return (
         <div className="space-y-6">
@@ -176,7 +209,7 @@ export function GroupOverviewTab({ groupStats, allianceAverages, allGroupsData }
                 </Card>
             </div>
 
-            {/* Charts Row */}
+            {/* Row 1: Capability Radar + Merit Comparison */}
             <div className="grid gap-6 lg:grid-cols-2">
                 {/* Capability Radar (5 dimensions) */}
                 <Card>
@@ -287,6 +320,113 @@ export function GroupOverviewTab({ groupStats, allianceAverages, allGroupsData }
                                 />
                                 <Bar dataKey="merit" radius={[0, 4, 4, 0]}>
                                     {chartData.map((entry) => (
+                                        <Cell
+                                            key={entry.name}
+                                            fill={entry.name === groupStats.group_name ? 'var(--primary)' : 'var(--muted)'}
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Row 2: Participation Charts */}
+            <div className="grid gap-6 md:grid-cols-2">
+                {/* Participation by Event Type */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">活動參與率</CardTitle>
+                        <CardDescription>依活動類型統計</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={groupChartConfigs.meritBar} className="h-[280px] w-full">
+                            <BarChart data={participationByTypeData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <XAxis
+                                    dataKey="type"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    className="text-xs"
+                                />
+                                <YAxis
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => `${value}%`}
+                                    domain={[0, 100]}
+                                    className="text-xs"
+                                />
+                                <ChartTooltip
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null
+                                        const data = payload[0].payload as (typeof participationByTypeData)[0]
+                                        return (
+                                            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                                                <div className="font-medium">{data.type}活動</div>
+                                                <div className="text-sm">參與率: {data.rate.toFixed(1)}%</div>
+                                            </div>
+                                        )
+                                    }}
+                                />
+                                <Bar dataKey="rate" radius={[4, 4, 0, 0]}>
+                                    {participationByTypeData.map((entry) => {
+                                        let color = 'hsl(142, 45%, 70%)' // Pastel green
+                                        if (entry.type === '攻城') color = 'hsl(25, 60%, 70%)' // Pastel orange
+                                        if (entry.type === '會戰') color = 'hsl(210, 50%, 70%)' // Pastel blue
+                                        return (
+                                            <Cell key={entry.type} fill={color} />
+                                        )
+                                    })}
+                                </Bar>
+                            </BarChart>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+
+                {/* All Groups Participation Comparison */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">全組別參與率比較</CardTitle>
+                        <CardDescription>整體活動參與率排名</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={groupChartConfigs.meritBar} className="h-[280px] w-full">
+                            <BarChart data={participationComparisonData} layout="vertical" margin={{ left: 0, right: 16 }}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
+                                <XAxis
+                                    type="number"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => `${value}%`}
+                                    domain={[0, 100]}
+                                    className="text-xs"
+                                />
+                                <YAxis
+                                    type="category"
+                                    dataKey="name"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    className="text-xs"
+                                    width={70}
+                                    interval={0}
+                                />
+                                <ChartTooltip
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null
+                                        const data = payload[0].payload as (typeof participationComparisonData)[0]
+                                        return (
+                                            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                                                <div className="font-medium">{data.name}</div>
+                                                <div className="text-sm">整體參與率: {data.overall.toFixed(1)}%</div>
+                                                <div className="text-sm text-muted-foreground">攻城: {data.siege.toFixed(1)}%</div>
+                                                <div className="text-sm text-muted-foreground">會戰: {data.battle.toFixed(1)}%</div>
+                                            </div>
+                                        )
+                                    }}
+                                />
+                                <Bar dataKey="overall" radius={[0, 4, 4, 0]}>
+                                    {participationComparisonData.map((entry) => (
                                         <Cell
                                             key={entry.name}
                                             fill={entry.name === groupStats.group_name ? 'var(--primary)' : 'var(--muted)'}
