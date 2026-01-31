@@ -123,6 +123,8 @@ export interface EventListItem {
   readonly total_merit: number | null
   readonly mvp_name: string | null
   readonly absent_count: number | null
+  readonly absent_names: readonly string[] | null
+  readonly participant_names: readonly string[] | null
   readonly created_at: string
 }
 

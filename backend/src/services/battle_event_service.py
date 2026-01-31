@@ -178,6 +178,7 @@ class BattleEventService:
                 # Get absent member names
                 metrics = await self._metrics_repo.get_by_event_with_member(event.id)
                 absent_names = [m.member_name for m in metrics if m.is_absent]
+                participant_names = [m.member_name for m in metrics if m.participated]
 
             result.append(
                 BattleEventListItem(
@@ -193,6 +194,7 @@ class BattleEventService:
                     mvp_name=mvp_name,
                     absent_count=absent_count,
                     absent_names=absent_names,
+                    participant_names=participant_names,
                 )
             )
 
@@ -425,6 +427,10 @@ class BattleEventService:
         participated_count = sum(1 for m in metrics if m.participated)
         new_member_count = sum(1 for m in metrics if m.is_new_member)
         absent_count = sum(1 for m in metrics if m.is_absent)
+        
+        # Extract participant and absent names
+        participant_names = [m.member_name for m in metrics if m.participated]
+        absent_names = [m.member_name for m in metrics if m.is_absent]
 
         # Calculate participation rate (excluding new members)
         eligible_members = total_members - new_member_count
@@ -508,6 +514,8 @@ class BattleEventService:
             total_members=total_members,
             participated_count=participated_count,
             absent_count=absent_count,
+            absent_names=absent_names,
+            participant_names=participant_names,
             new_member_count=new_member_count,
             participation_rate=round(participation_rate, 1),
             total_merit=total_merit,
