@@ -133,7 +133,9 @@ export function GroupMembersTab({ members, viewMode, memberParticipation }: Grou
                                         )}
                                         <td className="py-2 px-2 text-right tabular-nums">{Math.round(member.daily_assist)}</td>
                                         <td className="py-2 px-2 text-right tabular-nums">
-                                            {(memberParticipation.get(member.name) ?? 0).toFixed(1)}%
+                                            <span className={(memberParticipation.get(member.name) ?? 0) < 66.67 ? 'text-red-500 font-semibold' : ''}>
+                                                {(memberParticipation.get(member.name) ?? 0).toFixed(1)}%
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}
