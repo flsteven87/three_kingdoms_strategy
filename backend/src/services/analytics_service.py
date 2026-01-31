@@ -787,6 +787,7 @@ class AnalyticsService:
                     {
                         "season_daily_merit": season_daily_merit,
                         "end_rank": m["end_rank"],
+                        "member_name": m["member_name"],
                     }
                 )
 
@@ -796,6 +797,7 @@ class AnalyticsService:
                 count = len(members)
                 avg_merit = sum(m["season_daily_merit"] for m in members) / count
                 avg_rank = sum(m["end_rank"] for m in members) / count
+                member_names = [m["member_name"] for m in members]
 
                 result.append(
                     {
@@ -803,6 +805,7 @@ class AnalyticsService:
                         "avg_daily_merit": round(avg_merit, 2),
                         "avg_rank": round(avg_rank, 1),
                         "member_count": count,
+                        "member_names": member_names,
                     }
                 )
 
@@ -811,18 +814,21 @@ class AnalyticsService:
         # Default: latest period
         latest_period = periods[-1]
         group_averages = await self._metrics_repo.get_group_averages(latest_period.id)
-        all_metrics = await self._metrics_repo.get_by_period(latest_period.id)
+        all_metrics = await self._metrics_repo.get_by_period_with_member(latest_period.id)
 
         group_ranks: dict[str, list[int]] = defaultdict(list)
+        group_members: dict[str, list[str]] = defaultdict(list)
         for m in all_metrics:
-            group = m.end_group or "未分組"
-            group_ranks[group].append(m.end_rank)
+            group = m["end_group"] or "未分組"
+            group_ranks[group].append(m["end_rank"])
+            group_members[group].append(m["member_name"])
 
         result = []
         for g in group_averages:
             group_name = g["group_name"]
             ranks = group_ranks.get(group_name, [])
             avg_rank = sum(ranks) / len(ranks) if ranks else 0
+            member_names = group_members.get(group_name, [])
 
             result.append(
                 {
@@ -830,6 +836,7 @@ class AnalyticsService:
                     "avg_daily_merit": round(float(g["avg_daily_merit"]), 2),
                     "avg_rank": round(avg_rank, 1),
                     "member_count": g["member_count"],
+                    "member_names": member_names,
                 }
             )
 
