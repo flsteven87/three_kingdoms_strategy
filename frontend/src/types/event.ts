@@ -124,6 +124,8 @@ export interface EventListItem {
   readonly mvp_name: string | null;
   readonly absent_count: number | null;
   readonly created_at: string;
+  readonly absent_names: readonly string[] | null
+  readonly participant_names: readonly string[] | null
 }
 
 /**

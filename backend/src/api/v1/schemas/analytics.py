@@ -316,6 +316,7 @@ class GroupComparisonItem(BaseModel):
     avg_daily_merit: float = Field(..., ge=0, description="Average daily merit")
     avg_rank: float = Field(..., description="Average contribution rank")
     member_count: int = Field(..., ge=0, description="Number of members")
+    member_names: list[str] = Field(default_factory=list, description="List of member names in this group")
 
 
 # ============================================================================

@@ -232,6 +232,7 @@ export interface GroupComparisonItem {
   readonly avg_daily_merit: number
   readonly avg_rank: number
   readonly member_count: number
+  readonly member_names: readonly string[]
 }
 
 // =============================================================================

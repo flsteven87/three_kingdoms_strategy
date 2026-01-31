@@ -72,6 +72,8 @@ class EventSummary(BaseModel):
     total_members: int = Field(..., description="Total members in snapshots")
     participated_count: int = Field(..., description="Members who participated")
     absent_count: int = Field(..., description="Members who didn't participate")
+    absent_names: list[str] | None = Field(None, description="Names of absent members")
+    participant_names: list[str] | None = Field(None, description="Names of participating members")
     new_member_count: int = Field(..., description="New members (only in after)")
     participation_rate: float = Field(
         ..., ge=0, le=100, description="Participation rate percentage"

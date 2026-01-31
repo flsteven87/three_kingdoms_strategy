@@ -95,3 +95,5 @@ class BattleEventListItem(BaseModel):
     total_merit: int | None = None
     mvp_name: str | None = None
     absent_count: int | None = None
+    absent_names: list[str] | None = None
+    participant_names: list[str] | None = None
