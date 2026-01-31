@@ -8,10 +8,11 @@ import type { GroupMember } from '@/types/analytics'
 interface GroupMembersTabProps {
     readonly members: readonly GroupMember[]
     readonly viewMode: ViewMode
+    readonly memberParticipation: Map<string, number>
 }
 
-export function GroupMembersTab({ members, viewMode }: GroupMembersTabProps) {
-    const [sortBy, setSortBy] = useState<'rank' | 'merit' | 'assist'>('rank')
+export function GroupMembersTab({ members, viewMode, memberParticipation }: GroupMembersTabProps) {
+    const [sortBy, setSortBy] = useState<'rank' | 'merit' | 'assist' | 'participation'>('rank')
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
     const sortedMembers = useMemo(() => {
@@ -32,6 +33,10 @@ export function GroupMembersTab({ members, viewMode }: GroupMembersTabProps) {
                     aVal = a.daily_assist
                     bVal = b.daily_assist
                     break
+                case 'participation':
+                    aVal = memberParticipation.get(a.name) ?? 0
+                    bVal = memberParticipation.get(b.name) ?? 0
+                    break
                 default:
                     return 0
             }
@@ -39,7 +44,7 @@ export function GroupMembersTab({ members, viewMode }: GroupMembersTabProps) {
             return sortDir === 'desc' ? bVal - aVal : aVal - bVal
         })
         return sorted
-    }, [members, sortBy, sortDir])
+    }, [members, sortBy, sortDir, memberParticipation])
 
     const handleSort = (column: typeof sortBy) => {
         if (sortBy === column) {
@@ -89,6 +94,12 @@ export function GroupMembersTab({ members, viewMode }: GroupMembersTabProps) {
                                     >
                                         日均助攻 {sortBy === 'assist' && (sortDir === 'desc' ? '↓' : '↑')}
                                     </th>
+                                    <th
+                                        className="text-right py-2 px-2 font-medium cursor-pointer hover:text-primary"
+                                        onClick={() => handleSort('participation')}
+                                    >
+                                        參與率 {sortBy === 'participation' && (sortDir === 'desc' ? '↓' : '↑')}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -121,6 +132,9 @@ export function GroupMembersTab({ members, viewMode }: GroupMembersTabProps) {
                                             </td>
                                         )}
                                         <td className="py-2 px-2 text-right tabular-nums">{Math.round(member.daily_assist)}</td>
+                                        <td className="py-2 px-2 text-right tabular-nums">
+                                            {(memberParticipation.get(member.name) ?? 0).toFixed(1)}%
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

@@ -111,6 +111,8 @@ function GroupAnalytics() {
     }
   }
 
+
+
   // Derived data
   const groupStats = groupData?.stats
   const groupMembers = groupData?.members ?? []
@@ -138,6 +140,52 @@ function GroupAnalytics() {
   const groupParticipationRates = groupStats
     ? allGroupsParticipation.get(groupStats.group_name) ?? { overall: 0, siege: 0, battle: 0 }
     : { overall: 0, siege: 0, battle: 0 }
+
+  // Calculate member-level participation rates
+  const memberParticipationMap = useMemo(() => {
+    const participationMap = new Map<string, number>()
+
+    if (!events || events.length === 0) {
+      return participationMap
+    }
+
+    const allEvents = events.filter(e => e.event_type !== 'forbidden')
+
+    // Step 2: Create participated and absent maps
+    const participatedMap = new Map<string, number>()
+    const absentMap = new Map<string, number>()
+
+    // Step 1 & 3-4: For each event, find participants and absents, increment counts
+    allEvents.forEach(event => {
+      const participants = event.participant_names || []
+      const absents = event.absent_names || []
+
+      // Step 3: Increment participated map for each participant
+      participants.forEach(name => {
+        participatedMap.set(name, (participatedMap.get(name) || 0) + 1)
+      })
+
+      // Step 4: Increment absent map for each absent member
+      absents.forEach(name => {
+        absentMap.set(name, (absentMap.get(name) || 0) + 1)
+      })
+    })
+
+    // Step 5: Calculate participation % for each member
+    const allMemberNames = new Set([...participatedMap.keys(), ...absentMap.keys()])
+    allMemberNames.forEach(memberName => {
+      const participatedCount = participatedMap.get(memberName) || 0
+      const absentCount = absentMap.get(memberName) || 0
+      const totalTracked = participatedCount + absentCount
+
+      if (totalTracked > 0) {
+        const participationRate = (participatedCount / totalTracked) * 100
+        participationMap.set(memberName, participationRate)
+      }
+    })
+
+    return participationMap
+  }, [events])
 
   // Loading state
   const isLoading = isSeasonLoading || isGroupsLoading || isGroupLoading
@@ -267,7 +315,11 @@ function GroupAnalytics() {
             </TabsContent>
 
             <TabsContent value="members">
-              <GroupMembersTab members={groupMembers} viewMode={viewMode} />
+              <GroupMembersTab
+                members={groupMembers}
+                viewMode={viewMode}
+                memberParticipation={memberParticipationMap}
+              />
             </TabsContent>
           </Tabs>
         ) : null}
