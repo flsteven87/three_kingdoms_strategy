@@ -18,7 +18,6 @@ import {
 import { formatNumber, formatNumberCompact, calculatePercentDiff } from '@/lib/chart-utils'
 import { groupChartConfigs, MEDIAN_LINE_COLOR } from '@/lib/chart-configs'
 import type { GroupStats, GroupComparisonItem, AllianceAveragesResponse } from '@/types/analytics'
-import type { EventListItem } from '@/types/event'
 
 interface GroupOverviewTabProps {
     readonly groupStats: GroupStats
@@ -26,7 +25,6 @@ interface GroupOverviewTabProps {
     readonly allGroupsData: readonly GroupComparisonItem[]
     readonly groupParticipationRates: { overall: number; siege: number; battle: number }
     readonly allGroupsParticipation: Map<string, { overall: number; siege: number; battle: number }>
-    readonly events: readonly EventListItem[]
 }
 
 export function GroupOverviewTab({
@@ -35,7 +33,6 @@ export function GroupOverviewTab({
     allGroupsData,
     groupParticipationRates,
     allGroupsParticipation,
-    events
 }: GroupOverviewTabProps) {
     // Note: groupStats already contains correct values based on viewMode
     // Backend returns latest period data for 'latest' view, season-weighted data for 'season' view
