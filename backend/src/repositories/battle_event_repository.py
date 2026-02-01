@@ -341,3 +341,30 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         if not data:
             return None
         return self._build_model(data[0])
+
+    async def get_by_ids(self, event_ids: list[UUID]) -> list[BattleEvent]:
+        """
+        Get multiple events by IDs.
+
+        Args:
+            event_ids: List of event UUIDs
+
+        Returns:
+            List of events (may be fewer than requested if some not found)
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        if not event_ids:
+            return []
+
+        event_id_strs = [str(eid) for eid in event_ids]
+
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*")
+            .in_("id", event_id_strs)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return self._build_models(data)

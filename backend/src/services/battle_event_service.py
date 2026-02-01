@@ -175,7 +175,7 @@ class BattleEventService:
                 total_merit = summary.total_merit
                 mvp_name = summary.mvp_member_name
                 absent_count = summary.absent_count
-                
+
                 # Get absent member names
                 metrics = await self._metrics_repo.get_by_event_with_member(event.id)
                 absent_names = [m.member_name for m in metrics if m.is_absent]
@@ -428,7 +428,7 @@ class BattleEventService:
         participated_count = sum(1 for m in metrics if m.participated)
         new_member_count = sum(1 for m in metrics if m.is_new_member)
         absent_count = sum(1 for m in metrics if m.is_absent)
-        
+
         # Extract participant and absent names
         participant_names = [m.member_name for m in metrics if m.participated]
         absent_names = [m.member_name for m in metrics if m.is_absent]
@@ -839,6 +839,175 @@ class BattleEventService:
             top_contributors=top_contributors,
             top_assisters=top_assisters,
             violators=violators,
+        )
+
+    async def get_batch_event_analytics(
+        self, event_ids: list[UUID]
+    ) -> dict[UUID, tuple[BattleEvent, EventSummary, list[BattleEventMetricsWithMember]]]:
+        """
+        Get analytics for multiple events in a single batch.
+
+        Optimized to minimize database queries.
+
+        Args:
+            event_ids: List of event UUIDs
+
+        Returns:
+            Dict mapping event_id to tuple of (event, summary, metrics)
+        """
+        if not event_ids:
+            return {}
+
+        # Batch fetch events
+        events = await self._event_repo.get_by_ids(event_ids)
+        event_map = {e.id: e for e in events}
+
+        # Batch fetch all metrics
+        metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(event_ids)
+
+        # Calculate summaries for each event
+        result: dict[UUID, tuple[BattleEvent, EventSummary, list[BattleEventMetricsWithMember]]] = {}
+
+        for event_id in event_ids:
+            event = event_map.get(event_id)
+            if not event:
+                continue
+
+            metrics = metrics_map.get(event_id, [])
+            summary = self._calculate_summary_from_metrics(metrics, event.event_type)
+            result[event_id] = (event, summary, metrics)
+
+        return result
+
+    def _calculate_summary_from_metrics(
+        self,
+        metrics: list[BattleEventMetricsWithMember],
+        event_type: EventCategory = EventCategory.BATTLE,
+    ) -> EventSummary:
+        """
+        Calculate summary from pre-fetched metrics.
+
+        This is a sync helper that works with already-fetched data.
+        """
+        if not metrics:
+            return EventSummary(
+                total_members=0,
+                participated_count=0,
+                absent_count=0,
+                new_member_count=0,
+                participation_rate=0.0,
+                total_merit=0,
+                total_assist=0,
+                total_contribution=0,
+                avg_merit=0.0,
+                avg_assist=0.0,
+                avg_contribution=0.0,
+                mvp_member_id=None,
+                mvp_member_name=None,
+                mvp_merit=None,
+                contribution_mvp_member_id=None,
+                contribution_mvp_name=None,
+                contribution_mvp_score=None,
+                assist_mvp_member_id=None,
+                assist_mvp_name=None,
+                assist_mvp_score=None,
+                mvp_contribution=None,
+                mvp_assist=None,
+                mvp_combined_score=None,
+                violator_count=0,
+            )
+
+        total_members = len(metrics)
+        participated_count = sum(1 for m in metrics if m.participated)
+        new_member_count = sum(1 for m in metrics if m.is_new_member)
+        absent_count = sum(1 for m in metrics if m.is_absent)
+
+        eligible_members = total_members - new_member_count
+        participation_rate = (
+            (participated_count / eligible_members * 100) if eligible_members > 0 else 0.0
+        )
+
+        total_merit = sum(m.merit_diff for m in metrics)
+        total_assist = sum(m.assist_diff for m in metrics)
+        total_contribution = sum(m.contribution_diff for m in metrics)
+
+        avg_merit = total_merit / participated_count if participated_count > 0 else 0.0
+        avg_assist = total_assist / participated_count if participated_count > 0 else 0.0
+        avg_contribution = total_contribution / participated_count if participated_count > 0 else 0.0
+
+        mvp_member_id = None
+        mvp_member_name = None
+        mvp_merit = None
+        contribution_mvp_member_id = None
+        contribution_mvp_name = None
+        contribution_mvp_score = None
+        assist_mvp_member_id = None
+        assist_mvp_name = None
+        assist_mvp_score = None
+        mvp_contribution = None
+        mvp_assist = None
+        mvp_combined_score = None
+        violator_count = 0
+
+        if event_type == EventCategory.SIEGE:
+            contribution_candidates = [m for m in metrics if m.contribution_diff > 0]
+            if contribution_candidates:
+                top_contributor = max(contribution_candidates, key=lambda m: m.contribution_diff)
+                contribution_mvp_member_id = top_contributor.member_id
+                contribution_mvp_name = top_contributor.member_name
+                contribution_mvp_score = top_contributor.contribution_diff
+
+            assist_candidates = [m for m in metrics if m.assist_diff > 0]
+            if assist_candidates:
+                top_assister = max(assist_candidates, key=lambda m: m.assist_diff)
+                assist_mvp_member_id = top_assister.member_id
+                assist_mvp_name = top_assister.member_name
+                assist_mvp_score = top_assister.assist_diff
+
+            if metrics:
+                mvp = max(metrics, key=lambda m: m.contribution_diff + m.assist_diff)
+                combined = mvp.contribution_diff + mvp.assist_diff
+                if combined > 0:
+                    mvp_contribution = mvp.contribution_diff
+                    mvp_assist = mvp.assist_diff
+                    mvp_combined_score = combined
+
+        elif event_type == EventCategory.FORBIDDEN:
+            violator_count = sum(1 for m in metrics if m.power_diff > 0)
+
+        else:  # BATTLE
+            if metrics:
+                mvp = max(metrics, key=lambda m: m.merit_diff)
+                if mvp.merit_diff > 0:
+                    mvp_member_id = mvp.member_id
+                    mvp_member_name = mvp.member_name
+                    mvp_merit = mvp.merit_diff
+
+        return EventSummary(
+            total_members=total_members,
+            participated_count=participated_count,
+            absent_count=absent_count,
+            new_member_count=new_member_count,
+            participation_rate=round(participation_rate, 1),
+            total_merit=total_merit,
+            total_assist=total_assist,
+            total_contribution=total_contribution,
+            avg_merit=round(avg_merit, 1),
+            avg_assist=round(avg_assist, 1),
+            avg_contribution=round(avg_contribution, 1),
+            mvp_member_id=mvp_member_id,
+            mvp_member_name=mvp_member_name,
+            mvp_merit=mvp_merit,
+            contribution_mvp_member_id=contribution_mvp_member_id,
+            contribution_mvp_name=contribution_mvp_name,
+            contribution_mvp_score=contribution_mvp_score,
+            assist_mvp_member_id=assist_mvp_member_id,
+            assist_mvp_name=assist_mvp_name,
+            assist_mvp_score=assist_mvp_score,
+            mvp_contribution=mvp_contribution,
+            mvp_assist=mvp_assist,
+            mvp_combined_score=mvp_combined_score,
+            violator_count=violator_count,
         )
 
     def _calculate_group_stats(
