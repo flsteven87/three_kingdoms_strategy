@@ -20,6 +20,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from src.models.battle_event import EventCategory
+from src.models.battle_event_metrics import BattleEventMetrics, BattleEventMetricsWithMember
 from src.models.line_binding import (
     EventListItem,
     EventListResponse,
@@ -998,7 +999,7 @@ class LineBindingService:
 
         # 5. Batch fetch user's metrics for all events
         event_ids = [e.id for e in completed_events]
-        user_metrics_map: dict = {}
+        user_metrics_map: dict[UUID, BattleEventMetrics] = {}
         if member_id:
             user_metrics_map = await self._metrics_repo.get_user_metrics_for_events(
                 event_ids, member_id
@@ -1042,9 +1043,9 @@ class LineBindingService:
 
     def _build_user_participation(
         self,
-        user_metric,
+        user_metric: BattleEventMetrics | None,
         event_type: EventCategory | None,
-        all_metrics: list,
+        all_metrics: list[BattleEventMetricsWithMember],
     ) -> UserEventParticipation:
         """Build user participation object based on event type."""
         if not user_metric:
@@ -1106,7 +1107,12 @@ class LineBindingService:
                 violated=None,
             )
 
-    def _calculate_rank(self, user_score: int, all_metrics: list, score_fn) -> int:
+    def _calculate_rank(
+        self,
+        user_score: int,
+        all_metrics: list[BattleEventMetricsWithMember],
+        score_fn: callable,
+    ) -> int:
         """Calculate user's rank based on score."""
         scores = sorted([score_fn(m) for m in all_metrics if m.participated], reverse=True)
         try:

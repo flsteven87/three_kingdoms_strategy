@@ -22,14 +22,8 @@ import {
   Legend,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { AccountSelector } from "../components/AccountSelector";
 import { formatWan } from "@/lib/chart-utils";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import { useLiffPerformance } from "../hooks/use-liff-performance";
@@ -74,37 +68,6 @@ function MetricCard({ label, value, percentVsAvg }: MetricCardProps) {
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-interface AccountSelectorProps {
-  readonly accounts: ReadonlyArray<{ game_id: string }>;
-  readonly value: string | null;
-  readonly onValueChange: (value: string) => void;
-  readonly className?: string;
-}
-
-function AccountSelector({
-  accounts,
-  value,
-  onValueChange,
-  className,
-}: AccountSelectorProps) {
-  if (accounts.length <= 1) return null;
-
-  return (
-    <Select value={value || ""} onValueChange={onValueChange}>
-      <SelectTrigger className={className ?? "h-9"}>
-        <SelectValue placeholder="選擇帳號" />
-      </SelectTrigger>
-      <SelectContent>
-        {accounts.map((acc) => (
-          <SelectItem key={acc.game_id} value={acc.game_id}>
-            {acc.game_id}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 

@@ -11,14 +11,8 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { AccountSelector } from "../components/AccountSelector";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import {
   useLiffEventList,
@@ -48,37 +42,6 @@ function formatEventTime(dateStr: string | null): string {
 function formatScore(score: number): string {
   if (score >= 10000) return `${(score / 10000).toFixed(1)}萬`;
   return score.toLocaleString();
-}
-
-interface AccountSelectorProps {
-  readonly accounts: ReadonlyArray<{ game_id: string }>;
-  readonly value: string | null;
-  readonly onValueChange: (value: string) => void;
-  readonly className?: string;
-}
-
-function AccountSelector({
-  accounts,
-  value,
-  onValueChange,
-  className,
-}: AccountSelectorProps) {
-  if (accounts.length <= 1) return null;
-
-  return (
-    <Select value={value || ""} onValueChange={onValueChange}>
-      <SelectTrigger className={className ?? "h-9"}>
-        <SelectValue placeholder="選擇帳號" />
-      </SelectTrigger>
-      <SelectContent>
-        {accounts.map((acc) => (
-          <SelectItem key={acc.game_id} value={acc.game_id}>
-            {acc.game_id}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }
 
 interface ParticipationBadgeProps {
@@ -248,9 +211,11 @@ function ExpandedEventReport({
   const isSiege = eventType === "siege";
 
   const mainRate = isForbidden
-    ? ((summary.total_members - summary.violator_count) /
-        summary.total_members) *
-      100
+    ? summary.total_members > 0
+      ? ((summary.total_members - summary.violator_count) /
+          summary.total_members) *
+        100
+      : 0
     : summary.participation_rate;
   const mainRateLabel = isForbidden ? "守規率" : "出席率";
   const mainRateColor = isForbidden
