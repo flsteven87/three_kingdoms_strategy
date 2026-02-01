@@ -16,6 +16,7 @@ import type {
   UpdateEventRequest,
   EventAnalyticsResponse,
   EventGroupAnalytics,
+  BatchAnalyticsResponse,
 } from "@/types/event";
 
 // Query Keys Factory
@@ -28,6 +29,8 @@ export const eventKeys = {
   analytics: () => [...eventKeys.all, "analytics"] as const,
   eventAnalytics: (eventId: string) =>
     [...eventKeys.analytics(), eventId] as const,
+  batchAnalytics: (eventIds: string[]) =>
+    [...eventKeys.analytics(), "batch", eventIds.sort().join(",")] as const,
   groupAnalytics: (eventId: string) =>
     [...eventKeys.all, "group-analytics", eventId] as const,
 };
@@ -65,6 +68,20 @@ export function useEventAnalytics(eventId: string | undefined) {
     queryFn: () => apiClient.getEventAnalytics(eventId!),
     enabled: !!eventId,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+/**
+ * Hook to fetch analytics for multiple events in a single request
+ *
+ * Eliminates N+1 problem when loading event list with analytics.
+ */
+export function useBatchEventAnalytics(eventIds: string[]) {
+  return useQuery<BatchAnalyticsResponse>({
+    queryKey: eventKeys.batchAnalytics(eventIds),
+    queryFn: () => apiClient.getBatchEventAnalytics(eventIds),
+    enabled: eventIds.length > 0,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
