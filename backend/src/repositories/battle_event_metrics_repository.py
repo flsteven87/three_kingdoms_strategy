@@ -224,3 +224,34 @@ class BattleEventMetricsRepository(SupabaseRepository[BattleEventMetrics]):
                 grouped[event_id].append(BattleEventMetricsWithMember(**row))
 
         return grouped
+
+    async def get_user_metrics_for_events(
+        self, event_ids: list[UUID], member_id: UUID
+    ) -> dict[UUID, BattleEventMetrics | None]:
+        """
+        Get user's metrics for multiple events in a single query.
+
+        Args:
+            event_ids: List of event UUIDs
+            member_id: Member UUID to lookup
+
+        Returns:
+            Dict mapping event_id -> BattleEventMetrics (or None if not found)
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        if not event_ids:
+            return {}
+
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*")
+            .in_("event_id", [str(eid) for eid in event_ids])
+            .eq("member_id", str(member_id))
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        metrics_list = self._build_models(data)
+
+        return {m.event_id: m for m in metrics_list}
