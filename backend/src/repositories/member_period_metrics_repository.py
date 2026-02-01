@@ -354,6 +354,43 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
 
         return self._handle_supabase_result(result, allow_empty=True)
 
+    async def get_by_periods_batch(self, period_ids: list[UUID]) -> dict[UUID, list[dict]]:
+        """
+        Get all metrics for multiple periods in one query (eliminates N+1).
+
+        Args:
+            period_ids: List of Period UUIDs
+
+        Returns:
+            Dict mapping period_id to list of raw metric dicts
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        if not period_ids:
+            return {}
+
+        result = (
+            self.client.from_(self.table_name)
+            .select(
+                "period_id, member_id, end_group, end_rank, end_power, "
+                "daily_contribution, daily_merit, daily_assist, daily_donation"
+            )
+            .in_("period_id", [str(pid) for pid in period_ids])
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Group by period_id
+        from collections import defaultdict
+
+        grouped: dict[UUID, list[dict]] = defaultdict(list)
+        for row in data:
+            period_uuid = UUID(row["period_id"])
+            grouped[period_uuid].append(row)
+
+        return dict(grouped)
+
     async def get_all_groups_for_period(self, period_id: UUID) -> list[dict]:
         """
         Get unique groups and their member counts for a period.

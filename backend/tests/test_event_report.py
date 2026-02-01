@@ -145,9 +145,15 @@ class TestEventGroupAnalytics:
         ]
 
         top_members = [
-            TopMemberItem(rank=1, member_name="張飛", group_name="前鋒隊", score=85000, merit_diff=85000),
-            TopMemberItem(rank=2, member_name="關羽", group_name="前鋒隊", score=72000, merit_diff=72000),
-            TopMemberItem(rank=3, member_name="趙雲", group_name="前鋒隊", score=65000, merit_diff=65000),
+            TopMemberItem(
+                rank=1, member_name="張飛", group_name="前鋒隊", score=85000, merit_diff=85000
+            ),
+            TopMemberItem(
+                rank=2, member_name="關羽", group_name="前鋒隊", score=72000, merit_diff=72000
+            ),
+            TopMemberItem(
+                rank=3, member_name="趙雲", group_name="前鋒隊", score=65000, merit_diff=65000
+            ),
         ]
 
         analytics = EventGroupAnalytics(
@@ -226,11 +232,21 @@ class TestBuildEventReportFlex:
         ]
 
         top_members = [
-            TopMemberItem(rank=1, member_name="張飛", group_name="前鋒隊", score=85000, merit_diff=85000),
-            TopMemberItem(rank=2, member_name="關羽", group_name="前鋒隊", score=72000, merit_diff=72000),
-            TopMemberItem(rank=3, member_name="趙雲", group_name="前鋒隊", score=65000, merit_diff=65000),
-            TopMemberItem(rank=4, member_name="馬超", group_name="後勤隊", score=35000, merit_diff=35000),
-            TopMemberItem(rank=5, member_name="黃忠", group_name="後勤隊", score=32000, merit_diff=32000),
+            TopMemberItem(
+                rank=1, member_name="張飛", group_name="前鋒隊", score=85000, merit_diff=85000
+            ),
+            TopMemberItem(
+                rank=2, member_name="關羽", group_name="前鋒隊", score=72000, merit_diff=72000
+            ),
+            TopMemberItem(
+                rank=3, member_name="趙雲", group_name="前鋒隊", score=65000, merit_diff=65000
+            ),
+            TopMemberItem(
+                rank=4, member_name="馬超", group_name="後勤隊", score=35000, merit_diff=35000
+            ),
+            TopMemberItem(
+                rank=5, member_name="黃忠", group_name="後勤隊", score=32000, merit_diff=32000
+            ),
         ]
 
         return EventGroupAnalytics(
@@ -371,36 +387,32 @@ class TestBuildEventListCarousel:
             pytest.skip("linebot SDK not installed")
 
         from src.lib.line_flex_builder import build_event_list_carousel
-        from src.models.battle_event import BattleEvent, EventCategory, EventStatus
+        from src.models.battle_event import BattleEventListItem, EventCategory, EventStatus
 
         events = [
-            BattleEvent(
+            BattleEventListItem(
                 id=uuid4(),
-                season_id=uuid4(),
-                alliance_id=uuid4(),
                 name="徐州爭奪戰",
                 event_type=EventCategory.BATTLE,
                 status=EventStatus.COMPLETED,
                 event_start=datetime(2025, 1, 15, 6, 42),
                 event_end=datetime(2025, 1, 15, 7, 35),
                 created_at=datetime.now(),
-                before_upload_id=None,
-                after_upload_id=None,
-                created_by=None,
+                participation_rate=85.0,
+                total_merit=12500,
+                mvp_name="張飛",
             ),
-            BattleEvent(
+            BattleEventListItem(
                 id=uuid4(),
-                season_id=uuid4(),
-                alliance_id=uuid4(),
                 name="資源洲開關",
                 event_type=EventCategory.SIEGE,
                 status=EventStatus.COMPLETED,
                 event_start=datetime(2025, 1, 14, 10, 0),
                 event_end=datetime(2025, 1, 14, 11, 30),
                 created_at=datetime.now(),
-                before_upload_id=None,
-                after_upload_id=None,
-                created_by=None,
+                participation_rate=92.5,
+                total_merit=8000,
+                mvp_name="關羽",
             ),
         ]
 
@@ -472,7 +484,9 @@ class TestEventCategoryAwareReport:
             summary=summary,
             group_stats=[],
             top_members=[
-                TopMemberItem(rank=1, member_name="張飛", group_name="前鋒", score=50000, merit_diff=50000),
+                TopMemberItem(
+                    rank=1, member_name="張飛", group_name="前鋒", score=50000, merit_diff=50000
+                ),
             ],
         )
 
@@ -504,7 +518,9 @@ class TestEventCategoryAwareReport:
             summary=summary,
             group_stats=[],
             top_members=[
-                TopMemberItem(rank=1, member_name="關羽", group_name="攻城", score=80000, merit_diff=30000),
+                TopMemberItem(
+                    rank=1, member_name="關羽", group_name="攻城", score=80000, merit_diff=30000
+                ),
             ],
         )
 

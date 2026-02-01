@@ -686,19 +686,17 @@ class AnalyticsService:
 
         # Default: latest period view
         # Get previous period metrics for change calculation
-        # Use current member_ids to find their previous metrics (regardless of their old group)
+        # Reuse trend_data instead of extra query (optimization: eliminates 1 DB call)
         prev_metrics_map: dict[str, dict] = {}
         if len(periods) >= 2:
-            prev_period = periods[-2]
-            current_member_ids = [str(m["member_id"]) for m in group_metrics]
-            prev_metrics = await self._metrics_repo.get_members_metrics_for_periods(
-                current_member_ids, [str(prev_period.id)]
-            )
-            for pm in prev_metrics:
-                prev_metrics_map[str(pm["member_id"])] = {
-                    "daily_contribution": float(Decimal(str(pm["daily_contribution"]))),
-                    "daily_merit": float(Decimal(str(pm["daily_merit"]))),
-                }
+            prev_period_id = str(periods[-2].id)
+            # Extract previous period data from already-fetched trend_data
+            for td in trend_data:
+                if td["period_id"] == prev_period_id:
+                    prev_metrics_map[str(td["member_id"])] = {
+                        "daily_contribution": float(Decimal(str(td["daily_contribution"]))),
+                        "daily_merit": float(Decimal(str(td["daily_merit"]))),
+                    }
 
         # Build members list for latest period
         members = []
@@ -812,30 +810,29 @@ class AnalyticsService:
             return sorted(result, key=lambda x: x["avg_daily_merit"], reverse=True)
 
         # Default: latest period
+        # Optimized: single query instead of 2 separate queries
         latest_period = periods[-1]
-        group_averages = await self._metrics_repo.get_group_averages(latest_period.id)
         all_metrics = await self._metrics_repo.get_by_period_with_member(latest_period.id)
 
-        group_ranks: dict[str, list[int]] = defaultdict(list)
-        group_members: dict[str, list[str]] = defaultdict(list)
+        # Group metrics by end_group and calculate averages in one pass
+        group_data: dict[str, list[dict]] = defaultdict(list)
         for m in all_metrics:
             group = m["end_group"] or "未分組"
-            group_ranks[group].append(m["end_rank"])
-            group_members[group].append(m["member_name"])
+            group_data[group].append(m)
 
         result = []
-        for g in group_averages:
-            group_name = g["group_name"]
-            ranks = group_ranks.get(group_name, [])
-            avg_rank = sum(ranks) / len(ranks) if ranks else 0
-            member_names = group_members.get(group_name, [])
+        for group_name, members in group_data.items():
+            count = len(members)
+            merits = [float(Decimal(str(m["daily_merit"]))) for m in members]
+            ranks = [m["end_rank"] for m in members]
+            member_names = [m["member_name"] for m in members]
 
             result.append(
                 {
                     "name": group_name,
-                    "avg_daily_merit": round(float(g["avg_daily_merit"]), 2),
-                    "avg_rank": round(avg_rank, 1),
-                    "member_count": g["member_count"],
+                    "avg_daily_merit": round(sum(merits) / count, 2),
+                    "avg_rank": round(sum(ranks) / count, 1),
+                    "member_count": count,
                     "member_names": member_names,
                 }
             )
@@ -1315,19 +1312,31 @@ class AnalyticsService:
         }
 
     async def _calculate_alliance_trends_with_medians(self, periods: list[Period]) -> list[dict]:
-        """Calculate alliance trend data with median values for each period."""
+        """
+        Calculate alliance trend data with median values for each period.
+
+        Optimized: Uses batch query to fetch all periods' metrics in one DB call,
+        eliminating N+1 query pattern (previously 20+ queries → now 1 query).
+        """
+        if not periods:
+            return []
+
+        # Single batch query for all periods (eliminates N+1)
+        period_ids = [p.id for p in periods]
+        all_metrics = await self._metrics_repo.get_by_periods_batch(period_ids)
+
         result = []
         for period in periods:
-            metrics = await self._metrics_repo.get_by_period(period.id)
+            metrics = all_metrics.get(period.id, [])
             if not metrics:
                 continue
 
             count = len(metrics)
-            contributions = [float(m.daily_contribution) for m in metrics]
-            merits = [float(m.daily_merit) for m in metrics]
-            assists = [float(m.daily_assist) for m in metrics]
-            donations = [float(m.daily_donation) for m in metrics]
-            powers = [float(m.end_power) for m in metrics]
+            contributions = [float(m["daily_contribution"]) for m in metrics]
+            merits = [float(m["daily_merit"]) for m in metrics]
+            assists = [float(m["daily_assist"]) for m in metrics]
+            donations = [float(m["daily_donation"]) for m in metrics]
+            powers = [float(m["end_power"]) for m in metrics]
 
             result.append(
                 {
