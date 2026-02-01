@@ -35,7 +35,7 @@ export function formatNumber(value: number): string {
  */
 export function formatScore(value: number): string {
   if (value >= 10000) {
-    return `${(value / 10000).toFixed(1)}\u842C`; // 萬
+    return `${(value / 10000).toFixed(1)}萬`;
   }
   return value.toLocaleString();
 }
@@ -51,14 +51,14 @@ export function formatScore(value: number): string {
  */
 export function formatDuration(minutes: number): string {
   if (minutes < 60) {
-    return `${minutes}\u5206\u9418`; // 分鐘
+    return `${minutes}分鐘`;
   }
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   if (mins === 0) {
-    return `${hours}\u5C0F\u6642`; // 小時
+    return `${hours}小時`;
   }
-  return `${hours}\u5C0F\u6642${mins}\u5206`; // 小時...分
+  return `${hours}小時${mins}分`;
 }
 
 /**

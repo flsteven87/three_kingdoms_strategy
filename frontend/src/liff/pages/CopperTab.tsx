@@ -141,10 +141,7 @@ export function CopperTab({ session }: Props) {
   if (memberInfo?.registered_ids?.length === 0) {
     return (
       <div className="p-3 text-center">
-        <p className={liffTypography.body}>
-          \u8ACB\u5148\u81F3\u300CID
-          \u7BA1\u7406\u300D\u7D81\u5B9A\u904A\u6232\u5E33\u865F
-        </p>
+        <p className={liffTypography.body}>請先至「ID 管理」綁定遊戲帳號</p>
       </div>
     );
   }

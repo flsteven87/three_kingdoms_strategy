@@ -15,18 +15,18 @@ interface RankConfig {
 
 const RANK_CONFIG: Record<number, RankConfig> = {
   1: {
-    icon: "\uD83E\uDD47", // 🥇
-    label: "\u7B2C\u4E00\u540D", // 第一名
+    icon: "🥇",
+    label: "第一名",
     className: "text-amber-500",
   },
   2: {
-    icon: "\uD83E\uDD48", // 🥈
-    label: "\u7B2C\u4E8C\u540D", // 第二名
+    icon: "🥈",
+    label: "第二名",
     className: "text-gray-400 dark:text-gray-300",
   },
   3: {
-    icon: "\uD83E\uDD49", // 🥉
-    label: "\u7B2C\u4E09\u540D", // 第三名
+    icon: "🥉",
+    label: "第三名",
     className: "text-orange-600 dark:text-orange-400",
   },
 };

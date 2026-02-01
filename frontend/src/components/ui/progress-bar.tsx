@@ -107,7 +107,7 @@ export function GroupProgress({
         <div className="flex items-center justify-between text-xs">
           <span className="truncate font-medium">{name}</span>
           <span className="text-red-500 dark:text-red-400 shrink-0 ml-2">
-            {violations} \u4EBA\u9055\u898F
+            {violations} 人違規
           </span>
         </div>
         <ProgressBar

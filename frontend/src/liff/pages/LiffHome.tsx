@@ -101,16 +101,16 @@ export function LiffHome() {
         <div className="flex items-center justify-between mb-3">
           <div className="min-w-0 flex-1">
             <p className={`${liffTypography.cardTitle} truncate`}>
-              {session.lineDisplayName} \u4E3B\u516C\u60A8\u597D
+              {session.lineDisplayName} 主公您好
             </p>
             {unverifiedCount > 0 ? (
               <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mt-0.5">
                 <AlertCircle className="h-4 w-4" />
-                {unverifiedCount} \u500B\u5E33\u865F\u5F85\u5339\u914D
+                {unverifiedCount} 個帳號待匹配
               </p>
             ) : (
               <p className={`${liffTypography.caption} mt-0.5`}>
-                \u5DF2\u7D81\u5B9A {totalCount} \u500B\u5E33\u865F
+                已綁定 {totalCount} 個帳號
               </p>
             )}
           </div>
@@ -120,7 +120,7 @@ export function LiffHome() {
             className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
             onClick={() => setPageView("id-management")}
           >
-            ID \u7BA1\u7406
+            ID 管理
             <ChevronRight className="h-4 w-4 ml-0.5" />
           </Button>
         </div>

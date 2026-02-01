@@ -44,7 +44,7 @@ function ParticipationBadge({ event }: ParticipationBadgeProps) {
         <span
           className={`${liffTypography.caption} text-red-500 dark:text-red-400`}
         >
-          \u26A0 \u9055\u898F \u00B7 \u5171 {total_members}\u4EBA
+          ⚠ 違規 · 共 {total_members}人
         </span>
       );
     }
@@ -52,7 +52,7 @@ function ParticipationBadge({ event }: ParticipationBadgeProps) {
       <span
         className={`${liffTypography.caption} text-green-600 dark:text-green-400`}
       >
-        \u2713 \u5B88\u898F \u00B7 \u5171 {total_members}\u4EBA
+        ✓ 守規 · 共 {total_members}人
       </span>
     );
   }
@@ -60,20 +60,19 @@ function ParticipationBadge({ event }: ParticipationBadgeProps) {
   if (!up.participated) {
     return (
       <span className={liffTypography.caption}>
-        \u2717 \u672A\u53C3\u8207 \u00B7 \u5171 {total_members}\u4EBA
+        ✗ 未參與 · 共 {total_members}人
       </span>
     );
   }
 
   const scoreText = up.score ? formatScore(up.score) : "";
-  const label = up.score_label || "\u6230\u529F";
+  const label = up.score_label || "戰功";
 
   return (
     <span
       className={`${liffTypography.caption} text-green-600 dark:text-green-400`}
     >
-      \u2713 \u5DF2\u53C3\u8207 \u00B7 {label} {scoreText} #{up.rank}/
-      {total_members}
+      ✓ 已參與 · {label} {scoreText} #{up.rank}/{total_members}
     </span>
   );
 }
@@ -187,7 +186,7 @@ function ExpandedEventReport({
     return (
       <div className="px-3 pb-3 pt-2 border-t">
         <p className={`${liffTypography.caption} text-center py-2`}>
-          \u7121\u6CD5\u8F09\u5165\u5831\u544A
+          無法載入報告
         </p>
       </div>
     );
@@ -211,9 +210,7 @@ function ExpandedEventReport({
         100
       : 0
     : summary.participation_rate;
-  const mainRateLabel = isForbidden
-    ? "\u5B88\u898F\u7387"
-    : "\u51FA\u5E2D\u7387";
+  const mainRateLabel = isForbidden ? "守規率" : "出席率";
   const mainRateVariant = isForbidden
     ? summary.violator_count > 0
       ? "danger"
@@ -225,7 +222,7 @@ function ExpandedEventReport({
       {/* Main stat - aligned with LINE Bot report */}
       <div className="bg-muted/30 rounded-lg p-3">
         <div className={`${liffTypography.metricLabel} text-center`}>
-          \uD83D\uDCCA {mainRateLabel}
+          📊 {mainRateLabel}
         </div>
         <div className="flex items-center justify-center gap-3 mt-1">
           <span
@@ -247,20 +244,16 @@ function ExpandedEventReport({
         <div className={`${liffTypography.caption} text-center mt-1`}>
           {isForbidden
             ? summary.violator_count > 0
-              ? `${summary.violator_count} \u4EBA\u9055\u898F`
-              : "\u5168\u54E1\u9075\u5B88\u898F\u5B9A \u2713"
-            : `${summary.participated_count}/${summary.total_members}\u4EBA \u53C3\u6230`}
+              ? `${summary.violator_count} 人違規`
+              : "全員遵守規定 ✓"
+            : `${summary.participated_count}/${summary.total_members}人 參戰`}
         </div>
       </div>
 
       {/* Group Stats with Progress Bars */}
       {group_stats.length > 0 && (
         <CollapsibleSection
-          title={
-            isForbidden
-              ? "\u26A0\uFE0F \u5206\u7D44\u9055\u898F\u7D71\u8A08"
-              : "\uD83C\uDFD8\uFE0F \u7D44\u5225\u51FA\u5E2D\u7387"
-          }
+          title={isForbidden ? "⚠️ 分組違規統計" : "🏘️ 組別出席率"}
           isOpen={expandedSections.has("groups")}
           onToggle={() => toggleSection("groups")}
         >
@@ -283,7 +276,7 @@ function ExpandedEventReport({
                 <p
                   className={`${liffTypography.caption} text-green-600 dark:text-green-400 text-center`}
                 >
-                  \u7121\u9055\u898F\u8A18\u9304 \u2713
+                  無違規記錄 ✓
                 </p>
               )}
           </div>
@@ -294,7 +287,7 @@ function ExpandedEventReport({
       {isForbidden ? (
         violators.length > 0 && (
           <CollapsibleSection
-            title="\u26A0\uFE0F \u9055\u898F\u540D\u55AE"
+            title="⚠️ 違規名單"
             isOpen={expandedSections.has("violators")}
             onToggle={() => toggleSection("violators")}
           >
@@ -325,7 +318,7 @@ function ExpandedEventReport({
         <>
           {top_contributors.length > 0 && (
             <CollapsibleSection
-              title="\uD83C\uDFF0 \u8CA2\u7372 Top 5"
+              title="🏰 貢獻 Top 5"
               isOpen={expandedSections.has("contributors")}
               onToggle={() => toggleSection("contributors")}
             >
@@ -334,7 +327,7 @@ function ExpandedEventReport({
           )}
           {top_assisters.length > 0 && (
             <CollapsibleSection
-              title="\u2694\uFE0F \u52A9\u653B Top 5"
+              title="⚔️ 助攻 Top 5"
               isOpen={expandedSections.has("assisters")}
               onToggle={() => toggleSection("assisters")}
             >
@@ -345,7 +338,7 @@ function ExpandedEventReport({
       ) : (
         top_members.length > 0 && (
           <CollapsibleSection
-            title="\uD83C\uDFC6 \u6230\u529F Top 5"
+            title="🏆 戰功 Top 5"
             isOpen={expandedSections.has("top")}
             onToggle={() => toggleSection("top")}
           >
@@ -466,10 +459,7 @@ export function BattleTab({ session }: Props) {
   if (accounts.length === 0) {
     return (
       <div className="p-3 text-center">
-        <p className={liffTypography.body}>
-          \u8ACB\u5148\u81F3\u300CID
-          \u7BA1\u7406\u300D\u7D81\u5B9A\u904A\u6232\u5E33\u865F
-        </p>
+        <p className={liffTypography.body}>請先至「ID 管理」綁定遊戲帳號</p>
       </div>
     );
   }
@@ -507,9 +497,7 @@ export function BattleTab({ session }: Props) {
         <>
           {eventList.events.length === 0 ? (
             <div className="py-8 text-center">
-              <p className={liffTypography.body}>
-                \u66AB\u7121\u6230\u5F79\u8A18\u9304
-              </p>
+              <p className={liffTypography.body}>暫無戰役記錄</p>
             </div>
           ) : (
             <div className="space-y-2">

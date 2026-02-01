@@ -25,37 +25,37 @@ interface EventTypeConfig {
  */
 export const EVENT_TYPE_CONFIG: Record<EventType, EventTypeConfig> = {
   battle: {
-    icon: "\u2694\uFE0F", // ⚔️
-    label: "\u6230\u5F79", // 戰役
+    icon: "⚔️",
+    label: "戰役",
     tailwind: {
       bg: "bg-blue-500/15",
       text: "text-blue-600 dark:text-blue-400",
       border: "border-blue-500/30",
     },
     metric: "merit",
-    metricLabel: "\u6230\u529F", // 戰功
+    metricLabel: "戰功",
   },
   siege: {
-    icon: "\uD83C\uDFF0", // 🏰
-    label: "\u653B\u57CE", // 攻城
+    icon: "🏰",
+    label: "攻城",
     tailwind: {
       bg: "bg-orange-500/15",
       text: "text-orange-600 dark:text-orange-400",
       border: "border-orange-500/30",
     },
     metric: "contribution",
-    metricLabel: "\u8CA2\u7372", // 貢獻
+    metricLabel: "貢獻",
   },
   forbidden: {
-    icon: "\uD83D\uDEAB", // 🚫
-    label: "\u7981\u5730", // 禁地
+    icon: "🚫",
+    label: "禁地",
     tailwind: {
       bg: "bg-red-500/15",
       text: "text-red-600 dark:text-red-400",
       border: "border-red-500/30",
     },
     metric: "violation",
-    metricLabel: "\u9055\u898F", // 違規
+    metricLabel: "違規",
   },
 } as const;
 
