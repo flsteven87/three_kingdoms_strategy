@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandItem,
   CommandList,
@@ -156,7 +155,7 @@ export function RosterTab({ session }: Props) {
         <p className="text-xs text-muted-foreground">角色名稱（非數字編號）</p>
         <div className="flex gap-2">
           <Popover
-            open={isAutocompleteOpen}
+            open={isAutocompleteOpen && filteredCandidates.length > 0}
             onOpenChange={setIsAutocompleteOpen}
           >
             <PopoverTrigger asChild>
@@ -176,7 +175,8 @@ export function RosterTab({ session }: Props) {
                   }}
                   placeholder="例：曹操丞相"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !isAutocompleteOpen) {
+                    // Allow Enter to register when no suggestions shown
+                    if (e.key === "Enter" && filteredCandidates.length === 0) {
                       handleRegister();
                     }
                     if (e.key === "Escape") {
@@ -218,23 +218,6 @@ export function RosterTab({ session }: Props) {
                 </Command>
               </PopoverContent>
             )}
-            {filteredCandidates.length === 0 &&
-              newGameId.trim() &&
-              isAutocompleteOpen && (
-                <PopoverContent
-                  className="w-[--radix-popover-trigger-width] p-0"
-                  align="start"
-                  onOpenAutoFocus={(e) => e.preventDefault()}
-                >
-                  <Command>
-                    <CommandList>
-                      <CommandEmpty className="py-3 text-xs">
-                        無符合結果，按 Enter 可直接註冊
-                      </CommandEmpty>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              )}
           </Popover>
           <Button
             onClick={handleRegister}
