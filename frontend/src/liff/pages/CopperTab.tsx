@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { liffTypography } from "@/lib/typography";
 import {
   useLiffCopperMines,
   useLiffCopperRules,
@@ -139,9 +140,10 @@ export function CopperTab({ session }: Props) {
   // No registered accounts (edge case - should not reach here with onboarding)
   if (memberInfo?.registered_ids?.length === 0) {
     return (
-      <div className="p-4 text-center">
-        <p className="text-sm text-muted-foreground">
-          請先至「ID 管理」綁定遊戲帳號
+      <div className="p-3 text-center">
+        <p className={liffTypography.body}>
+          \u8ACB\u5148\u81F3\u300CID
+          \u7BA1\u7406\u300D\u7D81\u5B9A\u904A\u6232\u5E33\u865F
         </p>
       </div>
     );
@@ -283,7 +285,7 @@ export function CopperTab({ session }: Props) {
         {rules && rules.length > 0 && (
           <div className="bg-muted/50 rounded-lg p-3">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-              <Info className="h-3.5 w-3.5" />
+              <Info className="h-4 w-4" />
               申請條件
             </div>
             <div className="grid gap-1">
@@ -317,7 +319,7 @@ export function CopperTab({ session }: Props) {
                   className="flex items-center justify-between py-2 px-3 rounded-lg bg-primary/10"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <MapPin className="h-4 w-4 shrink-0 text-primary" />
                     <span className="text-sm font-medium">Lv.{mine.level}</span>
                     <span className="text-xs text-muted-foreground">
                       ({mine.coord_x},{mine.coord_y})
@@ -333,7 +335,7 @@ export function CopperTab({ session }: Props) {
                     onClick={() => handleDeleteClick(mine.id)}
                     disabled={deleteMutation.isPending}
                   >
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               ))}
@@ -349,9 +351,9 @@ export function CopperTab({ session }: Props) {
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
               >
                 {showOtherMines ? (
-                  <ChevronDown className="h-3.5 w-3.5" />
+                  <ChevronDown className="h-4 w-4" />
                 ) : (
-                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-4 w-4" />
                 )}
                 同盟銅礦 ({otherMines.length})
               </button>
@@ -363,7 +365,7 @@ export function CopperTab({ session }: Props) {
                       className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/50"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <span className="text-sm font-medium">
                           Lv.{mine.level}
                         </span>

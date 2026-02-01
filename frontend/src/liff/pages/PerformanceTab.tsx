@@ -1,9 +1,15 @@
 /**
  * Performance Tab
- * - No manual memoization (React Compiler handles)
  *
  * Mobile-optimized member performance analytics for LIFF.
- * Includes: rank card, metrics grid, radar chart, trend chart, season totals.
+ * Features:
+ * - Rank card with change indicator
+ * - Metrics grid with alliance comparison
+ * - Radar chart (5-dimensional capability)
+ * - Trend chart (contribution & merit)
+ * - Season totals summary
+ *
+ * Uses CSS variables for theme-aware chart colors.
  */
 
 import { useState } from "react";
@@ -25,6 +31,12 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { AccountSelector } from "../components/AccountSelector";
 import { formatWan } from "@/lib/chart-utils";
+import { liffTypography, typography } from "@/lib/typography";
+import {
+  liffChartColors,
+  radarChartColors,
+  trendChartColors,
+} from "@/lib/chart-colors";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import { useLiffPerformance } from "../hooks/use-liff-performance";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
@@ -52,19 +64,19 @@ function MetricCard({ label, value, percentVsAvg }: MetricCardProps) {
   return (
     <Card className="bg-muted/30">
       <CardContent className="p-3">
-        <div className="text-xs text-muted-foreground mb-1">{label}</div>
-        <div className="text-lg font-semibold">{formatWan(value)}</div>
+        <div className={liffTypography.metricLabel}>{label}</div>
+        <div className={liffTypography.metricSmall}>{formatWan(value)}</div>
         <div
           className={`text-xs flex items-center gap-0.5 ${
             isPositive
-              ? "text-green-600"
+              ? typography.success
               : isNegative
-                ? "text-red-500"
+                ? typography.danger
                 : "text-muted-foreground"
           }`}
         >
           {isPositive ? "+" : ""}
-          {percentVsAvg}% vs 盟均
+          {percentVsAvg}% vs \u76DF\u5747
         </div>
       </CardContent>
     </Card>
@@ -98,16 +110,16 @@ export function PerformanceTab({ session }: Props) {
   const radarData = (() => {
     if (!performance?.latest || !performance?.alliance_avg) return [];
 
-    // Dimension order matches MemberPerformance.tsx: 貢獻→戰功→勢力值→助攻→捐獻
+    // Dimension order matches MemberPerformance.tsx
     const metrics: Array<{
       key: keyof PerformanceMetrics;
       label: string;
     }> = [
-      { key: "daily_contribution", label: "貢獻" },
-      { key: "daily_merit", label: "戰功" },
-      { key: "power", label: "勢力值" },
-      { key: "daily_assist", label: "助攻" },
-      { key: "daily_donation", label: "捐獻" },
+      { key: "daily_contribution", label: "\u8CA2\u7372" },
+      { key: "daily_merit", label: "\u6230\u529F" },
+      { key: "power", label: "\u52E2\u529B\u503C" },
+      { key: "daily_assist", label: "\u52A9\u653B" },
+      { key: "daily_donation", label: "\u6350\u7372" },
     ];
 
     return metrics.map(({ key, label }) => {
@@ -131,7 +143,7 @@ export function PerformanceTab({ session }: Props) {
     if (!performance?.trend) return [];
     return performance.trend.map((item) => ({
       label: item.period_label.split("-")[0], // Just show start date
-      貢獻: Math.round(item.daily_contribution),
+      貢獲: Math.round(item.daily_contribution),
       戰功: Math.round(item.daily_merit),
     }));
   })();
@@ -140,17 +152,18 @@ export function PerformanceTab({ session }: Props) {
   if (isLoadingMember) {
     return (
       <div className="py-8 text-center">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
       </div>
     );
   }
 
-  // No registered accounts (edge case - should not reach here with onboarding)
+  // No registered accounts
   if (accounts.length === 0) {
     return (
-      <div className="p-4 text-center">
-        <p className="text-sm text-muted-foreground">
-          請先至「ID 管理」綁定遊戲帳號
+      <div className="p-3 text-center">
+        <p className={liffTypography.body}>
+          \u8ACB\u5148\u81F3\u300CID
+          \u7BA1\u7406\u300D\u7D81\u5B9A\u904A\u6232\u5E33\u865F
         </p>
       </div>
     );
@@ -166,7 +179,7 @@ export function PerformanceTab({ session }: Props) {
           onValueChange={setSelectedGameId}
         />
         <div className="py-8 text-center">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
         </div>
       </div>
     );
@@ -182,8 +195,8 @@ export function PerformanceTab({ session }: Props) {
           onValueChange={setSelectedGameId}
         />
         <div className="py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            暫無數據，請等待盟主上傳統計
+          <p className={liffTypography.body}>
+            \u66AB\u7121\u6578\u64DA\uFF0C\u8ACB\u7B49\u5F85\u76DF\u4E3B\u4E0A\u50B3\u7D71\u8A08
           </p>
         </div>
       </div>
@@ -194,7 +207,7 @@ export function PerformanceTab({ session }: Props) {
   const rankChange = rank?.change ?? 0;
 
   return (
-    <div className="p-3 space-y-4 pb-6">
+    <div className="p-3 space-y-3 pb-6">
       {/* Header: Account selector + Season */}
       <div className="flex items-center justify-between gap-2">
         {accounts.length > 1 ? (
@@ -205,10 +218,10 @@ export function PerformanceTab({ session }: Props) {
             className="h-9 flex-1"
           />
         ) : (
-          <span className="text-sm font-medium">{effectiveGameId}</span>
+          <span className={liffTypography.cardTitle}>{effectiveGameId}</span>
         )}
         {season_name && (
-          <span className="text-xs text-muted-foreground shrink-0">
+          <span className={`${liffTypography.caption} shrink-0`}>
             {season_name}
           </span>
         )}
@@ -218,8 +231,10 @@ export function PerformanceTab({ session }: Props) {
       {rank && (
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="py-4 text-center">
-            <div className="text-xs text-muted-foreground mb-1">貢獻排名</div>
-            <div className="text-3xl font-bold text-primary">
+            <div className={liffTypography.metricLabel}>
+              \u8CA2\u7372\u6392\u540D
+            </div>
+            <div className={`${liffTypography.metric} text-primary mt-1`}>
               #{rank.current}
               <span className="text-lg font-normal text-muted-foreground">
                 {" "}
@@ -229,7 +244,7 @@ export function PerformanceTab({ session }: Props) {
             {rankChange !== 0 && (
               <div
                 className={`text-sm flex items-center justify-center gap-1 mt-1 ${
-                  rankChange > 0 ? "text-green-600" : "text-red-500"
+                  rankChange > 0 ? typography.success : typography.danger
                 }`}
               >
                 {rankChange > 0 ? (
@@ -238,13 +253,13 @@ export function PerformanceTab({ session }: Props) {
                   <TrendingDown className="h-4 w-4" />
                 )}
                 {rankChange > 0 ? "+" : ""}
-                {rankChange} 本期
+                {rankChange} \u672C\u671F
               </div>
             )}
             {rankChange === 0 && rank.change !== null && (
               <div className="text-sm flex items-center justify-center gap-1 mt-1 text-muted-foreground">
                 <Minus className="h-4 w-4" />
-                持平
+                \u6301\u5E73
               </div>
             )}
           </CardContent>
@@ -255,7 +270,7 @@ export function PerformanceTab({ session }: Props) {
       {latest && alliance_avg && (
         <div className="grid grid-cols-2 gap-2">
           <MetricCard
-            label="日均貢獻"
+            label="\u65E5\u5747\u8CA2\u7372"
             value={latest.daily_contribution}
             percentVsAvg={calcPercentVsAvg(
               latest.daily_contribution,
@@ -263,7 +278,7 @@ export function PerformanceTab({ session }: Props) {
             )}
           />
           <MetricCard
-            label="日均戰功"
+            label="\u65E5\u5747\u6230\u529F"
             value={latest.daily_merit}
             percentVsAvg={calcPercentVsAvg(
               latest.daily_merit,
@@ -271,7 +286,7 @@ export function PerformanceTab({ session }: Props) {
             )}
           />
           <MetricCard
-            label="日均助攻"
+            label="\u65E5\u5747\u52A9\u653B"
             value={latest.daily_assist}
             percentVsAvg={calcPercentVsAvg(
               latest.daily_assist,
@@ -279,7 +294,7 @@ export function PerformanceTab({ session }: Props) {
             )}
           />
           <MetricCard
-            label="日均捐獻"
+            label="\u65E5\u5747\u6350\u7372"
             value={latest.daily_donation}
             percentVsAvg={calcPercentVsAvg(
               latest.daily_donation,
@@ -289,19 +304,19 @@ export function PerformanceTab({ session }: Props) {
         </div>
       )}
 
-      {/* Radar Chart */}
+      {/* Radar Chart - Theme-aware colors */}
       {radarData.length > 0 && (
         <Card>
           <CardContent className="pt-4 pb-2">
-            <div className="text-xs text-muted-foreground mb-2 text-center">
-              五維能力 (vs 同盟平均)
+            <div className={`${liffTypography.caption} text-center mb-2`}>
+              \u4E94\u7DAD\u80FD\u529B (vs \u540C\u76DF\u5E73\u5747)
             </div>
             <ResponsiveContainer width="100%" height={220}>
               <RadarChart data={radarData}>
-                <PolarGrid stroke="#e5e7eb" gridType="polygon" />
+                <PolarGrid stroke={liffChartColors.grid} gridType="polygon" />
                 <PolarAngleAxis
                   dataKey="metric"
-                  tick={{ fontSize: 11, fill: "#6b7280" }}
+                  tick={{ fontSize: 11, fill: liffChartColors.axisText }}
                 />
                 <PolarRadiusAxis
                   angle={90}
@@ -312,77 +327,77 @@ export function PerformanceTab({ session }: Props) {
                       ...radarData.map((d) => Math.max(d.me, d.median)),
                     ),
                   ]}
-                  tick={{ fontSize: 9, fill: "#9ca3af" }}
+                  tick={{ fontSize: 9, fill: liffChartColors.axisText }}
                   tickFormatter={(value) => `${value}%`}
                   tickCount={4}
                 />
                 {/* Render order: back to front for proper layering */}
                 <Radar
-                  name="盟均"
+                  name="\u76DF\u5747"
                   dataKey="avg"
-                  stroke="#9ca3af"
-                  fill="#9ca3af"
-                  fillOpacity={0.1}
-                  strokeDasharray="4 4"
-                  strokeWidth={1}
+                  stroke={radarChartColors.average.stroke}
+                  fill={radarChartColors.average.fill}
+                  fillOpacity={radarChartColors.average.fillOpacity}
+                  strokeDasharray={radarChartColors.average.strokeDasharray}
+                  strokeWidth={radarChartColors.average.strokeWidth}
                 />
                 <Radar
-                  name="中位數"
+                  name="\u4E2D\u4F4D\u6578"
                   dataKey="median"
-                  stroke="#8b9cb3"
-                  fill="#8b9cb3"
-                  fillOpacity={0.08}
-                  strokeDasharray="2 2"
-                  strokeWidth={1}
+                  stroke={radarChartColors.median.stroke}
+                  fill={radarChartColors.median.fill}
+                  fillOpacity={radarChartColors.median.fillOpacity}
+                  strokeDasharray={radarChartColors.median.strokeDasharray}
+                  strokeWidth={radarChartColors.median.strokeWidth}
                 />
                 <Radar
-                  name="我"
+                  name="\u6211"
                   dataKey="me"
-                  stroke="#2563eb"
-                  fill="#2563eb"
-                  fillOpacity={0.4}
-                  strokeWidth={2}
+                  stroke={radarChartColors.me.stroke}
+                  fill={radarChartColors.me.fill}
+                  fillOpacity={radarChartColors.me.fillOpacity}
+                  strokeWidth={radarChartColors.me.strokeWidth}
                 />
               </RadarChart>
             </ResponsiveContainer>
             <div className="flex justify-center gap-4 text-xs mt-1">
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 bg-primary inline-block" /> 我
+                <span className="w-3 h-0.5 bg-primary inline-block" /> \u6211
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 bg-gray-400 inline-block opacity-70" />{" "}
-                盟均
+                <span className="w-3 h-0.5 bg-muted-foreground inline-block opacity-70" />{" "}
+                \u76DF\u5747
               </span>
               <span className="flex items-center gap-1">
                 <span
                   className="w-3 h-0.5 inline-block"
-                  style={{ backgroundColor: "#8b9cb3" }}
+                  style={{ backgroundColor: radarChartColors.median.stroke }}
                 />{" "}
-                中位數
+                \u4E2D\u4F4D\u6578
               </span>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Trend Chart */}
+      {/* Trend Chart - Theme-aware colors */}
       {trendData.length > 1 && (
         <Card>
           <CardContent className="pt-4 pb-2">
-            <div className="text-xs text-muted-foreground mb-2 text-center">
-              貢獻與戰功趨勢
+            <div className={`${liffTypography.caption} text-center mb-2`}>
+              \u8CA2\u7372\u8207\u6230\u529F\u8DA8\u52E2
             </div>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={trendData}>
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  tick={{ fontSize: 10, fill: liffChartColors.axisText }}
                   tickLine={false}
-                  axisLine={{ stroke: "#e5e7eb" }}
+                  axisLine={{ stroke: liffChartColors.grid }}
                 />
                 <YAxis
                   yAxisId="left"
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  tick={{ fontSize: 10, fill: liffChartColors.axisText }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(v) => formatWan(v)}
@@ -391,7 +406,7 @@ export function PerformanceTab({ session }: Props) {
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  tick={{ fontSize: 10, fill: liffChartColors.axisText }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(v) => formatWan(v)}
@@ -406,8 +421,8 @@ export function PerformanceTab({ session }: Props) {
                 <Line
                   yAxisId="left"
                   type="stepAfter"
-                  dataKey="貢獻"
-                  stroke="#2563eb"
+                  dataKey="\u8CA2\u7372"
+                  stroke={trendChartColors.contribution}
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 4 }}
@@ -415,8 +430,8 @@ export function PerformanceTab({ session }: Props) {
                 <Line
                   yAxisId="right"
                   type="stepAfter"
-                  dataKey="戰功"
-                  stroke="#10b981"
+                  dataKey="\u6230\u529F"
+                  stroke={trendChartColors.merit}
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 4 }}
@@ -431,30 +446,44 @@ export function PerformanceTab({ session }: Props) {
       {season_total && (
         <Card className="bg-muted/30">
           <CardContent className="py-3">
-            <div className="text-xs text-muted-foreground mb-2">賽季累計</div>
+            <div className={`${liffTypography.metricLabel} mb-2`}>
+              \u8CFD\u5B63\u7D2F\u8A08
+            </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">總貢獻</span>
-                <span className="font-medium">
+                <span className="text-muted-foreground">
+                  \u7E3D\u8CA2\u7372
+                </span>
+                <span className="font-medium tabular-nums">
                   {formatWan(season_total.contribution)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">總捐獻</span>
-                <span className="font-medium">
+                <span className="text-muted-foreground">
+                  \u7E3D\u6350\u7372
+                </span>
+                <span className="font-medium tabular-nums">
                   {formatWan(season_total.donation)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">勢力值</span>
-                <span className="font-medium">
+                <span className="text-muted-foreground">
+                  \u52E2\u529B\u503C
+                </span>
+                <span className="font-medium tabular-nums">
                   {formatWan(season_total.power)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">勢力變化</span>
+                <span className="text-muted-foreground">
+                  \u52E2\u529B\u8B8A\u5316
+                </span>
                 <span
-                  className={`font-medium ${season_total.power_change >= 0 ? "text-green-600" : "text-red-500"}`}
+                  className={`font-medium tabular-nums ${
+                    season_total.power_change >= 0
+                      ? typography.success
+                      : typography.danger
+                  }`}
                 >
                   {season_total.power_change >= 0 ? "+" : ""}
                   {formatWan(season_total.power_change)}

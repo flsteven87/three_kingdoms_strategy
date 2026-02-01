@@ -4,44 +4,31 @@
  * Mobile-optimized battle event list for LIFF.
  * Features:
  * - Account selector (consistent with PerformanceTab)
- * - Event list with participation status
- * - Inline expandable event reports
- * - Progressive disclosure for report sections
+ * - Event list with participation status and type badge
+ * - Inline expandable event reports with progress bars
+ * - Visual alignment with LINE Bot Flex Messages
  */
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { EventBadge } from "@/components/ui/event-badge";
+import { RankBadge } from "@/components/ui/rank-badge";
+import { GroupProgress, ProgressBar } from "@/components/ui/progress-bar";
 import { AccountSelector } from "../components/AccountSelector";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import {
   useLiffEventList,
   useLiffEventReportInline,
 } from "../hooks/use-liff-battle";
+import { type EventType } from "@/constants/event-types";
+import { formatScore, formatEventTime } from "@/lib/format-utils";
+import { liffTypography } from "@/lib/typography";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
 import type { EventListItem } from "../lib/liff-api-client";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
-}
-
-const EVENT_TYPE_CONFIG: Record<string, { icon: string; label: string }> = {
-  battle: { icon: "⚔️", label: "戰役" },
-  siege: { icon: "🏰", label: "攻城" },
-  forbidden: { icon: "🚫", label: "禁地" },
-};
-
-function formatEventTime(dateStr: string | null): string {
-  if (!dateStr) return "";
-  const utcStr =
-    dateStr.endsWith("Z") || dateStr.includes("+") ? dateStr : `${dateStr}Z`;
-  const date = new Date(utcStr);
-  return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-function formatScore(score: number): string {
-  if (score >= 10000) return `${(score / 10000).toFixed(1)}萬`;
-  return score.toLocaleString();
 }
 
 interface ParticipationBadgeProps {
@@ -52,36 +39,41 @@ function ParticipationBadge({ event }: ParticipationBadgeProps) {
   const { user_participation: up, event_type, total_members } = event;
 
   if (event_type === "forbidden") {
-    // Forbidden: show compliance status
     if (up.violated === true) {
       return (
-        <span className="text-xs text-red-500">
-          ⚠ 違規 · 共 {total_members}人
+        <span
+          className={`${liffTypography.caption} text-red-500 dark:text-red-400`}
+        >
+          \u26A0 \u9055\u898F \u00B7 \u5171 {total_members}\u4EBA
         </span>
       );
     }
     return (
-      <span className="text-xs text-green-600">
-        ✓ 守規 · 共 {total_members}人
+      <span
+        className={`${liffTypography.caption} text-green-600 dark:text-green-400`}
+      >
+        \u2713 \u5B88\u898F \u00B7 \u5171 {total_members}\u4EBA
       </span>
     );
   }
 
   if (!up.participated) {
     return (
-      <span className="text-xs text-muted-foreground">
-        ✗ 未參與 · 共 {total_members}人
+      <span className={liffTypography.caption}>
+        \u2717 \u672A\u53C3\u8207 \u00B7 \u5171 {total_members}\u4EBA
       </span>
     );
   }
 
-  // Participated: show score and rank
   const scoreText = up.score ? formatScore(up.score) : "";
-  const label = up.score_label || "戰功";
+  const label = up.score_label || "\u6230\u529F";
 
   return (
-    <span className="text-xs text-green-600">
-      ✓ 已參與 · {label} {scoreText} #{up.rank}/{total_members}
+    <span
+      className={`${liffTypography.caption} text-green-600 dark:text-green-400`}
+    >
+      \u2713 \u5DF2\u53C3\u8207 \u00B7 {label} {scoreText} #{up.rank}/
+      {total_members}
     </span>
   );
 }
@@ -99,23 +91,25 @@ function EventCard({
   onToggle,
   lineGroupId,
 }: EventCardProps) {
-  const config =
-    EVENT_TYPE_CONFIG[event.event_type] || EVENT_TYPE_CONFIG.battle;
   const timeStr = formatEventTime(event.event_start);
 
   return (
     <Card className={isExpanded ? "ring-1 ring-primary/20" : ""}>
       <button type="button" onClick={onToggle} className="w-full text-left">
-        <CardContent className="py-3 px-4">
+        <CardContent className="py-3 px-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span>{config.icon}</span>
-                <span className="font-medium text-sm truncate">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <EventBadge
+                  type={event.event_type as EventType}
+                  size="sm"
+                  showLabel={false}
+                />
+                <span className={`${liffTypography.cardTitle} truncate`}>
                   {event.event_name}
                 </span>
                 {timeStr && (
-                  <span className="text-xs text-muted-foreground shrink-0">
+                  <span className={`${liffTypography.caption} shrink-0`}>
                     {timeStr}
                   </span>
                 )}
@@ -158,7 +152,7 @@ function ExpandedEventReport({
   lineGroupId,
 }: ExpandedEventReportProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(),
+    new Set(["groups"]), // Default expand groups section
   );
 
   const context = { lineGroupId };
@@ -181,7 +175,7 @@ function ExpandedEventReport({
 
   if (isLoading) {
     return (
-      <div className="px-4 pb-4 pt-2 border-t">
+      <div className="px-3 pb-3 pt-2 border-t">
         <div className="flex justify-center py-4">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
@@ -191,9 +185,9 @@ function ExpandedEventReport({
 
   if (!report) {
     return (
-      <div className="px-4 pb-4 pt-2 border-t">
-        <p className="text-xs text-muted-foreground text-center py-2">
-          無法載入報告
+      <div className="px-3 pb-3 pt-2 border-t">
+        <p className={`${liffTypography.caption} text-center py-2`}>
+          \u7121\u6CD5\u8F09\u5165\u5831\u544A
         </p>
       </div>
     );
@@ -217,34 +211,56 @@ function ExpandedEventReport({
         100
       : 0
     : summary.participation_rate;
-  const mainRateLabel = isForbidden ? "守規率" : "出席率";
-  const mainRateColor = isForbidden
+  const mainRateLabel = isForbidden
+    ? "\u5B88\u898F\u7387"
+    : "\u51FA\u5E2D\u7387";
+  const mainRateVariant = isForbidden
     ? summary.violator_count > 0
-      ? "text-red-500"
-      : "text-green-600"
-    : "text-green-600";
+      ? "danger"
+      : "success"
+    : "success";
 
   return (
-    <div className="px-4 pb-4 pt-2 border-t space-y-3">
-      {/* Main stat */}
-      <div className="bg-muted/30 rounded-lg p-3 text-center">
-        <div className="text-xs text-muted-foreground">{mainRateLabel}</div>
-        <div className={`text-2xl font-bold ${mainRateColor}`}>
-          {mainRate.toFixed(0)}%
+    <div className="px-3 pb-3 pt-2 border-t space-y-3">
+      {/* Main stat - aligned with LINE Bot report */}
+      <div className="bg-muted/30 rounded-lg p-3">
+        <div className={`${liffTypography.metricLabel} text-center`}>
+          \uD83D\uDCCA {mainRateLabel}
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-center gap-3 mt-1">
+          <span
+            className={`${liffTypography.metric} ${
+              mainRateVariant === "danger"
+                ? "text-red-500 dark:text-red-400"
+                : "text-green-600 dark:text-green-400"
+            }`}
+          >
+            {mainRate.toFixed(0)}%
+          </span>
+          <ProgressBar
+            value={mainRate}
+            variant={mainRateVariant === "danger" ? "danger" : "success"}
+            size="md"
+            className="w-24"
+          />
+        </div>
+        <div className={`${liffTypography.caption} text-center mt-1`}>
           {isForbidden
             ? summary.violator_count > 0
-              ? `${summary.violator_count} 人違規`
-              : "全員遵守規定 ✓"
-            : `${summary.participated_count}/${summary.total_members}人 參戰`}
+              ? `${summary.violator_count} \u4EBA\u9055\u898F`
+              : "\u5168\u54E1\u9075\u5B88\u898F\u5B9A \u2713"
+            : `${summary.participated_count}/${summary.total_members}\u4EBA \u53C3\u6230`}
         </div>
       </div>
 
-      {/* Expandable: Group Stats */}
+      {/* Group Stats with Progress Bars */}
       {group_stats.length > 0 && (
         <CollapsibleSection
-          title={isForbidden ? "⚠️ 分組違規統計" : "🏘️ 組別出席率"}
+          title={
+            isForbidden
+              ? "\u26A0\uFE0F \u5206\u7D44\u9055\u898F\u7D71\u8A08"
+              : "\uD83C\uDFD8\uFE0F \u7D44\u5225\u51FA\u5E2D\u7387"
+          }
           isOpen={expandedSections.has("groups")}
           onToggle={() => toggleSection("groups")}
         >
@@ -253,59 +269,51 @@ function ExpandedEventReport({
               ? group_stats.filter((g) => g.violator_count > 0)
               : group_stats
             ).map((group) => (
-              <div
+              <GroupProgress
                 key={group.group_name}
-                className="flex justify-between text-xs"
-              >
-                <span className="truncate">{group.group_name}</span>
-                {isForbidden ? (
-                  <span className="text-red-500">
-                    {group.violator_count} 人違規
-                  </span>
-                ) : (
-                  <span>
-                    {group.participated_count}/{group.member_count}
-                    <span className="text-green-600 ml-1">
-                      {group.participation_rate.toFixed(0)}%
-                    </span>
-                  </span>
-                )}
-              </div>
+                name={group.group_name}
+                participated={group.participated_count}
+                total={group.member_count}
+                violations={group.violator_count}
+                isViolation={isForbidden}
+              />
             ))}
             {isForbidden &&
               group_stats.filter((g) => g.violator_count > 0).length === 0 && (
-                <p className="text-xs text-green-600 text-center">
-                  無違規記錄 ✓
+                <p
+                  className={`${liffTypography.caption} text-green-600 dark:text-green-400 text-center`}
+                >
+                  \u7121\u9055\u898F\u8A18\u9304 \u2713
                 </p>
               )}
           </div>
         </CollapsibleSection>
       )}
 
-      {/* Expandable: Rankings */}
+      {/* Rankings - aligned with LINE Bot report */}
       {isForbidden ? (
         violators.length > 0 && (
           <CollapsibleSection
-            title="⚠️ 違規名單"
+            title="\u26A0\uFE0F \u9055\u898F\u540D\u55AE"
             isOpen={expandedSections.has("violators")}
             onToggle={() => toggleSection("violators")}
           >
-            <div className="space-y-1 pt-2">
+            <div className="space-y-1.5 pt-2">
               {violators.slice(0, 5).map((v, i) => (
                 <div
                   key={v.member_name}
-                  className="flex justify-between text-xs"
+                  className="flex justify-between items-center text-xs"
                 >
-                  <span>
-                    {i + 1}. {v.member_name}
+                  <span className="flex items-center gap-1.5">
+                    <RankBadge rank={i + 1} size="sm" />
+                    <span className="font-medium">{v.member_name}</span>
                     {v.line_display_name && (
                       <span className="text-muted-foreground">
-                        {" "}
                         ({v.line_display_name})
                       </span>
                     )}
                   </span>
-                  <span className="text-red-500">
+                  <span className="text-red-500 dark:text-red-400 tabular-nums">
                     +{formatScore(v.power_diff)}
                   </span>
                 </div>
@@ -317,7 +325,7 @@ function ExpandedEventReport({
         <>
           {top_contributors.length > 0 && (
             <CollapsibleSection
-              title="🏰 貢獻 Top 5"
+              title="\uD83C\uDFF0 \u8CA2\u7372 Top 5"
               isOpen={expandedSections.has("contributors")}
               onToggle={() => toggleSection("contributors")}
             >
@@ -326,7 +334,7 @@ function ExpandedEventReport({
           )}
           {top_assisters.length > 0 && (
             <CollapsibleSection
-              title="⚔️ 助攻 Top 5"
+              title="\u2694\uFE0F \u52A9\u653B Top 5"
               isOpen={expandedSections.has("assisters")}
               onToggle={() => toggleSection("assisters")}
             >
@@ -337,7 +345,7 @@ function ExpandedEventReport({
       ) : (
         top_members.length > 0 && (
           <CollapsibleSection
-            title="🏆 戰功 Top 5"
+            title="\uD83C\uDFC6 \u6230\u529F Top 5"
             isOpen={expandedSections.has("top")}
             onToggle={() => toggleSection("top")}
           >
@@ -369,11 +377,11 @@ function CollapsibleSection({
         onClick={onToggle}
         className="flex items-center justify-between w-full text-left py-1"
       >
-        <span className="text-xs font-medium">{title}</span>
+        <span className={liffTypography.badge}>{title}</span>
         {isOpen ? (
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
       {isOpen && children}
@@ -391,25 +399,25 @@ interface RankingListProps {
 }
 
 function RankingList({ members }: RankingListProps) {
-  const rankIcons: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
-
   return (
-    <div className="space-y-1 pt-2">
+    <div className="space-y-1.5 pt-2">
       {members.map((m) => (
-        <div key={m.member_name} className="flex justify-between text-xs">
-          <span>
-            <span className="w-5 inline-block">
-              {rankIcons[m.rank] || `${m.rank}.`}
-            </span>
-            {m.member_name}
+        <div
+          key={m.member_name}
+          className="flex justify-between items-center text-xs"
+        >
+          <span className="flex items-center gap-1.5">
+            <RankBadge rank={m.rank} size="sm" />
+            <span className="font-medium">{m.member_name}</span>
             {m.line_display_name && (
               <span className="text-muted-foreground">
-                {" "}
                 ({m.line_display_name})
               </span>
             )}
           </span>
-          <span className="text-muted-foreground">{formatScore(m.score)}</span>
+          <span className="text-muted-foreground tabular-nums">
+            {formatScore(m.score)}
+          </span>
         </div>
       ))}
     </div>
@@ -449,7 +457,7 @@ export function BattleTab({ session }: Props) {
   if (isLoadingMember) {
     return (
       <div className="py-8 text-center">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
       </div>
     );
   }
@@ -457,9 +465,10 @@ export function BattleTab({ session }: Props) {
   // No registered accounts
   if (accounts.length === 0) {
     return (
-      <div className="p-4 text-center">
-        <p className="text-sm text-muted-foreground">
-          請先至「ID 管理」綁定遊戲帳號
+      <div className="p-3 text-center">
+        <p className={liffTypography.body}>
+          \u8ACB\u5148\u81F3\u300CID
+          \u7BA1\u7406\u300D\u7D81\u5B9A\u904A\u6232\u5E33\u865F
         </p>
       </div>
     );
@@ -477,10 +486,10 @@ export function BattleTab({ session }: Props) {
             className="h-9 flex-1"
           />
         ) : (
-          <span className="text-sm font-medium">{effectiveGameId}</span>
+          <span className={liffTypography.cardTitle}>{effectiveGameId}</span>
         )}
         {eventList?.season_name && (
-          <span className="text-xs text-muted-foreground shrink-0">
+          <span className={`${liffTypography.caption} shrink-0`}>
             {eventList.season_name}
           </span>
         )}
@@ -489,7 +498,7 @@ export function BattleTab({ session }: Props) {
       {/* Loading events */}
       {isLoadingEvents && (
         <div className="py-8 text-center">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
         </div>
       )}
 
@@ -498,7 +507,9 @@ export function BattleTab({ session }: Props) {
         <>
           {eventList.events.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-muted-foreground">暫無戰役記錄</p>
+              <p className={liffTypography.body}>
+                \u66AB\u7121\u6230\u5F79\u8A18\u9304
+              </p>
             </div>
           ) : (
             <div className="space-y-2">

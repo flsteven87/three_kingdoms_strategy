@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { ChevronRight, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { liffTypography } from "@/lib/typography";
 import { useLiffContext } from "../hooks/use-liff-context";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import { OnboardingFlow } from "./OnboardingFlow";
@@ -68,7 +69,7 @@ export function LiffHome() {
   if (isLoading || showOnboarding === null) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -95,21 +96,21 @@ export function LiffHome() {
       className="flex flex-col h-full"
     >
       {/* Sticky header with tabs */}
-      <div className="sticky top-0 z-10 bg-background border-b px-3 pt-3 pb-2">
+      <div className="sticky top-0 z-10 bg-background border-b px-3 py-3">
         {/* Welcome section */}
         <div className="flex items-center justify-between mb-3">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">
-              {session.lineDisplayName} 主公您好
+            <p className={`${liffTypography.cardTitle} truncate`}>
+              {session.lineDisplayName} \u4E3B\u516C\u60A8\u597D
             </p>
             {unverifiedCount > 0 ? (
-              <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
-                <AlertCircle className="h-3 w-3" />
-                {unverifiedCount} 個帳號待匹配
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mt-0.5">
+                <AlertCircle className="h-4 w-4" />
+                {unverifiedCount} \u500B\u5E33\u865F\u5F85\u5339\u914D
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                已綁定 {totalCount} 個帳號
+              <p className={`${liffTypography.caption} mt-0.5`}>
+                \u5DF2\u7D81\u5B9A {totalCount} \u500B\u5E33\u865F
               </p>
             )}
           </div>
@@ -119,8 +120,8 @@ export function LiffHome() {
             className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
             onClick={() => setPageView("id-management")}
           >
-            ID 管理
-            <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+            ID \u7BA1\u7406
+            <ChevronRight className="h-4 w-4 ml-0.5" />
           </Button>
         </div>
         <TabsList className="grid w-full grid-cols-3 h-9">
