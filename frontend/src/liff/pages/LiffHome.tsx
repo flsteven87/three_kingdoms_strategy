@@ -5,7 +5,7 @@
  *
  * User flow:
  * - First-time: OnboardingFlow (forced game ID binding)
- * - Registered: 2-Tab layout (表現, 銅礦) + Header "ID 管理" button
+ * - Registered: 3-Tab layout (表現, 戰役, 銅礦) + Header "ID 管理" button
  */
 
 import { useState, useEffect } from "react";
@@ -16,6 +16,7 @@ import { useLiffContext } from "../hooks/use-liff-context";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import { OnboardingFlow } from "./OnboardingFlow";
 import { IdManagementPage } from "./IdManagementPage";
+import { BattleTab } from "./BattleTab";
 import { CopperTab } from "./CopperTab";
 import { PerformanceTab } from "./PerformanceTab";
 
@@ -122,9 +123,12 @@ export function LiffHome() {
             <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
           </Button>
         </div>
-        <TabsList className="grid w-full grid-cols-2 h-9">
+        <TabsList className="grid w-full grid-cols-3 h-9">
           <TabsTrigger value="performance" className="text-sm">
             表現
+          </TabsTrigger>
+          <TabsTrigger value="battle" className="text-sm">
+            戰役
           </TabsTrigger>
           <TabsTrigger value="copper" className="text-sm">
             銅礦
@@ -136,6 +140,9 @@ export function LiffHome() {
       <div className="flex-1 overflow-auto">
         <TabsContent value="performance" className="m-0">
           <PerformanceTab session={session} />
+        </TabsContent>
+        <TabsContent value="battle" className="m-0">
+          <BattleTab session={session} />
         </TabsContent>
         <TabsContent value="copper" className="m-0">
           <CopperTab session={session} />
