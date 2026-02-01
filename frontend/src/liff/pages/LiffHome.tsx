@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Settings } from "lucide-react";
+import { ChevronRight, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useLiffContext } from "../hooks/use-liff-context";
@@ -37,7 +37,12 @@ export function LiffHome() {
 
   const { data: memberInfo, isLoading } = useLiffMemberInfo(context);
 
-  const hasRegisteredIds = (memberInfo?.registered_ids?.length ?? 0) > 0;
+  const registeredIds = memberInfo?.registered_ids ?? [];
+  const hasRegisteredIds = registeredIds.length > 0;
+  const unverifiedCount = registeredIds.filter(
+    (acc) => !acc.is_verified,
+  ).length;
+  const totalCount = registeredIds.length;
 
   // Initialize onboarding state after loading
   useEffect(() => {
@@ -90,18 +95,31 @@ export function LiffHome() {
     >
       {/* Sticky header with tabs */}
       <div className="sticky top-0 z-10 bg-background border-b px-3 pt-3 pb-2">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-            {session.lineDisplayName}
-          </span>
+        {/* Welcome section */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">
+              {session.lineDisplayName} 主公您好
+            </p>
+            {unverifiedCount > 0 ? (
+              <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
+                <AlertCircle className="h-3 w-3" />
+                {unverifiedCount} 個帳號待匹配
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                已綁定 {totalCount} 個帳號
+              </p>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
             onClick={() => setPageView("id-management")}
           >
-            <Settings className="h-3.5 w-3.5 mr-1" />
             ID 管理
+            <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
           </Button>
         </div>
         <TabsList className="grid w-full grid-cols-2 h-9">
