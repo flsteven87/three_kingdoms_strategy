@@ -8,7 +8,7 @@
  * - Two-tier weight system (Tier 1: indicators, Tier 2: snapshots)
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Scale,
   Save,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { useCanManageWeights } from "@/hooks/use-user-role";
 import type { Season } from "@/types/season";
+import type { HegemonyWeightWithSnapshot } from "@/types/hegemony-weight";
 import {
   useHegemonyWeights,
   useInitializeHegemonyWeights,
@@ -62,6 +63,29 @@ interface LocalWeight {
   readonly weight_assist: number;
   readonly weight_donation: number;
   readonly snapshot_weight: number;
+}
+
+/**
+ * Convert server weights to local state format
+ * (Pure function, moved outside component for React Compiler compatibility)
+ */
+function syncWeightsToLocal(
+  serverWeights: HegemonyWeightWithSnapshot[] | undefined,
+): LocalWeight[] {
+  if (!serverWeights || serverWeights.length === 0) return [];
+
+  return serverWeights.map((w) => ({
+    id: w.id,
+    csv_upload_id: w.csv_upload_id,
+    snapshot_date: w.snapshot_date,
+    snapshot_filename: w.snapshot_filename,
+    total_members: w.total_members,
+    weight_contribution: Number(w.weight_contribution),
+    weight_merit: Number(w.weight_merit),
+    weight_assist: Number(w.weight_assist),
+    weight_donation: Number(w.weight_donation),
+    snapshot_weight: Number(w.snapshot_weight),
+  }));
 }
 
 export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
@@ -100,26 +124,6 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
   );
 
   /**
-   * Convert server weights to local state format
-   */
-  const syncWeightsToLocal = useCallback((serverWeights: typeof weights) => {
-    if (!serverWeights || serverWeights.length === 0) return [];
-
-    return serverWeights.map((w) => ({
-      id: w.id,
-      csv_upload_id: w.csv_upload_id,
-      snapshot_date: w.snapshot_date,
-      snapshot_filename: w.snapshot_filename,
-      total_members: w.total_members,
-      weight_contribution: Number(w.weight_contribution),
-      weight_merit: Number(w.weight_merit),
-      weight_assist: Number(w.weight_assist),
-      weight_donation: Number(w.weight_donation),
-      snapshot_weight: Number(w.snapshot_weight),
-    }));
-  }, []);
-
-  /**
    * Sync server weights to local state
    */
   useEffect(() => {
@@ -127,7 +131,7 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
       setLocalWeights(syncWeightsToLocal(weights));
       setHasUnsavedChanges(false);
     }
-  }, [weights, syncWeightsToLocal]);
+  }, [weights]);
 
   /**
    * Auto-initialize weights when CSV uploads exist but weights are missing
@@ -171,29 +175,26 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
   /**
    * Update Tier 1 weight (indicator weights)
    */
-  const handleTier1Change = useCallback(
-    (
-      index: number,
-      field: "contribution" | "merit" | "assist" | "donation",
-      value: number,
-    ) => {
-      setLocalWeights((prev) => {
-        const updated = [...prev];
-        updated[index] = {
-          ...updated[index],
-          [`weight_${field}`]: value,
-        };
-        return updated;
-      });
-      setHasUnsavedChanges(true);
-    },
-    [],
-  );
+  function handleTier1Change(
+    index: number,
+    field: "contribution" | "merit" | "assist" | "donation",
+    value: number,
+  ) {
+    setLocalWeights((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [`weight_${field}`]: value,
+      };
+      return updated;
+    });
+    setHasUnsavedChanges(true);
+  }
 
   /**
    * Update Tier 2 weight (snapshot weight)
    */
-  const handleTier2Change = useCallback((index: number, value: number) => {
+  function handleTier2Change(index: number, value: number) {
     setLocalWeights((prev) => {
       const updated = [...prev];
       updated[index] = {
@@ -203,12 +204,12 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
       return updated;
     });
     setHasUnsavedChanges(true);
-  }, []);
+  }
 
   /**
    * Distribute snapshot weights evenly
    */
-  const handleDistributeEvenly = useCallback(() => {
+  function handleDistributeEvenly() {
     if (localWeights.length === 0) return;
 
     const evenWeight = 1.0 / localWeights.length;
@@ -220,12 +221,12 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
       })),
     );
     setHasUnsavedChanges(true);
-  }, [localWeights.length]);
+  }
 
   /**
    * Save all changes with status animation
    */
-  const handleSave = useCallback(async () => {
+  async function handleSave() {
     setSaveStatus("loading");
 
     try {
@@ -260,53 +261,49 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
     } catch {
       setSaveStatus("idle");
     }
-  }, [localWeights, season.id, batchUpdateMutation, activeTab, refetchPreview]);
+  }
 
   /**
    * Discard changes (reset to server state)
    */
-  const handleDiscardChanges = useCallback(() => {
+  function handleDiscardChanges() {
     setLocalWeights(syncWeightsToLocal(weights));
     setHasUnsavedChanges(false);
-  }, [weights, syncWeightsToLocal]);
+  }
 
   /**
    * Validate Tier 1 weights (each snapshot's indicator weights should sum to 100% as integers)
    */
-  const tier1ValidStatus = useMemo(() => {
-    return localWeights.map((w) => {
-      const sum = Math.round(
-        w.weight_contribution * 100 +
-          w.weight_merit * 100 +
-          w.weight_assist * 100 +
-          w.weight_donation * 100,
-      );
-      return sum === 100;
-    });
-  }, [localWeights]);
+  const tier1ValidStatus = localWeights.map((w) => {
+    const sum = Math.round(
+      w.weight_contribution * 100 +
+        w.weight_merit * 100 +
+        w.weight_assist * 100 +
+        w.weight_donation * 100,
+    );
+    return sum === 100;
+  });
 
   /**
    * Validate Tier 2 weights (all snapshot weights should sum to 100% as integers)
    */
-  const tier2ValidStatus = useMemo(() => {
+  const tier2ValidStatus = (() => {
     if (localWeights.length === 0) return false;
     const sum = Math.round(
       localWeights.reduce((acc, w) => acc + w.snapshot_weight * 100, 0),
     );
     return sum === 100;
-  }, [localWeights]);
+  })();
 
   /**
    * Overall validation
    */
-  const allValid = useMemo(() => {
-    return tier1ValidStatus.every((v) => v) && tier2ValidStatus;
-  }, [tier1ValidStatus, tier2ValidStatus]);
+  const allValid = tier1ValidStatus.every((v) => v) && tier2ValidStatus;
 
   /**
    * Extract snapshot dates from weights (sorted chronologically)
    */
-  const snapshotDates = useMemo(() => {
+  const snapshotDates = (() => {
     if (!weights || weights.length === 0) return [];
 
     return [...weights]
@@ -316,12 +313,12 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
           new Date(b.snapshot_date).getTime(),
       )
       .map((w) => w.snapshot_date);
-  }, [weights]);
+  })();
 
   /**
    * Transform preview scores to chart data with snapshot breakdown
    */
-  const chartData: ChartMemberData[] = useMemo(() => {
+  const chartData: ChartMemberData[] = (() => {
     if (!previewScores || !snapshotDates || snapshotDates.length === 0)
       return [];
 
@@ -342,30 +339,25 @@ export function HegemonyWeightCard({ season }: HegemonyWeightCardProps) {
 
       return memberData;
     });
-  }, [previewScores, snapshotDates]);
+  })();
 
   /**
    * Build dynamic chart config based on snapshot dates
    */
-  const chartConfig = useMemo(() => {
-    return buildChartConfig(snapshotDates);
-  }, [snapshotDates]);
+  const chartConfig = buildChartConfig(snapshotDates);
 
   /**
    * Calculate dynamic chart height based on number of members
    */
-  const chartHeight = useMemo(() => {
-    const totalMembers = chartData.length;
-    return Math.max(400, totalMembers * 40); // 40px per member, minimum 400px
-  }, [chartData.length]);
+  const chartHeight = Math.max(400, chartData.length * 40); // 40px per member, minimum 400px
 
   /**
    * Calculate X-axis domain: max value = top score + 10%
    */
-  const xAxisMax = useMemo(() => {
+  const xAxisMax = (() => {
     const maxScore = chartData[0]?.total_score || 0;
     return Math.ceil(maxScore * 1.1);
-  }, [chartData]);
+  })();
 
   const icon = <Scale className="h-4 w-4" />;
 

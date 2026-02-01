@@ -9,57 +9,57 @@
  * Box plot shows: Min / Q1 / Median / Q3 / Max
  */
 
-import { useState, useMemo } from 'react'
-import { formatNumber, formatNumberCompact } from '@/lib/chart-utils'
+import { useState } from "react";
+import { formatNumber, formatNumberCompact } from "@/lib/chart-utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface BoxPlotStats {
-  readonly min: number
-  readonly q1: number
-  readonly median: number
-  readonly q3: number
-  readonly max: number
+  readonly min: number;
+  readonly q1: number;
+  readonly median: number;
+  readonly q3: number;
+  readonly max: number;
 }
 
 export interface StripPlotPoint {
-  readonly id: string
-  readonly name: string
-  readonly value: number
+  readonly id: string;
+  readonly name: string;
+  readonly value: number;
 }
 
 interface BoxPlotProps {
-  readonly stats: BoxPlotStats
+  readonly stats: BoxPlotStats;
   /** Optional strip plot data points */
-  readonly points?: readonly StripPlotPoint[]
+  readonly points?: readonly StripPlotPoint[];
   /** Color theme: primary, chart-2, chart-3, etc. */
-  readonly color?: string
+  readonly color?: string;
   /** Whether to show value labels */
-  readonly showLabels?: boolean
+  readonly showLabels?: boolean;
   /** Custom range for scaling (useful when comparing multiple box plots) */
-  readonly scaleRange?: { min: number; max: number }
+  readonly scaleRange?: { min: number; max: number };
 }
 
 interface BoxPlotComparisonProps {
   readonly items: readonly {
-    readonly name: string
-    readonly stats: BoxPlotStats
-  }[]
+    readonly name: string;
+    readonly stats: BoxPlotStats;
+  }[];
   /** Color theme */
-  readonly color?: string
+  readonly color?: string;
 }
 
 interface DetailedStripPlotProps {
-  readonly stats: BoxPlotStats
-  readonly points: readonly StripPlotPoint[]
+  readonly stats: BoxPlotStats;
+  readonly points: readonly StripPlotPoint[];
   /** Color theme: primary, chart-2, chart-3, etc. */
-  readonly color?: string
+  readonly color?: string;
   /** Sort order for members: desc (high first) or asc (low first) */
-  readonly sortOrder?: 'asc' | 'desc'
+  readonly sortOrder?: "asc" | "desc";
   /** Whether to show quartile reference lines */
-  readonly showQuartileLines?: boolean
+  readonly showQuartileLines?: boolean;
 }
 
 // ============================================================================
@@ -67,8 +67,8 @@ interface DetailedStripPlotProps {
 // ============================================================================
 
 function calculatePosition(value: number, min: number, max: number): number {
-  if (max === min) return 50
-  return ((value - min) / (max - min)) * 100
+  if (max === min) return 50;
+  return ((value - min) / (max - min)) * 100;
 }
 
 // ============================================================================
@@ -78,24 +78,25 @@ function calculatePosition(value: number, min: number, max: number): number {
 export function BoxPlot({
   stats,
   points,
-  color = 'primary',
+  color = "primary",
   showLabels = true,
   scaleRange,
 }: BoxPlotProps) {
-  const [hoveredPoint, setHoveredPoint] = useState<StripPlotPoint | null>(null)
+  const [hoveredPoint, setHoveredPoint] = useState<StripPlotPoint | null>(null);
 
-  const rangeMin = scaleRange?.min ?? stats.min
-  const rangeMax = scaleRange?.max ?? stats.max
+  const rangeMin = scaleRange?.min ?? stats.min;
+  const rangeMax = scaleRange?.max ?? stats.max;
 
-  const getPosition = (value: number) => calculatePosition(value, rangeMin, rangeMax)
+  const getPosition = (value: number) =>
+    calculatePosition(value, rangeMin, rangeMax);
 
-  const minPct = getPosition(stats.min)
-  const q1Pct = getPosition(stats.q1)
-  const medianPct = getPosition(stats.median)
-  const q3Pct = getPosition(stats.q3)
-  const maxPct = getPosition(stats.max)
+  const minPct = getPosition(stats.min);
+  const q1Pct = getPosition(stats.q1);
+  const medianPct = getPosition(stats.median);
+  const q3Pct = getPosition(stats.q3);
+  const maxPct = getPosition(stats.max);
 
-  const colorClass = `var(--${color})`
+  const colorClass = `var(--${color})`;
 
   return (
     <div className="space-y-2">
@@ -125,12 +126,20 @@ export function BoxPlot({
         {/* Min whisker cap */}
         <div
           className="absolute top-2 bottom-2 w-px"
-          style={{ left: `${minPct}%`, backgroundColor: colorClass, opacity: 0.5 }}
+          style={{
+            left: `${minPct}%`,
+            backgroundColor: colorClass,
+            opacity: 0.5,
+          }}
         />
         {/* Max whisker cap */}
         <div
           className="absolute top-2 bottom-2 w-px"
-          style={{ left: `${maxPct}%`, backgroundColor: colorClass, opacity: 0.5 }}
+          style={{
+            left: `${maxPct}%`,
+            backgroundColor: colorClass,
+            opacity: 0.5,
+          }}
         />
         {/* IQR box */}
         <div
@@ -153,8 +162,8 @@ export function BoxPlot({
       {points && points.length > 0 && (
         <div className="relative h-6">
           {points.map((point) => {
-            const position = getPosition(point.value)
-            const isHovered = hoveredPoint?.id === point.id
+            const position = getPosition(point.value);
+            const isHovered = hoveredPoint?.id === point.id;
             return (
               <div
                 key={point.id}
@@ -175,7 +184,7 @@ export function BoxPlot({
                   </div>
                 )}
               </div>
-            )
+            );
           })}
         </div>
       )}
@@ -190,31 +199,35 @@ export function BoxPlot({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // BoxPlot Comparison Component (multiple groups)
 // ============================================================================
 
-export function BoxPlotComparison({ items, color = 'primary' }: BoxPlotComparisonProps) {
+export function BoxPlotComparison({
+  items,
+  color = "primary",
+}: BoxPlotComparisonProps) {
   // Calculate global range for consistent scaling across all items
-  const allValues = items.flatMap((item) => [item.stats.min, item.stats.max])
-  const globalMin = Math.min(...allValues)
-  const globalMax = Math.max(...allValues)
+  const allValues = items.flatMap((item) => [item.stats.min, item.stats.max]);
+  const globalMin = Math.min(...allValues);
+  const globalMax = Math.max(...allValues);
 
-  const getPosition = (value: number) => calculatePosition(value, globalMin, globalMax)
+  const getPosition = (value: number) =>
+    calculatePosition(value, globalMin, globalMax);
 
-  const colorClass = `var(--${color})`
+  const colorClass = `var(--${color})`;
 
   return (
     <div className="space-y-4">
       {items.map((item) => {
-        const minPct = getPosition(item.stats.min)
-        const q1Pct = getPosition(item.stats.q1)
-        const medianPct = getPosition(item.stats.median)
-        const q3Pct = getPosition(item.stats.q3)
-        const maxPct = getPosition(item.stats.max)
+        const minPct = getPosition(item.stats.min);
+        const q1Pct = getPosition(item.stats.q1);
+        const medianPct = getPosition(item.stats.median);
+        const q3Pct = getPosition(item.stats.q3);
+        const maxPct = getPosition(item.stats.max);
 
         return (
           <div key={item.name} className="space-y-1">
@@ -241,12 +254,20 @@ export function BoxPlotComparison({ items, color = 'primary' }: BoxPlotCompariso
               {/* Min whisker cap */}
               <div
                 className="absolute top-1 bottom-1 w-px"
-                style={{ left: `${minPct}%`, backgroundColor: colorClass, opacity: 0.5 }}
+                style={{
+                  left: `${minPct}%`,
+                  backgroundColor: colorClass,
+                  opacity: 0.5,
+                }}
               />
               {/* Max whisker cap */}
               <div
                 className="absolute top-1 bottom-1 w-px"
-                style={{ left: `${maxPct}%`, backgroundColor: colorClass, opacity: 0.5 }}
+                style={{
+                  left: `${maxPct}%`,
+                  backgroundColor: colorClass,
+                  opacity: 0.5,
+                }}
               />
               {/* IQR box (Q1 to Q3) */}
               <div
@@ -273,10 +294,10 @@ export function BoxPlotComparison({ items, color = 'primary' }: BoxPlotCompariso
               <span>{formatNumberCompact(item.stats.max)}</span>
             </div>
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -286,32 +307,31 @@ export function BoxPlotComparison({ items, color = 'primary' }: BoxPlotCompariso
 export function DetailedStripPlot({
   stats,
   points,
-  color = 'primary',
-  sortOrder = 'desc',
+  color = "primary",
+  sortOrder = "desc",
   showQuartileLines = true,
 }: DetailedStripPlotProps) {
-  const colorClass = `var(--${color})`
+  const colorClass = `var(--${color})`;
 
   // Sort points by value
-  const sortedPoints = useMemo(() => {
-    return [...points].sort((a, b) =>
-      sortOrder === 'desc' ? b.value - a.value : a.value - b.value
-    )
-  }, [points, sortOrder])
+  const sortedPoints = [...points].sort((a, b) =>
+    sortOrder === "desc" ? b.value - a.value : a.value - b.value,
+  );
 
   // Calculate positions
-  const getPosition = (value: number) => calculatePosition(value, stats.min, stats.max)
+  const getPosition = (value: number) =>
+    calculatePosition(value, stats.min, stats.max);
 
-  const q1Pct = getPosition(stats.q1)
-  const medianPct = getPosition(stats.median)
-  const q3Pct = getPosition(stats.q3)
+  const q1Pct = getPosition(stats.q1);
+  const medianPct = getPosition(stats.median);
+  const q3Pct = getPosition(stats.q3);
 
   // Determine which quartile a value falls into for coloring
   const getQuartileClass = (value: number): string => {
-    if (value < stats.q1) return 'opacity-50' // Below Q1
-    if (value > stats.q3) return 'opacity-100' // Above Q3 (highlight)
-    return 'opacity-75' // Within IQR
-  }
+    if (value < stats.q1) return "opacity-50"; // Below Q1
+    if (value > stats.q3) return "opacity-100"; // Above Q3 (highlight)
+    return "opacity-75"; // Within IQR
+  };
 
   return (
     <div className="space-y-4">
@@ -373,7 +393,9 @@ export function DetailedStripPlot({
       <div className="space-y-0">
         {/* Axis header with quartile markers */}
         <div className="flex items-center gap-2 pb-2 border-b border-border/50">
-          <div className="w-24 shrink-0 text-xs text-muted-foreground">成員</div>
+          <div className="w-24 shrink-0 text-xs text-muted-foreground">
+            成員
+          </div>
           <div className="flex-1 relative h-4">
             {/* Axis line */}
             <div className="absolute top-1/2 left-0 right-0 h-px bg-border" />
@@ -395,7 +417,11 @@ export function DetailedStripPlot({
                 {/* Median marker */}
                 <div
                   className="absolute top-0 bottom-0 w-px"
-                  style={{ left: `${medianPct}%`, backgroundColor: colorClass, opacity: 0.5 }}
+                  style={{
+                    left: `${medianPct}%`,
+                    backgroundColor: colorClass,
+                    opacity: 0.5,
+                  }}
                 />
                 {/* Q3 marker */}
                 <div
@@ -405,19 +431,27 @@ export function DetailedStripPlot({
               </>
             )}
           </div>
-          <div className="w-16 shrink-0 text-xs text-muted-foreground text-right">數值</div>
+          <div className="w-16 shrink-0 text-xs text-muted-foreground text-right">
+            數值
+          </div>
         </div>
 
         {/* Member rows */}
         <div className="divide-y divide-border/30">
           {sortedPoints.map((point) => {
-            const position = getPosition(point.value)
-            const quartileClass = getQuartileClass(point.value)
+            const position = getPosition(point.value);
+            const quartileClass = getQuartileClass(point.value);
 
             return (
-              <div key={point.id} className="flex items-center gap-2 py-1.5 group hover:bg-muted/30">
+              <div
+                key={point.id}
+                className="flex items-center gap-2 py-1.5 group hover:bg-muted/30"
+              >
                 {/* Member name */}
-                <div className="w-24 shrink-0 text-sm truncate" title={point.name}>
+                <div
+                  className="w-24 shrink-0 text-sm truncate"
+                  title={point.name}
+                >
                   {point.name}
                 </div>
 
@@ -432,7 +466,11 @@ export function DetailedStripPlot({
                       />
                       <div
                         className="absolute top-0 bottom-0 w-px"
-                        style={{ left: `${medianPct}%`, backgroundColor: colorClass, opacity: 0.2 }}
+                        style={{
+                          left: `${medianPct}%`,
+                          backgroundColor: colorClass,
+                          opacity: 0.2,
+                        }}
                       />
                       <div
                         className="absolute top-0 bottom-0 w-px bg-border/50"
@@ -466,10 +504,10 @@ export function DetailedStripPlot({
                   {formatNumberCompact(point.value)}
                 </div>
               </div>
-            )
+            );
           })}
         </div>
       </div>
     </div>
-  )
+  );
 }

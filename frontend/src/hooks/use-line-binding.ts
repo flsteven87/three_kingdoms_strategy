@@ -9,28 +9,28 @@
  * - Query Key Factory pattern
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useCallback } from 'react'
-import { apiClient } from '@/lib/api-client'
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { apiClient } from "@/lib/api-client";
 import type {
   LineBindingCode,
   LineBindingStatusResponse,
   LineCustomCommand,
   LineCustomCommandCreate,
   LineCustomCommandUpdate,
-  RegisteredMembersResponse
-} from '@/types/line-binding'
+  RegisteredMembersResponse,
+} from "@/types/line-binding";
 
 // =============================================================================
 // Query Keys
 // =============================================================================
 
 export const lineBindingKeys = {
-  all: ['line-binding'] as const,
-  status: () => [...lineBindingKeys.all, 'status'] as const,
-  members: () => [...lineBindingKeys.all, 'members'] as const,
-  commands: () => [...lineBindingKeys.all, 'commands'] as const
-}
+  all: ["line-binding"] as const,
+  status: () => [...lineBindingKeys.all, "status"] as const,
+  members: () => [...lineBindingKeys.all, "members"] as const,
+  commands: () => [...lineBindingKeys.all, "commands"] as const,
+};
 
 // =============================================================================
 // Hooks
@@ -42,51 +42,52 @@ export const lineBindingKeys = {
 export function useLineBindingStatus(allianceId: string | undefined) {
   return useQuery({
     queryKey: lineBindingKeys.status(),
-    queryFn: (): Promise<LineBindingStatusResponse> => apiClient.getLineBindingStatus(),
+    queryFn: (): Promise<LineBindingStatusResponse> =>
+      apiClient.getLineBindingStatus(),
     enabled: Boolean(allianceId),
     refetchInterval: (query) => {
       // Poll every 5 seconds if there's a pending code (waiting for LINE group binding)
-      const data = query.state.data
+      const data = query.state.data;
       if (data?.pending_code && !data?.is_bound) {
-        return 5000
+        return 5000;
       }
-      return false
-    }
-  })
+      return false;
+    },
+  });
 }
 
 /**
  * Hook to generate a new binding code
  */
 export function useGenerateBindingCode() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (isTest: boolean = false): Promise<LineBindingCode> =>
       apiClient.generateLineBindingCode(isTest),
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: lineBindingKeys.status()
-      })
-    }
-  })
+        queryKey: lineBindingKeys.status(),
+      });
+    },
+  });
 }
 
 /**
  * Hook to unbind LINE group
  */
 export function useUnbindLineGroup() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (isTest: boolean = false): Promise<void> =>
       apiClient.unbindLineGroup(isTest),
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: lineBindingKeys.status()
-      })
-    }
-  })
+        queryKey: lineBindingKeys.status(),
+      });
+    },
+  });
 }
 
 /**
@@ -95,120 +96,135 @@ export function useUnbindLineGroup() {
 export function useRegisteredMembers(enabled: boolean = true) {
   return useQuery({
     queryKey: lineBindingKeys.members(),
-    queryFn: (): Promise<RegisteredMembersResponse> => apiClient.getRegisteredMembers(),
-    enabled
-  })
+    queryFn: (): Promise<RegisteredMembersResponse> =>
+      apiClient.getRegisteredMembers(),
+    enabled,
+  });
 }
 
 export function useLineCustomCommands(enabled: boolean = true) {
   return useQuery({
     queryKey: lineBindingKeys.commands(),
-    queryFn: (): Promise<LineCustomCommand[]> => apiClient.getLineCustomCommands(),
-    enabled
-  })
+    queryFn: (): Promise<LineCustomCommand[]> =>
+      apiClient.getLineCustomCommands(),
+    enabled,
+  });
 }
 
 export function useCreateLineCustomCommand() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: LineCustomCommandCreate) => apiClient.createLineCustomCommand(data),
+    mutationFn: (data: LineCustomCommandCreate) =>
+      apiClient.createLineCustomCommand(data),
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: lineBindingKeys.commands()
-      })
-    }
-  })
+        queryKey: lineBindingKeys.commands(),
+      });
+    },
+  });
 }
 
 export function useUpdateLineCustomCommand() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ commandId, data }: { commandId: string; data: LineCustomCommandUpdate }) =>
-      apiClient.updateLineCustomCommand(commandId, data),
+    mutationFn: ({
+      commandId,
+      data,
+    }: {
+      commandId: string;
+      data: LineCustomCommandUpdate;
+    }) => apiClient.updateLineCustomCommand(commandId, data),
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: lineBindingKeys.commands()
-      })
-    }
-  })
+        queryKey: lineBindingKeys.commands(),
+      });
+    },
+  });
 }
 
 export function useDeleteLineCustomCommand() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (commandId: string) => apiClient.deleteLineCustomCommand(commandId),
+    mutationFn: (commandId: string) =>
+      apiClient.deleteLineCustomCommand(commandId),
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: lineBindingKeys.commands()
-      })
-    }
-  })
+        queryKey: lineBindingKeys.commands(),
+      });
+    },
+  });
 }
 
 /**
  * Hook for countdown timer
  */
 export function useCountdown(expiresAt: string | undefined) {
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
-
-  const calculateRemaining = useCallback(() => {
-    if (!expiresAt) return null
-    const diff = new Date(expiresAt).getTime() - Date.now()
-    return Math.max(0, Math.floor(diff / 1000))
-  }, [expiresAt])
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
 
   useEffect(() => {
     if (!expiresAt) {
-      setRemainingSeconds(null)
-      return
+      setRemainingSeconds(null);
+      return;
+    }
+
+    function calculateRemaining() {
+      // expiresAt is guaranteed to be defined here (checked at line 168)
+      const diff = new Date(expiresAt!).getTime() - Date.now();
+      return Math.max(0, Math.floor(diff / 1000));
     }
 
     // Initial calculation
-    setRemainingSeconds(calculateRemaining())
+    setRemainingSeconds(calculateRemaining());
 
     // Update every second
     const interval = setInterval(() => {
-      const remaining = calculateRemaining()
-      setRemainingSeconds(remaining)
+      const remaining = calculateRemaining();
+      setRemainingSeconds(remaining);
 
       if (remaining === 0) {
-        clearInterval(interval)
+        clearInterval(interval);
       }
-    }, 1000)
+    }, 1000);
 
-    return () => clearInterval(interval)
-  }, [expiresAt, calculateRemaining])
+    return () => clearInterval(interval);
+  }, [expiresAt]);
 
   // Format as MM:SS
-  const formatted = remainingSeconds !== null
-    ? `${Math.floor(remainingSeconds / 60).toString().padStart(2, '0')}:${(remainingSeconds % 60).toString().padStart(2, '0')}`
-    : null
+  const formatted =
+    remainingSeconds !== null
+      ? `${Math.floor(remainingSeconds / 60)
+          .toString()
+          .padStart(
+            2,
+            "0",
+          )}:${(remainingSeconds % 60).toString().padStart(2, "0")}`
+      : null;
 
-  const isExpired = remainingSeconds === 0
-  const isUrgent = remainingSeconds !== null && remainingSeconds < 60
+  const isExpired = remainingSeconds === 0;
+  const isUrgent = remainingSeconds !== null && remainingSeconds < 60;
 
-  return { remainingSeconds, formatted, isExpired, isUrgent }
+  return { remainingSeconds, formatted, isExpired, isUrgent };
 }
 
 /**
  * Hook for clipboard copy with feedback
  */
 export function useCopyToClipboard() {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
-  const copy = useCallback(async (text: string) => {
+  async function copy(text: string) {
     try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-      return true
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return true;
     } catch {
-      return false
+      return false;
     }
-  }, [])
+  }
 
-  return { copied, copy }
+  return { copied, copy };
 }

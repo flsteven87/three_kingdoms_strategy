@@ -5,21 +5,27 @@
  * Adapted from digital-marketer project, following CLAUDE.md standards.
  */
 
-import { useState, useCallback, type ReactNode } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './card'
-import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, type ReactNode } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "./card";
+import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface CollapsibleCardProps {
-  readonly icon?: ReactNode
-  readonly title: ReactNode
-  readonly badge?: ReactNode
-  readonly description?: ReactNode
-  readonly children: ReactNode
-  readonly actions?: ReactNode
-  readonly collapsible?: boolean
-  readonly defaultExpanded?: boolean
-  readonly className?: string
+  readonly icon?: ReactNode;
+  readonly title: ReactNode;
+  readonly badge?: ReactNode;
+  readonly description?: ReactNode;
+  readonly children: ReactNode;
+  readonly actions?: ReactNode;
+  readonly collapsible?: boolean;
+  readonly defaultExpanded?: boolean;
+  readonly className?: string;
 }
 
 export function CollapsibleCard({
@@ -33,23 +39,25 @@ export function CollapsibleCard({
   defaultExpanded = false,
   className,
 }: CollapsibleCardProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  const toggleExpanded = useCallback(() => {
-    setIsExpanded(prev => !prev)
-  }, [])
+  function toggleExpanded() {
+    setIsExpanded((prev) => !prev);
+  }
 
-  const handleCardInteraction = useCallback((e: React.MouseEvent) => {
-    if (!collapsible) return
+  function handleCardInteraction(e: React.MouseEvent) {
+    if (!collapsible) return;
 
-    const target = e.target as HTMLElement
-    const isInteractiveElement = target.closest('button, input, textarea, select, [role="button"], a')
+    const target = e.target as HTMLElement;
+    const isInteractiveElement = target.closest(
+      'button, input, textarea, select, [role="button"], a',
+    );
 
     if (!isInteractiveElement) {
-      e.stopPropagation()
-      toggleExpanded()
+      e.stopPropagation();
+      toggleExpanded();
     }
-  }, [collapsible, toggleExpanded])
+  }
 
   return (
     <Card
@@ -58,43 +66,45 @@ export function CollapsibleCard({
         collapsible && [
           "hover:shadow-md hover:shadow-primary/10",
           "hover:border-primary/30",
-          "hover:bg-gradient-to-r hover:from-background hover:to-primary/5"
+          "hover:bg-gradient-to-r hover:from-background hover:to-primary/5",
         ],
         isExpanded && "border-primary/20 shadow-sm",
-        className
+        className,
       )}
     >
       <CardHeader
-        className={`pb-4 ${collapsible ? 'cursor-pointer' : ''}`}
+        className={`pb-4 ${collapsible ? "cursor-pointer" : ""}`}
         onClick={collapsible ? handleCardInteraction : undefined}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {icon && (
-              <div className={cn(
-                "w-8 h-8 rounded-lg bg-muted flex items-center justify-center",
-                "transition-all duration-300 group-hover:scale-105",
-                isExpanded
-                  ? "bg-primary/15 text-primary shadow-sm"
-                  : "group-hover:bg-primary/10"
-              )}>
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg bg-muted flex items-center justify-center",
+                  "transition-all duration-300 group-hover:scale-105",
+                  isExpanded
+                    ? "bg-primary/15 text-primary shadow-sm"
+                    : "group-hover:bg-primary/10",
+                )}
+              >
                 {icon}
               </div>
             )}
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <CardTitle className={cn(
-                  "text-lg transition-all duration-200",
-                  isExpanded
-                    ? "text-primary font-semibold"
-                    : "group-hover:text-primary/80"
-                )}>
+                <CardTitle
+                  className={cn(
+                    "text-lg transition-all duration-200",
+                    isExpanded
+                      ? "text-primary font-semibold"
+                      : "group-hover:text-primary/80",
+                  )}
+                >
                   {title}
                 </CardTitle>
                 {badge && (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    {badge}
-                  </div>
+                  <div onClick={(e) => e.stopPropagation()}>{badge}</div>
                 )}
               </div>
               {description && (
@@ -106,9 +116,7 @@ export function CollapsibleCard({
           </div>
           <div className="flex items-center gap-2">
             {actions && (
-              <div onClick={(e) => e.stopPropagation()}>
-                {actions}
-              </div>
+              <div onClick={(e) => e.stopPropagation()}>{actions}</div>
             )}
             {collapsible && (
               <div className="flex items-center">
@@ -116,14 +124,14 @@ export function CollapsibleCard({
                   <ChevronUp
                     className={cn(
                       "transition-all duration-300 h-5 w-5",
-                      "text-primary"
+                      "text-primary",
                     )}
                   />
                 ) : (
                   <ChevronDown
                     className={cn(
                       "transition-all duration-300 h-5 w-5",
-                      "text-muted-foreground group-hover:text-primary group-hover:scale-110"
+                      "text-muted-foreground group-hover:text-primary group-hover:scale-110",
                     )}
                   />
                 )}
@@ -141,6 +149,5 @@ export function CollapsibleCard({
         </div>
       )}
     </Card>
-  )
+  );
 }
-

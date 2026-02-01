@@ -14,7 +14,7 @@
  * - Single responsibility
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -69,7 +69,7 @@ export function useUploadStateMachine(): [UploadState, UploadActions] {
   const [state, setState] = useState<UploadState>(initialState);
   const idempotencyKeyRef = useRef<string | null>(null);
 
-  const start = useCallback((): string => {
+  function start(): string {
     // Generate new idempotency key using Web Crypto API
     const key = crypto.randomUUID();
     idempotencyKeyRef.current = key;
@@ -82,37 +82,37 @@ export function useUploadStateMachine(): [UploadState, UploadActions] {
     });
 
     return key;
-  }, []);
+  }
 
-  const setProgress = useCallback((progress: number) => {
+  function setProgress(progress: number) {
     setState((prev) => ({
       ...prev,
       progress: Math.min(100, Math.max(0, progress)),
     }));
-  }, []);
+  }
 
-  const success = useCallback(() => {
+  function success() {
     setState((prev) => ({
       ...prev,
       status: "success",
       progress: 100,
     }));
-  }, []);
+  }
 
-  const fail = useCallback((error: string) => {
+  function fail(error: string) {
     setState((prev) => ({
       ...prev,
       status: "error",
       error,
     }));
-  }, []);
+  }
 
-  const reset = useCallback(() => {
+  function reset() {
     idempotencyKeyRef.current = null;
     setState(initialState);
-  }, []);
+  }
 
-  const retry = useCallback((): string => {
+  function retry(): string {
     // Reuse existing idempotency key for retry (ensures server returns cached response)
     const key = idempotencyKeyRef.current ?? crypto.randomUUID();
     idempotencyKeyRef.current = key;
@@ -125,7 +125,7 @@ export function useUploadStateMachine(): [UploadState, UploadActions] {
     });
 
     return key;
-  }, []);
+  }
 
   return [state, { start, setProgress, success, fail, reset, retry }];
 }
