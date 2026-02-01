@@ -395,11 +395,12 @@ class PeriodMetricsService:
             Metrics data dictionary ready for insertion
         """
         # For new members, diff = total (assuming start from 0)
+        # Note: power_diff is 0 because power is instantaneous state, not cumulative
         contribution_diff = end_snapshot.total_contribution
         merit_diff = end_snapshot.total_merit
         assist_diff = end_snapshot.total_assist
         donation_diff = end_snapshot.total_donation
-        power_diff = end_snapshot.power_value
+        power_diff = 0  # Cannot calculate change without start snapshot
 
         # Calculate daily averages
         daily_contribution = Decimal(contribution_diff) / Decimal(days)
