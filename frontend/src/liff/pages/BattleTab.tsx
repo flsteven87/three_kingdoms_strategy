@@ -15,6 +15,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EventBadge } from "@/components/ui/event-badge";
 import { RankBadge } from "@/components/ui/rank-badge";
 import { GroupProgress, ProgressBar } from "@/components/ui/progress-bar";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { getStatusType } from "@/constants/event-types";
+import {
+  RankMetric,
+  RateMetric,
+  ComplianceMetric,
+} from "@/components/ui/metric-card";
 import { AccountSelector } from "../components/AccountSelector";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import {
@@ -31,52 +38,6 @@ interface Props {
   readonly session: LiffSessionWithGroup;
 }
 
-interface ParticipationBadgeProps {
-  readonly event: EventListItem;
-}
-
-function ParticipationBadge({ event }: ParticipationBadgeProps) {
-  const { user_participation: up, event_type, total_members } = event;
-
-  if (event_type === "forbidden") {
-    if (up.violated === true) {
-      return (
-        <span
-          className={`${liffTypography.caption} text-red-500 dark:text-red-400`}
-        >
-          ⚠ 違規 · 共 {total_members}人
-        </span>
-      );
-    }
-    return (
-      <span
-        className={`${liffTypography.caption} text-green-600 dark:text-green-400`}
-      >
-        ✓ 守規 · 共 {total_members}人
-      </span>
-    );
-  }
-
-  if (!up.participated) {
-    return (
-      <span className={liffTypography.caption}>
-        ✗ 未參與 · 共 {total_members}人
-      </span>
-    );
-  }
-
-  const scoreText = up.score ? formatScore(up.score) : "";
-  const label = up.score_label || "戰功";
-
-  return (
-    <span
-      className={`${liffTypography.caption} text-green-600 dark:text-green-400`}
-    >
-      ✓ 已參與 · {label} {scoreText} #{up.rank}/{total_members}
-    </span>
-  );
-}
-
 interface EventCardProps {
   readonly event: EventListItem;
   readonly isExpanded: boolean;
@@ -90,40 +51,70 @@ function EventCard({
   onToggle,
   lineGroupId,
 }: EventCardProps) {
+  const {
+    user_participation: up,
+    event_type,
+    total_members,
+    participation_rate,
+  } = event;
   const timeStr = formatEventTime(event.event_start);
+  const isForbidden = event_type === "forbidden";
+
+  // Derive status for badge
+  const statusType = getStatusType(event_type, up.participated, up.violated);
+
+  // Rate display: participation_rate is already calculated by backend
+  // For forbidden events, it represents compliance rate (守規率)
+  const rateLabel = isForbidden ? "守規率" : "出席率";
+  const rateVariant =
+    isForbidden && participation_rate < 100 ? "danger" : "success";
 
   return (
     <Card className={isExpanded ? "ring-1 ring-primary/20" : ""}>
       <button type="button" onClick={onToggle} className="w-full text-left">
-        <CardContent className="py-3 px-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <EventBadge
-                  type={event.event_type as EventType}
-                  size="sm"
-                  showLabel={false}
-                />
-                <span className={`${liffTypography.cardTitle} truncate`}>
-                  {event.event_name}
-                </span>
-                {timeStr && (
-                  <span className={`${liffTypography.caption} shrink-0`}>
-                    {timeStr}
-                  </span>
-                )}
-              </div>
-              <div className="mt-1">
-                <ParticipationBadge event={event} />
-              </div>
+        <CardContent className="py-3 px-3 space-y-2">
+          {/* Row 1: Header - Type badge + Name + Status badge + Chevron */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <EventBadge
+                type={event_type as EventType}
+                size="sm"
+                showLabel={false}
+              />
+              <span className={`${liffTypography.cardTitle} truncate`}>
+                {event.event_name}
+              </span>
             </div>
-            <div className="shrink-0 pt-0.5">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <StatusBadge status={statusType} />
               {isExpanded ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               ) : (
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               )}
             </div>
+          </div>
+
+          {/* Row 2: Subtitle - Date/Time */}
+          <div className={liffTypography.caption}>{timeStr || "時間未定"}</div>
+
+          {/* Row 3: Metrics - Two side-by-side cards */}
+          <div className="flex gap-2">
+            {isForbidden ? (
+              <ComplianceMetric violated={up.violated === true} />
+            ) : (
+              <RankMetric
+                rank={up.rank}
+                total={total_members}
+                score={up.score}
+                scoreLabel={up.score_label || "戰功"}
+              />
+            )}
+            <RateMetric
+              rate={participation_rate}
+              label={rateLabel}
+              variant={rateVariant}
+            />
           </div>
         </CardContent>
       </button>

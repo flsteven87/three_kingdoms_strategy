@@ -31,6 +31,9 @@ export const liffTypography = {
   /** Small metric value: compact KPI */
   metricSmall: "text-lg font-semibold tabular-nums",
 
+  /** Medium metric value: inline compact stats */
+  metricMedium: "text-base font-semibold tabular-nums",
+
   /** Metric label: describes the metric */
   metricLabel: "text-xs text-muted-foreground",
 
