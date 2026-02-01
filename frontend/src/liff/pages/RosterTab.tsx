@@ -203,10 +203,10 @@ export function RosterTab({ session }: Props) {
                           onSelect={() => handleSelectCandidate(candidate)}
                           className="cursor-pointer"
                         >
-                          <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center justify-between w-full gap-4">
                             <span>{candidate.name}</span>
                             {candidate.group_name && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground shrink-0">
                                 {candidate.group_name}
                               </span>
                             )}

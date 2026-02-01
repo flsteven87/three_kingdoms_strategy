@@ -12,6 +12,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
+from src.core.config import GAME_TIMEZONE
 from src.models.csv_upload import UploadType
 from src.repositories.alliance_collaborator_repository import (
     AllianceCollaboratorRepository,
@@ -114,7 +115,8 @@ class CSVUploadService:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
         # Step 2.5: Validate snapshot date is within season date range
-        snapshot_date_only = snapshot_date.date()
+        # Convert UTC timestamp to game timezone to get the correct local date
+        snapshot_date_only = snapshot_date.astimezone(GAME_TIMEZONE).date()
 
         if snapshot_date_only < season.start_date:
             raise HTTPException(

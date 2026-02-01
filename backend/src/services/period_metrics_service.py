@@ -17,6 +17,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from src.core.config import GAME_TIMEZONE
 from src.models.csv_upload import CsvUpload
 from src.models.member_snapshot import MemberSnapshot
 from src.models.period import Period
@@ -172,7 +173,10 @@ class PeriodMetricsService:
         Returns:
             Created period or None if days < 0
         """
-        end_date = end_upload.snapshot_date.date()
+        # Convert UTC timestamp to game timezone before extracting date
+        # This ensures CSV uploaded at e.g. 2026-02-01 03:00 (Taipei) = 2026-01-31 19:00 UTC
+        # correctly returns 2026-02-01 instead of 2026-01-31
+        end_date = end_upload.snapshot_date.astimezone(GAME_TIMEZONE).date()
         days = (end_date - season_start_date).days
 
         if days < 0:
@@ -239,8 +243,10 @@ class PeriodMetricsService:
         Returns:
             Created period or None if days < 0
         """
-        start_date = start_upload.snapshot_date.date()
-        end_date = end_upload.snapshot_date.date()
+        # Convert UTC timestamps to game timezone before extracting dates
+        # This ensures correct date extraction for uploads made during 00:00-07:59 Taipei time
+        start_date = start_upload.snapshot_date.astimezone(GAME_TIMEZONE).date()
+        end_date = end_upload.snapshot_date.astimezone(GAME_TIMEZONE).date()
         days = (end_date - start_date).days
 
         if days < 0:
