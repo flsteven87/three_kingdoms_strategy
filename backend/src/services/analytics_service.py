@@ -1083,6 +1083,12 @@ class AnalyticsService:
 
         Returns:
             Complete analytics response dict matching AllianceAnalyticsResponse schema
+
+        Performance optimization:
+            - Season view: Uses get_metrics_with_snapshot_totals() which already includes
+              all needed fields (member_name, end_group, etc.), eliminating redundant
+              call to get_by_period_with_member() for latest_period.
+            - Latest view: Uses get_by_period_with_member() as before.
         """
         # Get season and periods
         season = await self._season_repo.get_by_id(season_id)
@@ -1096,10 +1102,30 @@ class AnalyticsService:
         latest_period = periods[-1]
         prev_period = periods[-2] if len(periods) >= 2 else None
 
-        # Get all metrics for latest period (with member names)
-        latest_metrics_raw = await self._metrics_repo.get_by_period_with_member(latest_period.id)
-        if not latest_metrics_raw:
-            return self._empty_alliance_analytics()
+        # Calculate season days for season view
+        season_days = (latest_period.end_date - season.start_date).days
+        if season_days <= 0:
+            season_days = 1
+
+        # Get metrics based on view mode (optimized to avoid redundant queries)
+        metrics_with_totals: list[dict] | None = None
+        if view == "season":
+            # Season view: get_metrics_with_snapshot_totals() returns all needed fields
+            # including member_name, end_group, etc. - no need for separate query
+            metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
+                latest_period.id
+            )
+            if not metrics_with_totals:
+                return self._empty_alliance_analytics()
+            # Use metrics_with_totals as the base data for season view
+            latest_metrics_raw = metrics_with_totals
+        else:
+            # Latest view: use get_by_period_with_member() as before
+            latest_metrics_raw = await self._metrics_repo.get_by_period_with_member(
+                latest_period.id
+            )
+            if not latest_metrics_raw:
+                return self._empty_alliance_analytics()
 
         # Get previous period metrics for change calculations
         prev_metrics_map: dict[UUID, dict] = {}
@@ -1112,18 +1138,6 @@ class AnalyticsService:
                     "daily_assist": float(m["daily_assist"]),
                     "end_power": m["end_power"],
                 }
-
-        # Calculate season days for season view
-        season_days = (latest_period.end_date - season.start_date).days
-        if season_days <= 0:
-            season_days = 1
-
-        # Get metrics with snapshot totals for season view
-        metrics_with_totals = None
-        if view == "season":
-            metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
-                latest_period.id
-            )
 
         # Build member data based on view
         member_data = self._build_member_data(
