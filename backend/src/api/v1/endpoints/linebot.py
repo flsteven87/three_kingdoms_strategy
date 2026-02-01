@@ -37,6 +37,7 @@ from src.models.copper_mine import (
     RegisterCopperResponse,
 )
 from src.models.line_binding import (
+    EventListResponse,
     LineBindingCodeResponse,
     LineBindingStatusResponse,
     LineCustomCommandCreate,
@@ -392,6 +393,21 @@ async def find_similar_members(
 ) -> SimilarMembersResponse:
     """Find similar members for post-submit correction"""
     return await service.find_similar_members(line_group_id=g, name=name)
+
+
+@router.get(
+    "/events/list",
+    response_model=EventListResponse,
+    summary="Get event list for LIFF",
+    description="Get completed battle events with user participation status",
+)
+async def get_event_list_for_liff(
+    service: LineBindingServiceDep,
+    g: Annotated[str, Query(description="LINE group ID")],
+    game_id: Annotated[str, Query(description="Game ID to check participation")],
+) -> EventListResponse:
+    """Get event list for LIFF battle tab"""
+    return await service.get_event_list_for_liff(line_group_id=g, game_id=game_id)
 
 
 # =============================================================================
