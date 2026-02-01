@@ -397,6 +397,53 @@ export async function getEventReport(
   return response.json();
 }
 
+// Event List API (for Battle Tab)
+
+export interface UserEventParticipation {
+  participated: boolean;
+  rank: number | null;
+  score: number | null;
+  score_label: string | null; // "戰功" | "貢獻" | null
+  violated: boolean | null; // For FORBIDDEN events
+}
+
+export interface EventListItem {
+  event_id: string;
+  event_name: string;
+  event_type: "battle" | "siege" | "forbidden";
+  event_start: string | null;
+  total_members: number;
+  participated_count: number;
+  participation_rate: number;
+  user_participation: UserEventParticipation;
+}
+
+export interface EventListResponse {
+  season_name: string | null;
+  events: EventListItem[];
+}
+
+export async function getEventList(
+  options: Pick<LiffApiOptions, "lineGroupId"> & { gameId: string },
+): Promise<EventListResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/linebot/events/list`);
+  url.searchParams.set("g", options.lineGroupId);
+  url.searchParams.set("game_id", options.gameId);
+
+  const response = await fetch(url.toString(), {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || "Request failed");
+  }
+
+  return response.json();
+}
+
 // Performance API
 
 export interface PerformanceRank {
