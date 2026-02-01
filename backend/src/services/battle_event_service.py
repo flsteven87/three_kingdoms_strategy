@@ -336,6 +336,7 @@ class BattleEventService:
                     )
                 else:
                     # New member: only in after snapshot
+                    # Use post-battle values as the diff (assuming they started at 0)
                     metrics_list.append(
                         BattleEventMetricsCreate(
                             event_id=event_id,
@@ -343,11 +344,11 @@ class BattleEventService:
                             alliance_id=event.alliance_id,
                             start_snapshot_id=None,
                             end_snapshot_id=after_snap.id,
-                            contribution_diff=0,
-                            merit_diff=0,
-                            assist_diff=0,
-                            donation_diff=0,
-                            power_diff=0,
+                            contribution_diff=after_snap.total_contribution,
+                            merit_diff=after_snap.total_merit,
+                            assist_diff=after_snap.total_assist,
+                            donation_diff=after_snap.total_donation,
+                            power_diff=after_snap.power_value,
                             participated=False,
                             is_new_member=True,
                             is_absent=False,
