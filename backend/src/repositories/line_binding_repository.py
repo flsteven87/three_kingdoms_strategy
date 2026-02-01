@@ -16,8 +16,6 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-logger = logging.getLogger(__name__)
-
 from src.models.line_binding import (
     LineBindingCode,
     LineCustomCommand,
@@ -25,6 +23,8 @@ from src.models.line_binding import (
     MemberLineBinding,
 )
 from src.repositories.base import SupabaseRepository
+
+logger = logging.getLogger(__name__)
 
 
 class LineBindingRepository(SupabaseRepository[LineBindingCode]):
@@ -704,3 +704,33 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return data
+
+    async def get_member_by_game_id(self, alliance_id: UUID, game_id: str):
+        """
+        Get member by game ID within an alliance.
+
+        Args:
+            alliance_id: Alliance UUID
+            game_id: Game ID (member name)
+
+        Returns:
+            Member record or None
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_("members")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("name", game_id)
+            .limit(1)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        if not data:
+            return None
+
+        from src.models.member import Member
+
+        return Member(**data[0])
