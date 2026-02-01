@@ -332,3 +332,44 @@ class SimilarMembersResponse(BaseModel):
 
     similar: list[MemberCandidate] = []
     has_exact_match: bool = False
+
+
+# =============================================================================
+# Event List Models (for LIFF Battle Tab)
+# =============================================================================
+
+
+class UserEventParticipation(BaseModel):
+    """User's participation status in a battle event"""
+
+    participated: bool = Field(..., description="Whether user participated")
+    rank: int | None = Field(None, description="User's rank (if participated)")
+    score: int | None = Field(None, description="Primary metric value")
+    score_label: str | None = Field(None, description="Metric label: 戰功/貢獻/None")
+    violated: bool | None = Field(None, description="For FORBIDDEN: whether user violated")
+
+
+class EventListItem(BaseModel):
+    """Single event item for LIFF battle list"""
+
+    event_id: str = Field(..., description="Event UUID as string")
+    event_name: str = Field(..., description="Event name")
+    event_type: str = Field(..., description="battle/siege/forbidden")
+    event_start: datetime | None = Field(None, description="Event start time")
+
+    # Overall stats
+    total_members: int = Field(..., ge=0, description="Total members tracked")
+    participated_count: int = Field(..., ge=0, description="Members who participated")
+    participation_rate: float = Field(..., ge=0, le=100, description="Participation rate")
+
+    # User-specific participation
+    user_participation: UserEventParticipation = Field(
+        ..., description="Current user's participation in this event"
+    )
+
+
+class EventListResponse(BaseModel):
+    """Response for LIFF event list endpoint"""
+
+    season_name: str | None = Field(None, description="Current season name")
+    events: list[EventListItem] = Field(default_factory=list, description="List of events")
