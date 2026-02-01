@@ -63,11 +63,13 @@ export function RankMetric({
     );
   }
 
+  const isTop3 = rank <= 3;
+
   return (
     <MetricCard>
       <div className="text-center">
         <div className="flex items-center justify-center gap-1">
-          <RankBadge rank={rank} size="sm" />
+          {isTop3 && <RankBadge rank={rank} size="sm" />}
           <span className={cn(liffTypography.metricMedium, "text-foreground")}>
             #{rank}
           </span>
@@ -139,15 +141,8 @@ export function RateMetric({
         <div className={cn(liffTypography.metricMedium, rateColor)}>
           {rate.toFixed(0)}%
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className={liffTypography.metricLabel}>{label}</span>
-          <ProgressBar
-            value={rate}
-            variant={variant}
-            size="sm"
-            className="w-12"
-          />
-        </div>
+        <div className={liffTypography.metricLabel}>{label}</div>
+        <ProgressBar value={rate} variant={variant} size="sm" />
       </div>
     </MetricCard>
   );
