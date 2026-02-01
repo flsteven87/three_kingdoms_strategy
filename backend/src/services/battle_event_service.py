@@ -394,151 +394,7 @@ class BattleEventService:
             EventSummary with all stats
         """
         metrics = await self._metrics_repo.get_by_event_with_member(event_id)
-
-        if not metrics:
-            return EventSummary(
-                total_members=0,
-                participated_count=0,
-                absent_count=0,
-                new_member_count=0,
-                participation_rate=0.0,
-                total_merit=0,
-                total_assist=0,
-                total_contribution=0,
-                avg_merit=0.0,
-                avg_assist=0.0,
-                avg_contribution=0.0,
-                mvp_member_id=None,
-                mvp_member_name=None,
-                mvp_merit=None,
-                contribution_mvp_member_id=None,
-                contribution_mvp_name=None,
-                contribution_mvp_score=None,
-                assist_mvp_member_id=None,
-                assist_mvp_name=None,
-                assist_mvp_score=None,
-                mvp_contribution=None,
-                mvp_assist=None,
-                mvp_combined_score=None,
-                violator_count=0,
-            )
-
-        # Count participation types
-        total_members = len(metrics)
-        participated_count = sum(1 for m in metrics if m.participated)
-        new_member_count = sum(1 for m in metrics if m.is_new_member)
-        absent_count = sum(1 for m in metrics if m.is_absent)
-
-        # Extract participant and absent names
-        participant_names = [m.member_name for m in metrics if m.participated]
-        absent_names = [m.member_name for m in metrics if m.is_absent]
-
-        # Calculate participation rate (excluding new members)
-        eligible_members = total_members - new_member_count
-        participation_rate = (
-            (participated_count / eligible_members * 100) if eligible_members > 0 else 0.0
-        )
-
-        # Aggregate metrics
-        total_merit = sum(m.merit_diff for m in metrics)
-        total_assist = sum(m.assist_diff for m in metrics)
-        total_contribution = sum(m.contribution_diff for m in metrics)
-
-        # Average metrics (only for participants)
-        avg_merit = total_merit / participated_count if participated_count > 0 else 0.0
-        avg_assist = total_assist / participated_count if participated_count > 0 else 0.0
-        avg_contribution = (
-            total_contribution / participated_count if participated_count > 0 else 0.0
-        )
-
-        # Category-specific MVP calculation
-        mvp_member_id = None
-        mvp_member_name = None
-        mvp_merit = None
-        # Dual MVP for SIEGE
-        contribution_mvp_member_id = None
-        contribution_mvp_name = None
-        contribution_mvp_score = None
-        assist_mvp_member_id = None
-        assist_mvp_name = None
-        assist_mvp_score = None
-        # Legacy fields
-        mvp_contribution = None
-        mvp_assist = None
-        mvp_combined_score = None
-        violator_count = 0
-
-        if event_type == EventCategory.SIEGE:
-            # Dual MVP: Contribution MVP + Assist MVP
-            # Contribution MVP (highest contribution_diff)
-            contribution_candidates = [m for m in metrics if m.contribution_diff > 0]
-            if contribution_candidates:
-                top_contributor = max(
-                    contribution_candidates, key=lambda m: m.contribution_diff
-                )
-                contribution_mvp_member_id = top_contributor.member_id
-                contribution_mvp_name = top_contributor.member_name
-                contribution_mvp_score = top_contributor.contribution_diff
-
-            # Assist MVP (highest assist_diff)
-            assist_candidates = [m for m in metrics if m.assist_diff > 0]
-            if assist_candidates:
-                top_assister = max(assist_candidates, key=lambda m: m.assist_diff)
-                assist_mvp_member_id = top_assister.member_id
-                assist_mvp_name = top_assister.member_name
-                assist_mvp_score = top_assister.assist_diff
-
-            # Legacy: combined MVP for backward compatibility
-            if metrics:
-                mvp = max(metrics, key=lambda m: m.contribution_diff + m.assist_diff)
-                combined = mvp.contribution_diff + mvp.assist_diff
-                if combined > 0:
-                    mvp_contribution = mvp.contribution_diff
-                    mvp_assist = mvp.assist_diff
-                    mvp_combined_score = combined
-
-        elif event_type == EventCategory.FORBIDDEN:
-            # Count violators (power_diff > 0)
-            violator_count = sum(1 for m in metrics if m.power_diff > 0)
-            # No MVP for forbidden zone
-
-        else:  # BATTLE
-            # MVP = highest merit
-            if metrics:
-                mvp = max(metrics, key=lambda m: m.merit_diff)
-                if mvp.merit_diff > 0:
-                    mvp_member_id = mvp.member_id
-                    mvp_member_name = mvp.member_name
-                    mvp_merit = mvp.merit_diff
-
-        return EventSummary(
-            total_members=total_members,
-            participated_count=participated_count,
-            absent_count=absent_count,
-            absent_names=absent_names,
-            participant_names=participant_names,
-            new_member_count=new_member_count,
-            participation_rate=round(participation_rate, 1),
-            total_merit=total_merit,
-            total_assist=total_assist,
-            total_contribution=total_contribution,
-            avg_merit=round(avg_merit, 1),
-            avg_assist=round(avg_assist, 1),
-            avg_contribution=round(avg_contribution, 1),
-            mvp_member_id=mvp_member_id,
-            mvp_member_name=mvp_member_name,
-            mvp_merit=mvp_merit,
-            contribution_mvp_member_id=contribution_mvp_member_id,
-            contribution_mvp_name=contribution_mvp_name,
-            contribution_mvp_score=contribution_mvp_score,
-            assist_mvp_member_id=assist_mvp_member_id,
-            assist_mvp_name=assist_mvp_name,
-            assist_mvp_score=assist_mvp_score,
-            mvp_contribution=mvp_contribution,
-            mvp_assist=mvp_assist,
-            mvp_combined_score=mvp_combined_score,
-            violator_count=violator_count,
-        )
+        return self._calculate_summary_from_metrics(metrics, event_type)
 
     async def update_event(
         self,
@@ -917,24 +773,33 @@ class BattleEventService:
                 violator_count=0,
             )
 
+        # Count participation types
         total_members = len(metrics)
         participated_count = sum(1 for m in metrics if m.participated)
         new_member_count = sum(1 for m in metrics if m.is_new_member)
         absent_count = sum(1 for m in metrics if m.is_absent)
 
+        # Extract participant and absent names
+        participant_names = [m.member_name for m in metrics if m.participated]
+        absent_names = [m.member_name for m in metrics if m.is_absent]
+
+        # Calculate participation rate (excluding new members)
         eligible_members = total_members - new_member_count
         participation_rate = (
             (participated_count / eligible_members * 100) if eligible_members > 0 else 0.0
         )
 
+        # Aggregate metrics
         total_merit = sum(m.merit_diff for m in metrics)
         total_assist = sum(m.assist_diff for m in metrics)
         total_contribution = sum(m.contribution_diff for m in metrics)
 
+        # Average metrics (only for participants)
         avg_merit = total_merit / participated_count if participated_count > 0 else 0.0
         avg_assist = total_assist / participated_count if participated_count > 0 else 0.0
         avg_contribution = total_contribution / participated_count if participated_count > 0 else 0.0
 
+        # Category-specific MVP calculation
         mvp_member_id = None
         mvp_member_name = None
         mvp_merit = None
@@ -950,9 +815,12 @@ class BattleEventService:
         violator_count = 0
 
         if event_type == EventCategory.SIEGE:
+            # Dual MVP: Contribution MVP + Assist MVP
             contribution_candidates = [m for m in metrics if m.contribution_diff > 0]
             if contribution_candidates:
-                top_contributor = max(contribution_candidates, key=lambda m: m.contribution_diff)
+                top_contributor = max(
+                    contribution_candidates, key=lambda m: m.contribution_diff
+                )
                 contribution_mvp_member_id = top_contributor.member_id
                 contribution_mvp_name = top_contributor.member_name
                 contribution_mvp_score = top_contributor.contribution_diff
@@ -964,6 +832,7 @@ class BattleEventService:
                 assist_mvp_name = top_assister.member_name
                 assist_mvp_score = top_assister.assist_diff
 
+            # Legacy: combined MVP for backward compatibility
             if metrics:
                 mvp = max(metrics, key=lambda m: m.contribution_diff + m.assist_diff)
                 combined = mvp.contribution_diff + mvp.assist_diff
@@ -973,9 +842,11 @@ class BattleEventService:
                     mvp_combined_score = combined
 
         elif event_type == EventCategory.FORBIDDEN:
+            # Count violators (power_diff > 0)
             violator_count = sum(1 for m in metrics if m.power_diff > 0)
 
         else:  # BATTLE
+            # MVP = highest merit
             if metrics:
                 mvp = max(metrics, key=lambda m: m.merit_diff)
                 if mvp.merit_diff > 0:
@@ -987,6 +858,8 @@ class BattleEventService:
             total_members=total_members,
             participated_count=participated_count,
             absent_count=absent_count,
+            absent_names=absent_names,
+            participant_names=participant_names,
             new_member_count=new_member_count,
             participation_rate=round(participation_rate, 1),
             total_merit=total_merit,
