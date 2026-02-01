@@ -294,7 +294,6 @@ function GroupAnalytics() {
                 allGroupsData={groupsComparison ?? []}
                 groupParticipationRates={groupParticipationRates}
                 allGroupsParticipation={allGroupsParticipation}
-                events={events ?? []}
               />
             </TabsContent>
 

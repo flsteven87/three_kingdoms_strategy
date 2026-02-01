@@ -98,7 +98,7 @@ export function GroupMembersTab({ members, viewMode, memberParticipation }: Grou
                                         className="text-right py-2 px-2 font-medium cursor-pointer hover:text-primary"
                                         onClick={() => handleSort('participation')}
                                     >
-                                        參與率 {sortBy === 'participation' && (sortDir === 'desc' ? '↓' : '↑')}
+                                        參戰率 {sortBy === 'participation' && (sortDir === 'desc' ? '↓' : '↑')}
                                     </th>
                                 </tr>
                             </thead>
