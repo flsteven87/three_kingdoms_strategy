@@ -62,18 +62,17 @@ export function CopperTab({ session }: Props) {
   // Separate mines into my mines and other mines (must be before early returns)
   const { myMines, otherMines } = useMemo(() => {
     const mines = data?.mines || []
-    const activeGameId = selectedGameId || null
     const myRegisteredMines: typeof mines = []
     const otherMines: typeof mines = []
     for (const mine of mines) {
-      if (activeGameId && mine.game_id === activeGameId) {
+      if (effectiveGameId && mine.game_id === effectiveGameId) {
         myRegisteredMines.push(mine)
       } else {
         otherMines.push(mine)
       }
     }
     return { myMines: myRegisteredMines, otherMines: otherMines }
-  }, [data?.mines, selectedGameId])
+  }, [data?.mines, effectiveGameId])
 
   const handleRegister = async () => {
     if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return
