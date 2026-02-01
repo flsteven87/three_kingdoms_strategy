@@ -19,9 +19,10 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-logger = logging.getLogger(__name__)
-
+from src.models.battle_event import EventCategory
 from src.models.line_binding import (
+    EventListItem,
+    EventListResponse,
     LineBindingCodeResponse,
     LineBindingStatusResponse,
     LineCustomCommand,
@@ -41,8 +42,14 @@ from src.models.line_binding import (
     RegisteredAccount,
     RegisterMemberResponse,
     SimilarMembersResponse,
+    UserEventParticipation,
 )
+from src.repositories.battle_event_metrics_repository import BattleEventMetricsRepository
+from src.repositories.battle_event_repository import BattleEventRepository
 from src.repositories.line_binding_repository import LineBindingRepository
+from src.repositories.season_repository import SeasonRepository
+
+logger = logging.getLogger(__name__)
 
 # Constants
 BINDING_CODE_LENGTH = 6
@@ -57,6 +64,9 @@ class LineBindingService:
 
     def __init__(self, repository: LineBindingRepository | None = None):
         self.repository = repository or LineBindingRepository()
+        self._event_repo = BattleEventRepository()
+        self._metrics_repo = BattleEventMetricsRepository()
+        self._season_repo = SeasonRepository()
 
     # =========================================================================
     # Binding Code Operations (Web App)
@@ -934,3 +944,172 @@ class LineBindingService:
         has_exact_match = len(similar) > 0 and similar[0].name == name
 
         return SimilarMembersResponse(similar=similar, has_exact_match=has_exact_match)
+
+    # =========================================================================
+    # Event List Operations (LIFF Battle Tab)
+    # =========================================================================
+
+    async def get_event_list_for_liff(
+        self, line_group_id: str, game_id: str
+    ) -> EventListResponse:
+        """
+        Get list of completed events with user participation status for LIFF.
+
+        Args:
+            line_group_id: LINE group ID
+            game_id: User's game ID to check participation
+
+        Returns:
+            EventListResponse with events and user participation status
+
+        Raises:
+            HTTPException 404: If group not bound
+        """
+        from src.models.battle_event import EventStatus
+
+        # 1. Get alliance from group binding
+        group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
+        if not group_binding:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="此群組尚未綁定同盟",
+            )
+
+        alliance_id = group_binding.alliance_id
+
+        # 2. Get current season
+        current_season = await self._season_repo.get_current_season(alliance_id)
+        season_name = current_season.name if current_season else None
+        season_id = current_season.id if current_season else None
+
+        if not season_id:
+            return EventListResponse(season_name=None, events=[])
+
+        # 3. Get completed events for this season (limit 10 most recent)
+        events = await self._event_repo.get_by_season(season_id)
+        completed_events = [e for e in events if e.status == EventStatus.COMPLETED][:10]
+
+        if not completed_events:
+            return EventListResponse(season_name=season_name, events=[])
+
+        # 4. Get member_id from game_id
+        member = await self.repository.get_member_by_game_id(alliance_id, game_id)
+        member_id = member.id if member else None
+
+        # 5. Batch fetch user's metrics for all events
+        event_ids = [e.id for e in completed_events]
+        user_metrics_map: dict = {}
+        if member_id:
+            user_metrics_map = await self._metrics_repo.get_user_metrics_for_events(
+                event_ids, member_id
+            )
+
+        # 6. Batch fetch event summaries (avoid N+1)
+        all_metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(event_ids)
+
+        # 7. Build response items
+        items: list[EventListItem] = []
+        for event in completed_events:
+            event_metrics = all_metrics_map.get(event.id, [])
+
+            # Calculate overall stats
+            total_members = len(event_metrics)
+            participated_count = sum(1 for m in event_metrics if m.participated)
+            participation_rate = (
+                (participated_count / total_members * 100) if total_members > 0 else 0.0
+            )
+
+            # User participation
+            user_metric = user_metrics_map.get(event.id) if member_id else None
+            user_participation = self._build_user_participation(
+                user_metric, event.event_type, event_metrics
+            )
+
+            items.append(
+                EventListItem(
+                    event_id=str(event.id),
+                    event_name=event.name,
+                    event_type=event.event_type.value if event.event_type else "battle",
+                    event_start=event.event_start,
+                    total_members=total_members,
+                    participated_count=participated_count,
+                    participation_rate=round(participation_rate, 1),
+                    user_participation=user_participation,
+                )
+            )
+
+        return EventListResponse(season_name=season_name, events=items)
+
+    def _build_user_participation(
+        self,
+        user_metric,
+        event_type: EventCategory | None,
+        all_metrics: list,
+    ) -> UserEventParticipation:
+        """Build user participation object based on event type."""
+        if not user_metric:
+            return UserEventParticipation(
+                participated=False,
+                rank=None,
+                score=None,
+                score_label=None,
+                violated=None,
+            )
+
+        # Determine participation and score based on event type
+        event_type = event_type or EventCategory.BATTLE
+
+        if event_type == EventCategory.FORBIDDEN:
+            # For forbidden: check if user violated (power_diff > 0)
+            violated = user_metric.power_diff > 0
+            return UserEventParticipation(
+                participated=not violated,  # "participated" means compliance
+                rank=None,
+                score=None,
+                score_label=None,
+                violated=violated,
+            )
+
+        elif event_type == EventCategory.SIEGE:
+            # For siege: use contribution as primary metric
+            participated = user_metric.participated
+            score = user_metric.contribution_diff + user_metric.assist_diff
+            rank = self._calculate_rank(
+                user_metric.contribution_diff + user_metric.assist_diff,
+                all_metrics,
+                lambda m: m.contribution_diff + m.assist_diff,
+            ) if participated else None
+
+            return UserEventParticipation(
+                participated=participated,
+                rank=rank,
+                score=score if participated else None,
+                score_label="貢獻" if participated else None,
+                violated=None,
+            )
+
+        else:  # BATTLE
+            # For battle: use merit as primary metric
+            participated = user_metric.participated
+            score = user_metric.merit_diff
+            rank = self._calculate_rank(
+                user_metric.merit_diff,
+                all_metrics,
+                lambda m: m.merit_diff,
+            ) if participated else None
+
+            return UserEventParticipation(
+                participated=participated,
+                rank=rank,
+                score=score if participated else None,
+                score_label="戰功" if participated else None,
+                violated=None,
+            )
+
+    def _calculate_rank(self, user_score: int, all_metrics: list, score_fn) -> int:
+        """Calculate user's rank based on score."""
+        scores = sorted([score_fn(m) for m in all_metrics if m.participated], reverse=True)
+        try:
+            return scores.index(user_score) + 1
+        except ValueError:
+            return len(scores) + 1
