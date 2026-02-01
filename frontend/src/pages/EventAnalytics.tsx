@@ -30,7 +30,7 @@ import { CsvDropZone } from "@/components/uploads/CsvDropZone";
 import { useSeasons } from "@/hooks/use-seasons";
 import {
   useEvents,
-  useEventAnalytics,
+  useBatchEventAnalytics,
   useCreateEvent,
   useProcessEvent,
   useUploadEventCsv,
@@ -38,7 +38,11 @@ import {
 import { Plus, Swords, Loader2, AlertCircle } from "lucide-react";
 import { EventCard } from "@/components/events/EventCard";
 import { EventEditSheet } from "@/components/events/EventEditSheet";
-import type { EventCategory, EventListItem } from "@/types/event";
+import type {
+  EventCategory,
+  EventListItem,
+  EventAnalyticsResponse,
+} from "@/types/event";
 
 // ============================================================================
 // Types
@@ -111,26 +115,25 @@ function LoadingSkeleton() {
 }
 
 // ============================================================================
-// Event Card with Data Fetching
+// Event Card with Pre-fetched Data
 // ============================================================================
 
 interface EventCardWithDataProps {
-  readonly eventId: string;
   readonly event: EventListItem;
+  readonly analyticsData: EventAnalyticsResponse | undefined;
   readonly onEdit: (event: EventListItem) => void;
 }
 
-function EventCardWithData({ eventId, event, onEdit }: EventCardWithDataProps) {
-  const shouldFetch = event.status === "completed";
-  const { data: eventAnalytics } = useEventAnalytics(
-    shouldFetch ? eventId : undefined,
-  );
-
-  const eventDetail = eventAnalytics
+function EventCardWithData({
+  event,
+  analyticsData,
+  onEdit,
+}: EventCardWithDataProps) {
+  const eventDetail = analyticsData
     ? {
-        summary: eventAnalytics.summary,
-        metrics: eventAnalytics.metrics,
-        merit_distribution: eventAnalytics.merit_distribution,
+        summary: analyticsData.summary,
+        metrics: analyticsData.metrics,
+        merit_distribution: analyticsData.merit_distribution,
       }
     : null;
 
@@ -161,12 +164,21 @@ function EventAnalytics() {
     currentSeason?.id,
   );
 
+  // Batch fetch analytics for completed events
+  const completedEventIds = useMemo(() => {
+    if (!events) return [];
+    return events.filter((e) => e.status === "completed").map((e) => e.id);
+  }, [events]);
+
+  const { data: batchAnalytics, isLoading: analyticsLoading } =
+    useBatchEventAnalytics(completedEventIds);
+
   // Mutations
   const uploadEventCsv = useUploadEventCsv();
   const createEvent = useCreateEvent(currentSeason?.id);
   const processEvent = useProcessEvent();
 
-  const isLoading = seasonsLoading || eventsLoading;
+  const isLoading = seasonsLoading || eventsLoading || analyticsLoading;
 
   // Sort events by date (newest first)
   const sortedEvents = useMemo(() => {
@@ -414,8 +426,8 @@ function EventAnalytics() {
             {sortedEvents.map((event) => (
               <EventCardWithData
                 key={event.id}
-                eventId={event.id}
                 event={event}
+                analyticsData={batchAnalytics?.analytics[event.id]}
                 onEdit={handleEdit}
               />
             ))}
