@@ -50,6 +50,17 @@ class UpdateEventRequest(BaseModel):
     description: str | None = Field(None, max_length=500, description="Event description")
 
 
+class BatchAnalyticsRequest(BaseModel):
+    """Request body for batch event analytics"""
+
+    event_ids: list[UUID] = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="List of event UUIDs to fetch analytics for"
+    )
+
+
 # ============================================================================
 # Response Schemas
 # ============================================================================
@@ -166,6 +177,15 @@ class EventAnalyticsResponse(BaseModel):
     summary: EventSummaryResponse
     metrics: list[EventMemberMetricResponse]
     merit_distribution: list[DistributionBinResponse]
+
+
+class BatchAnalyticsResponse(BaseModel):
+    """Response for batch event analytics"""
+
+    analytics: dict[str, EventAnalyticsResponse] = Field(
+        ...,
+        description="Map of event_id to analytics"
+    )
 
 
 # ============================================================================
