@@ -179,3 +179,48 @@ class BattleEventMetricsRepository(SupabaseRepository[BattleEventMetrics]):
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return self._build_models(data)
+
+    async def get_by_events_with_member_and_group(
+        self, event_ids: list[UUID]
+    ) -> dict[UUID, list[BattleEventMetricsWithMember]]:
+        """
+        Get all metrics for multiple events with member and group info.
+
+        Optimized batch query to avoid N+1 problem.
+
+        Args:
+            event_ids: List of event UUIDs
+
+        Returns:
+            Dict mapping event_id to list of metrics
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        if not event_ids:
+            return {}
+
+        event_id_strs = [str(eid) for eid in event_ids]
+
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*, members!inner(name), member_snapshots!end_snapshot_id(group_name)")
+            .in_("event_id", event_id_strs)
+            .order("merit_diff", desc=True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Group by event_id
+        grouped: dict[UUID, list[BattleEventMetricsWithMember]] = {eid: [] for eid in event_ids}
+        for row in data:
+            member_data = row.pop("members", {})
+            snapshot_data = row.pop("member_snapshots", {})
+            row["member_name"] = member_data.get("name", "Unknown")
+            row["group_name"] = snapshot_data.get("group_name") if snapshot_data else None
+
+            event_id = UUID(row["event_id"])
+            if event_id in grouped:
+                grouped[event_id].append(BattleEventMetricsWithMember(**row))
+
+        return grouped
