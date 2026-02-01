@@ -484,12 +484,39 @@ class AnalyticsService:
 
         Returns:
             List of period averages ordered by period_number
+
+        Performance:
+            - 1 query for periods
+            - 1 batch query for all periods' metrics
+            - Total: 2 queries regardless of period count
         """
         periods = await self._period_repo.get_by_season(season_id)
 
+        if not periods:
+            return []
+
+        # Batch fetch averages for all periods (avoid N+1)
+        period_ids = [p.id for p in periods]
+        averages_map = await self._metrics_repo.get_periods_averages_batch(period_ids)
+
+        # Empty averages for periods with no metrics
+        empty_avg = {
+            "member_count": 0,
+            "avg_daily_contribution": 0,
+            "avg_daily_merit": 0,
+            "avg_daily_assist": 0,
+            "avg_daily_donation": 0,
+            "avg_power": 0,
+            "median_daily_contribution": 0,
+            "median_daily_merit": 0,
+            "median_daily_assist": 0,
+            "median_daily_donation": 0,
+            "median_power": 0,
+        }
+
         result = []
         for period in periods:
-            avg = await self.get_period_alliance_averages(period.id)
+            avg = averages_map.get(period.id, empty_avg)
             result.append(
                 {
                     "period_id": str(period.id),

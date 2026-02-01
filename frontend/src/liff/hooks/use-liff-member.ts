@@ -4,42 +4,45 @@
  * TanStack Query hooks for member registration in LIFF.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getMemberInfo,
   registerMember,
   unregisterMember,
   type MemberInfoResponse,
   type RegisterMemberResponse,
-} from '../lib/liff-api-client'
+} from "../lib/liff-api-client";
 
 interface LiffContext {
-  lineUserId: string
-  lineGroupId: string
-  lineDisplayName: string
+  lineUserId: string;
+  lineGroupId: string;
+  lineDisplayName: string;
 }
 
 // Query key factory
 export const liffMemberKeys = {
-  all: ['liff-member'] as const,
+  all: ["liff-member"] as const,
   info: (userId: string, groupId: string) =>
-    [...liffMemberKeys.all, 'info', userId, groupId] as const,
-}
+    [...liffMemberKeys.all, "info", userId, groupId] as const,
+};
 
 export function useLiffMemberInfo(context: LiffContext | null) {
   return useQuery<MemberInfoResponse>({
-    queryKey: liffMemberKeys.info(context?.lineUserId ?? '', context?.lineGroupId ?? ''),
+    queryKey: liffMemberKeys.info(
+      context?.lineUserId ?? "",
+      context?.lineGroupId ?? "",
+    ),
     queryFn: () =>
       getMemberInfo({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId,
-  })
+  });
 }
 
 export function useLiffRegisterMember(context: LiffContext | null) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation<RegisterMemberResponse, Error, { gameId: string }>({
     mutationFn: ({ gameId }) =>
@@ -49,18 +52,22 @@ export function useLiffRegisterMember(context: LiffContext | null) {
         displayName: context!.lineDisplayName,
         gameId,
       }),
-    onSuccess: () => {
+    onSettled: () => {
+      // Always invalidate to ensure cache consistency
       if (context) {
         queryClient.invalidateQueries({
-          queryKey: liffMemberKeys.info(context.lineUserId, context.lineGroupId),
-        })
+          queryKey: liffMemberKeys.info(
+            context.lineUserId,
+            context.lineGroupId,
+          ),
+        });
       }
     },
-  })
+  });
 }
 
 export function useLiffUnregisterMember(context: LiffContext | null) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation<RegisterMemberResponse, Error, { gameId: string }>({
     mutationFn: ({ gameId }) =>
@@ -69,12 +76,16 @@ export function useLiffUnregisterMember(context: LiffContext | null) {
         lineGroupId: context!.lineGroupId,
         gameId,
       }),
-    onSuccess: () => {
+    onSettled: () => {
+      // Always invalidate to ensure cache consistency
       if (context) {
         queryClient.invalidateQueries({
-          queryKey: liffMemberKeys.info(context.lineUserId, context.lineGroupId),
-        })
+          queryKey: liffMemberKeys.info(
+            context.lineUserId,
+            context.lineGroupId,
+          ),
+        });
       }
     },
-  })
+  });
 }

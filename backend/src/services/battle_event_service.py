@@ -14,7 +14,6 @@ Battle Event Service
 - NO direct database calls (delegates to repositories)
 """
 
-import asyncio
 from uuid import UUID
 
 from src.models.battle_event import (
@@ -520,6 +519,11 @@ class BattleEventService:
 
         Returns:
             List of BattleEventListItem with computed stats, ordered by event_end desc
+
+        Performance:
+            - 1 query for events
+            - 1 batch query for all events' metrics
+            - Total: 2 queries regardless of event count
         """
         events = await self._event_repo.get_recent_completed_events(
             alliance_id=alliance_id,
@@ -531,31 +535,31 @@ class BattleEventService:
         if not events:
             return []
 
-        # Parallel summary and metrics calculation to avoid reply token expiration
-        summaries = await asyncio.gather(
-            *[self._calculate_event_summary(e.id, e.event_type) for e in events]
-        )
-        all_metrics = await asyncio.gather(
-            *[self._metrics_repo.get_by_event_with_member(e.id) for e in events]
-        )
+        # Batch fetch metrics for all events (avoid N+1)
+        event_ids = [e.id for e in events]
+        metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(event_ids)
 
-        return [
-            BattleEventListItem(
-                id=event.id,
-                name=event.name,
-                event_type=event.event_type,
-                status=event.status,
-                event_start=event.event_start,
-                event_end=event.event_end,
-                created_at=event.created_at,
-                participation_rate=summary.participation_rate,
-                total_merit=summary.total_merit,
-                mvp_name=summary.mvp_member_name,
-                absent_count=summary.absent_count,
-                absent_names=[m.member_name for m in metrics if m.is_absent],
+        result = []
+        for event in events:
+            metrics = metrics_map.get(event.id, [])
+            summary = self._calculate_summary_from_metrics(metrics, event.event_type)
+            result.append(
+                BattleEventListItem(
+                    id=event.id,
+                    name=event.name,
+                    event_type=event.event_type,
+                    status=event.status,
+                    event_start=event.event_start,
+                    event_end=event.event_end,
+                    created_at=event.created_at,
+                    participation_rate=summary.participation_rate,
+                    total_merit=summary.total_merit,
+                    mvp_name=summary.mvp_member_name,
+                    absent_count=summary.absent_count,
+                    absent_names=[m.member_name for m in metrics if m.is_absent],
+                )
             )
-            for event, summary, metrics in zip(events, summaries, all_metrics, strict=True)
-        ]
+        return result
 
     async def get_event_by_name_for_alliance(
         self, alliance_id: UUID, name: str, season_id: UUID | None = None
