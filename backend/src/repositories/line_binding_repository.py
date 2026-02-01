@@ -658,9 +658,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     # Member Candidates Operations (for autocomplete)
     # =========================================================================
 
-    async def get_active_member_candidates(
-        self, alliance_id: UUID
-    ) -> list[dict[str, str | None]]:
+    async def get_active_member_candidates(self, alliance_id: UUID) -> list[dict[str, str | None]]:
         """
         Get active members with their latest group_name for autocomplete.
 
@@ -734,3 +732,65 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         from src.models.member import Member
 
         return Member(**data[0])
+
+    # =========================================================================
+    # Reverification Operations (for CSV upload)
+    # =========================================================================
+
+    async def get_unverified_bindings(self, alliance_id: UUID) -> list[MemberLineBinding]:
+        """
+        Get all unverified member bindings for an alliance.
+
+        Used for reverification after CSV upload when new members appear.
+
+        Args:
+            alliance_id: Alliance UUID
+
+        Returns:
+            List of unverified MemberLineBinding instances
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .eq("is_verified", False)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return [MemberLineBinding(**row) for row in data]
+
+    async def batch_verify_bindings(self, binding_updates: list[dict[str, str]]) -> int:
+        """
+        Batch update bindings to verified status.
+
+        Args:
+            binding_updates: List of dicts with 'id' and 'member_id' keys
+
+        Returns:
+            Number of bindings updated
+
+        Note: Uses individual updates since Supabase doesn't support
+              batch updates with different values per row efficiently.
+        """
+        if not binding_updates:
+            return 0
+
+        now_iso = datetime.now(UTC).isoformat()
+        updated_count = 0
+        for update in binding_updates:
+            await self._execute_async(
+                lambda u=update: self.client.from_("member_line_bindings")
+                .update(
+                    {
+                        "member_id": u["member_id"],
+                        "is_verified": True,
+                        "updated_at": now_iso,
+                    }
+                )
+                .eq("id", u["id"])
+                .execute()
+            )
+            updated_count += 1
+
+        return updated_count

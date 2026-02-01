@@ -66,3 +66,26 @@ export function getEventTypeConfig(type: string): EventTypeConfig {
   const normalized = type.toLowerCase() as EventType;
   return EVENT_TYPE_CONFIG[normalized] ?? EVENT_TYPE_CONFIG.battle;
 }
+
+/**
+ * Participation/compliance status types for event cards.
+ */
+export type StatusType =
+  | "participated"
+  | "not_participated"
+  | "compliant"
+  | "violated";
+
+/**
+ * Derive status type from event data.
+ */
+export function getStatusType(
+  eventType: string,
+  participated: boolean,
+  violated?: boolean | null,
+): StatusType {
+  if (eventType === "forbidden") {
+    return violated ? "violated" : "compliant";
+  }
+  return participated ? "participated" : "not_participated";
+}

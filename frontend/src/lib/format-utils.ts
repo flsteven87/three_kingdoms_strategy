@@ -32,10 +32,18 @@ export function formatNumber(value: number): string {
  * Examples:
  * - 8500 -> "8,500"
  * - 85000 -> "8.5萬"
+ * - 80000 -> "8萬" (compact mode)
+ *
+ * @param value - The numeric score value
+ * @param compact - If true, omit decimal when value is exact multiple of 萬
  */
-export function formatScore(value: number): string {
+export function formatScore(value: number, compact = false): string {
   if (value >= 10000) {
-    return `${(value / 10000).toFixed(1)}萬`;
+    const wan = value / 10000;
+    if (compact && wan % 1 === 0) {
+      return `${wan}萬`;
+    }
+    return `${wan.toFixed(1)}萬`;
   }
   return value.toLocaleString();
 }

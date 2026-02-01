@@ -201,11 +201,14 @@ class BattleEventMetricsRepository(SupabaseRepository[BattleEventMetrics]):
 
         event_id_strs = [str(eid) for eid in event_ids]
 
+        # Note: Remove order by merit_diff to avoid truncation issues
+        # Supabase has a default limit of 1000 rows, and ordering by merit_diff
+        # causes SIEGE events (merit_diff=0) to be sorted last and truncated
         result = await self._execute_async(
             lambda: self.client.from_(self.table_name)
             .select("*, members!inner(name), member_snapshots!end_snapshot_id(group_name)")
             .in_("event_id", event_id_strs)
-            .order("merit_diff", desc=True)
+            .limit(10000)  # Ensure we get all metrics (10 events × ~200 members)
             .execute()
         )
 

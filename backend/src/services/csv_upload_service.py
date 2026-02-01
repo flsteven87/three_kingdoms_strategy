@@ -19,6 +19,7 @@ from src.repositories.alliance_collaborator_repository import (
 )
 from src.repositories.alliance_repository import AllianceRepository
 from src.repositories.csv_upload_repository import CsvUploadRepository
+from src.repositories.line_binding_repository import LineBindingRepository
 from src.repositories.member_repository import MemberRepository
 from src.repositories.member_snapshot_repository import MemberSnapshotRepository
 from src.repositories.season_repository import SeasonRepository
@@ -38,6 +39,7 @@ class CSVUploadService:
         self._season_repo = SeasonRepository()
         self._alliance_repo = AllianceRepository()
         self._collaborator_repo = AllianceCollaboratorRepository()
+        self._line_binding_repo = LineBindingRepository()
         self._permission_service = PermissionService()
         self._period_metrics_service = PeriodMetricsService()
         self._parser = CSVParserService()
@@ -180,6 +182,12 @@ class CSVUploadService:
         members = await self._member_repo.upsert_batch(members_upsert_data)
         member_ids_map = {member.name: member.id for member in members}
 
+        # Step 6.5: Reverify pending LINE bindings
+        # Users who registered before their data appeared in CSV can now be verified
+        reverified_count = await self._reverify_pending_bindings(
+            alliance_id=alliance.id, member_ids_map=member_ids_map
+        )
+
         # Step 7: Batch create snapshots
         snapshots_data = []
         for member_data in members_data:
@@ -227,6 +235,7 @@ class CSVUploadService:
             "total_periods": total_periods,
             "replaced_existing": existing_upload is not None,
             "upload_type": upload_type,
+            "reverified_bindings": reverified_count,
         }
 
     async def get_uploads_by_season(self, user_id: UUID, season_id: UUID) -> list[dict]:
@@ -322,3 +331,43 @@ class CSVUploadService:
             "deleted_upload_id": upload_id,
             "recalculated_periods": total_periods,
         }
+
+    async def _reverify_pending_bindings(
+        self, alliance_id: UUID, member_ids_map: dict[str, UUID]
+    ) -> int:
+        """
+        Reverify pending LINE bindings after CSV upload.
+
+        When users register via LIFF before their data appears in CSV,
+        they get is_verified=false. After CSV upload creates the member,
+        we can now verify them.
+
+        Args:
+            alliance_id: Alliance UUID
+            member_ids_map: Mapping of member names to their UUIDs
+
+        Returns:
+            Number of bindings that were reverified
+
+        符合 CLAUDE.md 🔴: Service layer orchestration
+        """
+        # Get all unverified bindings for this alliance
+        unverified = await self._line_binding_repo.get_unverified_bindings(alliance_id)
+
+        if not unverified:
+            return 0
+
+        # Find bindings that can now be verified
+        updates: list[dict[str, str]] = []
+        for binding in unverified:
+            if binding.game_id in member_ids_map:
+                updates.append({
+                    "id": str(binding.id),
+                    "member_id": str(member_ids_map[binding.game_id]),
+                })
+
+        if not updates:
+            return 0
+
+        # Batch update the bindings
+        return await self._line_binding_repo.batch_verify_bindings(updates)
