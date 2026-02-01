@@ -14,7 +14,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EventBadge } from "@/components/ui/event-badge";
 import { RankBadge } from "@/components/ui/rank-badge";
-import { GroupProgress, ProgressBar } from "@/components/ui/progress-bar";
+import { GroupProgress } from "@/components/ui/progress-bar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getStatusType } from "@/constants/event-types";
 import {
@@ -184,7 +184,6 @@ function ExpandedEventReport({
   }
 
   const {
-    summary,
     group_stats,
     top_members,
     top_contributors,
@@ -194,53 +193,8 @@ function ExpandedEventReport({
   const isForbidden = eventType === "forbidden";
   const isSiege = eventType === "siege";
 
-  const mainRate = isForbidden
-    ? summary.total_members > 0
-      ? ((summary.total_members - summary.violator_count) /
-          summary.total_members) *
-        100
-      : 0
-    : summary.participation_rate;
-  const mainRateLabel = isForbidden ? "守規率" : "出席率";
-  const mainRateVariant = isForbidden
-    ? summary.violator_count > 0
-      ? "danger"
-      : "success"
-    : "success";
-
   return (
     <div className="px-3 pb-3 pt-2 border-t space-y-3">
-      {/* Main stat - aligned with LINE Bot report */}
-      <div className="bg-muted/30 rounded-lg p-3">
-        <div className={`${liffTypography.metricLabel} text-center`}>
-          📊 {mainRateLabel}
-        </div>
-        <div className="flex items-center justify-center gap-3 mt-1">
-          <span
-            className={`${liffTypography.metric} ${
-              mainRateVariant === "danger"
-                ? "text-red-500 dark:text-red-400"
-                : "text-green-600 dark:text-green-400"
-            }`}
-          >
-            {mainRate.toFixed(0)}%
-          </span>
-          <ProgressBar
-            value={mainRate}
-            variant={mainRateVariant === "danger" ? "danger" : "success"}
-            size="md"
-            className="w-24"
-          />
-        </div>
-        <div className={`${liffTypography.caption} text-center mt-1`}>
-          {isForbidden
-            ? summary.violator_count > 0
-              ? `${summary.violator_count} 人違規`
-              : "全員遵守規定 ✓"
-            : `${summary.participated_count}/${summary.total_members}人 參戰`}
-        </div>
-      </div>
-
       {/* Group Stats with Progress Bars */}
       {group_stats.length > 0 && (
         <CollapsibleSection
