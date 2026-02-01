@@ -4,67 +4,62 @@
  * Compact game ID registration for LIFF Tall mode.
  */
 
-import { useState } from 'react'
-import { Plus, Check, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { useLiffMemberInfo, useLiffRegisterMember, useLiffUnregisterMember } from '../hooks/use-liff-member'
-import type { LiffSession } from '../hooks/use-liff-session'
+import { useState } from "react";
+import { Plus, Check, X, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  useLiffMemberInfo,
+  useLiffRegisterMember,
+  useLiffUnregisterMember,
+} from "../hooks/use-liff-member";
+import type { LiffSession } from "../hooks/use-liff-session";
 
 interface Props {
-  readonly session: LiffSession
-}
-
-function formatDate(dateString: string): string {
-  // Ensure UTC interpretation: append 'Z' if no timezone info
-  const utcStr = dateString.endsWith('Z') || dateString.includes('+') ? dateString : `${dateString}Z`
-  return new Date(utcStr).toLocaleDateString('zh-TW', {
-    month: 'numeric',
-    day: 'numeric',
-  })
+  readonly session: LiffSession;
 }
 
 export function RosterTab({ session }: Props) {
-  const [newGameId, setNewGameId] = useState('')
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [newGameId, setNewGameId] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const context = {
     lineUserId: session.lineUserId,
     lineGroupId: session.lineGroupId!,
     lineDisplayName: session.lineDisplayName,
-  }
+  };
 
-  const { data, isLoading, error } = useLiffMemberInfo(context)
-  const registerMutation = useLiffRegisterMember(context)
-  const unregisterMutation = useLiffUnregisterMember(context)
+  const { data, isLoading, error } = useLiffMemberInfo(context);
+  const registerMutation = useLiffRegisterMember(context);
+  const unregisterMutation = useLiffUnregisterMember(context);
 
   const handleRegister = async () => {
-    if (!newGameId.trim()) return
+    if (!newGameId.trim()) return;
 
     try {
-      await registerMutation.mutateAsync({ gameId: newGameId.trim() })
-      setNewGameId('')
+      await registerMutation.mutateAsync({ gameId: newGameId.trim() });
+      setNewGameId("");
     } catch {
       // Error handled by mutation
     }
-  }
+  };
 
   const handleUnregister = async (gameId: string) => {
-    setDeletingId(gameId)
+    setDeletingId(gameId);
     try {
-      await unregisterMutation.mutateAsync({ gameId })
+      await unregisterMutation.mutateAsync({ gameId });
     } catch {
       // Error handled by mutation
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
-  }
+  };
 
   if (isLoading) {
     return (
       <div className="py-6 text-center">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -72,10 +67,10 @@ export function RosterTab({ session }: Props) {
       <div className="p-3 text-center text-sm text-destructive">
         {error.message}
       </div>
-    )
+    );
   }
 
-  const accounts = data?.registered_ids || []
+  const accounts = data?.registered_ids || [];
 
   return (
     <div className="p-3 space-y-3">
@@ -87,7 +82,7 @@ export function RosterTab({ session }: Props) {
             value={newGameId}
             onChange={(e) => setNewGameId(e.target.value)}
             placeholder="例：曹操丞相"
-            onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+            onKeyDown={(e) => e.key === "Enter" && handleRegister()}
             className="h-10"
           />
           <Button
@@ -128,12 +123,22 @@ export function RosterTab({ session }: Props) {
                 className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg"
               >
                 <div className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-primary" />
+                  {acc.is_verified ? (
+                    <Check className="h-3.5 w-3.5 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                  )}
                   <span className="text-sm font-medium">{acc.game_id}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(acc.created_at)}
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded ${
+                      acc.is_verified
+                        ? "bg-green-100 text-green-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {acc.is_verified ? "已匹配" : "待匹配"}
                   </span>
                   <Button
                     variant="ghost"
@@ -155,5 +160,5 @@ export function RosterTab({ session }: Props) {
         )}
       </div>
     </div>
-  )
+  );
 }

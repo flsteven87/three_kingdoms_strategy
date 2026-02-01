@@ -400,7 +400,7 @@ class LineBindingService:
 
         registered_ids = [
             RegisteredAccount(
-                game_id=b.game_id, display_name=b.line_display_name, created_at=b.created_at
+                game_id=b.game_id, display_name=b.line_display_name, is_verified=b.is_verified, created_at=b.created_at
             )
             for b in bindings
         ]
@@ -473,7 +473,7 @@ class LineBindingService:
 
         registered_ids = [
             RegisteredAccount(
-                game_id=b.game_id, display_name=b.line_display_name, created_at=b.created_at
+                game_id=b.game_id, display_name=b.line_display_name, is_verified=b.is_verified, created_at=b.created_at
             )
             for b in bindings
         ]
@@ -535,7 +535,7 @@ class LineBindingService:
 
         registered_ids = [
             RegisteredAccount(
-                game_id=b.game_id, display_name=b.line_display_name, created_at=b.created_at
+                game_id=b.game_id, display_name=b.line_display_name, is_verified=b.is_verified, created_at=b.created_at
             )
             for b in bindings
         ]

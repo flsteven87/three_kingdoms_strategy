@@ -133,6 +133,7 @@ class RegisteredAccount(BaseModel):
 
     game_id: str
     display_name: str | None = None
+    is_verified: bool = False
     created_at: datetime
 
 
