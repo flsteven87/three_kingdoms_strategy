@@ -179,3 +179,27 @@ class SeasonRepository(SupabaseRepository[Season]):
         )
         data = self._handle_supabase_result(result, allow_empty=True)
         return self._build_model(data[0]) if data else None
+
+    async def unset_all_current_by_alliance(self, alliance_id: UUID) -> int:
+        """
+        Unset is_current for all seasons in an alliance (single SQL query).
+
+        Performance: Replaces loop-based updates with single batch update.
+
+        Args:
+            alliance_id: Alliance UUID
+
+        Returns:
+            Number of seasons updated
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .update({"is_current": False})
+            .eq("alliance_id", str(alliance_id))
+            .eq("is_current", True)
+            .execute()
+        )
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return len(data) if data else 0

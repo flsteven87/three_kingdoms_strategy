@@ -76,6 +76,9 @@ class PeriodMetricsService:
         - Sequential uploads
         - Insert in middle (recalculates everything)
 
+        Performance: Uses batch query to load all snapshots upfront,
+        eliminating N+1 queries (previously 2N-1 queries → now 1 query).
+
         Args:
             season_id: Season UUID
 
@@ -100,7 +103,18 @@ class PeriodMetricsService:
         # 3. Delete existing periods and metrics (for clean recalculation)
         await self._period_repo.delete_by_season(season_id)
 
-        # 4. Calculate each period
+        # 4. Batch load all snapshots upfront (eliminates N+1 queries)
+        upload_ids = [u.id for u in uploads]
+        all_snapshots = await self._snapshot_repo.get_by_uploads_batch(upload_ids)
+
+        # Build upload_id -> snapshots map
+        snapshots_map: dict[UUID, list[MemberSnapshot]] = {}
+        for snap in all_snapshots:
+            if snap.csv_upload_id not in snapshots_map:
+                snapshots_map[snap.csv_upload_id] = []
+            snapshots_map[snap.csv_upload_id].append(snap)
+
+        # 5. Calculate each period using pre-loaded snapshots
         created_periods: list[Period] = []
 
         for i, end_upload in enumerate(uploads):
@@ -112,6 +126,7 @@ class PeriodMetricsService:
                     season_start_date=season.start_date,
                     end_upload=end_upload,
                     period_number=1,
+                    snapshots_map=snapshots_map,
                 )
             else:
                 # Subsequent uploads: use previous upload as start
@@ -122,6 +137,7 @@ class PeriodMetricsService:
                     start_upload=start_upload,
                     end_upload=end_upload,
                     period_number=i + 1,
+                    snapshots_map=snapshots_map,
                 )
 
             if period:
@@ -136,6 +152,7 @@ class PeriodMetricsService:
         season_start_date: date,
         end_upload: CsvUpload,
         period_number: int,
+        snapshots_map: dict[UUID, list[MemberSnapshot]],
     ) -> Period | None:
         """
         Calculate the first period (from season start to first upload).
@@ -150,6 +167,7 @@ class PeriodMetricsService:
             season_start_date: Season start date
             end_upload: First CSV upload
             period_number: Should be 1
+            snapshots_map: Pre-loaded snapshots map (upload_id -> snapshots)
 
         Returns:
             Created period or None if days < 0
@@ -179,8 +197,8 @@ class PeriodMetricsService:
 
         period = await self._period_repo.create(period_data)
 
-        # Get end snapshots
-        end_snapshots = await self._snapshot_repo.get_by_upload(end_upload.id)
+        # Get end snapshots from pre-loaded map (no DB query)
+        end_snapshots = snapshots_map.get(end_upload.id, [])
 
         # Calculate metrics for each member (all are "new" in first period)
         metrics_list = []
@@ -205,6 +223,7 @@ class PeriodMetricsService:
         start_upload: CsvUpload,
         end_upload: CsvUpload,
         period_number: int,
+        snapshots_map: dict[UUID, list[MemberSnapshot]],
     ) -> Period | None:
         """
         Calculate a period between two uploads.
@@ -215,6 +234,7 @@ class PeriodMetricsService:
             start_upload: Start CSV upload
             end_upload: End CSV upload
             period_number: Period number within season
+            snapshots_map: Pre-loaded snapshots map (upload_id -> snapshots)
 
         Returns:
             Created period or None if days < 0
@@ -245,9 +265,9 @@ class PeriodMetricsService:
 
         period = await self._period_repo.create(period_data)
 
-        # Get snapshots for both uploads
-        start_snapshots = await self._snapshot_repo.get_by_upload(start_upload.id)
-        end_snapshots = await self._snapshot_repo.get_by_upload(end_upload.id)
+        # Get snapshots from pre-loaded map (no DB queries)
+        start_snapshots = snapshots_map.get(start_upload.id, [])
+        end_snapshots = snapshots_map.get(end_upload.id, [])
 
         # Build member_id -> snapshot maps
         start_map = {snap.member_id: snap for snap in start_snapshots}
@@ -499,11 +519,12 @@ class PeriodMetricsService:
             period_count = len(periods)
             total_periods += period_count
 
-            # Count metrics for this season
+            # Batch count metrics for all periods (eliminates N+1 query)
             metrics_count = 0
-            for period in periods:
-                metrics = await self._metrics_repo.get_by_period(period.id)
-                metrics_count += len(metrics)
+            if periods:
+                period_ids = [p.id for p in periods]
+                counts_map = await self._metrics_repo.count_by_periods_batch(period_ids)
+                metrics_count = sum(counts_map.values())
             total_metrics += metrics_count
 
             season_results.append(

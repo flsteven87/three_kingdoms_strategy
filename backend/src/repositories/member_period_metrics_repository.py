@@ -6,6 +6,7 @@ Member Period Metrics Repository
 - Uses _handle_supabase_result() for all queries
 """
 
+from collections import Counter
 from uuid import UUID
 
 from src.models.member_period_metrics import MemberPeriodMetrics
@@ -468,3 +469,32 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
             row["member_name"] = member_data.get("name", "Unknown")
 
         return data
+
+    async def count_by_periods_batch(self, period_ids: list[UUID]) -> dict[UUID, int]:
+        """
+        Count metrics for multiple periods in one query (eliminates N+1).
+
+        Args:
+            period_ids: List of Period UUIDs
+
+        Returns:
+            Dict mapping period_id to metrics count
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        if not period_ids:
+            return {}
+
+        result = (
+            self.client.from_(self.table_name)
+            .select("period_id")
+            .in_("period_id", [str(pid) for pid in period_ids])
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        # Count occurrences per period_id
+        counts = Counter(row["period_id"] for row in data)
+
+        return {UUID(pid): count for pid, count in counts.items()}

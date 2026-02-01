@@ -499,11 +499,8 @@ class SeasonService:
         # Verify write permission (role check)
         await self._permission_service.require_role_permission(user_id, alliance.id)
 
-        # Unset current for all seasons in this alliance
-        all_seasons = await self._repo.get_by_alliance(alliance.id)
-        for s in all_seasons:
-            if s.is_current:
-                await self._repo.update(s.id, {"is_current": False})
+        # Unset current for all seasons in this alliance (single SQL query)
+        await self._repo.unset_all_current_by_alliance(alliance.id)
 
         # Set the target season as current
         return await self._repo.update(season_id, {"is_current": True})
