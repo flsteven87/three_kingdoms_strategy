@@ -124,8 +124,8 @@ export interface EventListItem {
   readonly mvp_name: string | null;
   readonly absent_count: number | null;
   readonly created_at: string;
-  readonly absent_names: readonly string[] | null
-  readonly participant_names: readonly string[] | null
+  readonly absent_names: readonly string[] | null;
+  readonly participant_names: readonly string[] | null;
 }
 
 /**
@@ -251,4 +251,18 @@ export interface EventGroupAnalytics {
 
   // Violators for FORBIDDEN events
   readonly violators: readonly ViolatorItem[];
+}
+
+/**
+ * Request for batch event analytics
+ */
+export interface BatchAnalyticsRequest {
+  readonly event_ids: readonly string[];
+}
+
+/**
+ * Response for batch event analytics
+ */
+export interface BatchAnalyticsResponse {
+  readonly analytics: Record<string, EventAnalyticsResponse>;
 }
