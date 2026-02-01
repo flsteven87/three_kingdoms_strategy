@@ -6,41 +6,48 @@
  * - TanStack Query for server state
  * - Type-safe component
  * - Optimistic updates
+ * - No manual memoization (React Compiler handles)
  */
 
-import { useCallback } from 'react'
-import { Loader2, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CSVUploadCard } from '@/components/uploads/CSVUploadCard'
-import { AllianceGuard } from '@/components/alliance/AllianceGuard'
-import { useSeasons } from '@/hooks/use-seasons'
-import { useCsvUploads, useUploadCsv, useDeleteCsvUpload } from '@/hooks/use-csv-uploads'
-import type { Season } from '@/types/season'
+import { Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CSVUploadCard } from "@/components/uploads/CSVUploadCard";
+import { AllianceGuard } from "@/components/alliance/AllianceGuard";
+import { useSeasons } from "@/hooks/use-seasons";
+import {
+  useCsvUploads,
+  useUploadCsv,
+  useDeleteCsvUpload,
+} from "@/hooks/use-csv-uploads";
+import type { Season } from "@/types/season";
 
 function DataManagement() {
-  const { data: seasons, isLoading: seasonsLoading } = useSeasons()
-  const uploadMutation = useUploadCsv()
+  const { data: seasons, isLoading: seasonsLoading } = useSeasons();
+  const uploadMutation = useUploadCsv();
 
   /**
    * Sort seasons: current first, then by start_date descending
    */
   const sortedSeasons = seasons
     ? [...seasons].sort((a, b) => {
-      if (a.is_current && !b.is_current) return -1
-      if (!a.is_current && b.is_current) return 1
-      return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-    })
-    : []
+        if (a.is_current && !b.is_current) return -1;
+        if (!a.is_current && b.is_current) return 1;
+        return (
+          new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+        );
+      })
+    : [];
 
   /**
    * Handle CSV upload with optional snapshot date
    */
-  const handleUpload = useCallback(
-    async (seasonId: string, file: File, snapshotDate?: string) => {
-      await uploadMutation.mutateAsync({ seasonId, file, snapshotDate })
-    },
-    [uploadMutation]
-  )
+  const handleUpload = async (
+    seasonId: string,
+    file: File,
+    snapshotDate?: string,
+  ) => {
+    await uploadMutation.mutateAsync({ seasonId, file, snapshotDate });
+  };
 
   return (
     <AllianceGuard>
@@ -83,42 +90,44 @@ function DataManagement() {
         )}
       </div>
     </AllianceGuard>
-  )
+  );
 }
 
 /**
  * Season Upload Card - Wrapper for CSV upload with season-specific data
  */
 interface SeasonUploadCardProps {
-  readonly season: Season
-  readonly onUpload: (seasonId: string, file: File, snapshotDate?: string) => Promise<void>
-  readonly isUploading: boolean
+  readonly season: Season;
+  readonly onUpload: (
+    seasonId: string,
+    file: File,
+    snapshotDate?: string,
+  ) => Promise<void>;
+  readonly isUploading: boolean;
 }
 
-function SeasonUploadCard({ season, onUpload, isUploading }: SeasonUploadCardProps) {
-  const { data: uploads = [], isLoading } = useCsvUploads(season.id)
-  const deleteMutation = useDeleteCsvUpload(season.id)
+function SeasonUploadCard({
+  season,
+  onUpload,
+  isUploading,
+}: SeasonUploadCardProps) {
+  const { data: uploads = [], isLoading } = useCsvUploads(season.id);
+  const deleteMutation = useDeleteCsvUpload(season.id);
 
-  const handleUpload = useCallback(
-    async (file: File, snapshotDate?: string) => {
-      await onUpload(season.id, file, snapshotDate)
-    },
-    [season.id, onUpload]
-  )
+  const handleUpload = async (file: File, snapshotDate?: string) => {
+    await onUpload(season.id, file, snapshotDate);
+  };
 
-  const handleDelete = useCallback(
-    async (uploadId: string) => {
-      await deleteMutation.mutateAsync(uploadId)
-    },
-    [deleteMutation]
-  )
+  const handleDelete = async (uploadId: string) => {
+    await deleteMutation.mutateAsync(uploadId);
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
@@ -129,7 +138,7 @@ function SeasonUploadCard({ season, onUpload, isUploading }: SeasonUploadCardPro
       onDelete={handleDelete}
       isUploading={isUploading}
     />
-  )
+  );
 }
 
-export { DataManagement }
+export { DataManagement };

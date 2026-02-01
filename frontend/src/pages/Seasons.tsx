@@ -12,21 +12,28 @@
  * - TanStack Query for server state
  * - Type-safe component
  * - Optimistic updates
+ * - No manual memoization (React Compiler handles)
  */
 
-import { useState, useCallback } from 'react'
-import { Plus, Loader2, Calendar } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/ui/empty-state'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { SeasonCard } from '@/components/seasons/SeasonCard'
-import { AllianceGuard } from '@/components/alliance/AllianceGuard'
-import { RoleGuard } from '@/components/alliance/RoleGuard'
-import { useAlliance } from '@/hooks/use-alliance'
-import { useSeasonQuotaDisplay } from '@/hooks/use-season-quota'
+import { useState } from "react";
+import { Plus, Loader2, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { SeasonCard } from "@/components/seasons/SeasonCard";
+import { AllianceGuard } from "@/components/alliance/AllianceGuard";
+import { RoleGuard } from "@/components/alliance/RoleGuard";
+import { useAlliance } from "@/hooks/use-alliance";
+import { useSeasonQuotaDisplay } from "@/hooks/use-season-quota";
 import {
   useSeasons,
   useCreateSeason,
@@ -36,35 +43,35 @@ import {
   useSetCurrentSeason,
   useCompleteSeason,
   useReopenSeason,
-} from '@/hooks/use-seasons'
-import type { Season } from '@/types/season'
+} from "@/hooks/use-seasons";
+import type { Season } from "@/types/season";
 
 function Seasons() {
-  const [isCreating, setIsCreating] = useState(false)
+  const [isCreating, setIsCreating] = useState(false);
   const [newSeasonData, setNewSeasonData] = useState({
-    name: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: '',
-    description: ''
-  })
+    name: "",
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: "",
+    description: "",
+  });
 
   // Fetch alliance data
-  const { data: alliance } = useAlliance()
+  const { data: alliance } = useAlliance();
 
   // Fetch seasons
-  const { data: seasons, isLoading } = useSeasons()
+  const { data: seasons, isLoading } = useSeasons();
 
   // Season quota status for display
-  const quotaDisplay = useSeasonQuotaDisplay()
+  const quotaDisplay = useSeasonQuotaDisplay();
 
   // Mutations
-  const createMutation = useCreateSeason()
-  const updateMutation = useUpdateSeason()
-  const deleteMutation = useDeleteSeason()
-  const activateMutation = useActivateSeason()
-  const setCurrentMutation = useSetCurrentSeason()
-  const completeMutation = useCompleteSeason()
-  const reopenMutation = useReopenSeason()
+  const createMutation = useCreateSeason();
+  const updateMutation = useUpdateSeason();
+  const deleteMutation = useDeleteSeason();
+  const activateMutation = useActivateSeason();
+  const setCurrentMutation = useSetCurrentSeason();
+  const completeMutation = useCompleteSeason();
+  const reopenMutation = useReopenSeason();
 
   /**
    * Sort seasons: current first, then activated, then draft, by start_date descending
@@ -72,25 +79,28 @@ function Seasons() {
   const sortedSeasons = seasons
     ? [...seasons].sort((a, b) => {
         // Current season first
-        if (a.is_current && !b.is_current) return -1
-        if (!a.is_current && b.is_current) return 1
+        if (a.is_current && !b.is_current) return -1;
+        if (!a.is_current && b.is_current) return 1;
 
         // Then by activation_status: activated > draft > completed
-        const statusOrder = { activated: 0, draft: 1, completed: 2 }
-        const statusDiff = statusOrder[a.activation_status] - statusOrder[b.activation_status]
-        if (statusDiff !== 0) return statusDiff
+        const statusOrder = { activated: 0, draft: 1, completed: 2 };
+        const statusDiff =
+          statusOrder[a.activation_status] - statusOrder[b.activation_status];
+        if (statusDiff !== 0) return statusDiff;
 
         // Then by start_date descending
-        return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+        return (
+          new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+        );
       })
-    : []
+    : [];
 
   /**
    * Handle create new season (as draft)
    */
-  const handleCreate = useCallback(async () => {
+  const handleCreate = async () => {
     if (!alliance || !newSeasonData.name.trim() || !newSeasonData.start_date) {
-      return
+      return;
     }
 
     await createMutation.mutateAsync({
@@ -99,72 +109,72 @@ function Seasons() {
       start_date: newSeasonData.start_date,
       end_date: newSeasonData.end_date || null,
       description: newSeasonData.description || null,
-    })
+    });
 
     // Reset form
     setNewSeasonData({
-      name: '',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: '',
-      description: ''
-    })
-    setIsCreating(false)
-  }, [alliance, newSeasonData, createMutation])
+      name: "",
+      start_date: new Date().toISOString().split("T")[0],
+      end_date: "",
+      description: "",
+    });
+    setIsCreating(false);
+  };
 
   /**
    * Handle update season (optimistic)
    */
-  const handleUpdate = useCallback(async (seasonId: string, data: Partial<Season>) => {
-    await updateMutation.mutateAsync({ seasonId, data })
-  }, [updateMutation])
+  const handleUpdate = async (seasonId: string, data: Partial<Season>) => {
+    await updateMutation.mutateAsync({ seasonId, data });
+  };
 
   /**
    * Handle delete season (optimistic)
    */
-  const handleDelete = useCallback(async (seasonId: string) => {
-    await deleteMutation.mutateAsync(seasonId)
-  }, [deleteMutation])
+  const handleDelete = async (seasonId: string) => {
+    await deleteMutation.mutateAsync(seasonId);
+  };
 
   /**
    * Handle activate season (consume season credit)
    */
-  const handleActivate = useCallback(async (seasonId: string) => {
-    await activateMutation.mutateAsync(seasonId)
-  }, [activateMutation])
+  const handleActivate = async (seasonId: string) => {
+    await activateMutation.mutateAsync(seasonId);
+  };
 
   /**
    * Handle set season as current
    */
-  const handleSetCurrent = useCallback(async (seasonId: string) => {
-    await setCurrentMutation.mutateAsync(seasonId)
-  }, [setCurrentMutation])
+  const handleSetCurrent = async (seasonId: string) => {
+    await setCurrentMutation.mutateAsync(seasonId);
+  };
 
   /**
    * Handle complete season
    */
-  const handleComplete = useCallback(async (seasonId: string) => {
-    await completeMutation.mutateAsync(seasonId)
-  }, [completeMutation])
+  const handleComplete = async (seasonId: string) => {
+    await completeMutation.mutateAsync(seasonId);
+  };
 
   /**
    * Handle reopen season
    */
-  const handleReopen = useCallback(async (seasonId: string) => {
-    await reopenMutation.mutateAsync(seasonId)
-  }, [reopenMutation])
+  const handleReopen = async (seasonId: string) => {
+    await reopenMutation.mutateAsync(seasonId);
+  };
 
   /**
    * Cancel create mode
    */
-  const handleCancelCreate = useCallback(() => {
-    setIsCreating(false)
+  const handleCancelCreate = () => {
+    setIsCreating(false);
     setNewSeasonData({
-      name: '',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: '',
-      description: ''
-    })
-  }, [])
+      name: "",
+      start_date: new Date().toISOString().split("T")[0],
+      end_date: "",
+      description: "",
+    });
+  };
 
   return (
     <AllianceGuard>
@@ -173,22 +183,27 @@ function Seasons() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight">賽季管理</h2>
-            <RoleGuard requiredRoles={['owner', 'collaborator']}>
+            <RoleGuard requiredRoles={["owner", "collaborator"]}>
               <Badge
-                variant={quotaDisplay.statusColor === 'red' ? 'destructive' : 'secondary'}
+                variant={
+                  quotaDisplay.statusColor === "red"
+                    ? "destructive"
+                    : "secondary"
+                }
                 className="text-xs"
               >
                 {quotaDisplay.hasTrialAvailable
-                  ? '可免費試用'
-                  : quotaDisplay.trialDaysRemaining !== null && quotaDisplay.trialDaysRemaining > 0
+                  ? "可免費試用"
+                  : quotaDisplay.trialDaysRemaining !== null &&
+                      quotaDisplay.trialDaysRemaining > 0
                     ? `試用 ${quotaDisplay.trialDaysRemaining} 天`
                     : quotaDisplay.availableSeasons > 0
                       ? `剩餘 ${quotaDisplay.availableSeasons} 季`
-                      : '需購買'}
+                      : "需購買"}
               </Badge>
             </RoleGuard>
           </div>
-          <RoleGuard requiredRoles={['owner', 'collaborator']}>
+          <RoleGuard requiredRoles={["owner", "collaborator"]}>
             {!isCreating && (
               <Button onClick={() => setIsCreating(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -199,7 +214,7 @@ function Seasons() {
         </div>
 
         {/* Create New Season Card */}
-        <RoleGuard requiredRoles={['owner', 'collaborator']}>
+        <RoleGuard requiredRoles={["owner", "collaborator"]}>
           {isCreating && (
             <Card className="border-primary/50 shadow-sm">
               <CardHeader>
@@ -215,7 +230,12 @@ function Seasons() {
                     <Input
                       id="new-season-name"
                       value={newSeasonData.name}
-                      onChange={(e) => setNewSeasonData({ ...newSeasonData, name: e.target.value })}
+                      onChange={(e) =>
+                        setNewSeasonData({
+                          ...newSeasonData,
+                          name: e.target.value,
+                        })
+                      }
                       placeholder="例如：第一賽季、春季賽"
                     />
                   </div>
@@ -227,7 +247,12 @@ function Seasons() {
                         id="new-season-start"
                         type="date"
                         value={newSeasonData.start_date}
-                        onChange={(e) => setNewSeasonData({ ...newSeasonData, start_date: e.target.value })}
+                        onChange={(e) =>
+                          setNewSeasonData({
+                            ...newSeasonData,
+                            start_date: e.target.value,
+                          })
+                        }
                       />
                     </div>
 
@@ -237,7 +262,12 @@ function Seasons() {
                         id="new-season-end"
                         type="date"
                         value={newSeasonData.end_date}
-                        onChange={(e) => setNewSeasonData({ ...newSeasonData, end_date: e.target.value })}
+                        onChange={(e) =>
+                          setNewSeasonData({
+                            ...newSeasonData,
+                            end_date: e.target.value,
+                          })
+                        }
                         placeholder="選填（留空表示進行中）"
                       />
                     </div>
@@ -248,7 +278,12 @@ function Seasons() {
                     <Input
                       id="new-season-desc"
                       value={newSeasonData.description}
-                      onChange={(e) => setNewSeasonData({ ...newSeasonData, description: e.target.value })}
+                      onChange={(e) =>
+                        setNewSeasonData({
+                          ...newSeasonData,
+                          description: e.target.value,
+                        })
+                      }
                       placeholder="選填：補充說明或備註"
                     />
                   </div>
@@ -256,12 +291,20 @@ function Seasons() {
                   {/* Existing seasons date reference */}
                   {seasons && seasons.length > 0 && (
                     <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">現有賽季日期</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">
+                        現有賽季日期
+                      </p>
                       <div className="space-y-1">
                         {seasons.map((s) => (
-                          <div key={s.id} className="flex justify-between text-xs text-muted-foreground">
+                          <div
+                            key={s.id}
+                            className="flex justify-between text-xs text-muted-foreground"
+                          >
                             <span>{s.name}</span>
-                            <span>{s.start_date}{s.end_date ? ` ~ ${s.end_date}` : ' ~ 進行中'}</span>
+                            <span>
+                              {s.start_date}
+                              {s.end_date ? ` ~ ${s.end_date}` : " ~ 進行中"}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -279,9 +322,15 @@ function Seasons() {
                   </Button>
                   <Button
                     onClick={handleCreate}
-                    disabled={createMutation.isPending || !newSeasonData.name.trim() || !newSeasonData.start_date}
+                    disabled={
+                      createMutation.isPending ||
+                      !newSeasonData.name.trim() ||
+                      !newSeasonData.start_date
+                    }
                   >
-                    {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {createMutation.isPending && (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    )}
                     建立賽季
                   </Button>
                 </div>
@@ -300,7 +349,7 @@ function Seasons() {
         {/* Empty State */}
         {!isLoading && sortedSeasons.length === 0 && !isCreating && (
           <RoleGuard
-            requiredRoles={['owner', 'collaborator']}
+            requiredRoles={["owner", "collaborator"]}
             fallback={
               <EmptyState
                 icon={Calendar}
@@ -314,7 +363,7 @@ function Seasons() {
               title="尚無賽季"
               description="建立第一個賽季以開始追蹤盟友表現數據。每個賽季可以設定時間範圍，方便進行數據分析與比較。"
               action={{
-                label: '建立第一個賽季',
+                label: "建立第一個賽季",
                 onClick: () => setIsCreating(true),
                 icon: Plus,
               }}
@@ -341,7 +390,7 @@ function Seasons() {
         )}
       </div>
     </AllianceGuard>
-  )
+  );
 }
 
-export { Seasons }
+export { Seasons };

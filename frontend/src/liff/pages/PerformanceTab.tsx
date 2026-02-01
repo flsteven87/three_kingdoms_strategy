@@ -1,11 +1,12 @@
 /**
  * Performance Tab
+ * - No manual memoization (React Compiler handles)
  *
  * Mobile-optimized member performance analytics for LIFF.
  * Includes: rank card, metrics grid, radar chart, trend chart, season totals.
  */
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   RadarChart,
@@ -131,7 +132,7 @@ export function PerformanceTab({ session }: Props) {
   );
 
   // Prepare radar chart data
-  const radarData = useMemo(() => {
+  const radarData = (() => {
     if (!performance?.latest || !performance?.alliance_avg) return [];
 
     // Dimension order matches MemberPerformance.tsx: 貢獻→戰功→勢力值→助攻→捐獻
@@ -160,17 +161,17 @@ export function PerformanceTab({ session }: Props) {
         median: Math.min(medianPercent, 200),
       };
     });
-  }, [performance]);
+  })();
 
   // Prepare trend chart data
-  const trendData = useMemo(() => {
+  const trendData = (() => {
     if (!performance?.trend) return [];
     return performance.trend.map((item) => ({
       label: item.period_label.split("-")[0], // Just show start date
       貢獻: Math.round(item.daily_contribution),
       戰功: Math.round(item.daily_merit),
     }));
-  }, [performance]);
+  })();
 
   // Loading state
   if (isLoadingMember) {

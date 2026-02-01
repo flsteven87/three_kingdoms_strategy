@@ -1,14 +1,15 @@
 /**
  * CopperMineFormDialog - Dialog for adding new copper mine ownership
+ * - No manual memoization (React Compiler handles)
  *
  * P0 修復: 使用 Select 組件選擇成員，傳入正確的 member_id (UUID)
  * P1 修復: 添加規則驗證錯誤顯示
  */
 
-import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { Loader2, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -16,41 +17,41 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { useCreateCopperMineOwnership } from '@/hooks/use-copper-mines'
-import { useAnalyticsMembers } from '@/hooks/use-analytics'
+} from "@/components/ui/select";
+import { useCreateCopperMineOwnership } from "@/hooks/use-copper-mines";
+import { useAnalyticsMembers } from "@/hooks/use-analytics";
 
 // Constants for reserved copper mine (awarded as rewards, not assigned to specific member)
-const RESERVED_MINE_ID = 'reserved'
-const RESERVED_MINE_DISPLAY_NAME = '【預留獎勵】'
+const RESERVED_MINE_ID = "reserved";
+const RESERVED_MINE_DISPLAY_NAME = "【預留獎勵】";
 
 interface FormData {
-  member_id: string
-  coord_x: string
-  coord_y: string
-  level: '9' | '10'
-  applied_at: string
+  member_id: string;
+  coord_x: string;
+  coord_y: string;
+  level: "9" | "10";
+  applied_at: string;
 }
 
 interface CopperMineFormDialogProps {
-  readonly open: boolean
-  readonly onOpenChange: (open: boolean) => void
-  readonly seasonId: string
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly seasonId: string;
 }
 
 function getTodayString(): string {
-  const today = new Date()
-  return today.toISOString().split('T')[0]
+  const today = new Date();
+  return today.toISOString().split("T")[0];
 }
 
 export function CopperMineFormDialog({
@@ -58,9 +59,12 @@ export function CopperMineFormDialog({
   onOpenChange,
   seasonId,
 }: CopperMineFormDialogProps) {
-  const createMutation = useCreateCopperMineOwnership()
-  const { data: members, isLoading: isLoadingMembers } = useAnalyticsMembers(seasonId, true)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const createMutation = useCreateCopperMineOwnership();
+  const { data: members, isLoading: isLoadingMembers } = useAnalyticsMembers(
+    seasonId,
+    true,
+  );
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -71,47 +75,49 @@ export function CopperMineFormDialog({
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      member_id: '',
-      coord_x: '',
-      coord_y: '',
-      level: '10',
+      member_id: "",
+      coord_x: "",
+      coord_y: "",
+      level: "10",
       applied_at: getTodayString(),
     },
-  })
+  });
 
-  const level = watch('level')
-  const memberId = watch('member_id')
+  const level = watch("level");
+  const memberId = watch("member_id");
 
   // Sort members by name for better UX
-  const sortedMembers = useMemo(() => {
-    if (!members) return []
-    const sorted = [...members].sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'))
+  const sortedMembers = (() => {
+    if (!members) return [];
+    const sorted = [...members].sort((a, b) =>
+      a.name.localeCompare(b.name, "zh-TW"),
+    );
 
     // Add reserved option at the top (for copper mines awarded as rewards)
     return [
       { id: RESERVED_MINE_ID, name: RESERVED_MINE_DISPLAY_NAME },
-      ...sorted
-    ]
-  }, [members])
+      ...sorted,
+    ];
+  })();
 
   // Reset form and error when dialog opens
   useEffect(() => {
     if (open) {
-      setSubmitError(null)
+      setSubmitError(null);
       reset({
-        member_id: '',
-        coord_x: '',
-        coord_y: '',
-        level: '10',
+        member_id: "",
+        coord_x: "",
+        coord_y: "",
+        level: "10",
         applied_at: getTodayString(),
-      })
+      });
     }
-  }, [open, reset])
+  }, [open, reset]);
 
   async function onSubmit(data: FormData) {
-    if (!data.member_id) return
+    if (!data.member_id) return;
 
-    setSubmitError(null)
+    setSubmitError(null);
 
     try {
       await createMutation.mutateAsync({
@@ -123,16 +129,16 @@ export function CopperMineFormDialog({
           level: parseInt(data.level, 10) as 9 | 10,
           applied_at: data.applied_at,
         },
-      })
-      onOpenChange(false)
+      });
+      onOpenChange(false);
     } catch (error) {
       // P1 修復: 顯示後端返回的規則驗證錯誤
-      const message = error instanceof Error ? error.message : '新增失敗'
-      setSubmitError(message)
+      const message = error instanceof Error ? error.message : "新增失敗";
+      setSubmitError(message);
     }
   }
 
-  const isLoading = createMutation.isPending
+  const isLoading = createMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -162,7 +168,7 @@ export function CopperMineFormDialog({
             ) : (
               <Select
                 value={memberId}
-                onValueChange={(value) => setValue('member_id', value)}
+                onValueChange={(value) => setValue("member_id", value)}
               >
                 <SelectTrigger id="member_id">
                   <SelectValue placeholder="選擇成員" />
@@ -183,7 +189,9 @@ export function CopperMineFormDialog({
               </Select>
             )}
             {errors.member_id && (
-              <p className="text-sm text-destructive">{errors.member_id.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.member_id.message}
+              </p>
             )}
           </div>
 
@@ -195,13 +203,15 @@ export function CopperMineFormDialog({
                 id="coord_x"
                 type="number"
                 placeholder="X"
-                {...register('coord_x', {
-                  required: '請輸入 X 座標',
-                  min: { value: 0, message: '座標必須為正數' },
+                {...register("coord_x", {
+                  required: "請輸入 X 座標",
+                  min: { value: 0, message: "座標必須為正數" },
                 })}
               />
               {errors.coord_x && (
-                <p className="text-sm text-destructive">{errors.coord_x.message}</p>
+                <p className="text-sm text-destructive">
+                  {errors.coord_x.message}
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -210,13 +220,15 @@ export function CopperMineFormDialog({
                 id="coord_y"
                 type="number"
                 placeholder="Y"
-                {...register('coord_y', {
-                  required: '請輸入 Y 座標',
-                  min: { value: 0, message: '座標必須為正數' },
+                {...register("coord_y", {
+                  required: "請輸入 Y 座標",
+                  min: { value: 0, message: "座標必須為正數" },
                 })}
               />
               {errors.coord_y && (
-                <p className="text-sm text-destructive">{errors.coord_y.message}</p>
+                <p className="text-sm text-destructive">
+                  {errors.coord_y.message}
+                </p>
               )}
             </div>
           </div>
@@ -226,7 +238,7 @@ export function CopperMineFormDialog({
             <Label htmlFor="level">銅礦等級</Label>
             <Select
               value={level}
-              onValueChange={(value: '9' | '10') => setValue('level', value)}
+              onValueChange={(value: "9" | "10") => setValue("level", value)}
             >
               <SelectTrigger id="level">
                 <SelectValue />
@@ -244,12 +256,14 @@ export function CopperMineFormDialog({
             <Input
               id="applied_at"
               type="date"
-              {...register('applied_at', {
-                required: '請選擇日期',
+              {...register("applied_at", {
+                required: "請選擇日期",
               })}
             />
             {errors.applied_at && (
-              <p className="text-sm text-destructive">{errors.applied_at.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.applied_at.message}
+              </p>
             )}
           </div>
 
@@ -270,5 +284,5 @@ export function CopperMineFormDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -109,7 +109,7 @@ export function useCreateEvent(seasonId: string | undefined) {
   return useMutation({
     mutationFn: (data: CreateEventRequest) =>
       apiClient.createEvent(seasonId!, data),
-    onSuccess: () => {
+    onSettled: () => {
       if (seasonId) {
         queryClient.invalidateQueries({ queryKey: eventKeys.list(seasonId) });
       }
@@ -134,6 +134,7 @@ interface UploadEventCsvVariables {
  * - Is stored with upload_type='event'
  *
  * Supports idempotency key for retry safety (Stripe-style pattern).
+ * Note: No cache invalidation needed as uploads are consumed by processEvent.
  */
 export function useUploadEventCsv() {
   return useMutation({
@@ -144,6 +145,7 @@ export function useUploadEventCsv() {
       idempotencyKey,
     }: UploadEventCsvVariables) =>
       apiClient.uploadEventCsv(seasonId, file, snapshotDate, idempotencyKey),
+    // onSettled intentionally omitted: upload results are consumed by processEvent mutation
   });
 }
 
@@ -188,7 +190,9 @@ export function useProcessEvent() {
       queryClient.invalidateQueries({
         queryKey: eventKeys.eventAnalytics(event.id),
       });
-      // Invalidate the events list
+    },
+    onSettled: () => {
+      // Ensure cache consistency - always invalidate list
       queryClient.invalidateQueries({ queryKey: eventKeys.lists() });
     },
   });

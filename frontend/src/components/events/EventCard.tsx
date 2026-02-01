@@ -1,5 +1,6 @@
 /**
  * EventCard - Collapsible Event Card with Inline Stats
+ * - No manual memoization (React Compiler handles)
  *
  * Single-row event display with expandable quick preview.
  * Follows the same pattern as SeasonCard for UI consistency.
@@ -8,8 +9,6 @@
  * - Collapsed: Show key metrics for quick scanning (duration, participation, absent count)
  * - Expanded: 3 KPI cards + stats row with MVP + compact box plot for merit distribution
  */
-
-import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Button } from "@/components/ui/button";
@@ -144,7 +143,7 @@ function ExpandedContent({ event, eventDetail }: ExpandedContentProps) {
   const isForbidden = event.event_type === "forbidden";
 
   // Calculate box plot stats based on event type
-  const distributionStats = useMemo(() => {
+  const distributionStats = (() => {
     if (isForbidden) {
       // For forbidden: show power_diff distribution of violators
       const violatorValues = metrics
@@ -161,7 +160,7 @@ function ExpandedContent({ event, eventDetail }: ExpandedContentProps) {
           : m.merit_diff,
       );
     return calculateBoxPlotStats(participatedValues);
-  }, [metrics, event.event_type, isForbidden]);
+  })();
 
   return (
     <div className="space-y-4">
@@ -297,17 +296,14 @@ export function EventCard({ event, eventDetail, onEdit }: EventCardProps) {
   const Icon = getEventIcon(event.event_type);
   const eventTypeLabel = getEventTypeLabel(event.event_type);
 
-  const handleViewDetail = useCallback(() => {
+  const handleViewDetail = () => {
     navigate(`/events/${event.id}`);
-  }, [event.id, navigate]);
+  };
 
-  const handleEdit = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onEdit?.(event);
-    },
-    [event, onEdit],
-  );
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit?.(event);
+  };
 
   const icon = <Icon className="h-4 w-4" />;
 

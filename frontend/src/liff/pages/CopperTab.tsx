@@ -1,10 +1,11 @@
 /**
  * Copper Tab
+ * - No manual memoization (React Compiler handles)
  *
  * Compact copper mine registration for LIFF Tall mode.
  */
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   Plus,
   MapPin,
@@ -72,19 +73,16 @@ export function CopperTab({ session }: Props) {
   const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
   // Separate mines into my mines and other mines (must be before early returns)
-  const { myMines, otherMines } = useMemo(() => {
-    const mines = data?.mines || [];
-    const myRegisteredMines: typeof mines = [];
-    const otherMines: typeof mines = [];
-    for (const mine of mines) {
-      if (effectiveGameId && mine.game_id === effectiveGameId) {
-        myRegisteredMines.push(mine);
-      } else {
-        otherMines.push(mine);
-      }
+  const mines = data?.mines || [];
+  const myMines: typeof mines = [];
+  const otherMines: typeof mines = [];
+  for (const mine of mines) {
+    if (effectiveGameId && mine.game_id === effectiveGameId) {
+      myMines.push(mine);
+    } else {
+      otherMines.push(mine);
     }
-    return { myMines: myRegisteredMines, otherMines: otherMines };
-  }, [data?.mines, effectiveGameId]);
+  }
 
   const handleRegister = async () => {
     if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return;

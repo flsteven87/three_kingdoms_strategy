@@ -1,5 +1,6 @@
 /**
  * CsvDropZone - Reusable CSV Upload Drop Zone Component
+ * - No manual memoization (React Compiler handles)
  *
  * A drag & drop zone for CSV file uploads with visual feedback.
  * Uses native <label> + <input> association for reliable file dialog triggering.
@@ -10,87 +11,78 @@
  * - Native label association is the most reliable cross-browser solution
  */
 
-import { useCallback, useState, useId, type ChangeEvent, type DragEvent } from 'react'
-import { FileUp, FileSpreadsheet, CheckCircle2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { useState, useId, type ChangeEvent, type DragEvent } from "react";
+import { FileUp, FileSpreadsheet, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface CsvDropZoneProps {
   /** Label displayed above the drop zone */
-  readonly label?: string
+  readonly label?: string;
   /** Description text inside the drop zone */
-  readonly description?: string
+  readonly description?: string;
   /** Helper text shown below the main description */
-  readonly helperText?: string
+  readonly helperText?: string;
   /** Currently selected file */
-  readonly file: File | null
+  readonly file: File | null;
   /** Callback when file is selected or cleared */
-  readonly onFileChange: (file: File | null) => void
+  readonly onFileChange: (file: File | null) => void;
   /** Whether the component is disabled */
-  readonly disabled?: boolean
+  readonly disabled?: boolean;
   /** Whether to show compact mode (smaller padding) */
-  readonly compact?: boolean
+  readonly compact?: boolean;
 }
 
 export function CsvDropZone({
   label,
-  description = '點擊上傳或拖放 CSV 檔案',
-  helperText = '拖放或點擊選擇 CSV',
+  description = "點擊上傳或拖放 CSV 檔案",
+  helperText = "拖放或點擊選擇 CSV",
   file,
   onFileChange,
   disabled = false,
   compact = false,
 }: CsvDropZoneProps) {
-  const [isDragging, setIsDragging] = useState(false)
-  const inputId = useId()
+  const [isDragging, setIsDragging] = useState(false);
+  const inputId = useId();
 
-  const handleFileChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      const selectedFile = e.target.files?.[0]
-      if (selectedFile) {
-        onFileChange(selectedFile)
-      }
-      // Reset input so same file can be selected again
-      e.target.value = ''
-    },
-    [onFileChange]
-  )
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      onFileChange(selectedFile);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  };
 
-  const handleDragEnter = useCallback(
-    (e: DragEvent<HTMLLabelElement>) => {
-      e.preventDefault()
-      e.stopPropagation()
-      if (!disabled) setIsDragging(true)
-    },
-    [disabled]
-  )
+  const handleDragEnter = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!disabled) setIsDragging(true);
+  };
 
-  const handleDragLeave = useCallback((e: DragEvent<HTMLLabelElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }, [])
+  const handleDragLeave = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
 
-  const handleDragOver = useCallback((e: DragEvent<HTMLLabelElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }, [])
+  const handleDragOver = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
-  const handleDrop = useCallback(
-    (e: DragEvent<HTMLLabelElement>) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setIsDragging(false)
+  const handleDrop = (e: DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
 
-      if (disabled) return
+    if (disabled) return;
 
-      const droppedFile = e.dataTransfer.files?.[0]
-      if (droppedFile?.name.endsWith('.csv')) {
-        onFileChange(droppedFile)
-      }
-    },
-    [disabled, onFileChange]
-  )
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile?.name.endsWith(".csv")) {
+      onFileChange(droppedFile);
+    }
+  };
 
   // File selected state
   if (file) {
@@ -98,7 +90,7 @@ export function CsvDropZone({
       <div className="space-y-2">
         {label && <p className="text-sm font-medium">{label}</p>}
         <Card className="border-primary/50">
-          <CardContent className={compact ? 'py-3' : 'py-4'}>
+          <CardContent className={compact ? "py-3" : "py-4"}>
             <div className="flex items-center gap-3">
               <FileSpreadsheet className="h-6 w-6 text-primary flex-shrink-0" />
               <div className="flex-1 min-w-0">
@@ -123,7 +115,7 @@ export function CsvDropZone({
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   // Empty state - drop zone using native label association
@@ -146,12 +138,12 @@ export function CsvDropZone({
           flex flex-col items-center justify-center
           rounded-lg border-2 border-dashed
           transition-all duration-200
-          ${compact ? 'px-4 py-6' : 'px-6 py-8'}
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${compact ? "px-4 py-6" : "px-6 py-8"}
+          ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
           ${
             isDragging
-              ? 'border-primary bg-primary/5 scale-[1.02]'
-              : 'border-muted-foreground/25 bg-muted/20 hover:border-primary/50 hover:bg-muted/40'
+              ? "border-primary bg-primary/5 scale-[1.02]"
+              : "border-muted-foreground/25 bg-muted/20 hover:border-primary/50 hover:bg-muted/40"
           }
         `}
       >
@@ -166,15 +158,17 @@ export function CsvDropZone({
         />
 
         <FileUp
-          className={`mb-2 ${compact ? 'h-6 w-6' : 'h-8 w-8'} ${
-            isDragging ? 'text-primary' : 'text-muted-foreground'
+          className={`mb-2 ${compact ? "h-6 w-6" : "h-8 w-8"} ${
+            isDragging ? "text-primary" : "text-muted-foreground"
           }`}
         />
         <p className="text-sm font-medium mb-1">
-          {isDragging ? '放開以上傳檔案' : description}
+          {isDragging ? "放開以上傳檔案" : description}
         </p>
-        <p className="text-xs text-muted-foreground text-center">{helperText}</p>
+        <p className="text-xs text-muted-foreground text-center">
+          {helperText}
+        </p>
       </label>
     </div>
-  )
+  );
 }

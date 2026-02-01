@@ -8,9 +8,11 @@
  * - Event list with expandable quick preview
  * - Inline event creation with before/after CSV uploads
  * - Event detail sheet with full member rankings
+ *
+ * - No manual memoization (React Compiler handles)
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -165,10 +167,9 @@ function EventAnalytics() {
   );
 
   // Batch fetch analytics for completed events
-  const completedEventIds = useMemo(() => {
-    if (!events) return [];
-    return events.filter((e) => e.status === "completed").map((e) => e.id);
-  }, [events]);
+  const completedEventIds = events
+    ? events.filter((e) => e.status === "completed").map((e) => e.id)
+    : [];
 
   const { data: batchAnalytics, isLoading: analyticsLoading } =
     useBatchEventAnalytics(completedEventIds);
@@ -181,14 +182,13 @@ function EventAnalytics() {
   const isLoading = seasonsLoading || eventsLoading || analyticsLoading;
 
   // Sort events by date (newest first)
-  const sortedEvents = useMemo(() => {
-    if (!events) return [];
-    return [...events].sort((a, b) => {
-      const aDate = a.event_start ? new Date(a.event_start).getTime() : 0;
-      const bDate = b.event_start ? new Date(b.event_start).getTime() : 0;
-      return bDate - aDate;
-    });
-  }, [events]);
+  const sortedEvents = events
+    ? [...events].sort((a, b) => {
+        const aDate = a.event_start ? new Date(a.event_start).getTime() : 0;
+        const bDate = b.event_start ? new Date(b.event_start).getTime() : 0;
+        return bDate - aDate;
+      })
+    : [];
 
   // Validation
   const canSubmit =
@@ -198,12 +198,12 @@ function EventAnalytics() {
     !isProcessing;
 
   // Handlers
-  const handleStartCreate = useCallback(() => {
+  const handleStartCreate = () => {
     setIsCreating(true);
     setError(null);
-  }, []);
+  };
 
-  const handleCancelCreate = useCallback(() => {
+  const handleCancelCreate = () => {
     setIsCreating(false);
     setFormData({
       name: "",
@@ -212,17 +212,17 @@ function EventAnalytics() {
       afterFile: null,
     });
     setError(null);
-  }, []);
+  };
 
-  const handleFormChange = useCallback((updates: Partial<CreateFormData>) => {
+  const handleFormChange = (updates: Partial<CreateFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
-  }, []);
+  };
 
-  const handleEdit = useCallback((event: EventListItem) => {
+  const handleEdit = (event: EventListItem) => {
     setEditingEvent(event);
-  }, []);
+  };
 
-  const handleCreate = useCallback(async () => {
+  const handleCreate = async () => {
     if (!currentSeason?.id || !formData.beforeFile || !formData.afterFile) {
       setError("缺少必要資料");
       return;
@@ -265,14 +265,7 @@ function EventAnalytics() {
     } finally {
       setIsProcessing(false);
     }
-  }, [
-    currentSeason?.id,
-    formData,
-    uploadEventCsv,
-    createEvent,
-    processEvent,
-    handleCancelCreate,
-  ]);
+  };
 
   return (
     <AllianceGuard>

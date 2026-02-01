@@ -14,35 +14,44 @@
  * - JSX syntax only
  * - Type-safe component
  * - Hyper-minimal UI - typography hierarchy over badges
+ * - No manual memoization (React Compiler handles)
  */
 
-import { useState, useCallback } from 'react'
-import { Activity, Check, CheckCircle, Edit2, Star, Trash2, X } from 'lucide-react'
-import { CollapsibleCard } from '@/components/ui/collapsible-card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
-import { useCanManageSeasons } from '@/hooks/use-user-role'
-import { useCanActivateSeason } from '@/hooks/use-season-quota'
-import type { Season } from '@/types/season'
+import { useState } from "react";
+import {
+  Activity,
+  Check,
+  CheckCircle,
+  Edit2,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
+import { useCanManageSeasons } from "@/hooks/use-user-role";
+import { useCanActivateSeason } from "@/hooks/use-season-quota";
+import type { Season } from "@/types/season";
 import {
   canActivate,
   canSetAsCurrent,
   canReopen,
   getActivationStatusLabel,
   getActivationStatusColor,
-} from '@/types/season'
-import { formatDateTW } from '@/lib/date-utils'
+} from "@/types/season";
+import { formatDateTW } from "@/lib/date-utils";
 
 interface SeasonCardProps {
-  readonly season: Season
-  readonly onUpdate: (seasonId: string, data: Partial<Season>) => Promise<void>
-  readonly onDelete: (seasonId: string) => Promise<void>
-  readonly onActivate: (seasonId: string) => Promise<void>
-  readonly onSetCurrent: (seasonId: string) => Promise<void>
-  readonly onComplete?: (seasonId: string) => Promise<void>
-  readonly onReopen?: (seasonId: string) => Promise<void>
+  readonly season: Season;
+  readonly onUpdate: (seasonId: string, data: Partial<Season>) => Promise<void>;
+  readonly onDelete: (seasonId: string) => Promise<void>;
+  readonly onActivate: (seasonId: string) => Promise<void>;
+  readonly onSetCurrent: (seasonId: string) => Promise<void>;
+  readonly onComplete?: (seasonId: string) => Promise<void>;
+  readonly onReopen?: (seasonId: string) => Promise<void>;
 }
 
 export function SeasonCard({
@@ -54,101 +63,103 @@ export function SeasonCard({
   onComplete,
   onReopen,
 }: SeasonCardProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [activateDialogOpen, setActivateDialogOpen] = useState(false)
-  const [setCurrentDialogOpen, setSetCurrentDialogOpen] = useState(false)
-  const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
-  const [reopenDialogOpen, setReopenDialogOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [setCurrentDialogOpen, setSetCurrentDialogOpen] = useState(false);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
     name: season.name,
     start_date: season.start_date,
-    end_date: season.end_date || '',
-    description: season.description || ''
-  })
+    end_date: season.end_date || "",
+    description: season.description || "",
+  });
 
-  const canManageSeasons = useCanManageSeasons()
-  const canActivateSeasonStatus = useCanActivateSeason()
+  const canManageSeasons = useCanManageSeasons();
+  const canActivateSeasonStatus = useCanActivateSeason();
 
-  const handleEdit = useCallback(() => {
-    setIsEditing(true)
-  }, [])
+  // Event handlers - React Compiler handles memoization automatically
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
 
-  const handleCancel = useCallback(() => {
-    setIsEditing(false)
+  const handleCancel = () => {
+    setIsEditing(false);
     setEditData({
       name: season.name,
       start_date: season.start_date,
-      end_date: season.end_date || '',
-      description: season.description || ''
-    })
-  }, [season])
+      end_date: season.end_date || "",
+      description: season.description || "",
+    });
+  };
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     await onUpdate(season.id, {
       name: editData.name,
       start_date: editData.start_date,
       end_date: editData.end_date || null,
-      description: editData.description || null
-    })
-    setIsEditing(false)
-  }, [season.id, editData, onUpdate])
+      description: editData.description || null,
+    });
+    setIsEditing(false);
+  };
 
-  const handleActivateClick = useCallback(() => {
-    setActivateDialogOpen(true)
-  }, [])
+  const handleActivateClick = () => {
+    setActivateDialogOpen(true);
+  };
 
-  const handleConfirmActivate = useCallback(async () => {
-    await onActivate(season.id)
-    setActivateDialogOpen(false)
-  }, [season.id, onActivate])
+  const handleConfirmActivate = async () => {
+    await onActivate(season.id);
+    setActivateDialogOpen(false);
+  };
 
-  const handleSetCurrentClick = useCallback(() => {
-    setSetCurrentDialogOpen(true)
-  }, [])
+  const handleSetCurrentClick = () => {
+    setSetCurrentDialogOpen(true);
+  };
 
-  const handleConfirmSetCurrent = useCallback(async () => {
-    await onSetCurrent(season.id)
-    setSetCurrentDialogOpen(false)
-  }, [season.id, onSetCurrent])
+  const handleConfirmSetCurrent = async () => {
+    await onSetCurrent(season.id);
+    setSetCurrentDialogOpen(false);
+  };
 
-  const handleCompleteClick = useCallback(() => {
-    setCompleteDialogOpen(true)
-  }, [])
+  const handleCompleteClick = () => {
+    setCompleteDialogOpen(true);
+  };
 
-  const handleConfirmComplete = useCallback(async () => {
+  const handleConfirmComplete = async () => {
     if (onComplete) {
-      await onComplete(season.id)
+      await onComplete(season.id);
     }
-    setCompleteDialogOpen(false)
-  }, [season.id, onComplete])
+    setCompleteDialogOpen(false);
+  };
 
-  const handleReopenClick = useCallback(() => {
-    setReopenDialogOpen(true)
-  }, [])
+  const handleReopenClick = () => {
+    setReopenDialogOpen(true);
+  };
 
-  const handleConfirmReopen = useCallback(async () => {
+  const handleConfirmReopen = async () => {
     if (onReopen) {
-      await onReopen(season.id)
+      await onReopen(season.id);
     }
-    setReopenDialogOpen(false)
-  }, [season.id, onReopen])
+    setReopenDialogOpen(false);
+  };
 
-  const handleDeleteClick = useCallback(() => {
-    setDeleteDialogOpen(true)
-  }, [])
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
 
-  const handleConfirmDelete = useCallback(async () => {
-    await onDelete(season.id)
-  }, [season.id, onDelete])
+  const handleConfirmDelete = async () => {
+    await onDelete(season.id);
+  };
 
   // Determine which buttons to show based on activation_status and is_current
-  const showActivateButton = canActivate(season) && canActivateSeasonStatus
-  const showSetCurrentButton = canSetAsCurrent(season) && !season.is_current
-  const showCompleteButton = season.activation_status === 'activated' && onComplete
-  const showReopenButton = canReopen(season) && onReopen
+  const showActivateButton = canActivate(season) && canActivateSeasonStatus;
+  const showSetCurrentButton = canSetAsCurrent(season) && !season.is_current;
+  const showCompleteButton =
+    season.activation_status === "activated" && onComplete;
+  const showReopenButton = canReopen(season) && onReopen;
   // Only draft seasons can be deleted
-  const canDelete = season.activation_status === 'draft'
+  const canDeleteSeason = season.activation_status === "draft";
 
   // Header actions: Only primary actions (Activate, Set Current)
   // Edit/Delete/Complete moved to expanded content for progressive disclosure
@@ -177,14 +188,18 @@ export function SeasonCard({
         </Button>
       )}
     </div>
-  ) : undefined
+  ) : undefined;
 
-  const title = season.name
+  const title = season.name;
 
   // Build badges: Only status + trial (current indicated by left border)
-  const statusColor = getActivationStatusColor(season.activation_status)
-  const statusVariant = statusColor === 'green' ? 'default' :
-                        statusColor === 'blue' ? 'secondary' : 'outline'
+  const statusColor = getActivationStatusColor(season.activation_status);
+  const statusVariant =
+    statusColor === "green"
+      ? "default"
+      : statusColor === "blue"
+        ? "secondary"
+        : "outline";
 
   const badge = (
     <div className="flex items-center gap-2">
@@ -197,12 +212,13 @@ export function SeasonCard({
         {getActivationStatusLabel(season.activation_status)}
       </Badge>
     </div>
-  )
+  );
 
   // Description shows date range for non-draft seasons
-  const description = season.activation_status === 'draft'
-    ? '草稿狀態 - 啟用後才能設為目前賽季'
-    : `${season.start_date}${season.end_date ? ` ~ ${season.end_date}` : ' ~ 進行中'}`
+  const description =
+    season.activation_status === "draft"
+      ? "草稿狀態 - 啟用後才能設為目前賽季"
+      : `${season.start_date}${season.end_date ? ` ~ ${season.end_date}` : " ~ 進行中"}`;
 
   return (
     <>
@@ -213,7 +229,9 @@ export function SeasonCard({
         actions={headerActions}
         collapsible={true}
         defaultExpanded={season.is_current}
-        className={season.is_current ? 'border-l-4 border-l-primary' : undefined}
+        className={
+          season.is_current ? "border-l-4 border-l-primary" : undefined
+        }
       >
         <div className="space-y-4">
           {/* Unified layout for both view and edit modes */}
@@ -221,7 +239,7 @@ export function SeasonCard({
             <div>
               <p className="text-muted-foreground mb-1">
                 開始日期
-                {isEditing && season.activation_status !== 'draft' && (
+                {isEditing && season.activation_status !== "draft" && (
                   <span className="ml-1 text-xs">（已鎖定）</span>
                 )}
               </p>
@@ -229,8 +247,10 @@ export function SeasonCard({
                 <Input
                   type="date"
                   value={editData.start_date}
-                  onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
-                  disabled={season.activation_status !== 'draft'}
+                  onChange={(e) =>
+                    setEditData({ ...editData, start_date: e.target.value })
+                  }
+                  disabled={season.activation_status !== "draft"}
                   className="h-8 text-sm"
                 />
               ) : (
@@ -240,7 +260,7 @@ export function SeasonCard({
             <div>
               <p className="text-muted-foreground mb-1">
                 結束日期
-                {isEditing && season.activation_status === 'completed' && (
+                {isEditing && season.activation_status === "completed" && (
                   <span className="ml-1 text-xs">（已鎖定）</span>
                 )}
               </p>
@@ -248,12 +268,14 @@ export function SeasonCard({
                 <Input
                   type="date"
                   value={editData.end_date}
-                  onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
-                  disabled={season.activation_status === 'completed'}
+                  onChange={(e) =>
+                    setEditData({ ...editData, end_date: e.target.value })
+                  }
+                  disabled={season.activation_status === "completed"}
                   className="h-8 text-sm"
                 />
               ) : (
-                <p className="font-medium">{season.end_date || '進行中'}</p>
+                <p className="font-medium">{season.end_date || "進行中"}</p>
               )}
             </div>
           </div>
@@ -265,7 +287,9 @@ export function SeasonCard({
               {isEditing ? (
                 <Input
                   value={editData.description}
-                  onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditData({ ...editData, description: e.target.value })
+                  }
                   placeholder="選填：補充說明或備註"
                   className="h-8 text-sm"
                 />
@@ -276,9 +300,10 @@ export function SeasonCard({
           )}
 
           {/* Help text for activated seasons in edit mode */}
-          {isEditing && season.activation_status === 'activated' && (
+          {isEditing && season.activation_status === "activated" && (
             <p className="text-xs text-muted-foreground">
-              賽季已啟用：開始日期已鎖定，結束日期可延長（最長 120 天且不與其他賽季重疊）
+              賽季已啟用：開始日期已鎖定，結束日期可延長（最長 120
+              天且不與其他賽季重疊）
             </p>
           )}
 
@@ -348,7 +373,7 @@ export function SeasonCard({
                         <Edit2 className="h-4 w-4 mr-1" />
                         編輯
                       </Button>
-                      {canDelete && (
+                      {canDeleteSeason && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -431,5 +456,5 @@ export function SeasonCard({
         warningMessage="此操作將永久刪除賽季及所有相關數據（CSV 上傳、成員快照等），無法復原。"
       />
     </>
-  )
+  );
 }
