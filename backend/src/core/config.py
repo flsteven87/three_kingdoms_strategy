@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     )
 
     # Application Version (from pyproject.toml)
-    version: str = "0.3.0"
+    version: str = "0.9.0"
 
     # Supabase Configuration
     supabase_url: str
