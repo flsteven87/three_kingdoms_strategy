@@ -4,8 +4,8 @@
  * Compact copper mine registration for LIFF Tall mode.
  */
 
-import { useState } from 'react'
-import { Plus, MapPin, Trash2, Info } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Plus, MapPin, Trash2, Info, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -34,6 +34,7 @@ export function CopperTab({ session }: Props) {
   const [coordY, setCoordY] = useState('')
   const [level, setLevel] = useState('9')
   const [formError, setFormError] = useState('')
+  const [showOtherMines, setShowOtherMines] = useState(false)
 
   const context = {
     lineUserId: session.lineUserId,
@@ -47,13 +48,32 @@ export function CopperTab({ session }: Props) {
 
   // Get registered accounts
   const { data: memberInfo, isLoading: isLoadingMember } = useLiffMemberInfo(memberContext)
-  const accounts = memberInfo?.registered_ids || []
-  const effectiveGameId = selectedGameId || accounts[0]?.game_id || null
+  const effectiveGameId = selectedGameId || memberInfo?.registered_ids?.[0]?.game_id || null
 
   const { data, isLoading, error } = useLiffCopperMines(context)
   const { data: rules } = useLiffCopperRules(session.lineGroupId)
   const registerMutation = useLiffRegisterCopper(context)
   const deleteMutation = useLiffDeleteCopper(context)
+
+  const myCount = data?.my_count ?? 0
+  const maxAllowed = data?.max_allowed ?? 0
+  const canApply = maxAllowed === 0 || myCount < maxAllowed
+
+  // Separate mines into my mines and other mines (must be before early returns)
+  const { myMines, otherMines } = useMemo(() => {
+    const mines = data?.mines || []
+    const activeGameId = selectedGameId || null
+    const myRegisteredMines: typeof mines = []
+    const otherMines: typeof mines = []
+    for (const mine of mines) {
+      if (activeGameId && mine.game_id === activeGameId) {
+        myRegisteredMines.push(mine)
+      } else {
+        otherMines.push(mine)
+      }
+    }
+    return { myMines: myRegisteredMines, otherMines: otherMines }
+  }, [data?.mines, selectedGameId])
 
   const handleRegister = async () => {
     if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return
@@ -99,7 +119,7 @@ export function CopperTab({ session }: Props) {
   }
 
   // No registered accounts - prompt to register first
-  if (accounts.length === 0) {
+  if (memberInfo?.registered_ids?.length === 0) {
     return (
       <div className="p-4 text-center">
         <p className="text-sm text-muted-foreground">
@@ -117,15 +137,6 @@ export function CopperTab({ session }: Props) {
     )
   }
 
-  const mines = data?.mines || []
-  const myCount = data?.my_count ?? 0
-  const maxAllowed = data?.max_allowed ?? 0
-  const canApply = maxAllowed === 0 || myCount < maxAllowed
-
-  // 判斷銅礦是否為自己註冊的（根據 game_id 匹配用戶的帳號列表）
-  const myGameIds = new Set(accounts.map((acc) => acc.game_id))
-  const isMyMine = (gameId: string) => myGameIds.has(gameId)
-
   // Format level text for display
   const formatLevel = (allowedLevel: 'nine' | 'ten' | 'both') => {
     if (allowedLevel === 'nine') return '9 級'
@@ -140,9 +151,8 @@ export function CopperTab({ session }: Props) {
     <div className="p-3 space-y-3">
       {/* Quota status */}
       {maxAllowed > 0 && (
-        <div className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${
-          canApply ? 'bg-muted/50' : 'bg-destructive/10'
-        }`}>
+        <div className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${canApply ? 'bg-muted/50' : 'bg-destructive/10'
+          }`}>
           <span className={canApply ? 'text-muted-foreground' : 'text-destructive'}>
             已申請 {myCount} / {maxAllowed} 座
           </span>
@@ -156,7 +166,7 @@ export function CopperTab({ session }: Props) {
       <div className="space-y-2">
         <div className="flex gap-2">
           {/* Account selector */}
-          {accounts.length === 1 ? (
+          {memberInfo?.registered_ids?.length === 1 ? (
             <div className="h-10 flex-1 flex items-center px-3 bg-muted/50 rounded-md text-sm">
               {effectiveGameId}
             </div>
@@ -170,7 +180,7 @@ export function CopperTab({ session }: Props) {
                 <SelectValue placeholder="選擇帳號" />
               </SelectTrigger>
               <SelectContent>
-                {accounts.map((acc) => (
+                {memberInfo?.registered_ids?.map((acc) => (
                   <SelectItem key={acc.game_id} value={acc.game_id}>
                     {acc.game_id}
                   </SelectItem>
@@ -258,48 +268,79 @@ export function CopperTab({ session }: Props) {
       {/* Mines list */}
       <div className="pt-2">
         <div className="text-xs text-muted-foreground mb-2">
-          同盟銅礦 ({mines.length})
+          我的銅礦 ({myMines.length})
         </div>
-        {mines.length === 0 ? (
+        {myMines.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            尚未有銅礦記錄
+            尚未註冊銅礦
           </p>
         ) : (
           <div className="space-y-1">
-            {mines.map((mine) => {
-              const isMine = isMyMine(mine.game_id)
-              return (
-                <div
-                  key={mine.id}
-                  className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                    isMine ? 'bg-primary/10' : 'bg-muted/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <MapPin className={`h-3.5 w-3.5 shrink-0 ${isMine ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-sm font-medium">Lv.{mine.level}</span>
-                    <span className="text-xs text-muted-foreground">
-                      ({mine.coord_x},{mine.coord_y})
-                    </span>
-                    <span className="text-xs text-muted-foreground truncate">
-                      {mine.game_id}
-                    </span>
-                  </div>
-                  {/* 只有自己的銅礦才顯示刪除按鈕 */}
-                  {isMine && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0"
-                      onClick={() => handleDelete(mine.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  )}
+            {myMines.map((mine) => (
+              <div
+                key={mine.id}
+                className="flex items-center justify-between py-2 px-3 rounded-lg bg-primary/10"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="text-sm font-medium">Lv.{mine.level}</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({mine.coord_x},{mine.coord_y})
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {mine.game_id}
+                  </span>
                 </div>
-              )
-            })}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => handleDelete(mine.id)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Other mines - expandable */}
+        {otherMines.length > 0 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowOtherMines(!showOtherMines)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+            >
+              {showOtherMines ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+              同盟銅礦 ({otherMines.length})
+            </button>
+            {showOtherMines && (
+              <div className="space-y-1 mt-2">
+                {otherMines.map((mine) => (
+                  <div
+                    key={mine.id}
+                    className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/50"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="text-sm font-medium">Lv.{mine.level}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({mine.coord_x},{mine.coord_y})
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {mine.game_id}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
