@@ -157,27 +157,42 @@ class BattleEventService:
 
         Returns:
             List of event list items with stats
+
+        Performance:
+            - 1 query for events
+            - 1 batch query for all completed events' metrics
+            - Total: 2 queries regardless of event count
         """
         events = await self._event_repo.get_by_season(season_id)
 
+        # Batch fetch metrics for all completed events (avoid N+1)
+        completed_event_ids = [e.id for e in events if e.status == EventStatus.COMPLETED]
+        metrics_map: dict[UUID, list[BattleEventMetricsWithMember]] = {}
+
+        if completed_event_ids:
+            metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(
+                completed_event_ids
+            )
+
         result: list[BattleEventListItem] = []
         for event in events:
-            # Get summary stats if event is completed
+            # Default values for non-completed events
             participation_rate = None
             total_merit = None
             mvp_name = None
             absent_count = None
             absent_names = None
+            participant_names = None
 
             if event.status == EventStatus.COMPLETED:
-                summary = await self._calculate_event_summary(event.id, event.event_type)
+                # Use pre-fetched metrics (no additional DB query)
+                metrics = metrics_map.get(event.id, [])
+                summary = self._calculate_summary_from_metrics(metrics, event.event_type)
+
                 participation_rate = summary.participation_rate
                 total_merit = summary.total_merit
                 mvp_name = summary.mvp_member_name
                 absent_count = summary.absent_count
-
-                # Get absent member names
-                metrics = await self._metrics_repo.get_by_event_with_member(event.id)
                 absent_names = [m.member_name for m in metrics if m.is_absent]
                 participant_names = [m.member_name for m in metrics if m.participated]
 
@@ -510,7 +525,8 @@ class BattleEventService:
             alliance_id=alliance_id,
             season_id=season_id,
             event_types=["battle", "siege"],
-            limit=limit)
+            limit=limit,
+        )
 
         if not events:
             return []
@@ -722,7 +738,9 @@ class BattleEventService:
         metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(event_ids)
 
         # Calculate summaries for each event
-        result: dict[UUID, tuple[BattleEvent, EventSummary, list[BattleEventMetricsWithMember]]] = {}
+        result: dict[
+            UUID, tuple[BattleEvent, EventSummary, list[BattleEventMetricsWithMember]]
+        ] = {}
 
         for event_id in event_ids:
             event = event_map.get(event_id)
@@ -797,7 +815,9 @@ class BattleEventService:
         # Average metrics (only for participants)
         avg_merit = total_merit / participated_count if participated_count > 0 else 0.0
         avg_assist = total_assist / participated_count if participated_count > 0 else 0.0
-        avg_contribution = total_contribution / participated_count if participated_count > 0 else 0.0
+        avg_contribution = (
+            total_contribution / participated_count if participated_count > 0 else 0.0
+        )
 
         # Category-specific MVP calculation
         mvp_member_id = None
@@ -818,9 +838,7 @@ class BattleEventService:
             # Dual MVP: Contribution MVP + Assist MVP
             contribution_candidates = [m for m in metrics if m.contribution_diff > 0]
             if contribution_candidates:
-                top_contributor = max(
-                    contribution_candidates, key=lambda m: m.contribution_diff
-                )
+                top_contributor = max(contribution_candidates, key=lambda m: m.contribution_diff)
                 contribution_mvp_member_id = top_contributor.member_id
                 contribution_mvp_name = top_contributor.member_name
                 contribution_mvp_score = top_contributor.contribution_diff

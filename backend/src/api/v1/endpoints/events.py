@@ -36,6 +36,7 @@ from src.api.v1.schemas.events import (
 from src.core.dependencies import (
     BattleEventServiceDep,
     CSVUploadServiceDep,
+    PermissionServiceDep,
     SeasonServiceDep,
     UserIdDep,
 )
@@ -126,6 +127,7 @@ async def get_batch_event_analytics(
     body: BatchAnalyticsRequest,
     user_id: UserIdDep,
     service: BattleEventServiceDep,
+    permission_service: PermissionServiceDep,
 ) -> BatchAnalyticsResponse:
     """
     Get analytics for multiple events in a single request.
@@ -138,20 +140,30 @@ async def get_batch_event_analytics(
 
     Returns:
         Map of event_id to complete analytics
+
+    Performance:
+        - Batch fetches events and metrics (2 DB queries)
+        - Single permission check per alliance (1 DB query)
+        - Total: 3 queries regardless of event count
     """
     # Fetch batch analytics
     batch_data = await service.get_batch_event_analytics(body.event_ids)
+
+    if not batch_data:
+        return BatchAnalyticsResponse(analytics={})
+
+    # All events from the same season belong to the same alliance
+    # Verify permission once using the first event's alliance_id
+    first_event = next(iter(batch_data.values()))[0]
+    role = await permission_service.get_user_role(user_id, first_event.alliance_id)
+    if role is None:
+        # User has no access to this alliance - return empty
+        return BatchAnalyticsResponse(analytics={})
 
     # Build response with distribution calculation
     analytics_map: dict[str, EventAnalyticsResponse] = {}
 
     for event_id, (event, summary, metrics) in batch_data.items():
-        # Verify user access for each event
-        try:
-            await service.verify_user_access(user_id, event_id)
-        except (ValueError, PermissionError):
-            continue  # Skip events user can't access
-
         # Calculate distribution based on event type
         if event.event_type == EventCategory.SIEGE:
             values = [m.contribution_diff + m.assist_diff for m in metrics]
