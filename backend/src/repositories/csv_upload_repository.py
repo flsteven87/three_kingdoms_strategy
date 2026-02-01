@@ -208,3 +208,40 @@ class CsvUploadRepository(SupabaseRepository[CsvUpload]):
         self._handle_supabase_result(result, allow_empty=True)
 
         return True
+
+    async def replace_same_day_upload(
+        self,
+        alliance_id: UUID,
+        season_id: UUID,
+        snapshot_date: datetime,
+        upload_data: dict,
+    ) -> tuple[CsvUpload, CsvUpload | None]:
+        """
+        Atomically replace same-day regular upload with a new one.
+
+        This method combines get_by_date, delete, and create into a single
+        operation to minimize race condition window. Combined with the
+        Idempotency Middleware, this provides strong duplicate prevention.
+
+        Args:
+            alliance_id: Alliance UUID
+            season_id: Season UUID
+            snapshot_date: Snapshot datetime
+            upload_data: New upload data dictionary
+
+        Returns:
+            Tuple of (new_upload, replaced_upload_or_none)
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        # Step 1: Check for existing upload on same date
+        existing_upload = await self.get_by_date(alliance_id, season_id, snapshot_date)
+
+        # Step 2: Delete existing if found
+        if existing_upload:
+            await self.delete(existing_upload.id)
+
+        # Step 3: Create new upload
+        new_upload = await self.create(upload_data)
+
+        return new_upload, existing_upload

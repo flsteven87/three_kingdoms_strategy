@@ -107,6 +107,43 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         data = self._handle_supabase_result(result, expect_single=True)
         return self._build_model(data)
 
+    async def update_status_with_check(
+        self,
+        event_id: UUID,
+        expected_status: EventStatus,
+        new_status: EventStatus,
+    ) -> BattleEvent | None:
+        """
+        Update event status only if current status matches expected (optimistic lock).
+
+        This prevents race conditions when multiple requests try to process
+        the same event simultaneously.
+
+        Args:
+            event_id: Event UUID
+            expected_status: Status the event must have for update to succeed
+            new_status: New status to set
+
+        Returns:
+            Updated battle event if successful, None if status didn't match
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .update({"status": new_status.value})
+            .eq("id", str(event_id))
+            .eq("status", expected_status.value)  # Optimistic lock condition
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        if not data:
+            return None  # Status didn't match - concurrent modification
+
+        return self._build_model(data[0])
+
     async def update_upload_ids(
         self,
         event_id: UUID,
@@ -272,7 +309,11 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         return self._build_model(data[0])
 
     async def get_recent_completed_events(
-        self, alliance_id: UUID, season_id: UUID | None = None, event_types: list[str] | None = None, limit: int = 5
+        self,
+        alliance_id: UUID,
+        season_id: UUID | None = None,
+        event_types: list[str] | None = None,
+        limit: int = 5,
     ) -> list[BattleEvent]:
         """
         Get the most recent completed battle events for an alliance.

@@ -240,7 +240,7 @@ class BattleEventService:
 
         符合 CLAUDE.md 🔴: Service layer orchestration
         """
-        # 1. Update event with upload IDs and set status to analyzing
+        # 1. Get event and verify it exists
         event = await self._event_repo.get_by_id(event_id)
         if not event:
             raise ValueError(f"Event {event_id} not found")
@@ -250,122 +250,147 @@ class BattleEventService:
             event.alliance_id, "process battle event snapshots"
         )
 
-        await self._event_repo.update_upload_ids(event_id, before_upload_id, after_upload_id)
-        await self._event_repo.update_status(event_id, EventStatus.ANALYZING)
+        # 2. Optimistic lock: only process DRAFT events
+        # This prevents race conditions when multiple requests try to process simultaneously
+        updated = await self._event_repo.update_status_with_check(
+            event_id=event_id,
+            expected_status=EventStatus.DRAFT,
+            new_status=EventStatus.ANALYZING,
+        )
 
-        # 1.5 Auto-set event times from CSV upload snapshot dates
-        before_upload = await self._upload_repo.get_by_id(before_upload_id)
-        after_upload = await self._upload_repo.get_by_id(after_upload_id)
+        if not updated:
+            # Another request is already processing or event is completed
+            current = await self._event_repo.get_by_id(event_id)
+            if current and current.status == EventStatus.COMPLETED:
+                return current  # Already done, return existing result
+            raise ValueError(f"Event {event_id} is already being processed or has invalid status")
 
-        if before_upload and after_upload:
-            await self._event_repo.update_event_times(
-                event_id,
-                event_start=before_upload.snapshot_date,
-                event_end=after_upload.snapshot_date,
+        try:
+            # 3. Update upload IDs
+            await self._event_repo.update_upload_ids(event_id, before_upload_id, after_upload_id)
+
+            # 4. Auto-set event times from CSV upload snapshot dates
+            before_upload = await self._upload_repo.get_by_id(before_upload_id)
+            after_upload = await self._upload_repo.get_by_id(after_upload_id)
+
+            if before_upload and after_upload:
+                await self._event_repo.update_event_times(
+                    event_id,
+                    event_start=before_upload.snapshot_date,
+                    event_end=after_upload.snapshot_date,
+                )
+
+            # 5. Get snapshots for both uploads
+            before_snapshots = await self._snapshot_repo.get_by_upload(before_upload_id)
+            after_snapshots = await self._snapshot_repo.get_by_upload(after_upload_id)
+
+            # 6. Build member_id -> snapshot maps
+            before_map = {snap.member_id: snap for snap in before_snapshots}
+            after_map = {snap.member_id: snap for snap in after_snapshots}
+
+            # 7. Delete existing metrics for this event (in case of reprocessing)
+            await self._metrics_repo.delete_by_event(event_id)
+
+            # 8. Calculate metrics for each member
+            metrics_list: list[BattleEventMetricsCreate] = []
+
+            # Members in after snapshot (participated or new)
+            for member_id, after_snap in after_map.items():
+                before_snap = before_map.get(member_id)
+
+                if before_snap:
+                    # Existing member: calculate diffs
+                    contribution_diff = max(
+                        0, after_snap.total_contribution - before_snap.total_contribution
+                    )
+                    merit_diff = max(0, after_snap.total_merit - before_snap.total_merit)
+                    assist_diff = max(0, after_snap.total_assist - before_snap.total_assist)
+                    donation_diff = max(0, after_snap.total_donation - before_snap.total_donation)
+                    power_diff = after_snap.power_value - before_snap.power_value
+
+                    # Participation based on event category
+                    participated, is_absent = self._determine_participation(
+                        event.event_type,
+                        contribution_diff,
+                        merit_diff,
+                        assist_diff,
+                        power_diff,
+                    )
+
+                    metrics_list.append(
+                        BattleEventMetricsCreate(
+                            event_id=event_id,
+                            member_id=member_id,
+                            alliance_id=event.alliance_id,
+                            start_snapshot_id=before_snap.id,
+                            end_snapshot_id=after_snap.id,
+                            contribution_diff=contribution_diff,
+                            merit_diff=merit_diff,
+                            assist_diff=assist_diff,
+                            donation_diff=donation_diff,
+                            power_diff=power_diff,
+                            participated=participated,
+                            is_new_member=False,
+                            is_absent=is_absent,
+                        )
+                    )
+                else:
+                    # New member: only in after snapshot
+                    metrics_list.append(
+                        BattleEventMetricsCreate(
+                            event_id=event_id,
+                            member_id=member_id,
+                            alliance_id=event.alliance_id,
+                            start_snapshot_id=None,
+                            end_snapshot_id=after_snap.id,
+                            contribution_diff=0,
+                            merit_diff=0,
+                            assist_diff=0,
+                            donation_diff=0,
+                            power_diff=0,
+                            participated=False,
+                            is_new_member=True,
+                            is_absent=False,
+                        )
+                    )
+
+            # Members only in before snapshot (left/absent during event)
+            for member_id, before_snap in before_map.items():
+                if member_id not in after_map:
+                    # Member left or not in after snapshot
+                    metrics_list.append(
+                        BattleEventMetricsCreate(
+                            event_id=event_id,
+                            member_id=member_id,
+                            alliance_id=event.alliance_id,
+                            start_snapshot_id=before_snap.id,
+                            end_snapshot_id=None,
+                            contribution_diff=0,
+                            merit_diff=0,
+                            assist_diff=0,
+                            donation_diff=0,
+                            power_diff=0,
+                            participated=False,
+                            is_new_member=False,
+                            is_absent=True,
+                        )
+                    )
+
+            # 9. Batch insert metrics
+            if metrics_list:
+                await self._metrics_repo.create_batch(metrics_list)
+
+            # 10. Update event status to completed
+            return await self._event_repo.update_status(event_id, EventStatus.COMPLETED)
+
+        except Exception:
+            # Rollback: reset status to DRAFT on failure
+            await self._event_repo.update_status_with_check(
+                event_id=event_id,
+                expected_status=EventStatus.ANALYZING,
+                new_status=EventStatus.DRAFT,
             )
-
-        # 2. Get snapshots for both uploads
-        before_snapshots = await self._snapshot_repo.get_by_upload(before_upload_id)
-        after_snapshots = await self._snapshot_repo.get_by_upload(after_upload_id)
-
-        # 3. Build member_id -> snapshot maps
-        before_map = {snap.member_id: snap for snap in before_snapshots}
-        after_map = {snap.member_id: snap for snap in after_snapshots}
-
-        # 4. Delete existing metrics for this event (in case of reprocessing)
-        await self._metrics_repo.delete_by_event(event_id)
-
-        # 5. Calculate metrics for each member
-        metrics_list: list[BattleEventMetricsCreate] = []
-
-        # Members in after snapshot (participated or new)
-        for member_id, after_snap in after_map.items():
-            before_snap = before_map.get(member_id)
-
-            if before_snap:
-                # Existing member: calculate diffs
-                contribution_diff = max(
-                    0, after_snap.total_contribution - before_snap.total_contribution
-                )
-                merit_diff = max(0, after_snap.total_merit - before_snap.total_merit)
-                assist_diff = max(0, after_snap.total_assist - before_snap.total_assist)
-                donation_diff = max(0, after_snap.total_donation - before_snap.total_donation)
-                power_diff = after_snap.power_value - before_snap.power_value
-
-                # Participation based on event category
-                participated, is_absent = self._determine_participation(
-                    event.event_type,
-                    contribution_diff,
-                    merit_diff,
-                    assist_diff,
-                    power_diff,
-                )
-
-                metrics_list.append(
-                    BattleEventMetricsCreate(
-                        event_id=event_id,
-                        member_id=member_id,
-                        alliance_id=event.alliance_id,
-                        start_snapshot_id=before_snap.id,
-                        end_snapshot_id=after_snap.id,
-                        contribution_diff=contribution_diff,
-                        merit_diff=merit_diff,
-                        assist_diff=assist_diff,
-                        donation_diff=donation_diff,
-                        power_diff=power_diff,
-                        participated=participated,
-                        is_new_member=False,
-                        is_absent=is_absent,
-                    )
-                )
-            else:
-                # New member: only in after snapshot
-                metrics_list.append(
-                    BattleEventMetricsCreate(
-                        event_id=event_id,
-                        member_id=member_id,
-                        alliance_id=event.alliance_id,
-                        start_snapshot_id=None,
-                        end_snapshot_id=after_snap.id,
-                        contribution_diff=0,
-                        merit_diff=0,
-                        assist_diff=0,
-                        donation_diff=0,
-                        power_diff=0,
-                        participated=False,
-                        is_new_member=True,
-                        is_absent=False,
-                    )
-                )
-
-        # Members only in before snapshot (left/absent during event)
-        for member_id, before_snap in before_map.items():
-            if member_id not in after_map:
-                # Member left or not in after snapshot
-                metrics_list.append(
-                    BattleEventMetricsCreate(
-                        event_id=event_id,
-                        member_id=member_id,
-                        alliance_id=event.alliance_id,
-                        start_snapshot_id=before_snap.id,
-                        end_snapshot_id=None,
-                        contribution_diff=0,
-                        merit_diff=0,
-                        assist_diff=0,
-                        donation_diff=0,
-                        power_diff=0,
-                        participated=False,
-                        is_new_member=False,
-                        is_absent=True,
-                    )
-                )
-
-        # 6. Batch insert metrics
-        if metrics_list:
-            await self._metrics_repo.create_batch(metrics_list)
-
-        # 7. Update event status to completed
-        return await self._event_repo.update_status(event_id, EventStatus.COMPLETED)
+            raise
 
     async def get_event_metrics(self, event_id: UUID) -> list[BattleEventMetricsWithMember]:
         """

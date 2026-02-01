@@ -141,18 +141,9 @@ class CSVUploadService:
         if not members_data:
             raise HTTPException(status_code=400, detail="CSV file is empty")
 
-        # Step 4: For 'regular' uploads only - check for existing upload on same date
-        existing_upload = None
-        if upload_type == "regular":
-            existing_upload = await self._csv_upload_repo.get_by_date(
-                alliance_id=alliance.id, season_id=season_id, snapshot_date=snapshot_date
-            )
-
-            if existing_upload:
-                # Delete existing upload (CASCADE will delete snapshots automatically)
-                await self._csv_upload_repo.delete(existing_upload.id)
-
-        # Step 5: Create CSV upload record
+        # Step 4-5: Create CSV upload record
+        # For 'regular' uploads, atomically replace same-day upload if exists
+        # Combined with Idempotency Middleware, this prevents race conditions
         upload_data = {
             "season_id": str(season_id),
             "alliance_id": str(alliance.id),
@@ -162,7 +153,17 @@ class CSVUploadService:
             "upload_type": upload_type,
         }
 
-        csv_upload = await self._csv_upload_repo.create(upload_data)
+        existing_upload = None
+        if upload_type == "regular":
+            csv_upload, existing_upload = await self._csv_upload_repo.replace_same_day_upload(
+                alliance_id=alliance.id,
+                season_id=season_id,
+                snapshot_date=snapshot_date,
+                upload_data=upload_data,
+            )
+        else:
+            # Event uploads don't replace - multiple per day allowed
+            csv_upload = await self._csv_upload_repo.create(upload_data)
 
         # Step 6: Upsert members (update last_seen_at for existing, insert new)
         members_upsert_data = [

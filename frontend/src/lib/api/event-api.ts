@@ -60,11 +60,14 @@ export async function createEvent(
  * - Do NOT trigger period calculation
  * - Can have multiple uploads on the same day
  * - Are stored with upload_type='event'
+ *
+ * @param idempotencyKey - Optional key for retry safety (Stripe-style pattern)
  */
 export async function uploadEventCsv(
   seasonId: string,
   file: File,
   snapshotDate?: string,
+  idempotencyKey?: string,
 ): Promise<EventUploadResponse> {
   const formData = new FormData();
   formData.append("season_id", seasonId);
@@ -73,27 +76,48 @@ export async function uploadEventCsv(
     formData.append("snapshot_date", snapshotDate);
   }
 
-  // IMPORTANT: Must set Content-Type to undefined to let axios
-  // automatically set multipart/form-data with correct boundary.
+  // Build headers with optional idempotency key for retry safety
+  const headers: Record<string, string | undefined> = {
+    // IMPORTANT: Must set Content-Type to undefined to let axios
+    // automatically set multipart/form-data with correct boundary.
+    "Content-Type": undefined,
+  };
+
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+
   const response = await axiosInstance.post<EventUploadResponse>(
     "/api/v1/events/upload-csv",
     formData,
-    { headers: { "Content-Type": undefined } },
+    { headers },
   );
   return response.data;
 }
 
+/**
+ * Process event to calculate analytics
+ *
+ * @param idempotencyKey - Optional key for retry safety (Stripe-style pattern)
+ */
 export async function processEvent(
   eventId: string,
   beforeUploadId: string,
   afterUploadId: string,
+  idempotencyKey?: string,
 ): Promise<BattleEvent> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
+
   const response = await axiosInstance.post<BattleEvent>(
     `/api/v1/events/${eventId}/process`,
     {
       before_upload_id: beforeUploadId,
       after_upload_id: afterUploadId,
     },
+    { headers },
   );
   return response.data;
 }

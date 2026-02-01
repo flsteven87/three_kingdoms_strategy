@@ -31,8 +31,12 @@ from src.api.v1.endpoints import (
 )
 from src.core.config import settings
 from src.core.exceptions import SeasonQuotaExhaustedError
+from src.core.idempotency import IdempotencyMiddleware, InMemoryIdempotencyStorage
 
 logger = logging.getLogger(__name__)
+
+# Create idempotency storage for preventing duplicate mutations
+idempotency_storage = InMemoryIdempotencyStorage()
 
 # Create FastAPI app
 # 符合 CLAUDE.md 🔴: redirect_slashes=False for cloud deployment
@@ -43,6 +47,14 @@ app = FastAPI(
     redirect_slashes=False,
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
+)
+
+# Idempotency middleware (must be added before CORS)
+# Prevents duplicate mutations from network retries
+app.add_middleware(
+    IdempotencyMiddleware,
+    storage=idempotency_storage,
+    ttl_seconds=86400,  # 24 hours
 )
 
 # CORS middleware

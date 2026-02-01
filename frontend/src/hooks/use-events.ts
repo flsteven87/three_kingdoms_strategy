@@ -117,6 +117,14 @@ export function useCreateEvent(seasonId: string | undefined) {
   });
 }
 
+interface UploadEventCsvVariables {
+  readonly seasonId: string;
+  readonly file: File;
+  readonly snapshotDate?: string;
+  /** Idempotency key for retry safety - use useUploadStateMachine to generate */
+  readonly idempotencyKey?: string;
+}
+
 /**
  * Hook to upload CSV for event analysis
  *
@@ -124,6 +132,8 @@ export function useCreateEvent(seasonId: string | undefined) {
  * - Does NOT trigger period calculation
  * - Can have multiple uploads on the same day
  * - Is stored with upload_type='event'
+ *
+ * Supports idempotency key for retry safety (Stripe-style pattern).
  */
 export function useUploadEventCsv() {
   return useMutation({
@@ -131,30 +141,47 @@ export function useUploadEventCsv() {
       seasonId,
       file,
       snapshotDate,
-    }: {
-      seasonId: string;
-      file: File;
-      snapshotDate?: string;
-    }) => apiClient.uploadEventCsv(seasonId, file, snapshotDate),
+      idempotencyKey,
+    }: UploadEventCsvVariables) =>
+      apiClient.uploadEventCsv(seasonId, file, snapshotDate, idempotencyKey),
   });
+}
+
+interface ProcessEventVariables {
+  readonly eventId: string;
+  readonly beforeUploadId: string;
+  readonly afterUploadId: string;
+  /** Idempotency key for retry safety - prevents duplicate processing */
+  readonly idempotencyKey?: string;
 }
 
 /**
  * Hook to process event snapshots
+ *
+ * Uses mutationKey for serialization - prevents concurrent processing
+ * of the same event (race condition prevention).
+ *
+ * Supports idempotency key for retry safety (Stripe-style pattern).
  */
 export function useProcessEvent() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    // Mutation scope key: serializes concurrent mutations
+    // Prevents race conditions when rapidly clicking process button
+    mutationKey: ["processEvent"],
     mutationFn: ({
       eventId,
       beforeUploadId,
       afterUploadId,
-    }: {
-      eventId: string;
-      beforeUploadId: string;
-      afterUploadId: string;
-    }) => apiClient.processEvent(eventId, beforeUploadId, afterUploadId),
+      idempotencyKey,
+    }: ProcessEventVariables) =>
+      apiClient.processEvent(
+        eventId,
+        beforeUploadId,
+        afterUploadId,
+        idempotencyKey,
+      ),
     onSuccess: (event: BattleEvent) => {
       // Invalidate the event detail and analytics
       queryClient.invalidateQueries({ queryKey: eventKeys.detail(event.id) });

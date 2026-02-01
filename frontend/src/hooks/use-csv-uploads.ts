@@ -32,10 +32,34 @@ export function useCsvUploads(seasonId: string) {
   });
 }
 
+interface UploadCsvVariables {
+  readonly seasonId: string;
+  readonly file: File;
+  readonly snapshotDate?: string;
+  /** Idempotency key for retry safety - use useUploadStateMachine to generate */
+  readonly idempotencyKey?: string;
+}
+
 /**
  * Hook to upload CSV file with optional custom snapshot date
  *
- * Optimistic updates enabled
+ * Supports idempotency key for retry safety (Stripe-style pattern).
+ * Use with useUploadStateMachine hook for proper state management.
+ *
+ * @example
+ * ```tsx
+ * const [uploadState, uploadActions] = useUploadStateMachine();
+ * const uploadMutation = useUploadCsv();
+ *
+ * const handleUpload = async (file: File) => {
+ *   const key = uploadActions.start();
+ *   uploadMutation.mutate({
+ *     seasonId,
+ *     file,
+ *     idempotencyKey: key,
+ *   });
+ * };
+ * ```
  */
 export function useUploadCsv() {
   const queryClient = useQueryClient();
@@ -45,11 +69,9 @@ export function useUploadCsv() {
       seasonId,
       file,
       snapshotDate,
-    }: {
-      seasonId: string;
-      file: File;
-      snapshotDate?: string;
-    }) => apiClient.uploadCsv(seasonId, file, snapshotDate),
+      idempotencyKey,
+    }: UploadCsvVariables) =>
+      apiClient.uploadCsv(seasonId, file, snapshotDate, idempotencyKey),
     onSettled: (_data, _error, variables) => {
       // Always invalidate to ensure cache consistency
       queryClient.invalidateQueries({
