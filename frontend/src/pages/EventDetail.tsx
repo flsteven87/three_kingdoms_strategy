@@ -271,9 +271,11 @@ function MetricDistribution({
 interface MemberRankingProps {
   readonly metrics: readonly EventMemberMetric[];
   readonly eventType: EventCategory;
+  readonly medianValue?: number;
+  readonly medianField?: SortField;
 }
 
-function MemberRanking({ metrics, eventType }: MemberRankingProps) {
+function MemberRanking({ metrics, eventType, medianValue, medianField }: MemberRankingProps) {
   const isBattle = eventType === "battle";
   const isSiege = eventType === "siege";
   const isForbidden = eventType === "forbidden";
@@ -286,6 +288,23 @@ function MemberRanking({ metrics, eventType }: MemberRankingProps) {
       : "merit_diff";
   const [sortField, setSortField] = useState<SortField>(defaultSortField);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  // Find median member ID - member closest to median value
+  const medianMemberId = (() => {
+    if (medianValue === undefined || !medianField) return null;
+    let closestMember: EventMemberMetric | null = null;
+    let closestDiff = Infinity;
+    for (const m of metrics) {
+      const val = m[medianField];
+      if (typeof val !== "number") continue;
+      const diff = Math.abs(val - medianValue);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestMember = m;
+      }
+    }
+    return closestMember?.id ?? null;
+  })();
 
   const sortedMetrics = [...metrics].sort((a, b) => {
     // For FORBIDDEN, show violators (power_diff > 0) first
@@ -462,53 +481,61 @@ function MemberRanking({ metrics, eventType }: MemberRankingProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedMetrics.map((m, index) => (
-                <tr
-                  key={m.id}
-                  className="border-b last:border-0 hover:bg-muted/50 transition-colors"
-                >
-                  <td className="py-3 px-3 tabular-nums text-muted-foreground">
-                    {index + 1}
-                  </td>
-                  <td className="py-3 px-3">
-                    <div className="flex items-center gap-2">
-                      {getMedalIcon(index, m)}
-                      <span className="font-medium">{m.member_name}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-muted-foreground">
-                    {m.group_name || "-"}
-                  </td>
-                  {/* BATTLE: 戰功 */}
-                  {isBattle && (
-                    <td className="py-3 px-3 text-right tabular-nums font-medium">
-                      {formatNumber(m.merit_diff)}
+              {sortedMetrics.map((m, index) => {
+                const isMedianMember = m.id === medianMemberId;
+                return (
+                  <tr
+                    key={m.id}
+                    className={`border-b last:border-0 hover:bg-muted/50 transition-colors ${isMedianMember ? "bg-amber-50 dark:bg-amber-950/30" : ""}`}
+                  >
+                    <td className="py-3 px-3 tabular-nums text-muted-foreground">
+                      {index + 1}
                     </td>
-                  )}
-                  {/* SIEGE: 貢獻 + 助攻 */}
-                  {isSiege && (
-                    <>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-2">
+                        {getMedalIcon(index, m)}
+                        <span className="font-medium">{m.member_name}</span>
+                        {isMedianMember && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
+                            Median
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-muted-foreground">
+                      {m.group_name || "-"}
+                    </td>
+                    {/* BATTLE: 戰功 */}
+                    {isBattle && (
                       <td className="py-3 px-3 text-right tabular-nums font-medium">
-                        {formatNumber(m.contribution_diff)}
+                        {formatNumber(m.merit_diff)}
                       </td>
-                      <td className="py-3 px-3 text-right tabular-nums">
-                        {formatNumber(m.assist_diff)}
+                    )}
+                    {/* SIEGE: 貢獻 + 助攻 */}
+                    {isSiege && (
+                      <>
+                        <td className="py-3 px-3 text-right tabular-nums font-medium">
+                          {formatNumber(m.contribution_diff)}
+                        </td>
+                        <td className="py-3 px-3 text-right tabular-nums">
+                          {formatNumber(m.assist_diff)}
+                        </td>
+                      </>
+                    )}
+                    {/* FORBIDDEN: 勢力增加 */}
+                    {isForbidden && (
+                      <td
+                        className={`py-3 px-3 text-right tabular-nums ${m.power_diff > 0 ? "text-destructive font-medium" : ""}`}
+                      >
+                        {m.power_diff > 0
+                          ? `+${formatNumber(m.power_diff)}`
+                          : formatNumber(m.power_diff)}
                       </td>
-                    </>
-                  )}
-                  {/* FORBIDDEN: 勢力增加 */}
-                  {isForbidden && (
-                    <td
-                      className={`py-3 px-3 text-right tabular-nums ${m.power_diff > 0 ? "text-destructive font-medium" : ""}`}
-                    >
-                      {m.power_diff > 0
-                        ? `+${formatNumber(m.power_diff)}`
-                        : formatNumber(m.power_diff)}
-                    </td>
-                  )}
-                  <td className="py-3 px-3 text-center">{getStatusBadge(m)}</td>
-                </tr>
-              ))}
+                    )}
+                    <td className="py-3 px-3 text-center">{getStatusBadge(m)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -912,7 +939,49 @@ function EventDetail() {
         />
 
         {/* Member Ranking (Category-aware) */}
-        <MemberRanking metrics={metrics} eventType={event.event_type} />
+        {(() => {
+          // Calculate median for the primary metric based on event type
+          let medianValue: number | undefined;
+          let medianField: SortField | undefined;
+
+          if (event.event_type === "siege") {
+            const contributionValues = metrics
+              .filter((m) => m.participated)
+              .map((m) => m.contribution_diff);
+            const stats = calculateBoxPlotStats(contributionValues);
+            if (stats) {
+              medianValue = stats.median;
+              medianField = "contribution_diff";
+            }
+          } else if (event.event_type === "battle") {
+            const meritValues = metrics
+              .filter((m) => m.participated)
+              .map((m) => m.merit_diff);
+            const stats = calculateBoxPlotStats(meritValues);
+            if (stats) {
+              medianValue = stats.median;
+              medianField = "merit_diff";
+            }
+          } else if (event.event_type === "forbidden") {
+            const powerValues = metrics
+              .filter((m) => m.power_diff > 0)
+              .map((m) => m.power_diff);
+            const stats = calculateBoxPlotStats(powerValues);
+            if (stats) {
+              medianValue = stats.median;
+              medianField = "power_diff";
+            }
+          }
+
+          return (
+            <MemberRanking
+              metrics={metrics}
+              eventType={event.event_type}
+              medianValue={medianValue}
+              medianField={medianField}
+            />
+          );
+        })()}
 
         {/* Participation Summary (only for BATTLE/SIEGE) */}
         {hasParticipationTracking(event.event_type) && (

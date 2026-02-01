@@ -83,6 +83,7 @@ export function BoxPlot({
   scaleRange,
 }: BoxPlotProps) {
   const [hoveredPoint, setHoveredPoint] = useState<StripPlotPoint | null>(null);
+  const [hoveredStat, setHoveredStat] = useState<"q1" | "median" | "q3" | null>(null);
 
   const rangeMin = scaleRange?.min ?? stats.min;
   const rangeMax = scaleRange?.max ?? stats.max;
@@ -143,19 +144,45 @@ export function BoxPlot({
         />
         {/* IQR box */}
         <div
-          className="absolute inset-y-1 rounded border-2"
+          className="absolute inset-y-1 rounded border-2 cursor-pointer"
           style={{
             left: `${q1Pct}%`,
             right: `${100 - q3Pct}%`,
             backgroundColor: `color-mix(in srgb, ${colorClass} 20%, transparent)`,
             borderColor: colorClass,
           }}
-        />
+          onMouseEnter={() => setHoveredStat("q1")}
+          onMouseLeave={() => setHoveredStat(null)}
+        >
+          {hoveredStat === "q1" && (
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 rounded bg-popover border shadow-md text-xs whitespace-nowrap z-20">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                <span className="text-muted-foreground">Q1:</span>
+                <span className="font-medium text-right">{formatNumber(stats.q1)}</span>
+                <span className="text-muted-foreground">Median:</span>
+                <span className="font-medium text-right">{formatNumber(stats.median)}</span>
+                <span className="text-muted-foreground">Q3:</span>
+                <span className="font-medium text-right">{formatNumber(stats.q3)}</span>
+              </div>
+            </div>
+          )}
+        </div>
         {/* Median line */}
         <div
-          className="absolute inset-y-0 w-0.5"
+          className="absolute inset-y-0 w-1 -ml-0.5 cursor-pointer hover:w-1.5 transition-all"
           style={{ left: `${medianPct}%`, backgroundColor: colorClass }}
-        />
+          onMouseEnter={() => setHoveredStat("median")}
+          onMouseLeave={() => setHoveredStat(null)}
+        >
+          {hoveredStat === "median" && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded bg-popover border shadow-md text-xs whitespace-nowrap z-20">
+              <div className="text-center">
+                <span className="text-muted-foreground">Median: </span>
+                <span className="font-medium">{formatNumber(stats.median)}</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Strip Plot - Individual data points */}
