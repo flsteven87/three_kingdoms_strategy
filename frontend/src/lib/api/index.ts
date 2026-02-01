@@ -113,6 +113,7 @@ export const apiClient = {
   getEvents: eventApi.getEvents,
   getEvent: eventApi.getEvent,
   getEventAnalytics: eventApi.getEventAnalytics,
+  getBatchEventAnalytics: eventApi.getBatchEventAnalytics,
   getEventGroupAnalytics: eventApi.getEventGroupAnalytics,
   createEvent: eventApi.createEvent,
   updateEvent: eventApi.updateEvent,

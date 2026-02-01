@@ -13,6 +13,7 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
   EventUploadResponse,
+  BatchAnalyticsResponse,
 } from "@/types/event";
 
 export async function getEvents(seasonId: string): Promise<EventListItem[]> {
@@ -123,6 +124,19 @@ export async function getEventGroupAnalytics(
 ): Promise<EventGroupAnalytics> {
   const response = await axiosInstance.get<EventGroupAnalytics>(
     `/api/v1/events/${eventId}/group-analytics`,
+  );
+  return response.data;
+}
+
+/**
+ * Get analytics for multiple events in a single request
+ */
+export async function getBatchEventAnalytics(
+  eventIds: string[],
+): Promise<BatchAnalyticsResponse> {
+  const response = await axiosInstance.post<BatchAnalyticsResponse>(
+    "/api/v1/events/batch-analytics",
+    { event_ids: eventIds },
   );
   return response.data;
 }
