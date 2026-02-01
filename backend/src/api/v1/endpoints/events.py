@@ -16,6 +16,8 @@ from uuid import UUID
 from fastapi import APIRouter, File, Form, UploadFile
 
 from src.api.v1.schemas.events import (
+    BatchAnalyticsRequest,
+    BatchAnalyticsResponse,
     CreateEventRequest,
     DistributionBinResponse,
     EventAnalyticsResponse,
@@ -117,6 +119,57 @@ async def list_events(
     await season_service.verify_user_access(user_id, season_id)
     events = await service.get_events_by_season(season_id)
     return [EventListItemResponse.model_validate(e) for e in events]
+
+
+@router.post("/batch-analytics", response_model=BatchAnalyticsResponse)
+async def get_batch_event_analytics(
+    body: BatchAnalyticsRequest,
+    user_id: UserIdDep,
+    service: BattleEventServiceDep,
+) -> BatchAnalyticsResponse:
+    """
+    Get analytics for multiple events in a single request.
+
+    This endpoint eliminates N+1 queries when loading the event list page.
+    Only returns analytics for events the user has access to.
+
+    Request Body:
+        event_ids: List of event UUIDs (max 50)
+
+    Returns:
+        Map of event_id to complete analytics
+    """
+    # Fetch batch analytics
+    batch_data = await service.get_batch_event_analytics(body.event_ids)
+
+    # Build response with distribution calculation
+    analytics_map: dict[str, EventAnalyticsResponse] = {}
+
+    for event_id, (event, summary, metrics) in batch_data.items():
+        # Verify user access for each event
+        try:
+            await service.verify_user_access(user_id, event_id)
+        except (ValueError, PermissionError):
+            continue  # Skip events user can't access
+
+        # Calculate distribution based on event type
+        if event.event_type == EventCategory.SIEGE:
+            values = [m.contribution_diff + m.assist_diff for m in metrics]
+        elif event.event_type == EventCategory.FORBIDDEN:
+            values = [m.power_diff for m in metrics if m.power_diff > 0]
+        else:
+            values = [m.merit_diff for m in metrics]
+
+        merit_distribution = _calculate_metric_distribution(values)
+
+        analytics_map[str(event_id)] = EventAnalyticsResponse(
+            event=EventDetailResponse.model_validate(event),
+            summary=EventSummaryResponse.model_validate(summary),
+            metrics=[EventMemberMetricResponse.model_validate(m) for m in metrics],
+            merit_distribution=merit_distribution,
+        )
+
+    return BatchAnalyticsResponse(analytics=analytics_map)
 
 
 @router.post("", response_model=EventDetailResponse, status_code=201)
