@@ -653,3 +653,54 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             alliance_id=group_binding.alliance_id, line_user_id=line_user_id
         )
         return len(bindings) > 0
+
+    # =========================================================================
+    # Member Candidates Operations (for autocomplete)
+    # =========================================================================
+
+    async def get_active_member_candidates(
+        self, alliance_id: UUID
+    ) -> list[dict[str, str | None]]:
+        """
+        Get active members with their latest group_name for autocomplete.
+
+        Uses a subquery to get the most recent snapshot's group_name for each member.
+
+        Returns:
+            List of dicts with 'name' and 'group_name' keys
+        """
+        # Query active members with their latest snapshot's group_name
+        # Using RPC for efficient join with latest snapshot
+        result = await self._execute_async(
+            lambda: self.client.rpc(
+                "get_member_candidates",
+                {"p_alliance_id": str(alliance_id)},
+            ).execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return data
+
+    async def find_similar_members(
+        self, alliance_id: UUID, name: str, limit: int = 5
+    ) -> list[dict[str, str | None]]:
+        """
+        Find members with similar names using case-insensitive LIKE matching.
+
+        Args:
+            alliance_id: Alliance UUID
+            name: Name to search for
+            limit: Maximum results to return
+
+        Returns:
+            List of dicts with 'name' and 'group_name' keys
+        """
+        result = await self._execute_async(
+            lambda: self.client.rpc(
+                "find_similar_members",
+                {"p_alliance_id": str(alliance_id), "p_name": name, "p_limit": limit},
+            ).execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return data

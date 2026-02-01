@@ -29,6 +29,8 @@ from src.models.line_binding import (
     LineCustomCommandResponse,
     LineCustomCommandUpdate,
     LineGroupBindingResponse,
+    MemberCandidate,
+    MemberCandidatesResponse,
     MemberInfoResponse,
     MemberLineBinding,
     MemberPerformanceResponse,
@@ -38,6 +40,7 @@ from src.models.line_binding import (
     PerformanceTrendItem,
     RegisteredAccount,
     RegisterMemberResponse,
+    SimilarMembersResponse,
 )
 from src.repositories.line_binding_repository import LineBindingRepository
 
@@ -871,3 +874,63 @@ class LineBindingService:
             trend=trend_items,
             season_total=season_total,
         )
+
+    # =========================================================================
+    # Member Candidates Operations (for LIFF autocomplete)
+    # =========================================================================
+
+    async def get_member_candidates(self, line_group_id: str) -> MemberCandidatesResponse:
+        """
+        Get active member candidates for autocomplete in LIFF.
+
+        Args:
+            line_group_id: LINE group ID
+
+        Returns:
+            MemberCandidatesResponse with list of candidates
+        """
+        group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
+        if not group_binding:
+            return MemberCandidatesResponse(candidates=[])
+
+        data = await self.repository.get_active_member_candidates(group_binding.alliance_id)
+
+        candidates = [
+            MemberCandidate(name=row["name"], group_name=row.get("group_name"))
+            for row in data
+        ]
+
+        return MemberCandidatesResponse(candidates=candidates)
+
+    async def find_similar_members(
+        self, line_group_id: str, name: str
+    ) -> SimilarMembersResponse:
+        """
+        Find members with similar names for fuzzy matching.
+
+        Args:
+            line_group_id: LINE group ID
+            name: Name to search for
+
+        Returns:
+            SimilarMembersResponse with similar candidates and exact match flag
+        """
+        group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
+        if not group_binding:
+            return SimilarMembersResponse(similar=[], has_exact_match=False)
+
+        data = await self.repository.find_similar_members(
+            alliance_id=group_binding.alliance_id,
+            name=name,
+            limit=5,
+        )
+
+        similar = [
+            MemberCandidate(name=row["name"], group_name=row.get("group_name"))
+            for row in data
+        ]
+
+        # Check if first result is exact match
+        has_exact_match = len(similar) > 0 and similar[0].name == name
+
+        return SimilarMembersResponse(similar=similar, has_exact_match=has_exact_match)

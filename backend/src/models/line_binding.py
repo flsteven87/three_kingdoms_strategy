@@ -307,3 +307,28 @@ class MemberPerformanceResponse(BaseModel):
     alliance_median: PerformanceMetrics | None = None
     trend: list[PerformanceTrendItem] = []
     season_total: PerformanceSeasonTotal | None = None
+
+
+# =============================================================================
+# Member Candidate Models (for autocomplete)
+# =============================================================================
+
+
+class MemberCandidate(BaseModel):
+    """Single member candidate for autocomplete"""
+
+    name: str
+    group_name: str | None = None
+
+
+class MemberCandidatesResponse(BaseModel):
+    """Response for member candidates list"""
+
+    candidates: list[MemberCandidate] = []
+
+
+class SimilarMembersResponse(BaseModel):
+    """Response for similar members search"""
+
+    similar: list[MemberCandidate] = []
+    has_exact_match: bool = False

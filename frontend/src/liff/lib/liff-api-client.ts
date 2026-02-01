@@ -64,6 +64,63 @@ export interface RegisterMemberResponse {
   registered_ids: RegisteredAccount[];
 }
 
+// Member Candidates API (for autocomplete)
+
+export interface MemberCandidate {
+  name: string;
+  group_name: string | null;
+}
+
+export interface MemberCandidatesResponse {
+  candidates: MemberCandidate[];
+}
+
+export interface SimilarMembersResponse {
+  similar: MemberCandidate[];
+  has_exact_match: boolean;
+}
+
+export async function getMemberCandidates(
+  options: Pick<LiffApiOptions, "lineGroupId">,
+): Promise<MemberCandidatesResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/linebot/member/candidates`);
+  url.searchParams.set("g", options.lineGroupId);
+
+  const response = await fetch(url.toString(), {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || "Request failed");
+  }
+
+  return response.json();
+}
+
+export async function findSimilarMembers(
+  options: Pick<LiffApiOptions, "lineGroupId"> & { name: string },
+): Promise<SimilarMembersResponse> {
+  const url = new URL(`${API_BASE_URL}/api/v1/linebot/member/similar`);
+  url.searchParams.set("g", options.lineGroupId);
+  url.searchParams.set("name", options.name);
+
+  const response = await fetch(url.toString(), {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || "Request failed");
+  }
+
+  return response.json();
+}
+
 export async function getMemberInfo(
   options: LiffApiOptions,
 ): Promise<MemberInfoResponse> {

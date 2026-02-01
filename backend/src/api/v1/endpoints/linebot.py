@@ -45,11 +45,13 @@ from src.models.line_binding import (
     LineGroupBindingResponse,
     LineWebhookEvent,
     LineWebhookRequest,
+    MemberCandidatesResponse,
     MemberInfoResponse,
     MemberLineBindingCreate,
     MemberPerformanceResponse,
     RegisteredMembersResponse,
     RegisterMemberResponse,
+    SimilarMembersResponse,
 )
 from src.services.battle_event_service import BattleEventService
 from src.services.line_binding_service import LineBindingService
@@ -361,6 +363,35 @@ async def unregister_game_id(
 ) -> RegisterMemberResponse:
     """Unregister a game ID for a LINE user"""
     return await service.unregister_member(line_group_id=g, line_user_id=u, game_id=game_id)
+
+
+@router.get(
+    "/member/candidates",
+    response_model=MemberCandidatesResponse,
+    summary="Get member candidates",
+    description="Get active members for autocomplete in LIFF",
+)
+async def get_member_candidates(
+    service: LineBindingServiceDep,
+    g: Annotated[str, Query(description="LINE group ID")],
+) -> MemberCandidatesResponse:
+    """Get member candidates for autocomplete"""
+    return await service.get_member_candidates(line_group_id=g)
+
+
+@router.get(
+    "/member/similar",
+    response_model=SimilarMembersResponse,
+    summary="Find similar members",
+    description="Find members with similar names for fuzzy matching",
+)
+async def find_similar_members(
+    service: LineBindingServiceDep,
+    g: Annotated[str, Query(description="LINE group ID")],
+    name: Annotated[str, Query(description="Name to search for", min_length=1)],
+) -> SimilarMembersResponse:
+    """Find similar members for post-submit correction"""
+    return await service.find_similar_members(line_group_id=g, name=name)
 
 
 # =============================================================================
