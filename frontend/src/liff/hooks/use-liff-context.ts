@@ -2,15 +2,12 @@
  * LIFF Context Hook
  *
  * Access LIFF session from child components of LiffLayout.
+ * Returns LiffSessionWithGroup since LiffLayout validates lineGroupId before rendering.
  */
 
-import { useOutletContext } from 'react-router-dom'
-import type { LiffSession } from './use-liff-session'
-
-type LiffContextType = {
-  session: LiffSession
-}
+import { useOutletContext } from "react-router-dom";
+import type { LiffContextType } from "../components/LiffLayout";
 
 export function useLiffContext() {
-  return useOutletContext<LiffContextType>()
+  return useOutletContext<LiffContextType>();
 }
