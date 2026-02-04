@@ -13,6 +13,7 @@ import {
   Info,
   ChevronDown,
   ChevronRight,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ export function CopperTab({ session }: Props) {
   const [coordY, setCoordY] = useState("");
   const [level, setLevel] = useState("9");
   const [formError, setFormError] = useState("");
+  const [searchResult, setSearchResult] = useState<string | null>(null);
   const [showOtherMines, setShowOtherMines] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -94,6 +96,31 @@ export function CopperTab({ session }: Props) {
   const maxAllowed = data?.max_allowed ?? 0;
   const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
+  const handleSearch = () => {
+    if (!coordX.trim() || !coordY.trim()) {
+      setSearchResult(null);
+      return;
+    }
+
+    const x = parseInt(coordX, 10);
+    const y = parseInt(coordY, 10);
+
+    if (isNaN(x) || x < 0 || isNaN(y) || y < 0) {
+      setSearchResult(null);
+      return;
+    }
+
+    const existingMine = mines.find(
+      (mine) => mine.coord_x === x && mine.coord_y === y
+    );
+
+    if (existingMine) {
+      setSearchResult(`已被 ${existingMine.game_id} 註冊 (Lv.${existingMine.level})`);
+    } else {
+      setSearchResult("座標可用 ✓");
+    }
+  };
+
   const handleRegister = async () => {
     if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return;
 
@@ -110,6 +137,7 @@ export function CopperTab({ session }: Props) {
     }
 
     setFormError("");
+    setSearchResult(null);
     try {
       await registerMutation.mutateAsync({
         gameId: effectiveGameId,
@@ -277,8 +305,23 @@ export function CopperTab({ session }: Props) {
                 <Plus className="h-4 w-4" />
               )}
             </Button>
+            <Button
+              onClick={handleSearch}
+              disabled={!coordX.trim() || !coordY.trim()}
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 shrink-0"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
           </div>
         </div>
+
+        {searchResult && (
+          <p className={`text-xs ${searchResult.includes("✓") ? "text-green-600" : "text-amber-600"}`}>
+            {searchResult}
+          </p>
+        )}
 
         {(formError || registerMutation.error) && (
           <p className="text-xs text-destructive">
