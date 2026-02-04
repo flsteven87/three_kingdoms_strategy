@@ -139,20 +139,24 @@ class CopperMineService:
         rules = await self.rule_repository.get_rules_by_alliance(alliance_id)
         max_allowed = len(rules)
 
-        # 計算用戶已申請的銅礦數量
-        # 需要先取得用戶綁定的 game_ids
-        my_count = 0
+        # 計算每個綁定 game_id 的銅礦數量
+        mine_counts_by_game_id: dict[str, int] = {}
         member_bindings = await self.line_binding_repository.get_member_bindings_by_line_user(
             alliance_id, line_user_id
         )
         if member_bindings:
             my_game_ids = {b.game_id for b in member_bindings}
-            my_count = sum(1 for mine in mines if mine.game_id in my_game_ids)
+            # 為每個綁定的 game_id 初始化計數為 0
+            mine_counts_by_game_id = {game_id: 0 for game_id in my_game_ids}
+            # 計算每個 game_id 的銅礦數量
+            for mine in mines:
+                if mine.game_id in my_game_ids:
+                    mine_counts_by_game_id[mine.game_id] += 1
 
         return CopperMineListResponse(
             mines=[self._to_response(mine) for mine in mines],
             total=len(mines),
-            my_count=my_count,
+            mine_counts_by_game_id=mine_counts_by_game_id,
             max_allowed=max_allowed,
         )
 

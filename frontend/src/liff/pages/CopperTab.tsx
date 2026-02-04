@@ -69,7 +69,7 @@ export function CopperTab({ session }: Props) {
   const registerMutation = useLiffRegisterCopper(context);
   const deleteMutation = useLiffDeleteCopper(context);
 
-  const myCount = data?.my_count ?? 0;
+  const myCount = effectiveGameId ? (data?.mine_counts_by_game_id?.[effectiveGameId] ?? 0) : 0;
   const maxAllowed = data?.max_allowed ?? 0;
   const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
@@ -170,9 +170,8 @@ export function CopperTab({ session }: Props) {
         {/* Quota status */}
         {maxAllowed > 0 && (
           <div
-            className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${
-              canApply ? "bg-muted/50" : "bg-destructive/10"
-            }`}
+            className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${canApply ? "bg-muted/50" : "bg-destructive/10"
+              }`}
           >
             <span
               className={

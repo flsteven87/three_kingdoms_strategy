@@ -197,7 +197,7 @@ export interface CopperMine {
 export interface CopperMineListResponse {
   mines: CopperMine[];
   total: number;
-  my_count: number;
+  mine_counts_by_game_id: Record<string, number>;
   max_allowed: number;
 }
 

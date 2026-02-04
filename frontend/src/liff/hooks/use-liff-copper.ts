@@ -98,12 +98,16 @@ export function useLiffRegisterCopper(context: LiffContext | null) {
         registered_at: new Date().toISOString(),
       }
 
-      queryClient.setQueryData<CopperMineListResponse>(queryKey, (old) => ({
-        mines: [optimisticMine, ...(old?.mines || [])],
-        total: (old?.total || 0) + 1,
-        my_count: (old?.my_count || 0) + 1,
-        max_allowed: old?.max_allowed || 0,
-      }))
+      queryClient.setQueryData<CopperMineListResponse>(queryKey, (old) => {
+        const newCounts = { ...(old?.mine_counts_by_game_id || {}) }
+        newCounts[params.gameId] = (newCounts[params.gameId] || 0) + 1
+        return {
+          mines: [optimisticMine, ...(old?.mines || [])],
+          total: (old?.total || 0) + 1,
+          mine_counts_by_game_id: newCounts,
+          max_allowed: old?.max_allowed || 0,
+        }
+      })
 
       return { previousData }
     },
@@ -157,12 +161,19 @@ export function useLiffDeleteCopper(context: LiffContext | null) {
       const previousData = queryClient.getQueryData<CopperMineListResponse>(queryKey)
 
       // Optimistically remove the mine
-      queryClient.setQueryData<CopperMineListResponse>(queryKey, (old) => ({
-        mines: old?.mines.filter((m) => m.id !== mineId) || [],
-        total: Math.max((old?.total || 0) - 1, 0),
-        my_count: Math.max((old?.my_count || 0) - 1, 0),
-        max_allowed: old?.max_allowed || 0,
-      }))
+      queryClient.setQueryData<CopperMineListResponse>(queryKey, (old) => {
+        const deletedMine = old?.mines.find((m) => m.id === mineId)
+        const newCounts = { ...(old?.mine_counts_by_game_id || {}) }
+        if (deletedMine?.game_id && newCounts[deletedMine.game_id]) {
+          newCounts[deletedMine.game_id] = Math.max(newCounts[deletedMine.game_id] - 1, 0)
+        }
+        return {
+          mines: old?.mines.filter((m) => m.id !== mineId) || [],
+          total: Math.max((old?.total || 0) - 1, 0),
+          mine_counts_by_game_id: newCounts,
+          max_allowed: old?.max_allowed || 0,
+        }
+      })
 
       return { previousData }
     },
