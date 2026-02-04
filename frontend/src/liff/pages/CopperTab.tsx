@@ -69,10 +69,6 @@ export function CopperTab({ session }: Props) {
   const registerMutation = useLiffRegisterCopper(context);
   const deleteMutation = useLiffDeleteCopper(context);
 
-  const myCount = effectiveGameId ? (data?.mine_counts_by_game_id?.[effectiveGameId] ?? 0) : 0;
-  const maxAllowed = data?.max_allowed ?? 0;
-  const canApply = maxAllowed === 0 || myCount < maxAllowed;
-
   // Separate mines into my mines and other mines (must be before early returns)
   const mines = data?.mines || [];
   const myMines: typeof mines = [];
@@ -84,6 +80,11 @@ export function CopperTab({ session }: Props) {
       otherMines.push(mine);
     }
   }
+
+  // Use myMines.length as the single source of truth for count
+  const myCount = myMines.length;
+  const maxAllowed = data?.max_allowed ?? 0;
+  const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
   const handleRegister = async () => {
     if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return;
