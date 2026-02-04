@@ -69,20 +69,28 @@ export function CopperTab({ session }: Props) {
   const registerMutation = useLiffRegisterCopper(context);
   const deleteMutation = useLiffDeleteCopper(context);
 
-  // Separate mines into my mines and other mines (must be before early returns)
+  // Get all game_ids owned by this user
+  const myGameIds = new Set(
+    memberInfo?.registered_ids?.map((acc) => acc.game_id) || []
+  );
+
+  // Separate mines into: selected account, other accounts (mine), alliance (others)
   const mines = data?.mines || [];
-  const myMines: typeof mines = [];
+  const selectedMines: typeof mines = [];
+  const myOtherMines: typeof mines = [];
   const otherMines: typeof mines = [];
   for (const mine of mines) {
     if (effectiveGameId && mine.game_id === effectiveGameId) {
-      myMines.push(mine);
+      selectedMines.push(mine);
+    } else if (myGameIds.has(mine.game_id)) {
+      myOtherMines.push(mine);
     } else {
       otherMines.push(mine);
     }
   }
 
-  // Use myMines.length as the single source of truth for count
-  const myCount = myMines.length;
+  // Count for currently selected game_id
+  const myCount = selectedMines.length;
   const maxAllowed = data?.max_allowed ?? 0;
   const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
@@ -302,21 +310,56 @@ export function CopperTab({ session }: Props) {
         {/* Mines list */}
         <div className="pt-2">
           <div className="text-xs text-muted-foreground mb-2">
-            我的銅礦 ({myMines.length})
+            {effectiveGameId} 的銅礦 ({selectedMines.length})
           </div>
-          {myMines.length === 0 ? (
+          {selectedMines.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               尚未註冊銅礦
             </p>
           ) : (
             <div className="space-y-1">
-              {myMines.map((mine) => (
+              {selectedMines.map((mine) => (
                 <div
                   key={mine.id}
                   className="flex items-center justify-between py-2 px-3 rounded-lg bg-primary/10"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <MapPin className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm font-medium">Lv.{mine.level}</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({mine.coord_x},{mine.coord_y})
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {mine.game_id}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => handleDeleteClick(mine.id)}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* My other accounts' mines */}
+          {myOtherMines.length > 0 && (
+            <div className="mt-3 space-y-1">
+              <div className="text-xs text-muted-foreground mb-2">
+                我的其他帳號 ({myOtherMines.length})
+              </div>
+              {myOtherMines.map((mine) => (
+                <div
+                  key={mine.id}
+                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/30"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MapPin className="h-4 w-4 shrink-0 text-secondary-foreground" />
                     <span className="text-sm font-medium">Lv.{mine.level}</span>
                     <span className="text-xs text-muted-foreground">
                       ({mine.coord_x},{mine.coord_y})
