@@ -235,7 +235,6 @@ export function CopperTab({ session }: Props) {
               <Select
                 value={effectiveGameId || ""}
                 onValueChange={setSelectedGameId}
-                disabled={!canApply}
               >
                 <SelectTrigger className="h-10 flex-1">
                   <SelectValue placeholder="選擇帳號" />
@@ -269,7 +268,6 @@ export function CopperTab({ session }: Props) {
                 className="h-10"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                disabled={!canApply}
               />
             </div>
             <div className="flex items-center gap-1.5 flex-1">
@@ -281,12 +279,22 @@ export function CopperTab({ session }: Props) {
                 className="h-10"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                disabled={!canApply}
                 onKeyDown={(e) =>
                   e.key === "Enter" && canApply && handleRegister()
                 }
               />
             </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSearch}
+              disabled={!coordX.trim() || !coordY.trim()}
+              variant="outline"
+              className="h-10 flex-1"
+            >
+              <Search className="h-4 w-4 mr-2" />
+              查詢
+            </Button>
             <Button
               onClick={handleRegister}
               disabled={
@@ -296,23 +304,16 @@ export function CopperTab({ session }: Props) {
                 !coordY.trim() ||
                 registerMutation.isPending
               }
-              size="icon"
-              className="h-10 w-10 shrink-0"
+              className="h-10 flex-1"
             >
               {registerMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
-                <Plus className="h-4 w-4" />
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  註冊
+                </>
               )}
-            </Button>
-            <Button
-              onClick={handleSearch}
-              disabled={!coordX.trim() || !coordY.trim()}
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 shrink-0"
-            >
-              <Search className="h-4 w-4" />
             </Button>
           </div>
         </div>
