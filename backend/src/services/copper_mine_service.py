@@ -218,24 +218,23 @@ class CopperMineService:
 
     async def _validate_rule(
         self, alliance_id: UUID, member_id: UUID | None, season_id: UUID | None, level: int
-    ) -> None:
+    ) -> int | None:
         """
         Validate copper mine registration against alliance rules.
 
-        P0 修復: 銅礦上限驗證邏輯
-
-        Rules validation:
-        1. Get all rules to determine max allowed mines
-        2. Check member's current mine count in the season
-        3. Validate not exceeding max allowed
-        4. Validate member's total_merit >= rule.required_merit
-        5. Validate level matches rule.allowed_level
+        Flexible tier system:
+        - Users can skip tiers if they have enough merit and level matches
+        - System tracks which tiers have been claimed to prevent double-claiming
+        - Returns the claimed tier number for storage
 
         Args:
             alliance_id: Alliance UUID
             member_id: Member UUID (may be None if not matched)
             season_id: Season UUID (may be None if no active season)
-            level: Mine level (1-10)
+            level: Mine level (9 or 10)
+
+        Returns:
+            The tier number that was claimed (to be stored with the mine)
 
         Raises:
             HTTPException 403: If rule validation fails
@@ -259,51 +258,81 @@ class CopperMineService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"銅礦等級限制：{LEVEL_TEXT[first_rule.allowed_level]}",
                 )
-            return
+            return None
 
-        # 3. 檢查是否已達上限
-        current_count = await self.repository.count_member_mines(season_id, member_id)
+        # 3. 取得已領取的 tier 集合
+        claimed_tiers = await self.repository.get_claimed_tiers(season_id, member_id)
 
-        if current_count >= max_allowed:
+        if len(claimed_tiers) >= max_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"已達銅礦上限（{current_count}/{max_allowed} 座）",
+                detail=f"已達銅礦上限（{len(claimed_tiers)}/{max_allowed} 座）",
             )
 
-        next_tier = current_count + 1
-
-        # 4. 取得下一座銅礦的規則（一定存在，因為 current_count < max_allowed）
-        rule = await self.rule_repository.get_rule_by_tier(alliance_id, next_tier)
-
-        if not rule:
-            # 防禦性檢查：理論上不應該發生
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail=f"第 {next_tier} 座銅礦規則未設定"
-            )
-
-        # 5. 取得成員快照驗證戰功
+        # 4. 取得成員快照驗證戰功
         snapshot = await self.snapshot_repository.get_latest_by_member_in_season(
             member_id, season_id
         )
 
-        if snapshot:
-            # 驗證戰功要求
-            if snapshot.total_merit < rule.required_merit:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"總戰功不足：需要 {rule.required_merit:,}，目前 {snapshot.total_merit:,}",
-                )
-        else:
+        if not snapshot:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="成員戰功不存在，無法驗證戰功要求"
             )
 
-        # 6. 驗證等級限制
-        if not self._is_level_allowed(level, rule.allowed_level):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"第 {next_tier} 座銅礦只能申請{LEVEL_TEXT[rule.allowed_level]}",
-            )
+        # 5. 找出符合條件且未被領取的最低階規則
+        # 條件：(1) 戰功符合 (2) 等級符合 (3) 該 tier 尚未被領取
+        eligible_rule = None
+        sorted_rules = sorted(all_rules, key=lambda r: r.tier)
+
+        for candidate_rule in sorted_rules:
+            # 跳過已領取的 tier
+            if candidate_rule.tier in claimed_tiers:
+                continue
+            # 檢查戰功是否符合
+            if snapshot.total_merit < candidate_rule.required_merit:
+                continue
+            # 檢查等級是否符合
+            if not self._is_level_allowed(level, candidate_rule.allowed_level):
+                continue
+            # 找到第一個符合的規則
+            eligible_rule = candidate_rule
+            break
+
+        if not eligible_rule:
+            # 沒有符合的規則，給出明確的錯誤訊息
+            # 檢查是所有已領取、戰功不足、還是等級不符
+            unclaimed_rules = [r for r in sorted_rules if r.tier not in claimed_tiers]
+            if not unclaimed_rules:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"已達銅礦上限（{len(claimed_tiers)}/{max_allowed} 座）",
+                )
+
+            # 檢查是否有符合戰功但等級不符的規則
+            merit_ok_rules = [r for r in unclaimed_rules if snapshot.total_merit >= r.required_merit]
+            if merit_ok_rules:
+                # 有符合戰功的，但等級不符
+                allowed_levels = set()
+                for r in merit_ok_rules:
+                    if r.allowed_level == "nine":
+                        allowed_levels.add("9級")
+                    elif r.allowed_level == "ten":
+                        allowed_levels.add("10級")
+                    else:
+                        allowed_levels.add("9或10級")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"目前可申請的銅礦等級：{', '.join(sorted(allowed_levels))}",
+                )
+            else:
+                # 戰功不足
+                next_rule = unclaimed_rules[0]
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"總戰功不足：需要 {next_rule.required_merit:,}，目前 {snapshot.total_merit:,}",
+                )
+
+        return eligible_rule.tier
 
     async def register_mine(
         self,
@@ -350,8 +379,8 @@ class CopperMineService:
             alliance_id=alliance_id, coord_x=coord_x, coord_y=coord_y, season_id=season_id
         )
 
-        # P1 修復: 驗證銅礦申請規則
-        await self._validate_rule(
+        # P1 修復: 驗證銅礦申請規則，返回領取的 tier
+        claimed_tier = await self._validate_rule(
             alliance_id=alliance_id, member_id=member_id, season_id=season_id, level=level
         )
 
@@ -366,6 +395,7 @@ class CopperMineService:
             notes=notes,
             season_id=season_id,
             member_id=member_id,
+            claimed_tier=claimed_tier,
         )
 
         return RegisterCopperResponse(
@@ -579,8 +609,9 @@ class CopperMineService:
 
         # P0 修復: 驗證銅礦申請規則（與 LIFF 行為一致）
         # Skip validation for reserved mines
+        claimed_tier = None
         if not is_reserved:
-            await self._validate_rule(
+            claimed_tier = await self._validate_rule(
                 alliance_id=alliance_id, member_id=member_id, season_id=season_id, level=level
             )
 
@@ -594,6 +625,7 @@ class CopperMineService:
             coord_y=coord_y,
             level=level,
             applied_at=applied_at,
+            claimed_tier=claimed_tier,
         )
 
         return CopperMineOwnershipResponse(

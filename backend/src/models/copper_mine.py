@@ -42,6 +42,8 @@ class CopperMine(BaseModel):
     # New fields for Dashboard integration
     season_id: UUID | None = None
     member_id: UUID | None = None
+    # Tier tracking for flexible rule system
+    claimed_tier: int | None = None
     registered_at: datetime
     updated_at: datetime
 

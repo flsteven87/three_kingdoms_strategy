@@ -116,6 +116,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         notes: str | None = None,
         season_id: UUID | None = None,
         member_id: UUID | None = None,
+        claimed_tier: int | None = None,
     ) -> CopperMine:
         """Create a new copper mine record (LIFF registration)"""
         insert_data: dict[str, Any] = {
@@ -133,6 +134,8 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
             insert_data["season_id"] = str(season_id)
         if member_id:
             insert_data["member_id"] = str(member_id)
+        if claimed_tier:
+            insert_data["claimed_tier"] = claimed_tier
 
         result = await self._execute_async(
             lambda: self.client.from_("copper_mines").insert(insert_data).execute()
@@ -229,6 +232,7 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         coord_y: int,
         level: int,
         applied_at: datetime | None = None,
+        claimed_tier: int | None = None,
     ) -> CopperMine:
         """Create a copper mine ownership record (Dashboard)"""
         insert_data: dict[str, Any] = {
@@ -244,6 +248,8 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         # Only include member_id if it's not None (for reserved mines)
         if member_id is not None:
             insert_data["member_id"] = str(member_id)
+        if claimed_tier is not None:
+            insert_data["claimed_tier"] = claimed_tier
 
         if applied_at:
             insert_data["registered_at"] = applied_at.isoformat()
@@ -266,6 +272,32 @@ class CopperMineRepository(SupabaseRepository[CopperMine]):
         )
 
         return result.count or 0
+
+    async def get_claimed_tiers(self, season_id: UUID, member_id: UUID) -> set[int]:
+        """
+        Get the set of tiers already claimed by a member in a season.
+
+        Used for flexible tier validation - allows skipping tiers but prevents
+        double-claiming the same tier.
+
+        Args:
+            season_id: Season UUID
+            member_id: Member UUID
+
+        Returns:
+            Set of tier numbers already claimed
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_("copper_mines")
+            .select("claimed_tier")
+            .eq("season_id", str(season_id))
+            .eq("member_id", str(member_id))
+            .not_.is_("claimed_tier", "null")
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return {row["claimed_tier"] for row in data if row.get("claimed_tier") is not None}
 
     async def update_ownership(
         self, ownership_id: UUID, member_id: UUID, game_id: str
