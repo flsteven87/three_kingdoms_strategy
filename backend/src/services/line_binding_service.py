@@ -312,7 +312,9 @@ class LineBindingService:
         if not group_binding:
             return []
 
-        results = await self.repository.search_member_bindings(group_binding.alliance_id, query)
+        results = await self.repository.search_game_id_bindings(group_binding.alliance_id, query)
+        if not results:
+            results = await self.repository.search_line_id_bindings(group_binding.alliance_id, query)
         return results
 
     # =========================================================================
