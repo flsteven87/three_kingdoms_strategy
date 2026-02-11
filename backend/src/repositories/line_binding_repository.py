@@ -331,13 +331,13 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     async def search_id_bindings(
         self, alliance_id: UUID, query: str
     ) -> list[MemberLineBinding]:
-        """Search member bindings by game ID or LINE user ID (case-insensitive)."""
+        """Search member bindings by game ID or LINE display name (case-insensitive)."""
         result = await self._execute_async(
             lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))            
             .or_(
-                f"game_id.ilike.%{query}%,line_user_id.ilike.%{query}%"
+                f"game_id.ilike.%{query}%,line_display_name.ilike.%{query}%"
             )
             .execute()
         )
