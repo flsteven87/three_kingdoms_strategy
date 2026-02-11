@@ -304,17 +304,17 @@ class LineBindingService:
     async def search_registered_members(
         self, line_group_id: str, query: str
     ) -> list[MemberLineBinding]:
-        """Search registered members for a group by game ID.
+        """Search registered members for a group by game ID or LINE user ID.
+
+        First searches by game ID. If no results found, searches by LINE user ID.
 
         Returns a list of MemberLineBinding instances (may be empty).
         """
         group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
         if not group_binding:
-            return []
+            return []   
 
-        results = await self.repository.search_game_id_bindings(group_binding.alliance_id, query)
-        if not results:
-            results = await self.repository.search_line_id_bindings(group_binding.alliance_id, query)
+        results = await self.repository.search_id_bindings(group_binding.alliance_id, query)
         return results
 
     # =========================================================================
