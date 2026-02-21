@@ -50,6 +50,7 @@ def mock_copper_mine_repo() -> MagicMock:
     """Create mock CopperMineRepository"""
     repo = MagicMock()
     repo.count_member_mines = AsyncMock(return_value=0)
+    repo.get_claimed_tiers = AsyncMock(return_value=set())
     return repo
 
 
@@ -290,7 +291,7 @@ class TestValidateRuleLevelRestriction:
             )
 
         assert exc_info.value.status_code == 403
-        assert "10 級" in exc_info.value.detail
+        assert "10級" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_should_reject_level_10_when_only_level_9_allowed(
@@ -323,7 +324,7 @@ class TestValidateRuleLevelRestriction:
             )
 
         assert exc_info.value.status_code == 403
-        assert "9 級" in exc_info.value.detail
+        assert "9級" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_should_pass_any_level_when_both_allowed(
@@ -376,7 +377,7 @@ class TestValidateRuleMineCountLimit:
             create_mock_rule(tier=2, required_merit=200000),
         ]
         mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=rules)
-        mock_copper_mine_repo.count_member_mines = AsyncMock(return_value=2)
+        mock_copper_mine_repo.get_claimed_tiers = AsyncMock(return_value={1, 2})
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:

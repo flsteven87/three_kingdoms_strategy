@@ -1,14 +1,14 @@
 /**
  * API Client - Unified Export
  *
- * Provides backward-compatible apiClient object and modular exports.
+ * Provides apiClient object and modular exports.
  *
  * Usage:
- *   // Backward compatible (existing code works as-is)
+ *   // Object-style access
  *   import { apiClient } from '@/lib/api-client'
  *   await apiClient.getAlliance()
  *
- *   // Or use new modular imports for tree-shaking
+ *   // Modular imports for tree-shaking
  *   import { getAlliance } from '@/lib/api'
  *   await getAlliance()
  */
@@ -28,7 +28,7 @@ export * from "./line-api";
 export * from "./copper-mine-api";
 export * from "./season-quota-api";
 
-// Import all functions for backward-compatible apiClient object
+// Import all functions for apiClient object
 import { setAuthToken } from "./base-client";
 import * as allianceApi from "./alliance-api";
 import * as seasonApi from "./season-api";
@@ -42,10 +42,9 @@ import * as copperMineApi from "./copper-mine-api";
 import * as seasonQuotaApi from "./season-quota-api";
 
 /**
- * Backward-compatible API client object
+ * API client object
  *
- * This maintains the same interface as the original ApiClient class.
- * Existing code using `apiClient.methodName()` will continue to work.
+ * Aggregates all API functions into a single namespace for convenient access.
  */
 export const apiClient = {
   // Auth

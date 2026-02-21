@@ -103,7 +103,7 @@ class LineBindingService:
             )
 
         # Rate limiting: max 3 codes per hour
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = datetime.now(UTC) - timedelta(hours=1)
         recent_count = await self.repository.count_recent_codes(alliance_id, one_hour_ago)
         if recent_count >= MAX_CODES_PER_HOUR:
             raise HTTPException(
@@ -115,7 +115,7 @@ class LineBindingService:
         code = "".join(secrets.choice(BINDING_CODE_ALPHABET) for _ in range(BINDING_CODE_LENGTH))
 
         # Calculate expiry time
-        expires_at = datetime.utcnow() + timedelta(minutes=BINDING_CODE_EXPIRY_MINUTES)
+        expires_at = datetime.now(UTC) + timedelta(minutes=BINDING_CODE_EXPIRY_MINUTES)
 
         # Create code in database with is_test flag
         binding_code = await self.repository.create_binding_code(
@@ -312,7 +312,7 @@ class LineBindingService:
         """
         group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
         if not group_binding:
-            return []   
+            return []
 
         results = await self.repository.search_id_bindings(group_binding.alliance_id, query)
         return results

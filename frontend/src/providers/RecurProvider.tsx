@@ -19,10 +19,6 @@ interface RecurProviderProps {
 export function RecurProvider({ children }: RecurProviderProps) {
   const publishableKey = import.meta.env.VITE_RECUR_PUBLISHABLE_KEY
 
-  if (!publishableKey) {
-    console.warn('VITE_RECUR_PUBLISHABLE_KEY not configured, Recur payments will be disabled')
-  }
-
   return (
     <RecurSDKProvider
       config={{

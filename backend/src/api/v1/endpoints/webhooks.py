@@ -76,20 +76,24 @@ async def recur_webhook(
     # Get raw body for signature verification
     payload = await request.body()
 
-    # Verify signature if webhook secret is configured
-    if settings.recur_webhook_secret:
-        if not verify_recur_signature(
-            payload=payload,
-            signature=x_recur_signature or "",
-            secret=settings.recur_webhook_secret,
-        ):
-            logger.warning("Recur webhook signature verification failed")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid signature",
-            )
-    else:
-        logger.warning("RECUR_WEBHOOK_SECRET not configured, skipping signature verification")
+    # Verify webhook signature - reject all requests if secret is not configured
+    if not settings.recur_webhook_secret:
+        logger.warning("RECUR_WEBHOOK_SECRET not configured, rejecting webhook request")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Webhook signature verification is not configured",
+        )
+
+    if not verify_recur_signature(
+        payload=payload,
+        signature=x_recur_signature or "",
+        secret=settings.recur_webhook_secret,
+    ):
+        logger.warning("Recur webhook signature verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid signature",
+        )
 
     # Parse JSON body
     try:

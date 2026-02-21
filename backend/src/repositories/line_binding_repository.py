@@ -107,7 +107,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .is_("used_at", "null")
-            .gt("expires_at", datetime.utcnow().isoformat())
+            .gt("expires_at", datetime.now(UTC).isoformat())
             .order("created_at", desc=True)
             .limit(1)
             .execute()
@@ -122,7 +122,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         """Mark a binding code as used"""
         await self._execute_async(
             lambda: self.client.from_("line_binding_codes")
-            .update({"used_at": datetime.utcnow().isoformat()})
+            .update({"used_at": datetime.now(UTC).isoformat()})
             .eq("id", str(code_id))
             .execute()
         )
@@ -236,7 +236,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         """Deactivate a group binding"""
         await self._execute_async(
             lambda: self.client.from_("line_group_bindings")
-            .update({"is_active": False, "updated_at": datetime.utcnow().isoformat()})
+            .update({"is_active": False, "updated_at": datetime.now(UTC).isoformat()})
             .eq("id", str(binding_id))
             .execute()
         )
@@ -245,7 +245,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         self, binding_id: UUID, group_name: str | None = None, group_picture_url: str | None = None
     ) -> LineGroupBinding:
         """Update group name and/or picture for an existing binding"""
-        update_data: dict[str, str] = {"updated_at": datetime.utcnow().isoformat()}
+        update_data: dict[str, str] = {"updated_at": datetime.now(UTC).isoformat()}
         if group_name is not None:
             update_data["group_name"] = group_name
         if group_picture_url is not None:
@@ -335,7 +335,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         result = await self._execute_async(
             lambda: self.client.from_("member_line_bindings")
             .select("*")
-            .eq("alliance_id", str(alliance_id))            
+            .eq("alliance_id", str(alliance_id))
             .or_(
                 f"game_id.ilike.%{query}%,line_display_name.ilike.%{query}%"
             )

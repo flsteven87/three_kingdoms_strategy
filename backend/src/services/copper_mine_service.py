@@ -147,7 +147,7 @@ class CopperMineService:
         if member_bindings:
             my_game_ids = {b.game_id for b in member_bindings}
             # 為每個綁定的 game_id 初始化計數為 0
-            mine_counts_by_game_id = {game_id: 0 for game_id in my_game_ids}
+            mine_counts_by_game_id = dict.fromkeys(my_game_ids, 0)
             # 計算每個 game_id 的銅礦數量
             for mine in mines:
                 if mine.game_id in my_game_ids:

@@ -165,11 +165,7 @@ function PurchaseSeason() {
         customerName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
         externalCustomerId,
         successUrl: `${baseUrl}/purchase?payment=success`,
-        onSuccess: (result) => {
-          console.log('[Recur] Checkout session created:', result)
-        },
         onError: (checkoutError) => {
-          console.error('[Recur] Checkout error:', checkoutError)
           setError(`付款錯誤：${checkoutError.message}`)
         },
         onPaymentComplete: async () => {
@@ -178,7 +174,6 @@ function PurchaseSeason() {
           setShowSuccessBanner(true)
         },
         onPaymentFailed: (err) => {
-          console.error('[Recur] Payment failed:', err)
           const errorCode = err?.code
           switch (errorCode) {
             case 'CARD_DECLINED':
@@ -194,7 +189,6 @@ function PurchaseSeason() {
         },
       })
     } catch (err: unknown) {
-      console.error('[Recur] Checkout exception:', err)
       const errorMessage = err instanceof Error ? err.message : JSON.stringify(err)
       setError(`付款過程發生錯誤：${errorMessage}`)
     }

@@ -112,9 +112,8 @@ async def get_member_season_summary(
     summary = await service.get_season_summary(member_id, season_id)
 
     if not summary:
-        raise ValueError(
-            status_code=404,
-            detail="No metrics data available for this member in this season",
+        raise FileNotFoundError(
+            "No metrics data available for this member in this season"
         )
 
     return SeasonSummaryResponse(**summary)
@@ -145,9 +144,8 @@ async def get_member_comparison(
     result = await service.get_member_with_comparison(member_id, period_id)
 
     if not result:
-        raise ValueError(
-            status_code=404,
-            detail="Member metrics not found for this period",
+        raise FileNotFoundError(
+            "Member metrics not found for this period"
         )
 
     return MemberComparisonResponse(**result)
@@ -342,9 +340,8 @@ async def get_group_analytics(
     data = await service.get_group_analytics(season_id, decoded_group_name, view=view)
 
     if not data["members"]:
-        raise ValueError(
-            status_code=404,
-            detail=f"Group '{decoded_group_name}' not found or has no members in this season",
+        raise FileNotFoundError(
+            f"Group '{decoded_group_name}' not found or has no members in this season"
         )
 
     return GroupAnalyticsResponse(**data)

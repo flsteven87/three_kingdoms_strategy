@@ -38,19 +38,11 @@ function getParamsFromLiffUrl(): Record<string, string> {
   const qs = new URLSearchParams(window.location.search);
   const state = qs.get("liff.state");
 
-  // Debug logging
-  console.log("[LIFF] window.location.href:", window.location.href);
-  console.log("[LIFF] window.location.search:", window.location.search);
-  console.log("[LIFF] liff.state:", state);
-
   const raw = state ? decodeURIComponent(state) : window.location.href;
-  console.log("[LIFF] raw after decode:", raw);
 
   const query = raw.includes("?") ? raw.split("?")[1] : "";
-  console.log("[LIFF] query string:", query);
 
   const params = Object.fromEntries(new URLSearchParams(query).entries());
-  console.log("[LIFF] parsed params:", params);
 
   return params;
 }
@@ -72,13 +64,11 @@ function isOAuthCallback(): boolean {
 function saveParamsBeforeLogin(): void {
   // Don't overwrite saved params when returning from OAuth
   if (isOAuthCallback()) {
-    console.log("[LIFF] Skipping save - this is OAuth callback");
     return;
   }
 
   const params = getParamsFromLiffUrl();
   if (params.g || params.e) {
-    console.log("[LIFF] Saving params to sessionStorage:", params);
     sessionStorage.setItem(LIFF_PARAMS_KEY, JSON.stringify(params));
   }
 }
@@ -90,7 +80,6 @@ function saveParamsBeforeLogin(): void {
 function getSavedParams(): Record<string, string> | null {
   const saved = sessionStorage.getItem(LIFF_PARAMS_KEY);
   if (saved) {
-    console.log("[LIFF] Retrieved saved params from sessionStorage");
     sessionStorage.removeItem(LIFF_PARAMS_KEY);
     return JSON.parse(saved) as Record<string, string>;
   }
@@ -122,20 +111,12 @@ export function useLiffSession(liffId: string): LiffState {
         if (!params.g && !params.e) {
           const savedParams = getSavedParams();
           if (savedParams) {
-            console.log("[LIFF] Using saved params:", savedParams);
             params = savedParams;
           }
         }
 
         const groupId = params.g || params.groupId || null;
         const eventId = params.e || params.eventId || null;
-
-        console.log(
-          "[LIFF] Final session params - groupId:",
-          groupId,
-          "eventId:",
-          eventId,
-        );
 
         if (!cancelled) {
           setState({

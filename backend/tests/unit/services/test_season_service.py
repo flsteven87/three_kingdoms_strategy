@@ -481,39 +481,29 @@ class TestSetCurrentSeason:
         mock_alliance = create_mock_alliance(alliance_id)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=mock_alliance)
 
-        other_season_id = uuid4()
         target_season = create_mock_season(
             season_id, alliance_id, "S2", is_current=False, activation_status="activated"
         )
-        other_season = create_mock_season(
-            other_season_id, alliance_id, "S1", is_current=True, activation_status="activated"
-        )
 
         mock_season_repo.get_by_id = AsyncMock(return_value=target_season)
-        mock_season_repo.get_by_alliance = AsyncMock(return_value=[target_season, other_season])
-        mock_season_repo.update = AsyncMock(return_value=target_season)
+        mock_season_repo.unset_all_current_by_alliance = AsyncMock(return_value=None)
+        updated_season = create_mock_season(
+            season_id, alliance_id, "S2", is_current=True, activation_status="activated"
+        )
+        mock_season_repo.update = AsyncMock(return_value=updated_season)
         mock_permission_service.require_role_permission = AsyncMock()
 
         # Act
-        await season_service.set_current_season(user_id, season_id)
+        result = await season_service.set_current_season(user_id, season_id)
 
-        # Assert - other season should have is_current set to False
-        unset_calls = [
-            call
-            for call in mock_season_repo.update.call_args_list
-            if call[0][1] == {"is_current": False}
-        ]
-        assert len(unset_calls) == 1
-        assert unset_calls[0][0][0] == other_season_id
+        # Assert - unset_all_current_by_alliance should be called with alliance_id
+        mock_season_repo.unset_all_current_by_alliance.assert_called_once_with(alliance_id)
 
         # Assert - target season should have is_current set to True
-        set_calls = [
-            call
-            for call in mock_season_repo.update.call_args_list
-            if call[0][1] == {"is_current": True}
-        ]
-        assert len(set_calls) == 1
-        assert set_calls[0][0][0] == season_id
+        mock_season_repo.update.assert_called_once_with(season_id, {"is_current": True})
+
+        # Assert - result is the updated season
+        assert result.is_current is True
 
     @pytest.mark.asyncio
     async def test_should_raise_valueerror_when_season_not_activated(

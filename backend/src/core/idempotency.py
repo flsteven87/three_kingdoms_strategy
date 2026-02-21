@@ -13,7 +13,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from threading import Lock
 
@@ -46,7 +46,7 @@ class IdempotencyRecord:
 
     def is_expired(self) -> bool:
         """Check if this record has expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
 
 class IdempotencyStorage(ABC):
@@ -112,7 +112,7 @@ class InMemoryIdempotencyStorage(IdempotencyStorage):
 
     async def create(self, key: str, user_id: str, ttl_seconds: int) -> bool:
         composite_key = self._make_key(key, user_id)
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         with self._lock:
             # Check existing
@@ -164,7 +164,7 @@ class InMemoryIdempotencyStorage(IdempotencyStorage):
                 del self._store[composite_key]
 
     async def cleanup_expired(self) -> int:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         count = 0
         with self._lock:
             expired_keys = [k for k, v in self._store.items() if v.expires_at < now]

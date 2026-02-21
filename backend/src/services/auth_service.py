@@ -124,8 +124,8 @@ class AuthService:
 
             return claims
 
-        except jwt.ExpiredSignatureError:
-            raise TokenExpiredError("Token signature has expired") from None
+        except jwt.ExpiredSignatureError as e:
+            raise TokenExpiredError("Token signature has expired") from e
         except jwt.InvalidTokenError as e:
             raise TokenInvalidError(f"Invalid token: {str(e)}") from e
         except JWTError as e:
