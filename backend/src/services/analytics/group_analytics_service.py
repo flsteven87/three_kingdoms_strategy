@@ -8,12 +8,13 @@ and statistical calculations (box plots, CV, percentiles).
 from collections import defaultdict
 from uuid import UUID
 
+from src.utils.numeric import db_float
+
 from ._helpers import (
     UNGROUPED_LABEL,
     ViewMode,
     build_period_label,
     compute_box_plot_stats,
-    db_float,
 )
 from ._shared import SharedAnalyticsMixin
 
@@ -91,7 +92,7 @@ class GroupAnalyticsService(SharedAnalyticsMixin):
         # Get alliance averages for comparison (use season averages for season view)
         if view == "season":
             season = await self._season_repo.get_by_id(season_id)
-            alliance_averages = await self.get_season_alliance_averages(season_id)
+            alliance_averages = await self.get_season_alliance_averages(season_id, periods=periods)
             return await self._build_season_view(
                 season, group_name, group_metrics, latest_period, trends, alliance_averages
             )

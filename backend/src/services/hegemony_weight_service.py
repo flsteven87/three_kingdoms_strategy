@@ -31,6 +31,7 @@ from src.repositories.hegemony_weight_repository import HegemonyWeightRepository
 from src.repositories.member_snapshot_repository import MemberSnapshotRepository
 from src.repositories.season_repository import SeasonRepository
 from src.services.permission_service import PermissionService
+from src.utils.numeric import db_decimal
 
 logger = logging.getLogger(__name__)
 
@@ -243,9 +244,7 @@ class HegemonyWeightService:
         )
 
         # Verify quota: trial or available seasons required
-        await self._permission_service.require_active_quota(
-            alliance.id, "create hegemony weights"
-        )
+        await self._permission_service.require_active_quota(alliance.id, "create hegemony weights")
 
         # Verify CSV upload exists and belongs to this season
         upload = await self._upload_repo.get_by_id(data.csv_upload_id)
@@ -335,9 +334,7 @@ class HegemonyWeightService:
         )
 
         # Verify quota: trial or available seasons required
-        await self._permission_service.require_active_quota(
-            alliance_id, "update hegemony weights"
-        )
+        await self._permission_service.require_active_quota(alliance_id, "update hegemony weights")
 
         return await self._weight_repo.update_weights(
             weight_id=weight_id,
@@ -369,9 +366,7 @@ class HegemonyWeightService:
         )
 
         # Verify quota: trial or available seasons required
-        await self._permission_service.require_active_quota(
-            alliance_id, "delete hegemony weights"
-        )
+        await self._permission_service.require_active_quota(alliance_id, "delete hegemony weights")
 
         return await self._weight_repo.delete(weight_id)
 
@@ -448,11 +443,10 @@ class HegemonyWeightService:
                 else:
                     # Calculate snapshot score using tier 1 weights
                     snapshot_score = (
-                        Decimal(str(snapshot.total_contribution or 0))
-                        * weight_config.weight_contribution
-                        + Decimal(str(snapshot.total_merit or 0)) * weight_config.weight_merit
-                        + Decimal(str(snapshot.total_assist or 0)) * weight_config.weight_assist
-                        + Decimal(str(snapshot.total_donation or 0)) * weight_config.weight_donation
+                        db_decimal(snapshot.total_contribution) * weight_config.weight_contribution
+                        + db_decimal(snapshot.total_merit) * weight_config.weight_merit
+                        + db_decimal(snapshot.total_assist) * weight_config.weight_assist
+                        + db_decimal(snapshot.total_donation) * weight_config.weight_donation
                     )
 
                 # Store snapshot score using consistent date formatting

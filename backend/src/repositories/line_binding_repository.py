@@ -14,7 +14,6 @@ Data access layer for LINE Bot integration tables:
 
 import asyncio
 import logging
-import re
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -25,6 +24,7 @@ from src.models.line_binding import (
     MemberLineBinding,
 )
 from src.repositories.base import SupabaseRepository
+from src.utils.postgrest import sanitize_postgrest_filter_input
 
 logger = logging.getLogger(__name__)
 
@@ -330,25 +330,9 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
 
-    @staticmethod
-    def _sanitize_search_query(query: str) -> str:
-        """Sanitize search query to prevent PostgREST filter injection.
-
-        Strips characters that could be used to inject additional filters:
-        - Commas (filter separator)
-        - Sequences like .eq. .neq. .like. etc. (operator patterns)
-        """
-        sanitized = query.replace(",", "")
-        sanitized = re.sub(
-            r"\.(eq|neq|gt|lt|gte|lte|like|ilike|is|in|cs|cd|sl|sr|nxl|nxr|adj|ov|fts|plfts|phfts|wfts|not|or|and)\.",
-            "",
-            sanitized,
-        )
-        return sanitized
-
     async def search_id_bindings(self, alliance_id: UUID, query: str) -> list[MemberLineBinding]:
         """Search member bindings by game ID or LINE display name (case-insensitive)."""
-        safe_query = self._sanitize_search_query(query)
+        safe_query = sanitize_postgrest_filter_input(query)
         result = await self._execute_async(
             lambda: self.client.from_("member_line_bindings")
             .select("*")

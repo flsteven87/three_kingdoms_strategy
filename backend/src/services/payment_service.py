@@ -12,6 +12,7 @@ Follows CLAUDE.md:
 import logging
 from uuid import UUID
 
+from src.repositories.webhook_event_repository import WebhookEventRepository
 from src.services.season_quota_service import SeasonQuotaService
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class PaymentService:
     def __init__(self):
         """Initialize payment service with dependencies."""
         self._quota_service = SeasonQuotaService()
+        self._webhook_repo = WebhookEventRepository()
 
     def _parse_external_customer_id(self, external_customer_id: str) -> tuple[UUID, int]:
         """
@@ -69,18 +71,15 @@ class PaymentService:
 
         return user_id, quantity
 
-    async def handle_checkout_completed(self, event_data: dict) -> dict:
+    async def handle_checkout_completed(
+        self, event_data: dict, *, event_id: str | None = None
+    ) -> dict:
         """
-        Handle checkout.completed webhook event.
-
-        Parses the externalCustomerId to get user_id and quantity,
-        then adds the purchased seasons to the user's alliance.
+        Handle checkout.completed webhook event with idempotency.
 
         Args:
-            event_data: Webhook event data containing:
-                - externalCustomerId: "user_id|quantity" format
-                - amount: Payment amount in cents
-                - productId: Recur product ID
+            event_data: Webhook event data containing externalCustomerId, amount, productId
+            event_id: Recur event ID for dedup. If provided, duplicate events are skipped.
 
         Returns:
             Dict with processing result
@@ -88,32 +87,49 @@ class PaymentService:
         Raises:
             ValueError: If required data is missing or invalid
         """
+        # --- Dedup check ---
+        if event_id:
+            if await self._webhook_repo.exists_by_event_id(event_id):
+                logger.info(f"Duplicate webhook event skipped - event_id={event_id}")
+                return {"success": True, "duplicate": True, "event_id": event_id}
+
         external_customer_id = event_data.get("externalCustomerId")
         if not external_customer_id:
-            # Try alternative field names
             external_customer_id = event_data.get("external_customer_id")
 
         if not external_customer_id:
             raise ValueError("Missing externalCustomerId in checkout.completed event")
 
-        # Parse user_id and quantity from externalCustomerId
         user_id, quantity = self._parse_external_customer_id(external_customer_id)
 
         logger.info(
             f"Processing checkout.completed - user_id={user_id}, quantity={quantity}, "
-            f"amount={event_data.get('amount')}"
+            f"amount={event_data.get('amount')}, event_id={event_id}"
         )
 
-        # Get user's alliance
         alliance = await self._quota_service.get_alliance_by_user(user_id)
         if not alliance:
             raise ValueError(f"No alliance found for user: {user_id}")
 
-        # Add purchased seasons
         new_available = await self._quota_service.add_purchased_seasons(
             alliance_id=alliance.id,
             seasons=quantity,
         )
+
+        # --- Record event for dedup ---
+        if event_id:
+            try:
+                await self._webhook_repo.create({
+                    "event_id": event_id,
+                    "event_type": "checkout.completed",
+                    "alliance_id": str(alliance.id),
+                    "user_id": str(user_id),
+                    "seasons_added": quantity,
+                    "payload": event_data,
+                })
+            except Exception as e:
+                # Log but don't fail — the seasons were already added
+                logger.warning(f"Failed to record webhook event for dedup: {e}")
 
         logger.info(
             f"Seasons added successfully - alliance_id={alliance.id}, "

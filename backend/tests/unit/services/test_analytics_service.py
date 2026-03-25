@@ -397,7 +397,7 @@ class TestDbFloat:
 
     def test_converts_decimal_to_float(self):
         """Should convert Decimal to float with identical numerical value."""
-        from src.services.analytics._helpers import db_float as _db_float
+        from src.utils.numeric import db_float as _db_float
 
         result = _db_float(Decimal("1234.56"))
         assert isinstance(result, float)
@@ -405,7 +405,7 @@ class TestDbFloat:
 
     def test_converts_float_passthrough(self):
         """Should convert a Python float input correctly."""
-        from src.services.analytics._helpers import db_float as _db_float
+        from src.utils.numeric import db_float as _db_float
 
         result = _db_float(3.14)
         assert isinstance(result, float)
@@ -413,7 +413,7 @@ class TestDbFloat:
 
     def test_converts_string_representation(self):
         """Should convert a string representation of a number to float."""
-        from src.services.analytics._helpers import db_float as _db_float
+        from src.utils.numeric import db_float as _db_float
 
         result = _db_float("9999.99")
         assert isinstance(result, float)
@@ -421,7 +421,7 @@ class TestDbFloat:
 
     def test_converts_integer(self):
         """Should convert integer input to float."""
-        from src.services.analytics._helpers import db_float as _db_float
+        from src.utils.numeric import db_float as _db_float
 
         result = _db_float(42)
         assert isinstance(result, float)
@@ -429,14 +429,14 @@ class TestDbFloat:
 
     def test_converts_zero(self):
         """Should handle zero correctly."""
-        from src.services.analytics._helpers import db_float as _db_float
+        from src.utils.numeric import db_float as _db_float
 
         result = _db_float(Decimal("0.00"))
         assert result == pytest.approx(0.0)
 
     def test_converts_high_precision_decimal(self):
         """Should handle high-precision Decimal without floating-point drift."""
-        from src.services.analytics._helpers import db_float as _db_float
+        from src.utils.numeric import db_float as _db_float
 
         # Using Decimal(str(value)) is the safe conversion pattern
         decimal_val = Decimal("12345.678900")
@@ -445,7 +445,7 @@ class TestDbFloat:
 
     def test_result_identical_to_manual_conversion(self):
         """Must produce identical results to float(Decimal(str(value)))."""
-        from src.services.analytics._helpers import db_float as _db_float
+        from src.utils.numeric import db_float as _db_float
 
         inputs = [Decimal("100.50"), 200.75, "300.25", 400]
         for val in inputs:

@@ -51,7 +51,6 @@ class Alliance(AllianceBase):
     # Season purchase fields
     purchased_seasons: int = 0
     used_seasons: int = 0
-    recur_customer_id: str | None = None
 
 
 class SeasonQuotaStatus(BaseModel):

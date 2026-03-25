@@ -14,7 +14,6 @@ export interface Alliance {
   // Season purchase fields
   readonly purchased_seasons: number
   readonly used_seasons: number
-  readonly recur_customer_id: string | null
 }
 
 export interface AllianceCreate {

@@ -293,18 +293,20 @@ class SeasonQuotaService:
         raise ValueError("No available seasons or trial to consume")
 
     async def add_purchased_seasons(self, alliance_id: UUID, seasons: int) -> int:
-        """Add purchased seasons to alliance."""
+        """Add purchased seasons to alliance using atomic DB increment."""
         if seasons <= 0:
             raise ValueError("Seasons must be positive")
 
+        # Atomic increment — no read-modify-write race
+        new_purchased = await self._alliance_repo.increment_purchased_seasons(
+            alliance_id, seasons
+        )
+
+        # Fetch used_seasons for available calculation
         alliance = await self.get_alliance_by_id(alliance_id)
-        if not alliance:
-            raise ValueError(f"Alliance not found: {alliance_id}")
+        used = alliance.used_seasons if alliance else 0
+        new_available = new_purchased - used
 
-        new_purchased = alliance.purchased_seasons + seasons
-        await self._alliance_repo.update(alliance_id, {"purchased_seasons": new_purchased})
-
-        new_available = new_purchased - alliance.used_seasons
         logger.info(
             f"Seasons purchased - alliance_id={alliance_id}, "
             f"added={seasons}, available={new_available}"

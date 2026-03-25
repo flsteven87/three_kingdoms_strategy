@@ -712,14 +712,15 @@ class TestAddPurchasedSeasons:
         # Arrange
         alliance = create_mock_alliance(alliance_id, purchased_seasons=2, used_seasons=1)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        mock_alliance_repo.update = AsyncMock()
+        # Atomic increment returns new total: 2 + 5 = 7
+        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=7)
 
         # Act
         result = await quota_service.add_purchased_seasons(alliance_id, 5)
 
         # Assert
-        assert result == 6  # 2 + 5 - 1 = 6 available
-        mock_alliance_repo.update.assert_called_once_with(alliance_id, {"purchased_seasons": 7})
+        assert result == 6  # 7 purchased - 1 used = 6 available
+        mock_alliance_repo.increment_purchased_seasons.assert_called_once_with(alliance_id, 5)
 
     @pytest.mark.asyncio
     async def test_raises_when_seasons_not_positive(
@@ -1056,10 +1057,12 @@ class TestAddPurchasedSeasonsAdditional:
         mock_alliance_repo: MagicMock,
         alliance_id: UUID,
     ):
-        """Should raise ValueError when alliance doesn't exist"""
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+        """Should raise when alliance doesn't exist (RPC raises exception)"""
+        mock_alliance_repo.increment_purchased_seasons = AsyncMock(
+            side_effect=Exception("Alliance not found")
+        )
 
-        with pytest.raises(ValueError, match="Alliance not found"):
+        with pytest.raises(Exception, match="Alliance not found"):
             await quota_service.add_purchased_seasons(alliance_id, 5)
 
     @pytest.mark.asyncio

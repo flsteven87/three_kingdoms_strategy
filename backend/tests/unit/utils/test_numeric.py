@@ -132,3 +132,55 @@ class TestDbFloat:
 
         with pytest.raises(InvalidOperation):
             db_float("")
+
+
+# =============================================================================
+# TestDbDecimal
+# =============================================================================
+
+
+class TestDbDecimal:
+    """Tests for db_decimal() Decimal conversion utility."""
+
+    def test_converts_float_to_decimal(self):
+        """Should convert a float value to Decimal via string round-trip."""
+        from src.utils.numeric import db_decimal
+
+        result = db_decimal(3.14)
+        assert result == Decimal("3.14")
+        assert isinstance(result, Decimal)
+
+    def test_converts_string_to_decimal(self):
+        """Should convert a numeric string to Decimal."""
+        from src.utils.numeric import db_decimal
+
+        result = db_decimal("12345.678")
+        assert result == Decimal("12345.678")
+
+    def test_converts_decimal_passthrough(self):
+        """Should pass through an existing Decimal value unchanged."""
+        from src.utils.numeric import db_decimal
+
+        result = db_decimal(Decimal("99.99"))
+        assert result == Decimal("99.99")
+
+    def test_none_returns_zero(self):
+        """None should return Decimal('0')."""
+        from src.utils.numeric import db_decimal
+
+        result = db_decimal(None)
+        assert result == Decimal("0")
+
+    def test_zero_int(self):
+        """Integer zero should return Decimal('0')."""
+        from src.utils.numeric import db_decimal
+
+        result = db_decimal(0)
+        assert result == Decimal("0")
+
+    def test_negative_value(self):
+        """Should handle negative values correctly."""
+        from src.utils.numeric import db_decimal
+
+        result = db_decimal(-42.5)
+        assert result == Decimal("-42.5")

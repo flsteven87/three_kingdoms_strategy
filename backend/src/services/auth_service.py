@@ -217,6 +217,12 @@ class AuthService:
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from e
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
 
     def authenticate_optional(self, authorization: str | None) -> AuthenticatedUser | None:
         """

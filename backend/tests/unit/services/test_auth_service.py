@@ -220,3 +220,34 @@ class TestTokenCacheKey:
         """Cache key should be 64 hex characters (full SHA-256)."""
         key = AuthService._token_cache_key("any-token")
         assert len(key) == 64
+
+
+# =============================================================================
+# Tests for authenticate_user_session exception handling
+# =============================================================================
+
+
+class TestAuthenticateUserSession:
+    """Tests for authenticate_user_session catch-all exception handling."""
+
+    def test_unexpected_exception_returns_401(self, auth_service, monkeypatch):
+        """Unexpected errors should return 401, not 500."""
+        monkeypatch.setattr(
+            auth_service,
+            "_extract_token",
+            lambda _: (_ for _ in ()).throw(RuntimeError("unexpected")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            auth_service.authenticate_user_session("Bearer token")
+
+        assert exc_info.value.status_code == 401
+        assert exc_info.value.detail == "Could not validate credentials"
+
+    def test_returns_session_with_valid_token(self, auth_service, valid_jwt_payload):
+        """Should return UserSession with valid token."""
+        token = _encode_token(valid_jwt_payload, auth_service.jwt_secret)
+        session = auth_service.authenticate_user_session(f"Bearer {token}")
+
+        assert str(session.user.id) == valid_jwt_payload["sub"]
+        assert session.access_token == token

@@ -95,6 +95,21 @@ class AllianceRepository(SupabaseRepository[Alliance]):
 
         return self._build_model(data)
 
+    async def increment_purchased_seasons(self, alliance_id: UUID, seasons: int) -> int:
+        """
+        Atomically increment purchased_seasons and return new value.
+
+        Uses PostgreSQL RPC to avoid read-modify-write race conditions.
+        """
+        result = await self._execute_async(
+            lambda: self.client.rpc(
+                "increment_purchased_seasons",
+                {"p_alliance_id": str(alliance_id), "p_seasons": seasons},
+            ).execute()
+        )
+        # RPC scalar return: result.data is the direct value
+        return result.data
+
     async def delete(self, alliance_id: UUID) -> bool:
         """
         Delete alliance (hard delete)

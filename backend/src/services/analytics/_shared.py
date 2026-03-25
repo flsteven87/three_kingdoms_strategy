@@ -93,16 +93,23 @@ class SharedAnalyticsMixin:
             "median_power": round(calc_median(powers), 2),
         }
 
-    async def get_season_alliance_averages(self, season_id: UUID) -> dict:
+    async def get_season_alliance_averages(
+        self, season_id: UUID, *, periods: list | None = None
+    ) -> dict:
         """
         Calculate alliance average and median metrics for season-to-date.
 
         Uses snapshot totals / season_days for accurate season daily averages.
+        Pass ``periods`` to avoid re-fetching if the caller already has them.
         """
-        season, periods = await asyncio.gather(
-            self._season_repo.get_by_id(season_id),
-            self._period_repo.get_by_season(season_id),
-        )
+        if periods is None:
+            season, periods = await asyncio.gather(
+                self._season_repo.get_by_id(season_id),
+                self._period_repo.get_by_season(season_id),
+            )
+        else:
+            season = await self._season_repo.get_by_id(season_id)
+
         if not season or not periods:
             return self._empty_alliance_averages()
 

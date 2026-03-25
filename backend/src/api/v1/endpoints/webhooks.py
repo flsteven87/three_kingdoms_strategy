@@ -116,7 +116,9 @@ async def recur_webhook(
 
     try:
         if event_type == "checkout.completed":
-            result = await payment_service.handle_checkout_completed(event_data)
+            result = await payment_service.handle_checkout_completed(
+                event_data, event_id=event_id
+            )
             logger.info(f"checkout.completed processed successfully: {result}")
         else:
             # Log unhandled events but return success

@@ -11,13 +11,13 @@ from statistics import median as calc_median
 from uuid import UUID
 
 from src.models.period import Period
+from src.utils.numeric import db_float
 
 from ._helpers import (
     UNGROUPED_LABEL,
     ViewMode,
     build_period_label,
     compute_box_plot_stats,
-    db_float,
 )
 from ._shared import SharedAnalyticsMixin
 

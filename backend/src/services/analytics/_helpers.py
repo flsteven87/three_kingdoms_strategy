@@ -9,7 +9,6 @@ from statistics import stdev
 from typing import Literal, TypedDict
 
 from src.models.period import Period
-from src.utils.numeric import db_float
 
 ViewMode = Literal["latest", "season"]
 
@@ -20,7 +19,6 @@ __all__ = [
     "ViewMode",
     "build_period_label",
     "compute_box_plot_stats",
-    "db_float",
     "percentile",
 ]
 

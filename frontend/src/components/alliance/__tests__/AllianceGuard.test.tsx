@@ -23,7 +23,6 @@ const mockAlliance: Alliance = {
   updated_at: "2026-01-01T00:00:00Z",
   purchased_seasons: 0,
   used_seasons: 0,
-  recur_customer_id: null,
 };
 
 function mockAllianceHook(
