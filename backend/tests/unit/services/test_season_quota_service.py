@@ -649,9 +649,7 @@ class TestConsumeSeason:
         assert remaining == 2  # 5 - 3 = 2
         assert used_trial is False
         assert trial_ends_at is None
-        mock_alliance_repo.update.assert_called_once_with(
-            alliance_id, {"used_seasons": 3}
-        )
+        mock_alliance_repo.update.assert_called_once_with(alliance_id, {"used_seasons": 3})
 
     @pytest.mark.asyncio
     async def test_uses_trial_when_no_purchased_seasons(
@@ -721,9 +719,7 @@ class TestAddPurchasedSeasons:
 
         # Assert
         assert result == 6  # 2 + 5 - 1 = 6 available
-        mock_alliance_repo.update.assert_called_once_with(
-            alliance_id, {"purchased_seasons": 7}
-        )
+        mock_alliance_repo.update.assert_called_once_with(alliance_id, {"purchased_seasons": 7})
 
     @pytest.mark.asyncio
     async def test_raises_when_seasons_not_positive(
@@ -736,3 +732,464 @@ class TestAddPurchasedSeasons:
         with pytest.raises(ValueError) as exc_info:
             await quota_service.add_purchased_seasons(alliance_id, 0)
         assert "Seasons must be positive" in str(exc_info.value)
+
+
+# =============================================================================
+# Tests for get_quota_status_by_alliance
+# =============================================================================
+
+
+class TestGetQuotaStatusByAlliance:
+    """Tests for getting quota status by alliance ID"""
+
+    @pytest.mark.asyncio
+    async def test_returns_status_for_valid_alliance(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should return quota status for existing alliance"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=3, used_seasons=1)
+        season = create_mock_season(season_id, alliance_id, is_trial=False)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=season)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        result = await quota_service.get_quota_status_by_alliance(alliance_id)
+
+        assert result.purchased_seasons == 3
+        assert result.available_seasons == 2
+        assert result.can_write is True
+
+    @pytest.mark.asyncio
+    async def test_raises_when_alliance_not_found(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should raise ValueError when alliance doesn't exist"""
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+
+        with pytest.raises(ValueError, match="Alliance not found"):
+            await quota_service.get_quota_status_by_alliance(alliance_id)
+
+
+# =============================================================================
+# Tests for check_write_access (public method)
+# =============================================================================
+
+
+class TestCheckWriteAccess:
+    """Tests for the public check_write_access method"""
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_has_write_access(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should return True when alliance can write"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=5)
+        season = create_mock_season(season_id, alliance_id, is_trial=False)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=season)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        result = await quota_service.check_write_access(alliance_id)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_no_write_access(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should return False when trial expired and no purchased seasons"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
+        activated_at = datetime.now(UTC) - timedelta(days=20)
+        season = create_mock_season(
+            season_id, alliance_id, is_trial=True, activated_at=activated_at
+        )
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=season)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        result = await quota_service.check_write_access(alliance_id)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_alliance_not_found(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should return False (not raise) when alliance doesn't exist"""
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+
+        result = await quota_service.check_write_access(alliance_id)
+
+        assert result is False
+
+
+# =============================================================================
+# Tests for can_activate_season (public method)
+# =============================================================================
+
+
+class TestCanActivateSeasonPublic:
+    """Tests for the public can_activate_season method"""
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_can_activate(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should return True when has available seasons"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=5, used_seasons=2)
+        season = create_mock_season(season_id, alliance_id, is_trial=False)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=season)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=2)
+
+        result = await quota_service.can_activate_season(alliance_id)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_cannot_activate(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should return False when no quota and trial used"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
+        season = create_mock_season(season_id, alliance_id, is_trial=False)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=season)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        result = await quota_service.can_activate_season(alliance_id)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_alliance_not_found(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should return False (not raise) when alliance doesn't exist"""
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+
+        result = await quota_service.can_activate_season(alliance_id)
+
+        assert result is False
+
+
+# =============================================================================
+# Tests for require_season_activation
+# =============================================================================
+
+
+class TestRequireSeasonActivation:
+    """Tests for enforcing season activation requirements"""
+
+    @pytest.mark.asyncio
+    async def test_passes_when_can_activate(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should pass silently when alliance can activate"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=5, used_seasons=2)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=2)
+
+        await quota_service.require_season_activation(alliance_id)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_cannot_activate(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should raise SeasonQuotaExhaustedError when no quota and trial used"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        with pytest.raises(SeasonQuotaExhaustedError) as exc_info:
+            await quota_service.require_season_activation(alliance_id)
+        assert "購買季數" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_alliance_not_found(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should raise ValueError when alliance doesn't exist"""
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+
+        with pytest.raises(ValueError, match="Alliance not found"):
+            await quota_service.require_season_activation(alliance_id)
+
+
+# =============================================================================
+# Tests for require_write_access — additional branches
+# =============================================================================
+
+
+class TestRequireWriteAccessAdditional:
+    """Additional tests for require_write_access covering missing branches"""
+
+    @pytest.mark.asyncio
+    async def test_raises_non_trial_message_when_no_purchased(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should raise with '可用季數已用完' message for non-trial expired season"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
+        season = create_mock_season(season_id, alliance_id, is_trial=False)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=season)
+
+        with pytest.raises(SeasonQuotaExhaustedError) as exc_info:
+            await quota_service.require_write_access(alliance_id, "upload CSV")
+        assert "可用季數已用完" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_alliance_not_found(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should raise ValueError when alliance doesn't exist"""
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+
+        with pytest.raises(ValueError, match="Alliance not found"):
+            await quota_service.require_write_access(alliance_id)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_no_current_season_and_no_purchased(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should raise with non-trial message when no current season"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=None)
+
+        with pytest.raises(SeasonQuotaExhaustedError) as exc_info:
+            await quota_service.require_write_access(alliance_id)
+        assert "可用季數已用完" in str(exc_info.value)
+
+
+# =============================================================================
+# Tests for consume_season — additional edge cases
+# =============================================================================
+
+
+class TestConsumeSeasonAdditional:
+    """Additional tests for consume_season edge cases"""
+
+    @pytest.mark.asyncio
+    async def test_raises_when_alliance_not_found(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should raise ValueError when alliance doesn't exist"""
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+
+        with pytest.raises(ValueError, match="Alliance not found"):
+            await quota_service.consume_season(alliance_id)
+
+
+# =============================================================================
+# Tests for add_purchased_seasons — additional edge cases
+# =============================================================================
+
+
+class TestAddPurchasedSeasonsAdditional:
+    """Additional tests for add_purchased_seasons edge cases"""
+
+    @pytest.mark.asyncio
+    async def test_raises_when_alliance_not_found(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        alliance_id: UUID,
+    ):
+        """Should raise ValueError when alliance doesn't exist"""
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+
+        with pytest.raises(ValueError, match="Alliance not found"):
+            await quota_service.add_purchased_seasons(alliance_id, 5)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_negative_seasons(
+        self,
+        quota_service: SeasonQuotaService,
+        alliance_id: UUID,
+    ):
+        """Should raise for negative seasons parameter"""
+        with pytest.raises(ValueError, match="Seasons must be positive"):
+            await quota_service.add_purchased_seasons(alliance_id, -3)
+
+
+# =============================================================================
+# Tests for _calculate_trial_end edge cases
+# =============================================================================
+
+
+class TestCalculateTrialEndEdgeCases:
+    """Edge case tests for trial end date calculation"""
+
+    def test_returns_none_for_non_trial_season(
+        self,
+        quota_service: SeasonQuotaService,
+        season_id: UUID,
+        alliance_id: UUID,
+    ):
+        """Should return None for non-trial season"""
+        season = create_mock_season(
+            season_id, alliance_id, is_trial=False, activated_at=datetime.now(UTC)
+        )
+
+        result = quota_service._calculate_trial_end(season)
+
+        assert result is None
+
+    def test_returns_none_when_no_activated_at(
+        self,
+        quota_service: SeasonQuotaService,
+        season_id: UUID,
+        alliance_id: UUID,
+    ):
+        """Should return None for trial season without activated_at"""
+        season = create_mock_season(season_id, alliance_id, is_trial=True, activated_at=None)
+
+        result = quota_service._calculate_trial_end(season)
+
+        assert result is None
+
+    def test_handles_naive_datetime(
+        self,
+        quota_service: SeasonQuotaService,
+        season_id: UUID,
+        alliance_id: UUID,
+    ):
+        """Should handle naive datetime by adding UTC timezone"""
+        naive_dt = datetime(2026, 3, 1, 12, 0, 0)  # No tzinfo
+        season = create_mock_season(season_id, alliance_id, is_trial=True, activated_at=naive_dt)
+
+        result = quota_service._calculate_trial_end(season)
+
+        assert result is not None
+        assert result.tzinfo is not None
+
+
+# =============================================================================
+# Tests for _calculate_available_seasons edge cases
+# =============================================================================
+
+
+class TestCalculateAvailableSeasonsEdgeCases:
+    """Edge case tests for available seasons calculation"""
+
+    def test_returns_zero_when_used_exceeds_purchased(
+        self,
+        quota_service: SeasonQuotaService,
+        alliance_id: UUID,
+    ):
+        """Should return 0 (not negative) when used > purchased"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=2, used_seasons=5)
+
+        result = quota_service._calculate_available_seasons(alliance)
+
+        assert result == 0
+
+    def test_returns_correct_difference(
+        self,
+        quota_service: SeasonQuotaService,
+        alliance_id: UUID,
+    ):
+        """Should return purchased - used"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=10, used_seasons=3)
+
+        result = quota_service._calculate_available_seasons(alliance)
+
+        assert result == 7
+
+
+# =============================================================================
+# Tests for get_quota_status — expired trial + no purchased combination
+# =============================================================================
+
+
+class TestGetQuotaStatusExpiredTrial:
+    """Tests for quota status with expired trial and no purchased seasons"""
+
+    @pytest.mark.asyncio
+    async def test_expired_trial_shows_correct_status(
+        self,
+        quota_service: SeasonQuotaService,
+        mock_alliance_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should show expired trial with no write access"""
+        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
+        activated_at = datetime.now(UTC) - timedelta(days=20)
+        season = create_mock_season(
+            season_id, alliance_id, is_trial=True, activated_at=activated_at
+        )
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
+        mock_season_repo.get_current_season = AsyncMock(return_value=season)
+        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        result = await quota_service.get_quota_status(user_id)
+
+        assert result.can_write is False
+        assert result.can_activate_season is False
+        assert result.current_season_is_trial is True
+        assert result.trial_days_remaining == 0
+        assert result.has_trial_available is False

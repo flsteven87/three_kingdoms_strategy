@@ -65,33 +65,25 @@ def create_mock_alliance(alliance_id: UUID) -> MagicMock:
 class TestParseExternalCustomerId:
     """Tests for _parse_external_customer_id method"""
 
-    def test_should_parse_valid_format(
-        self, payment_service: PaymentService, user_id: UUID
-    ):
+    def test_should_parse_valid_format(self, payment_service: PaymentService, user_id: UUID):
         """Should correctly parse valid user_id:quantity format"""
         # Arrange
         external_id = f"{user_id}:3"
 
         # Act
-        parsed_user_id, quantity = payment_service._parse_external_customer_id(
-            external_id
-        )
+        parsed_user_id, quantity = payment_service._parse_external_customer_id(external_id)
 
         # Assert
         assert parsed_user_id == user_id
         assert quantity == 3
 
-    def test_should_parse_single_quantity(
-        self, payment_service: PaymentService, user_id: UUID
-    ):
+    def test_should_parse_single_quantity(self, payment_service: PaymentService, user_id: UUID):
         """Should correctly parse quantity of 1"""
         # Arrange
         external_id = f"{user_id}:1"
 
         # Act
-        parsed_user_id, quantity = payment_service._parse_external_customer_id(
-            external_id
-        )
+        parsed_user_id, quantity = payment_service._parse_external_customer_id(external_id)
 
         # Assert
         assert parsed_user_id == user_id
@@ -282,3 +274,32 @@ class TestHandleCheckoutCompleted:
         # Act & Assert
         with pytest.raises(ValueError, match="Invalid externalCustomerId format"):
             await payment_service.handle_checkout_completed(event_data)
+
+    @pytest.mark.asyncio
+    async def test_should_raise_when_add_purchased_seasons_fails(
+        self,
+        payment_service: PaymentService,
+        mock_quota_service: MagicMock,
+        user_id: UUID,
+        alliance_id: UUID,
+    ):
+        """Should propagate errors from add_purchased_seasons"""
+        # Arrange
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_quota_service.get_alliance_by_user = AsyncMock(return_value=mock_alliance)
+        mock_quota_service.add_purchased_seasons = AsyncMock(
+            side_effect=ValueError("Alliance not found")
+        )
+
+        event_data = {"externalCustomerId": f"{user_id}:1"}
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Alliance not found"):
+            await payment_service.handle_checkout_completed(event_data)
+
+    @pytest.mark.asyncio
+    async def test_should_raise_for_empty_event_data(self, payment_service: PaymentService):
+        """Should raise ValueError for empty event data dict"""
+        # Act & Assert
+        with pytest.raises(ValueError, match="Missing externalCustomerId"):
+            await payment_service.handle_checkout_completed({})
