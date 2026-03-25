@@ -126,10 +126,8 @@ class AuthService:
 
         except jwt.ExpiredSignatureError as e:
             raise TokenExpiredError("Token signature has expired") from e
-        except jwt.InvalidTokenError as e:
+        except (JWTError, jwt.JWSError) as e:
             raise TokenInvalidError(f"Invalid token: {str(e)}") from e
-        except JWTError as e:
-            raise TokenInvalidError(f"JWT decode error: {str(e)}") from e
         except ValueError as e:
             raise TokenInvalidError(f"Token claims validation error: {str(e)}") from e
 
@@ -201,9 +199,18 @@ class AuthService:
                 session_id=claims.session_id,
             )
 
-        except (TokenExpiredError, TokenInvalidError):
-            # Re-raise auth-specific exceptions as HTTP exceptions
-            return self.authenticate_user(authorization)  # Will raise HTTPException
+        except TokenExpiredError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
+        except TokenInvalidError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
 
     def authenticate_optional(self, authorization: str | None) -> AuthenticatedUser | None:
         """
@@ -219,8 +226,10 @@ class AuthService:
             return None
 
         try:
-            return self.authenticate_user(authorization)
-        except HTTPException:
+            token = self._extract_token(authorization)
+            claims = self._validate_jwt_token(token)
+            return claims.to_authenticated_user()
+        except (TokenInvalidError, TokenExpiredError):
             return None
 
     def cleanup_cache(self) -> None:
