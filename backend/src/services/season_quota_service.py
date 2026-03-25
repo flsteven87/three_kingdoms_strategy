@@ -126,9 +126,7 @@ class SeasonQuotaService:
 
         return await self._has_trial_available(alliance.id)
 
-    async def _can_write_to_season(
-        self, alliance: Alliance, current_season: Season | None
-    ) -> bool:
+    async def _can_write_to_season(self, alliance: Alliance, current_season: Season | None) -> bool:
         """
         Check if user can write (upload CSV) to current season.
 
@@ -231,9 +229,7 @@ class SeasonQuotaService:
         can_write = await self._can_write_to_season(alliance, current_season)
 
         if not can_write:
-            logger.warning(
-                f"Write access denied - alliance_id={alliance_id}, action={action}"
-            )
+            logger.warning(f"Write access denied - alliance_id={alliance_id}, action={action}")
 
             if current_season and current_season.is_trial:
                 message = f"您的 14 天試用期已結束，請購買季數以繼續{action}。"
@@ -297,14 +293,9 @@ class SeasonQuotaService:
         if seasons <= 0:
             raise ValueError("Seasons must be positive")
 
-        # Atomic increment — no read-modify-write race
-        new_purchased = await self._alliance_repo.increment_purchased_seasons(
+        new_purchased, used = await self._alliance_repo.increment_purchased_seasons(
             alliance_id, seasons
         )
-
-        # Fetch used_seasons for available calculation
-        alliance = await self.get_alliance_by_id(alliance_id)
-        used = alliance.used_seasons if alliance else 0
         new_available = new_purchased - used
 
         logger.info(

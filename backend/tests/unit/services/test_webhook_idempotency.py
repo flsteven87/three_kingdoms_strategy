@@ -48,9 +48,7 @@ class TestWebhookIdempotency:
         payment_service._quota_service.get_alliance_by_user = AsyncMock(return_value=alliance)
         payment_service._quota_service.add_purchased_seasons = AsyncMock(return_value=3)
 
-        result = await payment_service.handle_checkout_completed(
-            event_data, event_id="evt_abc123"
-        )
+        result = await payment_service.handle_checkout_completed(event_data, event_id="evt_abc123")
 
         assert result["success"] is True
         assert result["seasons_added"] == 3
@@ -69,9 +67,7 @@ class TestWebhookIdempotency:
 
         payment_service._webhook_repo.try_claim_event = AsyncMock(return_value=False)
 
-        result = await payment_service.handle_checkout_completed(
-            event_data, event_id="evt_abc123"
-        )
+        result = await payment_service.handle_checkout_completed(event_data, event_id="evt_abc123")
 
         assert result["success"] is True
         assert result["duplicate"] is True
@@ -86,9 +82,7 @@ class TestWebhookIdempotency:
         payment_service._quota_service.get_alliance_by_user = AsyncMock(return_value=alliance)
         payment_service._quota_service.add_purchased_seasons = AsyncMock(return_value=3)
 
-        result = await payment_service.handle_checkout_completed(
-            event_data, event_id=None
-        )
+        result = await payment_service.handle_checkout_completed(event_data, event_id=None)
 
         assert result["success"] is True
         payment_service._webhook_repo.try_claim_event.assert_not_called()
@@ -110,8 +104,8 @@ class TestAtomicIncrement:
         mock_alliance.purchased_seasons = 5
         mock_alliance.used_seasons = 2
 
-        service._alliance_repo.increment_purchased_seasons = AsyncMock(return_value=8)
-        service._alliance_repo.get_by_id = AsyncMock(return_value=mock_alliance)
+        # RPC now returns (new_purchased, used_seasons) tuple
+        service._alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(8, 2))
 
         result = await service.add_purchased_seasons(mock_alliance.id, 3)
 

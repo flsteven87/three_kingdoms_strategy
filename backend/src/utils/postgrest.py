@@ -2,6 +2,10 @@
 
 import re
 
+_POSTGREST_OPERATOR_RE = re.compile(
+    r"\.(eq|neq|gt|lt|gte|lte|like|ilike|is|in|cs|cd|sl|sr|nxl|nxr|adj|ov|fts|plfts|phfts|wfts|not|or|and)\."
+)
+
 
 def sanitize_postgrest_filter_input(query: str) -> str:
     """Sanitize user input for use in PostgREST filter expressions.
@@ -11,9 +15,4 @@ def sanitize_postgrest_filter_input(query: str) -> str:
     - Operator patterns like .eq., .neq., .ilike., etc.
     """
     sanitized = query.replace(",", "")
-    sanitized = re.sub(
-        r"\.(eq|neq|gt|lt|gte|lte|like|ilike|is|in|cs|cd|sl|sr|nxl|nxr|adj|ov|fts|plfts|phfts|wfts|not|or|and)\.",
-        "",
-        sanitized,
-    )
-    return sanitized
+    return _POSTGREST_OPERATOR_RE.sub("", sanitized)

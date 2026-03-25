@@ -709,11 +709,8 @@ class TestAddPurchasedSeasons:
         alliance_id: UUID,
     ):
         """Should add seasons to alliance correctly"""
-        # Arrange
-        alliance = create_mock_alliance(alliance_id, purchased_seasons=2, used_seasons=1)
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        # Atomic increment returns new total: 2 + 5 = 7
-        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=7)
+        # Arrange — RPC returns (new_purchased, used_seasons) tuple
+        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(7, 1))
 
         # Act
         result = await quota_service.add_purchased_seasons(alliance_id, 5)

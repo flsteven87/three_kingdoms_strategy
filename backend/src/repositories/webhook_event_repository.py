@@ -7,11 +7,14 @@ Stores processed webhook events for idempotency dedup.
 
 import logging
 
+from postgrest.exceptions import APIError
 from pydantic import BaseModel, ConfigDict
 
 from src.repositories.base import SupabaseRepository
 
 logger = logging.getLogger(__name__)
+
+POSTGRES_UNIQUE_VIOLATION = "23505"
 
 
 class WebhookEvent(BaseModel):
@@ -25,7 +28,7 @@ class WebhookEvent(BaseModel):
     alliance_id: str | None = None
     user_id: str | None = None
     seasons_added: int = 0
-    payload: dict | None = None
+    payload: dict[str, object] | None = None
 
 
 class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
@@ -48,10 +51,11 @@ class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
                 .execute()
             )
             return True
-        except Exception:
-            # UNIQUE violation = already claimed by another request
-            logger.info(f"Event already claimed - event_id={event_id}")
-            return False
+        except APIError as e:
+            if e.code == POSTGRES_UNIQUE_VIOLATION:
+                logger.info(f"Event already claimed - event_id={event_id}")
+                return False
+            raise
 
     async def update_event_details(
         self,
@@ -65,12 +69,14 @@ class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
         """Update a claimed event with processing details after successful payment."""
         await self._execute_async(
             lambda: self.client.from_(self.table_name)
-            .update({
-                "alliance_id": alliance_id,
-                "user_id": user_id,
-                "seasons_added": seasons_added,
-                "payload": payload,
-            })
+            .update(
+                {
+                    "alliance_id": alliance_id,
+                    "user_id": user_id,
+                    "seasons_added": seasons_added,
+                    "payload": payload,
+                }
+            )
             .eq("event_id", event_id)
             .execute()
         )

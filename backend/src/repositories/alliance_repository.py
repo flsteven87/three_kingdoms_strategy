@@ -95,11 +95,12 @@ class AllianceRepository(SupabaseRepository[Alliance]):
 
         return self._build_model(data)
 
-    async def increment_purchased_seasons(self, alliance_id: UUID, seasons: int) -> int:
+    async def increment_purchased_seasons(self, alliance_id: UUID, seasons: int) -> tuple[int, int]:
         """
-        Atomically increment purchased_seasons and return new value.
+        Atomically increment purchased_seasons and return (new_purchased, used_seasons).
 
         Uses PostgreSQL RPC to avoid read-modify-write race conditions.
+        Returns both values in a single round-trip so the caller doesn't need a second query.
         """
         result = await self._execute_async(
             lambda: self.client.rpc(
@@ -107,8 +108,9 @@ class AllianceRepository(SupabaseRepository[Alliance]):
                 {"p_alliance_id": str(alliance_id), "p_seasons": seasons},
             ).execute()
         )
-        # RPC scalar return: result.data is the direct value
-        return result.data
+        # RPC returns JSONB: {"new_purchased": N, "used_seasons": M}
+        data = result.data
+        return data["new_purchased"], data["used_seasons"]
 
     async def delete(self, alliance_id: UUID) -> bool:
         """

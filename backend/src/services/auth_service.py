@@ -137,6 +137,27 @@ class AuthService:
         except ValueError as e:
             raise TokenInvalidError(f"Token claims validation error: {str(e)}") from e
 
+    @staticmethod
+    def _raise_auth_error(e: Exception) -> None:
+        """Convert auth exceptions to HTTP 401 responses."""
+        if isinstance(e, TokenExpiredError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
+        if isinstance(e, TokenInvalidError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
+
     def authenticate_user(self, authorization: str | None) -> AuthenticatedUser:
         """
         Authenticate user from Authorization header.
@@ -151,33 +172,11 @@ class AuthService:
             HTTPException: If authentication fails
         """
         try:
-            # Extract and validate token
             token = self._extract_token(authorization)
             claims = self._validate_jwt_token(token)
-
-            # Convert to user model
-            user = claims.to_authenticated_user()
-
-            return user
-
-        except TokenExpiredError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token expired",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from e
-        except TokenInvalidError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from e
+            return claims.to_authenticated_user()
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from e
+            self._raise_auth_error(e)
 
     def authenticate_user_session(self, authorization: str | None) -> UserSession:
         """
@@ -204,25 +203,8 @@ class AuthService:
                 issued_at=claims.issued_at,
                 session_id=claims.session_id,
             )
-
-        except TokenExpiredError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token expired",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from e
-        except TokenInvalidError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from e
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from e
+            self._raise_auth_error(e)
 
     def authenticate_optional(self, authorization: str | None) -> AuthenticatedUser | None:
         """
