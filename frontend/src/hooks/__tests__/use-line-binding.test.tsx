@@ -629,7 +629,7 @@ describe("useCountdown", () => {
     const { result, rerender } = renderHook(
       ({ expiresAt }: { expiresAt: string | undefined }) =>
         useCountdown(expiresAt),
-      { initialProps: { expiresAt } }
+      { initialProps: { expiresAt } as { expiresAt: string | undefined } }
     );
 
     expect(result.current.remainingSeconds).toBe(300);

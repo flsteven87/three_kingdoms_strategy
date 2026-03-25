@@ -7,7 +7,7 @@ import {
   donationKeys,
 } from "../use-donations";
 import type { QueryClient } from "@tanstack/react-query";
-import type { CreateDonationPayload } from "@/lib/api/donation-api";
+import type { CreateDonationPayload, DonationListItem } from "@/lib/api/donation-api";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
 
 vi.mock("@/lib/api-client", () => ({
@@ -26,9 +26,35 @@ import { apiClient } from "@/lib/api-client";
 const ALLIANCE_ID = "alliance-1";
 const SEASON_ID = "season-1";
 
-const mockDonations = [
-  { id: "d1", title: "Donation A", target_amount: 1000 },
-  { id: "d2", title: "Donation B", target_amount: 2000 },
+const mockDonations: DonationListItem[] = [
+  {
+    id: "d1",
+    season_id: SEASON_ID,
+    alliance_id: ALLIANCE_ID,
+    title: "Donation A",
+    type: "regular",
+    deadline: "2026-04-01",
+    target_amount: 1000,
+    description: null,
+    status: "active",
+    created_at: "2026-01-01T00:00:00Z",
+    created_by: "user-1",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "d2",
+    season_id: SEASON_ID,
+    alliance_id: ALLIANCE_ID,
+    title: "Donation B",
+    type: "regular",
+    deadline: "2026-05-01",
+    target_amount: 2000,
+    description: null,
+    status: "active",
+    created_at: "2026-01-01T00:00:00Z",
+    created_by: "user-1",
+    updated_at: "2026-01-01T00:00:00Z",
+  },
 ];
 
 describe("donationKeys", () => {
@@ -90,7 +116,20 @@ describe("useCreateDonation", () => {
 
 
   it("calls createDonation and invalidates list cache", async () => {
-    const newDonation = { id: "d3", title: "New" };
+    const newDonation: DonationListItem = {
+      id: "d3",
+      season_id: SEASON_ID,
+      alliance_id: ALLIANCE_ID,
+      title: "New",
+      type: "regular",
+      deadline: "2026-04-01",
+      target_amount: 500,
+      description: null,
+      status: "active",
+      created_at: "2026-01-01T00:00:00Z",
+      created_by: "user-1",
+      updated_at: "2026-01-01T00:00:00Z",
+    };
     vi.mocked(apiClient.createDonation).mockResolvedValueOnce(newDonation);
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 

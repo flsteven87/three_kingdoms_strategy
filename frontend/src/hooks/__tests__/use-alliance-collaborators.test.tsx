@@ -266,9 +266,11 @@ describe("useUpdateCollaboratorRole", () => {
   });
 
   it("calls updateCollaboratorRole and invalidates cache on success", async () => {
-    const updatedCollaborator: AllianceCollaborator = {
-      ...mockCollaborator,
+    const updatedCollaborator = {
+      id: mockCollaborator.id!,
+      user_id: mockCollaborator.user_id!,
       role: "viewer",
+      updated_at: "2026-01-02T00:00:00Z",
     };
     vi.mocked(apiClient.updateCollaboratorRole).mockResolvedValueOnce(
       updatedCollaborator

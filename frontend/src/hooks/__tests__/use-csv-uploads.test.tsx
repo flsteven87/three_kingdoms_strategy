@@ -8,7 +8,7 @@ import {
 } from "../use-csv-uploads";
 import type { QueryClient } from "@tanstack/react-query";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
-import type { CsvUpload } from "@/types/csv-upload";
+import type { CsvUpload, CsvUploadResponse } from "@/types/csv-upload";
 
 vi.mock("@/lib/api-client", () => ({
   apiClient: {
@@ -26,19 +26,23 @@ const mockUploads: CsvUpload[] = [
   {
     id: "upload-1",
     season_id: SEASON_ID,
+    alliance_id: "alliance-1",
     file_name: "stats-2026-01.csv",
     snapshot_date: "2026-01-15",
-    record_count: 50,
+    total_members: 50,
+    uploaded_at: "2026-01-15T10:00:00Z",
     created_at: "2026-01-15T10:00:00Z",
-  } as CsvUpload,
+  },
   {
     id: "upload-2",
     season_id: SEASON_ID,
+    alliance_id: "alliance-1",
     file_name: "stats-2026-02.csv",
     snapshot_date: "2026-02-15",
-    record_count: 48,
+    total_members: 48,
+    uploaded_at: "2026-02-15T10:00:00Z",
     created_at: "2026-02-15T10:00:00Z",
-  } as CsvUpload,
+  },
 ];
 
 describe("csvUploadKeys", () => {
@@ -93,7 +97,16 @@ describe("useUploadCsv", () => {
 
 
   it("calls uploadCsv with correct parameters", async () => {
-    const mockResponse = { ...mockUploads[0], id: "new-upload" };
+    const mockResponse: CsvUploadResponse = {
+      upload_id: "new-upload",
+      season_id: SEASON_ID,
+      alliance_id: "alliance-1",
+      snapshot_date: "2026-03-01",
+      filename: "test.csv",
+      total_members: 50,
+      total_snapshots: 50,
+      replaced_existing: false,
+    };
     vi.mocked(apiClient.uploadCsv).mockResolvedValueOnce(mockResponse);
 
     const file = new File(["csv data"], "test.csv", { type: "text/csv" });
@@ -119,7 +132,17 @@ describe("useUploadCsv", () => {
   });
 
   it("invalidates csv upload list on settled", async () => {
-    vi.mocked(apiClient.uploadCsv).mockResolvedValueOnce(mockUploads[0]);
+    const mockUploadResponse: CsvUploadResponse = {
+      upload_id: mockUploads[0].id,
+      season_id: mockUploads[0].season_id,
+      alliance_id: mockUploads[0].alliance_id,
+      snapshot_date: mockUploads[0].snapshot_date,
+      filename: mockUploads[0].file_name,
+      total_members: mockUploads[0].total_members,
+      total_snapshots: 50,
+      replaced_existing: false,
+    };
+    vi.mocked(apiClient.uploadCsv).mockResolvedValueOnce(mockUploadResponse);
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
     const file = new File(["data"], "test.csv");

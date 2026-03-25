@@ -15,6 +15,7 @@ import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils
 import type {
   BattleEvent,
   EventAnalyticsResponse,
+  EventListItem,
   BatchAnalyticsResponse,
 } from "@/types/event";
 
@@ -140,14 +141,29 @@ describe("useEvents", () => {
   });
 
   it("fetches events list for a season", async () => {
-    vi.mocked(apiClient.getEvents).mockResolvedValueOnce([mockEventAnalytics]);
+    const mockEventListItem: EventListItem = {
+      id: mockEvent.id,
+      name: mockEvent.name,
+      event_type: mockEvent.event_type,
+      status: mockEvent.status,
+      event_start: mockEvent.event_start,
+      event_end: mockEvent.event_end,
+      participation_rate: 0.83,
+      total_merit: 50000,
+      mvp_name: "TopPlayer",
+      absent_count: 5,
+      created_at: mockEvent.created_at,
+      absent_names: null,
+      participant_names: null,
+    };
+    vi.mocked(apiClient.getEvents).mockResolvedValueOnce([mockEventListItem]);
 
     const { result } = renderHook(() => useEvents("season-1"), {
       wrapper: createWrapper(queryClient),
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual([mockEventAnalytics]);
+    expect(result.current.data).toEqual([mockEventListItem]);
     expect(apiClient.getEvents).toHaveBeenCalledWith("season-1");
   });
 

@@ -36,8 +36,10 @@ describe("useRecalculateSeasonPeriods", () => {
 
   it("calls recalculateSeasonPeriods with the season id", async () => {
     vi.mocked(apiClient.recalculateSeasonPeriods).mockResolvedValueOnce({
+      success: true,
+      season_id: SEASON_ID,
+      season_name: "Season 1",
       periods_created: 3,
-      metrics_created: 15,
     });
 
     const { result } = renderHook(
@@ -53,8 +55,10 @@ describe("useRecalculateSeasonPeriods", () => {
 
   it("invalidates period and csv-upload caches on settled", async () => {
     vi.mocked(apiClient.recalculateSeasonPeriods).mockResolvedValueOnce({
+      success: true,
+      season_id: SEASON_ID,
+      season_name: "Season 1",
       periods_created: 1,
-      metrics_created: 5,
     });
 
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
