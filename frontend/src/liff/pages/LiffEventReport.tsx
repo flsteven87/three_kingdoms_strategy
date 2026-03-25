@@ -6,6 +6,7 @@
  */
 
 import { Card, CardContent } from "@/components/ui/card";
+import { formatNumber } from "@/lib/format-utils";
 import { useLiffEventReport } from "../hooks/use-liff-event";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
 import type {
@@ -28,12 +29,6 @@ const EVENT_TYPE_CONFIG: Record<
   siege: { icon: "🏰", label: "攻城", color: "#E67E22" },
   forbidden: { icon: "🚫", label: "禁地", color: "#FF5555" },
 };
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${Math.floor(n / 1_000)}K`;
-  return n.toLocaleString();
-}
 
 function formatEventTime(dateStr: string | null): string {
   if (!dateStr) return "";

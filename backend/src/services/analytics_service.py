@@ -76,6 +76,11 @@ def _build_period_label(period: Period) -> str:
 class AnalyticsService:
     """Service for member analytics and performance data"""
 
+    @staticmethod
+    def _compute_season_days(season_start, latest_period_end) -> int:
+        """Calculate season days with floor of 1 to prevent division by zero."""
+        return max(1, (latest_period_end - season_start).days)
+
     def __init__(self):
         """Initialize analytics service with required repositories"""
         self._member_repo = MemberRepository()
@@ -256,19 +261,7 @@ class AnalyticsService:
         metrics = await self._metrics_repo.get_by_period(period_id)
 
         if not metrics:
-            return {
-                "member_count": 0,
-                "avg_daily_contribution": 0,
-                "avg_daily_merit": 0,
-                "avg_daily_assist": 0,
-                "avg_daily_donation": 0,
-                "avg_power": 0,
-                "median_daily_contribution": 0,
-                "median_daily_merit": 0,
-                "median_daily_assist": 0,
-                "median_daily_donation": 0,
-                "median_power": 0,
-            }
+            return self._empty_alliance_averages()
 
         count = len(metrics)
 
@@ -318,10 +311,7 @@ class AnalyticsService:
 
         latest_period = periods[-1]
 
-        # Calculate season days
-        season_days = (latest_period.end_date - season.start_date).days
-        if season_days <= 0:
-            season_days = 1
+        season_days = self._compute_season_days(season.start_date, latest_period.end_date)
 
         # Get metrics with snapshot totals for latest period
         metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
@@ -508,20 +498,7 @@ class AnalyticsService:
         period_ids = [p.id for p in periods]
         averages_map = await self._metrics_repo.get_periods_averages_batch(period_ids)
 
-        # Empty averages for periods with no metrics
-        empty_avg = {
-            "member_count": 0,
-            "avg_daily_contribution": 0,
-            "avg_daily_merit": 0,
-            "avg_daily_assist": 0,
-            "avg_daily_donation": 0,
-            "avg_power": 0,
-            "median_daily_contribution": 0,
-            "median_daily_merit": 0,
-            "median_daily_assist": 0,
-            "median_daily_donation": 0,
-            "median_power": 0,
-        }
+        empty_avg = self._empty_alliance_averages()
 
         result = []
         for period in periods:
@@ -678,10 +655,7 @@ class AnalyticsService:
                 m for m in metrics_with_totals if str(m["member_id"]) in group_member_ids
             ]
 
-            # Calculate season days: from season start to latest snapshot date
-            season_days = (latest_period.end_date - season.start_date).days
-            if season_days <= 0:
-                season_days = 1  # Prevent division by zero
+            season_days = self._compute_season_days(season.start_date, latest_period.end_date)
 
             # Calculate season daily averages using snapshot totals
             members = []
@@ -802,10 +776,7 @@ class AnalyticsService:
 
             latest_period = periods[-1]
 
-            # Calculate season days
-            season_days = (latest_period.end_date - season.start_date).days
-            if season_days <= 0:
-                season_days = 1
+            season_days = self._compute_season_days(season.start_date, latest_period.end_date)
 
             # Get metrics with snapshot totals for latest period
             metrics_with_totals = await self._metrics_repo.get_metrics_with_snapshot_totals(
@@ -1029,10 +1000,7 @@ class AnalyticsService:
         latest_period = periods[-1]
         prev_period = periods[-2] if len(periods) >= 2 else None
 
-        # Calculate season days for season view
-        season_days = (latest_period.end_date - season.start_date).days
-        if season_days <= 0:
-            season_days = 1
+        season_days = self._compute_season_days(season.start_date, latest_period.end_date)
 
         # Get metrics based on view mode (optimized to avoid redundant queries)
         metrics_with_totals: list[dict] | None = None

@@ -19,7 +19,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from linebot.v3.messaging import ReplyMessageRequest, TextMessage
+from linebot.v3.messaging import ApiException, ReplyMessageRequest, TextMessage
 
 from src.core.config import GAME_TIMEZONE, Settings, get_settings
 from src.core.dependencies import (
@@ -1255,40 +1255,26 @@ async def _send_liff_first_message_reminder(
     await _send_flex_message(reply_token, flex_message)
 
 
+def _send_reply(reply_token: str, messages: list) -> None:
+    """Send a reply via LINE Bot API with error handling."""
+    line_bot = get_line_bot_api()
+    if not line_bot:
+        logger.warning("LINE Bot API not available")
+        return
+
+    try:
+        line_bot.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=messages))
+    except ApiException as e:
+        logger.error(f"LINE API reply failed: {e}")
+
+
 async def _send_flex_message(reply_token: str, flex_message) -> None:
     """發送 Flex Message"""
     if not flex_message:
         return
-
-    line_bot = get_line_bot_api()
-    if not line_bot:
-        logger.warning("LINE Bot API not available")
-        return
-
-    try:
-        line_bot.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[flex_message],
-            )
-        )
-    except Exception as e:
-        logger.error(f"Failed to send flex message: {e}")
+    _send_reply(reply_token, [flex_message])
 
 
 async def _reply_text(reply_token: str, text: str) -> None:
     """發送文字回覆"""
-    line_bot = get_line_bot_api()
-    if not line_bot:
-        logger.warning("LINE Bot API not available")
-        return
-
-    try:
-        line_bot.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text=text)],
-            )
-        )
-    except Exception as e:
-        logger.error(f"Failed to reply: {e}")
+    _send_reply(reply_token, [TextMessage(text=text)])

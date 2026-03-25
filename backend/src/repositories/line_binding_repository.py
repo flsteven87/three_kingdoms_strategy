@@ -12,6 +12,7 @@ Data access layer for LINE Bot integration tables:
 - No business logic (belongs in Service layer)
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
@@ -87,15 +88,15 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
         data = self._handle_supabase_result(result, allow_empty=True, expect_single=True)
         if not data:
-            # Debug: also check if code exists at all
-            debug_result = await self._execute_async(
-                lambda: self.client.from_("line_binding_codes")
-                .select("code, expires_at, used_at, is_test")
-                .eq("code", code)
-                .execute()
-            )
-            debug_data = self._handle_supabase_result(debug_result, allow_empty=True)
-            logger.warning(f"[REPO] Code not valid. Debug info: {debug_data}")
+            if logger.isEnabledFor(logging.DEBUG):
+                debug_result = await self._execute_async(
+                    lambda: self.client.from_("line_binding_codes")
+                    .select("code, expires_at, used_at, is_test")
+                    .eq("code", code)
+                    .execute()
+                )
+                debug_data = self._handle_supabase_result(debug_result, allow_empty=True)
+                logger.debug(f"[REPO] Code not valid. Debug info: {debug_data}")
             return None
         logger.info(f"[REPO] Code found: {data}")
         return LineBindingCode(**data)
@@ -328,17 +329,13 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
 
-    async def search_id_bindings(
-        self, alliance_id: UUID, query: str
-    ) -> list[MemberLineBinding]:
+    async def search_id_bindings(self, alliance_id: UUID, query: str) -> list[MemberLineBinding]:
         """Search member bindings by game ID or LINE display name (case-insensitive)."""
         result = await self._execute_async(
             lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
-            .or_(
-                f"game_id.ilike.%{query}%,line_display_name.ilike.%{query}%"
-            )
+            .or_(f"game_id.ilike.%{query}%,line_display_name.ilike.%{query}%")
             .execute()
         )
 
@@ -645,17 +642,6 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .execute()
         )
 
-    async def is_user_registered_in_group(self, line_group_id: str, line_user_id: str) -> bool:
-        """Check if a LINE user has any registered game IDs in the group's alliance"""
-        group_binding = await self.get_group_binding_by_line_group_id(line_group_id)
-        if not group_binding:
-            return False
-
-        bindings = await self.get_member_bindings_by_line_user(
-            alliance_id=group_binding.alliance_id, line_user_id=line_user_id
-        )
-        return len(bindings) > 0
-
     # =========================================================================
     # Member Candidates Operations (for autocomplete)
     # =========================================================================
@@ -779,10 +765,9 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             return 0
 
         now_iso = datetime.now(UTC).isoformat()
-        updated_count = 0
-        for update in binding_updates:
-            await self._execute_async(
-                lambda u=update: self.client.from_("member_line_bindings")
+        tasks = [
+            self._execute_async(
+                lambda u=u: self.client.from_("member_line_bindings")
                 .update(
                     {
                         "member_id": u["member_id"],
@@ -793,6 +778,8 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
                 .eq("id", u["id"])
                 .execute()
             )
-            updated_count += 1
+            for u in binding_updates
+        ]
+        await asyncio.gather(*tasks)
 
-        return updated_count
+        return len(binding_updates)

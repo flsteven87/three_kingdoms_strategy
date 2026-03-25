@@ -46,6 +46,8 @@ from src.models.line_binding import (
     PerformanceSeasonTotal,
     PerformanceTrendItem,
     RegisteredAccount,
+    RegisteredMemberItem,
+    RegisteredMembersResponse,
     RegisterMemberResponse,
     SimilarMembersResponse,
     UserEventParticipation,
@@ -54,6 +56,7 @@ from src.repositories.battle_event_metrics_repository import BattleEventMetricsR
 from src.repositories.battle_event_repository import BattleEventRepository
 from src.repositories.line_binding_repository import LineBindingRepository
 from src.repositories.season_repository import SeasonRepository
+from src.services.analytics_service import AnalyticsService
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +76,7 @@ class LineBindingService:
         self._event_repo = BattleEventRepository()
         self._metrics_repo = BattleEventMetricsRepository()
         self._season_repo = SeasonRepository()
+        self._analytics_service = AnalyticsService()
 
     # =========================================================================
     # Common Lookups (used by webhook handlers and endpoints)
@@ -337,7 +341,7 @@ class LineBindingService:
             member_count=member_count,
         )
 
-    async def get_registered_members(self, alliance_id: UUID):
+    async def get_registered_members(self, alliance_id: UUID) -> RegisteredMembersResponse:
         """
         Get all registered LINE members for an alliance (admin view)
 
@@ -347,8 +351,6 @@ class LineBindingService:
         Returns:
             RegisteredMembersResponse with member list
         """
-        from src.models.line_binding import RegisteredMemberItem, RegisteredMembersResponse
-
         bindings = await self.repository.get_all_member_bindings_by_alliance(alliance_id)
 
         members = [
@@ -452,6 +454,21 @@ class LineBindingService:
     # Member Registration Operations (LIFF)
     # =========================================================================
 
+    @staticmethod
+    def _bindings_to_registered_accounts(
+        bindings: list[MemberLineBinding],
+    ) -> list[RegisteredAccount]:
+        """Convert binding models to RegisteredAccount response objects."""
+        return [
+            RegisteredAccount(
+                game_id=b.game_id,
+                display_name=b.line_display_name,
+                is_verified=b.is_verified,
+                created_at=b.created_at,
+            )
+            for b in bindings
+        ]
+
     async def get_member_info(self, line_user_id: str, line_group_id: str) -> MemberInfoResponse:
         """
         Get member info for LIFF display
@@ -479,15 +496,7 @@ class LineBindingService:
             alliance_id=group_binding.alliance_id, line_user_id=line_user_id
         )
 
-        registered_ids = [
-            RegisteredAccount(
-                game_id=b.game_id,
-                display_name=b.line_display_name,
-                is_verified=b.is_verified,
-                created_at=b.created_at,
-            )
-            for b in bindings
-        ]
+        registered_ids = self._bindings_to_registered_accounts(bindings)
 
         return MemberInfoResponse(
             has_registered=len(registered_ids) > 0,
@@ -555,15 +564,7 @@ class LineBindingService:
             alliance_id=alliance_id, line_user_id=line_user_id
         )
 
-        registered_ids = [
-            RegisteredAccount(
-                game_id=b.game_id,
-                display_name=b.line_display_name,
-                is_verified=b.is_verified,
-                created_at=b.created_at,
-            )
-            for b in bindings
-        ]
+        registered_ids = self._bindings_to_registered_accounts(bindings)
 
         return RegisterMemberResponse(has_registered=True, registered_ids=registered_ids)
 
@@ -620,15 +621,7 @@ class LineBindingService:
             alliance_id=alliance_id, line_user_id=line_user_id
         )
 
-        registered_ids = [
-            RegisteredAccount(
-                game_id=b.game_id,
-                display_name=b.line_display_name,
-                is_verified=b.is_verified,
-                created_at=b.created_at,
-            )
-            for b in bindings
-        ]
+        registered_ids = self._bindings_to_registered_accounts(bindings)
 
         return RegisterMemberResponse(
             has_registered=len(registered_ids) > 0, registered_ids=registered_ids
@@ -659,13 +652,14 @@ class LineBindingService:
         2. User has NOT registered any game ID
         3. Group is NOT in cooldown (30 minutes)
         """
-        if not await self.is_group_bound(line_group_id):
+        group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
+        if not group_binding:
             return False
 
-        is_registered = await self.repository.is_user_registered_in_group(
-            line_group_id=line_group_id, line_user_id=line_user_id
+        bindings = await self.repository.get_member_bindings_by_line_user(
+            alliance_id=group_binding.alliance_id, line_user_id=line_user_id
         )
-        if is_registered:
+        if bindings:
             return False
 
         return not await self._is_group_in_cooldown(line_group_id)
@@ -837,10 +831,6 @@ class LineBindingService:
         Raises:
             HTTPException 404: If group not bound or game_id not found
         """
-        # Lazy import to avoid circular dependency
-        from src.repositories.season_repository import SeasonRepository
-        from src.services.analytics_service import AnalyticsService
-
         # Find alliance by group ID
         group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
 
@@ -868,17 +858,13 @@ class LineBindingService:
             return MemberPerformanceResponse(has_data=False, game_id=game_id)
 
         # Get current (selected) season
-        season_repo = SeasonRepository()
-        current_season = await season_repo.get_current_season(alliance_id)
+        current_season = await self._season_repo.get_current_season(alliance_id)
 
         if not current_season:
             return MemberPerformanceResponse(has_data=False, game_id=game_id)
 
-        # Get analytics data
-        analytics_service = AnalyticsService()
-
         # Get member trend data
-        trend_data = await analytics_service.get_member_trend(
+        trend_data = await self._analytics_service.get_member_trend(
             member_id=member_id, season_id=current_season.id
         )
 
@@ -888,7 +874,7 @@ class LineBindingService:
             )
 
         # Get season summary
-        season_summary = await analytics_service.get_season_summary(
+        season_summary = await self._analytics_service.get_season_summary(
             member_id=member_id, season_id=current_season.id
         )
 
