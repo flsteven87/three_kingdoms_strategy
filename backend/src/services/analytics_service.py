@@ -10,7 +10,7 @@ Follows CLAUDE.md:
 
 import asyncio
 from collections import defaultdict
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from statistics import median as calc_median
 from statistics import stdev
@@ -77,7 +77,7 @@ class AnalyticsService:
     """Service for member analytics and performance data"""
 
     @staticmethod
-    def _compute_season_days(season_start, latest_period_end) -> int:
+    def _compute_season_days(season_start: date, latest_period_end: date) -> int:
         """Calculate season days with floor of 1 to prevent division by zero."""
         return max(1, (latest_period_end - season_start).days)
 
