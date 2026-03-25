@@ -43,6 +43,13 @@ export function calculatePercentDiff(value: number, average: number): number {
   return ((value - average) / average) * 100
 }
 
+/** Get CSS class name for diff value (positive/negative/zero) */
+export function getDiffClassName(diff: number): string {
+  if (diff > 0) return "text-primary";
+  if (diff < 0) return "text-destructive";
+  return "text-muted-foreground";
+}
+
 /**
  * Format a date string to MM/DD format for chart labels.
  */
