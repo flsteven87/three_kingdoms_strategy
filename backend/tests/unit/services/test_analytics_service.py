@@ -384,3 +384,311 @@ class TestGetAllianceAnalyticsSeasonViewData:
         # Note: actual calculation depends on season_days calculation
         assert summary["member_count"] == 1
         assert summary["avg_daily_contribution"] > 0
+
+
+# =============================================================================
+# Tests for _db_float helper
+# =============================================================================
+
+
+class TestDbFloat:
+    """Tests for the _db_float() helper function."""
+
+    def test_converts_decimal_to_float(self):
+        """Should convert Decimal to float with identical numerical value."""
+        from src.services.analytics_service import _db_float
+
+        result = _db_float(Decimal("1234.56"))
+        assert isinstance(result, float)
+        assert result == pytest.approx(1234.56)
+
+    def test_converts_float_passthrough(self):
+        """Should convert a Python float input correctly."""
+        from src.services.analytics_service import _db_float
+
+        result = _db_float(3.14)
+        assert isinstance(result, float)
+        assert result == pytest.approx(3.14)
+
+    def test_converts_string_representation(self):
+        """Should convert a string representation of a number to float."""
+        from src.services.analytics_service import _db_float
+
+        result = _db_float("9999.99")
+        assert isinstance(result, float)
+        assert result == pytest.approx(9999.99)
+
+    def test_converts_integer(self):
+        """Should convert integer input to float."""
+        from src.services.analytics_service import _db_float
+
+        result = _db_float(42)
+        assert isinstance(result, float)
+        assert result == pytest.approx(42.0)
+
+    def test_converts_zero(self):
+        """Should handle zero correctly."""
+        from src.services.analytics_service import _db_float
+
+        result = _db_float(Decimal("0.00"))
+        assert result == pytest.approx(0.0)
+
+    def test_converts_high_precision_decimal(self):
+        """Should handle high-precision Decimal without floating-point drift."""
+        from src.services.analytics_service import _db_float
+
+        # Using Decimal(str(value)) is the safe conversion pattern
+        decimal_val = Decimal("12345.678900")
+        result = _db_float(decimal_val)
+        assert result == pytest.approx(12345.6789)
+
+    def test_result_identical_to_manual_conversion(self):
+        """Must produce identical results to float(Decimal(str(value)))."""
+        from src.services.analytics_service import _db_float
+
+        inputs = [Decimal("100.50"), 200.75, "300.25", 400]
+        for val in inputs:
+            expected = float(Decimal(str(val)))
+            assert _db_float(val) == expected, f"Mismatch for input {val!r}"
+
+
+# =============================================================================
+# Tests for _compute_group_stats
+# =============================================================================
+
+
+class TestComputeGroupStats:
+    """Tests for the _compute_group_stats() method."""
+
+    @pytest.fixture
+    def service(self) -> AnalyticsService:
+        """Create AnalyticsService instance (no repos needed for pure methods)."""
+        return AnalyticsService()
+
+    def test_returns_correct_averages_for_known_input(self, service: AnalyticsService):
+        """Should calculate correct averages from known numeric lists."""
+        # contributions: [100, 200, 300] → avg = 200
+        result = service._compute_group_stats(
+            group_name="前鋒隊",
+            contributions=[100.0, 200.0, 300.0],
+            merits=[500.0, 1000.0, 1500.0],
+            assists=[10.0, 20.0, 30.0],
+            donations=[50.0, 100.0, 150.0],
+            powers=[10000.0, 20000.0, 30000.0],
+            ranks=[1.0, 2.0, 3.0],
+        )
+        assert result["group_name"] == "前鋒隊"
+        assert result["member_count"] == 3
+        assert result["avg_daily_contribution"] == pytest.approx(200.0)
+        assert result["avg_daily_merit"] == pytest.approx(1000.0)
+        assert result["avg_daily_assist"] == pytest.approx(20.0)
+        assert result["avg_daily_donation"] == pytest.approx(100.0)
+        assert result["avg_power"] == pytest.approx(20000.0)
+        assert result["avg_rank"] == pytest.approx(2.0)
+
+    def test_returns_correct_boxplot_fields(self, service: AnalyticsService):
+        """Should calculate min, Q1, median, Q3, max for contributions."""
+        # sorted contributions: [100, 200, 300]
+        result = service._compute_group_stats(
+            group_name="後勤隊",
+            contributions=[300.0, 100.0, 200.0],
+            merits=[1000.0, 1000.0, 1000.0],
+            assists=[10.0, 10.0, 10.0],
+            donations=[50.0, 50.0, 50.0],
+            powers=[10000.0, 10000.0, 10000.0],
+            ranks=[1.0, 2.0, 3.0],
+        )
+        assert result["contribution_min"] == pytest.approx(100.0)
+        assert result["contribution_max"] == pytest.approx(300.0)
+        assert result["contribution_median"] == pytest.approx(200.0)
+        # Q1 and Q3 via linear interpolation on [100, 200, 300]
+        assert result["contribution_q1"] == pytest.approx(150.0)
+        assert result["contribution_q3"] == pytest.approx(250.0)
+
+    def test_returns_correct_cv_for_known_variance(self, service: AnalyticsService):
+        """Should calculate coefficient of variation = std/mean."""
+        import statistics
+
+        contributions = [100.0, 200.0, 300.0]
+        mean = sum(contributions) / len(contributions)  # 200
+        std = statistics.stdev(contributions)
+        expected_cv = round(std / mean, 3)
+
+        result = service._compute_group_stats(
+            group_name="Test",
+            contributions=contributions,
+            merits=[1000.0, 1000.0, 1000.0],
+            assists=[10.0, 10.0, 10.0],
+            donations=[50.0, 50.0, 50.0],
+            powers=[10000.0, 10000.0, 10000.0],
+            ranks=[1.0, 2.0, 3.0],
+        )
+        assert result["contribution_cv"] == pytest.approx(expected_cv)
+
+    def test_returns_empty_stats_for_empty_lists(self, service: AnalyticsService):
+        """Should return empty stats dict when given empty lists."""
+        result = service._compute_group_stats(
+            group_name="空組",
+            contributions=[],
+            merits=[],
+            assists=[],
+            donations=[],
+            powers=[],
+            ranks=[],
+        )
+        assert result["group_name"] == "空組"
+        assert result["member_count"] == 0
+        assert result["avg_daily_contribution"] == 0
+
+    def test_single_member_cv_is_zero(self, service: AnalyticsService):
+        """With a single member, std is 0, so CV should be 0."""
+        result = service._compute_group_stats(
+            group_name="Solo",
+            contributions=[500.0],
+            merits=[2000.0],
+            assists=[30.0],
+            donations=[100.0],
+            powers=[50000.0],
+            ranks=[5.0],
+        )
+        assert result["member_count"] == 1
+        assert result["contribution_cv"] == pytest.approx(0.0)
+        assert result["merit_cv"] == pytest.approx(0.0)
+
+
+# =============================================================================
+# Tests for _calculate_group_stats and _calculate_group_stats_from_members
+# equivalence
+# =============================================================================
+
+
+class TestGroupStatsEquivalence:
+    """
+    Tests that _calculate_group_stats and _calculate_group_stats_from_members
+    produce identical output dicts for equivalent inputs.
+    """
+
+    @pytest.fixture
+    def service(self) -> AnalyticsService:
+        return AnalyticsService()
+
+    def test_identical_output_for_equivalent_inputs(self, service: AnalyticsService):
+        """
+        Both methods must produce identical stats for the same underlying data.
+
+        raw_metrics (from DB query) → _calculate_group_stats
+        members_list (from season view) → _calculate_group_stats_from_members
+        """
+        raw_metrics = [
+            {
+                "daily_contribution": Decimal("1000.00"),
+                "daily_merit": Decimal("5000.00"),
+                "daily_assist": Decimal("20.00"),
+                "daily_donation": Decimal("300.00"),
+                "end_power": 100000,
+                "end_rank": 1,
+            },
+            {
+                "daily_contribution": Decimal("2000.00"),
+                "daily_merit": Decimal("8000.00"),
+                "daily_assist": Decimal("40.00"),
+                "daily_donation": Decimal("600.00"),
+                "end_power": 150000,
+                "end_rank": 2,
+            },
+            {
+                "daily_contribution": Decimal("1500.00"),
+                "daily_merit": Decimal("6500.00"),
+                "daily_assist": Decimal("30.00"),
+                "daily_donation": Decimal("450.00"),
+                "end_power": 120000,
+                "end_rank": 3,
+            },
+        ]
+
+        members_list = [
+            {
+                "daily_contribution": 1000.0,
+                "daily_merit": 5000.0,
+                "daily_assist": 20.0,
+                "daily_donation": 300.0,
+                "power": 100000,
+                "contribution_rank": 1,
+            },
+            {
+                "daily_contribution": 2000.0,
+                "daily_merit": 8000.0,
+                "daily_assist": 40.0,
+                "daily_donation": 600.0,
+                "power": 150000,
+                "contribution_rank": 2,
+            },
+            {
+                "daily_contribution": 1500.0,
+                "daily_merit": 6500.0,
+                "daily_assist": 30.0,
+                "daily_donation": 450.0,
+                "power": 120000,
+                "contribution_rank": 3,
+            },
+        ]
+
+        group_name = "前鋒隊"
+        stats_from_raw = service._calculate_group_stats(group_name, raw_metrics)
+        stats_from_members = service._calculate_group_stats_from_members(group_name, members_list)
+
+        # All numeric fields must be identical
+        for key in stats_from_raw:
+            assert stats_from_raw[key] == pytest.approx(stats_from_members[key]), (
+                f"Field '{key}' differs: raw={stats_from_raw[key]}, "
+                f"members={stats_from_members[key]}"
+            )
+
+    def test_empty_input_returns_identical_empty_stats(self, service: AnalyticsService):
+        """Both methods must return the same empty stats structure."""
+        group_name = "空組"
+        stats_from_raw = service._calculate_group_stats(group_name, [])
+        stats_from_members = service._calculate_group_stats_from_members(group_name, [])
+
+        assert stats_from_raw == stats_from_members
+
+    def test_output_contains_all_required_keys(self, service: AnalyticsService):
+        """Output dict must contain all expected box-plot and summary keys."""
+        required_keys = {
+            "group_name",
+            "member_count",
+            "avg_daily_contribution",
+            "avg_daily_merit",
+            "avg_daily_assist",
+            "avg_daily_donation",
+            "avg_power",
+            "avg_rank",
+            "best_rank",
+            "worst_rank",
+            "contribution_min",
+            "contribution_q1",
+            "contribution_median",
+            "contribution_q3",
+            "contribution_max",
+            "contribution_cv",
+            "merit_min",
+            "merit_q1",
+            "merit_median",
+            "merit_q3",
+            "merit_max",
+            "merit_cv",
+        }
+        raw_metrics = [
+            {
+                "daily_contribution": Decimal("1000.00"),
+                "daily_merit": Decimal("5000.00"),
+                "daily_assist": Decimal("20.00"),
+                "daily_donation": Decimal("300.00"),
+                "end_power": 100000,
+                "end_rank": 1,
+            }
+        ]
+        result = service._calculate_group_stats("Test", raw_metrics)
+        assert required_keys.issubset(result.keys()), (
+            f"Missing keys: {required_keys - result.keys()}"
+        )

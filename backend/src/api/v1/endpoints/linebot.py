@@ -19,6 +19,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from linebot.v3.messaging import ReplyMessageRequest, TextMessage
 
 from src.core.config import GAME_TIMEZONE, Settings, get_settings
 from src.core.dependencies import (
@@ -30,6 +31,11 @@ from src.core.dependencies import (
     UserIdDep,
 )
 from src.core.line_auth import WebhookBodyDep, create_liff_url, get_group_info, get_line_bot_api
+from src.lib.line_flex_builder import (
+    build_event_list_carousel,
+    build_event_report_flex,
+    build_liff_entry_flex,
+)
 from src.models.battle_event_metrics import EventGroupAnalytics
 from src.models.copper_mine import (
     CopperMineCreate,
@@ -64,6 +70,29 @@ router = APIRouter(prefix="/linebot", tags=["LINE Bot"])
 # 綁定碼格式：6 位英數字
 BIND_CODE_PATTERN = re.compile(r"^[A-Z0-9]{6}$")
 
+_MSG_GROUP_NOT_BOUND = (
+    "❌ 此群組尚未綁定同盟\n\n請盟主在 Web App 生成綁定碼，\n然後發送「/綁定 XXXXXX」完成綁定"
+)
+
+
+async def _resolve_alliance_and_season(
+    line_group_id: str,
+    reply_token: str,
+    service: LineBindingService,
+) -> tuple[UUID, UUID | None] | None:
+    """
+    Resolve group binding to (alliance_id, season_id).
+    Sends error reply and returns None if the group is not bound.
+    """
+    group_binding = await service.get_group_binding(line_group_id)
+    if not group_binding:
+        await _reply_text(reply_token, _MSG_GROUP_NOT_BOUND)
+        return None
+
+    alliance_id = group_binding.alliance_id
+    season_id = await service.get_current_season_id(alliance_id)
+    return alliance_id, season_id
+
 
 # =============================================================================
 # Web App Endpoints (Supabase JWT Auth)
@@ -82,9 +111,7 @@ async def generate_binding_code(
     service: LineBindingServiceDep,
     alliance_service: AllianceServiceDep,
     permission_service: PermissionServiceDep,
-    is_test: Annotated[
-        bool, Query(description="Generate code for test group binding")
-    ] = False,
+    is_test: Annotated[bool, Query(description="Generate code for test group binding")] = False,
 ) -> LineBindingCodeResponse:
     """Generate a new binding code for the user's alliance"""
     alliance = await alliance_service.get_user_alliance(user_id)
@@ -433,10 +460,8 @@ async def get_event_report_for_liff(
     This endpoint returns group analytics for a specific battle event,
     to be displayed in the LIFF event report page.
     """
-    from uuid import UUID as UUIDType
-
     # 1. Validate group binding
-    group_binding = await service.repository.get_group_binding_by_line_group_id(g)
+    group_binding = await service.get_group_binding(g)
     if not group_binding:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -447,7 +472,7 @@ async def get_event_report_for_liff(
 
     # 2. Parse and validate event ID
     try:
-        event_id = UUIDType(e)
+        event_id = UUID(e)
     except ValueError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -477,40 +502,7 @@ async def get_event_report_for_liff(
         )
 
     # 5. Enrich with LINE display names for all ranking types
-    game_ids_to_lookup: list[str] = []
-
-    # BATTLE: top_members
-    if analytics.top_members:
-        game_ids_to_lookup.extend([m.member_name for m in analytics.top_members])
-
-    # SIEGE: top_contributors and top_assisters
-    if analytics.top_contributors:
-        game_ids_to_lookup.extend([m.member_name for m in analytics.top_contributors])
-    if analytics.top_assisters:
-        game_ids_to_lookup.extend([m.member_name for m in analytics.top_assisters])
-
-    # FORBIDDEN: violators
-    if analytics.violators:
-        game_ids_to_lookup.extend([v.member_name for v in analytics.violators])
-
-    if game_ids_to_lookup:
-        # Deduplicate game_ids for efficiency
-        unique_game_ids = list(set(game_ids_to_lookup))
-        line_bindings = await service.repository.get_member_bindings_by_game_ids(
-            alliance_id=alliance_id,
-            game_ids=unique_game_ids,
-        )
-        line_name_map = {b.game_id: b.line_display_name for b in line_bindings}
-
-        # Enrich all ranking lists
-        for member in analytics.top_members:
-            member.line_display_name = line_name_map.get(member.member_name)
-        for contributor in analytics.top_contributors:
-            contributor.line_display_name = line_name_map.get(contributor.member_name)
-        for assister in analytics.top_assisters:
-            assister.line_display_name = line_name_map.get(assister.member_name)
-        for violator in analytics.violators:
-            violator.line_display_name = line_name_map.get(violator.member_name)
+    await service.enrich_analytics_with_line_names(alliance_id, analytics)
 
     return analytics
 
@@ -584,8 +576,6 @@ async def delete_copper_mine(
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> Response:
     """Delete a copper mine by ID"""
-    from uuid import UUID
-
     await service.delete_mine(mine_id=UUID(mine_id), line_group_id=g, line_user_id=u)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -948,30 +938,13 @@ async def _handle_event_command(
     - /戰役: 列出最近 5 場已完成戰役 (Carousel)
     - /戰役 {名稱}: 發送該戰役的詳細報告 (有 5 分鐘群組 CD)
     """
-    from src.repositories.season_repository import SeasonRepository
-
-    # 1. 查詢群組綁定的同盟
-    group_binding = await line_binding_service.repository.get_group_binding_by_line_group_id(
-        line_group_id
-    )
-
-    if not group_binding:
-        await _reply_text(
-            reply_token,
-            "❌ 此群組尚未綁定同盟\n\n"
-            "請盟主在 Web App 生成綁定碼，\n"
-            "然後發送「/綁定 XXXXXX」完成綁定",
-        )
+    result = await _resolve_alliance_and_season(line_group_id, reply_token, line_binding_service)
+    if not result:
         return
 
-    alliance_id = group_binding.alliance_id
+    alliance_id, season_id = result
 
-    # 1.5 取得當前賽季（嚴格限制只顯示當前賽季的戰役）
-    season_repo = SeasonRepository()
-    current_season = await season_repo.get_current_season(alliance_id)
-    season_id = current_season.id if current_season else None
-
-    # 2. 根據是否有 event_name 決定行為
+    # 根據是否有 event_name 決定行為
     if event_name is None:
         # 列出最近 5 場戰役
         await _handle_event_list(
@@ -1004,8 +977,6 @@ async def _handle_event_list(
     settings: Settings,
 ) -> None:
     """列出最近 5 場已完成戰役 (Carousel Flex Message)"""
-    from src.lib.line_flex_builder import build_event_list_carousel
-
     # 取得最近 5 場已完成戰役（限制當前賽季）
     events = await battle_event_service.get_recent_completed_events_for_alliance(
         alliance_id, season_id=season_id, limit=5
@@ -1039,22 +1010,7 @@ async def _handle_event_list(
         await _reply_text(reply_token, "\n".join(lines))
         return
 
-    line_bot = get_line_bot_api()
-    if not line_bot:
-        logger.error("LINE Bot API not available")
-        return
-
-    try:
-        from linebot.v3.messaging import ReplyMessageRequest
-
-        line_bot.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[flex_message],
-            )
-        )
-    except Exception as e:
-        logger.error(f"Failed to send event list carousel: {e}")
+    await _send_flex_message(reply_token, flex_message)
 
 
 async def _handle_event_report(
@@ -1067,7 +1023,6 @@ async def _handle_event_report(
     battle_event_service: BattleEventService,
 ) -> None:
     """發送指定戰役的報告 (有 5 分鐘群組 CD)"""
-    from src.lib.line_flex_builder import build_event_report_flex
 
     # 1. 檢查 CD
     cd_remaining = await line_binding_service.get_event_report_cd_remaining(line_group_id)
@@ -1087,8 +1042,7 @@ async def _handle_event_report(
     if not event:
         await _reply_text(
             reply_token,
-            f"❌ 找不到戰役「{event_name}」\n\n"
-            "請確認名稱完全正確，或輸入「/戰役」查看列表",
+            f"❌ 找不到戰役「{event_name}」\n\n請確認名稱完全正確，或輸入「/戰役」查看列表",
         )
         return
 
@@ -1099,24 +1053,8 @@ async def _handle_event_report(
         await _reply_text(reply_token, "❌ 無法取得戰役分析資料")
         return
 
-    # 4. 補充 Top Members / Violators 的 LINE 名稱
-    game_ids_to_lookup = []
-    if analytics.top_members:
-        game_ids_to_lookup.extend([m.member_name for m in analytics.top_members])
-    if analytics.violators:
-        game_ids_to_lookup.extend([v.member_name for v in analytics.violators])
-
-    if game_ids_to_lookup:
-        line_bindings = await line_binding_service.repository.get_member_bindings_by_game_ids(
-            alliance_id=alliance_id,
-            game_ids=game_ids_to_lookup,
-        )
-        line_name_map = {b.game_id: b.line_display_name for b in line_bindings}
-
-        for member in analytics.top_members:
-            member.line_display_name = line_name_map.get(member.member_name)
-        for violator in analytics.violators:
-            violator.line_display_name = line_name_map.get(violator.member_name)
+    # 4. 補充 LINE 名稱
+    await line_binding_service.enrich_analytics_with_line_names(alliance_id, analytics)
 
     # 5. 建構 Flex Message 並發送
     flex_message = build_event_report_flex(analytics)
@@ -1135,22 +1073,7 @@ async def _handle_event_report(
     # 6. 記錄 CD
     await line_binding_service.record_event_report_cd(line_group_id)
 
-    line_bot = get_line_bot_api()
-    if not line_bot:
-        logger.error("LINE Bot API not available")
-        return
-
-    try:
-        from linebot.v3.messaging import ReplyMessageRequest
-
-        line_bot.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[flex_message],
-            )
-        )
-    except Exception as e:
-        logger.error(f"Failed to send event report: {e}")
+    await _send_flex_message(reply_token, flex_message)
 
 
 async def _handle_latest_event_report(
@@ -1164,31 +1087,13 @@ async def _handle_latest_event_report(
 
     查詢該群組綁定同盟的最新已完成戰役，並發送分析報告。
     """
-    from src.lib.line_flex_builder import build_event_report_flex
-    from src.repositories.season_repository import SeasonRepository
-
-    # 1. 查詢群組綁定的同盟
-    group_binding = await line_binding_service.repository.get_group_binding_by_line_group_id(
-        line_group_id
-    )
-
-    if not group_binding:
-        await _reply_text(
-            reply_token,
-            "❌ 此群組尚未綁定同盟\n\n"
-            "請盟主在 Web App 生成綁定碼，\n"
-            "然後發送「/綁定 XXXXXX」完成綁定",
-        )
+    result = await _resolve_alliance_and_season(line_group_id, reply_token, line_binding_service)
+    if not result:
         return
 
-    alliance_id = group_binding.alliance_id
+    alliance_id, season_id = result
 
-    # 1.5 取得當前賽季（嚴格限制只顯示當前賽季的戰役）
-    season_repo = SeasonRepository()
-    current_season = await season_repo.get_current_season(alliance_id)
-    season_id = current_season.id if current_season else None
-
-    # 2. 查詢最新已完成戰役（限制當前賽季）
+    # 查詢最新已完成戰役（限制當前賽季）
     latest_event = await battle_event_service.get_latest_completed_event_for_alliance(
         alliance_id, season_id=season_id
     )
@@ -1206,19 +1111,8 @@ async def _handle_latest_event_report(
         await _reply_text(reply_token, "❌ 無法取得戰役分析資料")
         return
 
-    # 4. 補充 Top Members 的 LINE 名稱
-    if analytics.top_members:
-        game_ids = [m.member_name for m in analytics.top_members]
-        line_bindings = await line_binding_service.repository.get_member_bindings_by_game_ids(
-            alliance_id=alliance_id,
-            game_ids=game_ids,
-        )
-        # 建立 game_id -> line_display_name 映射
-        line_name_map = {b.game_id: b.line_display_name for b in line_bindings}
-
-        # 更新 top_members 的 line_display_name
-        for member in analytics.top_members:
-            member.line_display_name = line_name_map.get(member.member_name)
+    # 4. 補充 LINE 名稱
+    await line_binding_service.enrich_analytics_with_line_names(alliance_id, analytics)
 
     # 5. 建構 Flex Message 並發送
     flex_message = build_event_report_flex(analytics)
@@ -1234,22 +1128,7 @@ async def _handle_latest_event_report(
         )
         return
 
-    line_bot = get_line_bot_api()
-    if not line_bot:
-        logger.error("LINE Bot API not available")
-        return
-
-    try:
-        from linebot.v3.messaging import ReplyMessageRequest
-
-        line_bot.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[flex_message],
-            )
-        )
-    except Exception as e:
-        logger.error(f"Failed to send event report: {e}")
+    await _send_flex_message(reply_token, flex_message)
 
 
 async def _handle_bind_command(
@@ -1292,7 +1171,6 @@ async def _handle_bind_command(
 
 async def _send_bind_success_message(reply_token: str, liff_url: str) -> None:
     """發送綁定成功訊息（Flex Message - 熱血戰場風）"""
-    from src.lib.line_flex_builder import build_liff_entry_flex
 
     flex_message = build_liff_entry_flex(
         title="🏰 同盟連結成功！",
@@ -1314,7 +1192,6 @@ async def _send_liff_entry(
     settings: Settings,
 ) -> None:
     """發送 LIFF 入口（被 @ 時 - 熱血戰場風）"""
-    from src.lib.line_flex_builder import build_liff_entry_flex
 
     if not settings.liff_id:
         await _reply_text(reply_token, "💡 功能開發中～")
@@ -1339,7 +1216,6 @@ async def _send_liff_entry(
 
 async def _send_liff_welcome(reply_token: str, liff_url: str) -> None:
     """發送新成員歡迎訊息（熱血戰場風）"""
-    from src.lib.line_flex_builder import build_liff_entry_flex
 
     flex_message = build_liff_entry_flex(
         title="🔥 盟友來了！",
@@ -1358,7 +1234,6 @@ async def _send_liff_first_message_reminder(
     settings: Settings,
 ) -> None:
     """發送首次發言提醒（熱血戰場風 - 3 分鐘 CD）"""
-    from src.lib.line_flex_builder import build_liff_entry_flex
 
     if not settings.liff_id:
         return
@@ -1391,8 +1266,6 @@ async def _send_flex_message(reply_token: str, flex_message) -> None:
         return
 
     try:
-        from linebot.v3.messaging import ReplyMessageRequest
-
         line_bot.reply_message(
             ReplyMessageRequest(
                 reply_token=reply_token,
@@ -1411,8 +1284,6 @@ async def _reply_text(reply_token: str, text: str) -> None:
         return
 
     try:
-        from linebot.v3.messaging import ReplyMessageRequest, TextMessage
-
         line_bot.reply_message(
             ReplyMessageRequest(
                 reply_token=reply_token,

@@ -8,11 +8,13 @@ Follows CLAUDE.md:
 - NO direct database calls (delegates to repositories)
 """
 
+import asyncio
 from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 from statistics import median as calc_median
 from statistics import stdev
+from typing import Literal
 from uuid import UUID
 
 from src.models.period import Period
@@ -20,6 +22,13 @@ from src.repositories.member_period_metrics_repository import MemberPeriodMetric
 from src.repositories.member_repository import MemberRepository
 from src.repositories.period_repository import PeriodRepository
 from src.repositories.season_repository import SeasonRepository
+
+ViewMode = Literal["latest", "season"]
+
+
+def _db_float(value: Decimal | float | str) -> float:
+    """Convert a DB NUMERIC value (str, Decimal, or float) to float safely."""
+    return float(Decimal(str(value)))
 
 
 def _percentile(data: list[float], p: float) -> float:
@@ -103,10 +112,13 @@ class AnalyticsService:
         members_with_data: set[UUID] = set()
 
         if season_id:
-            # Get all periods for the season and find the latest one
-            periods = await self._period_repo.get_by_season(season_id)
+            # Fetch periods and members in parallel (independent queries)
+            periods, all_members = await asyncio.gather(
+                self._period_repo.get_by_season(season_id),
+                self._member_repo.get_by_alliance(alliance_id, active_only),
+            )
             if periods:
-                latest_period = periods[-1]  # Already sorted by period_number
+                latest_period = periods[-1]
                 metrics = await self._metrics_repo.get_by_period(latest_period.id)
                 for m in metrics:
                     members_with_data.add(m.member_id)
@@ -114,9 +126,8 @@ class AnalyticsService:
                         "contribution_rank": m.end_rank,
                         "group": m.end_group,
                     }
-
-        # Get all members, then filter to only those with data in this season (if season_id provided)
-        all_members = await self._member_repo.get_by_alliance(alliance_id, active_only)
+        else:
+            all_members = await self._member_repo.get_by_alliance(alliance_id, active_only)
 
         # If season_id is provided, filter to members with data; otherwise return all
         if season_id:
@@ -297,14 +308,12 @@ class AnalyticsService:
         Returns:
             Dict with average and median daily metrics, power, and member count
         """
-        # Get season info for start_date
-        season = await self._season_repo.get_by_id(season_id)
-        if not season:
-            return self._empty_alliance_averages()
-
-        # Get all periods to find latest
-        periods = await self._period_repo.get_by_season(season_id)
-        if not periods:
+        # Fetch season and periods in parallel (independent queries)
+        season, periods = await asyncio.gather(
+            self._season_repo.get_by_id(season_id),
+            self._period_repo.get_by_season(season_id),
+        )
+        if not season or not periods:
             return self._empty_alliance_averages()
 
         latest_period = periods[-1]
@@ -551,7 +560,7 @@ class AnalyticsService:
         return await self._metrics_repo.get_all_groups_for_period(latest_period.id)
 
     async def get_group_analytics(
-        self, season_id: UUID, group_name: str, view: str = "latest"
+        self, season_id: UUID, group_name: str, view: ViewMode = "latest"
     ) -> dict:
         """
         Get complete group analytics including stats, members, trends, and alliance averages.
@@ -613,10 +622,10 @@ class AnalyticsService:
             if period:
                 count = len(metrics)
                 ranks = [m["end_rank"] for m in metrics]
-                contributions = [float(Decimal(str(m["daily_contribution"]))) for m in metrics]
-                merits = [float(Decimal(str(m["daily_merit"]))) for m in metrics]
-                assists = [float(Decimal(str(m["daily_assist"]))) for m in metrics]
-                donations = [float(Decimal(str(m["daily_donation"]))) for m in metrics]
+                contributions = [_db_float(m["daily_contribution"]) for m in metrics]
+                merits = [_db_float(m["daily_merit"]) for m in metrics]
+                assists = [_db_float(m["daily_assist"]) for m in metrics]
+                donations = [_db_float(m["daily_donation"]) for m in metrics]
                 powers = [float(m["end_power"]) for m in metrics]
 
                 trends.append(
@@ -721,18 +730,18 @@ class AnalyticsService:
             for td in trend_data:
                 if td["period_id"] == prev_period_id:
                     prev_metrics_map[str(td["member_id"])] = {
-                        "daily_contribution": float(Decimal(str(td["daily_contribution"]))),
-                        "daily_merit": float(Decimal(str(td["daily_merit"]))),
+                        "daily_contribution": _db_float(td["daily_contribution"]),
+                        "daily_merit": _db_float(td["daily_merit"]),
                     }
 
         # Build members list for latest period
         members = []
         for m in group_metrics:
             member_id = str(m["member_id"])
-            current_contribution = round(float(Decimal(str(m["daily_contribution"]))), 2)
-            current_merit = round(float(Decimal(str(m["daily_merit"]))), 2)
-            current_assist = round(float(Decimal(str(m["daily_assist"]))), 2)
-            current_donation = round(float(Decimal(str(m["daily_donation"]))), 2)
+            current_contribution = round(_db_float(m["daily_contribution"]), 2)
+            current_merit = round(_db_float(m["daily_merit"]), 2)
+            current_assist = round(_db_float(m["daily_assist"]), 2)
+            current_donation = round(_db_float(m["daily_donation"]), 2)
             prev_data = prev_metrics_map.get(member_id)
             contribution_change = (
                 round(current_contribution - prev_data["daily_contribution"], 2)
@@ -767,7 +776,7 @@ class AnalyticsService:
             "alliance_averages": alliance_averages,
         }
 
-    async def get_groups_comparison(self, season_id: UUID, view: str = "latest") -> list[dict]:
+    async def get_groups_comparison(self, season_id: UUID, view: ViewMode = "latest") -> list[dict]:
         """
         Get comparison data for all groups in a season.
 
@@ -850,7 +859,7 @@ class AnalyticsService:
         result = []
         for group_name, members in group_data.items():
             count = len(members)
-            merits = [float(Decimal(str(m["daily_merit"]))) for m in members]
+            merits = [_db_float(m["daily_merit"]) for m in members]
             ranks = [m["end_rank"] for m in members]
             member_names = [m["member_name"] for m in members]
 
@@ -866,139 +875,30 @@ class AnalyticsService:
 
         return sorted(result, key=lambda x: x["avg_daily_merit"], reverse=True)
 
-    def _calculate_group_stats(self, group_name: str, metrics: list[dict]) -> dict:
-        """
-        Calculate group statistics from metrics data.
-
-        Args:
-            group_name: Group name
-            metrics: List of member metrics for the group
-
-        Returns:
-            GroupStats dict
-        """
-        count = len(metrics)
-
-        # Extract values
-        contributions = [float(Decimal(str(m["daily_contribution"]))) for m in metrics]
-        merits = [float(Decimal(str(m["daily_merit"]))) for m in metrics]
-        assists = [float(Decimal(str(m["daily_assist"]))) for m in metrics]
-        donations = [float(Decimal(str(m["daily_donation"]))) for m in metrics]
-        powers = [float(m["end_power"]) for m in metrics]
-        ranks = [m["end_rank"] for m in metrics]
-
-        # Calculate averages
-        avg_contribution = sum(contributions) / count
-        avg_merit = sum(merits) / count
-        avg_assist = sum(assists) / count
-        avg_donation = sum(donations) / count
-        avg_power = sum(powers) / count
-        avg_rank = sum(ranks) / count
-
-        # Calculate contribution quartiles for box plot
-        sorted_contributions = sorted(contributions)
-        contribution_min = sorted_contributions[0] if sorted_contributions else 0
-        contribution_q1 = _percentile(sorted_contributions, 0.25)
-        contribution_median = _percentile(sorted_contributions, 0.5)
-        contribution_q3 = _percentile(sorted_contributions, 0.75)
-        contribution_max = sorted_contributions[-1] if sorted_contributions else 0
-
-        # Contribution coefficient of variation
-        contribution_std = stdev(contributions) if len(contributions) > 1 else 0
-        contribution_cv = contribution_std / avg_contribution if avg_contribution > 0 else 0
-
-        # Calculate merit quartiles for box plot
-        sorted_merits = sorted(merits)
-        merit_min = sorted_merits[0] if sorted_merits else 0
-        merit_q1 = _percentile(sorted_merits, 0.25)
-        merit_median = _percentile(sorted_merits, 0.5)
-        merit_q3 = _percentile(sorted_merits, 0.75)
-        merit_max = sorted_merits[-1] if sorted_merits else 0
-
-        # Merit coefficient of variation
-        merit_std = stdev(merits) if len(merits) > 1 else 0
-        merit_cv = merit_std / avg_merit if avg_merit > 0 else 0
-
-        return {
-            "group_name": group_name,
-            "member_count": count,
-            "avg_daily_contribution": round(avg_contribution, 2),
-            "avg_daily_merit": round(avg_merit, 2),
-            "avg_daily_assist": round(avg_assist, 2),
-            "avg_daily_donation": round(avg_donation, 2),
-            "avg_power": round(avg_power, 2),
-            "avg_rank": round(avg_rank, 1),
-            "best_rank": min(ranks),
-            "worst_rank": max(ranks),
-            "contribution_min": round(contribution_min, 2),
-            "contribution_q1": round(contribution_q1, 2),
-            "contribution_median": round(contribution_median, 2),
-            "contribution_q3": round(contribution_q3, 2),
-            "contribution_max": round(contribution_max, 2),
-            "contribution_cv": round(contribution_cv, 3),
-            "merit_min": round(merit_min, 2),
-            "merit_q1": round(merit_q1, 2),
-            "merit_median": round(merit_median, 2),
-            "merit_q3": round(merit_q3, 2),
-            "merit_max": round(merit_max, 2),
-            "merit_cv": round(merit_cv, 3),
-        }
-
-    def _calculate_group_stats_from_members(self, group_name: str, members: list[dict]) -> dict:
-        """
-        Calculate group statistics from pre-calculated member data.
-
-        Used for season view where members already have aggregated values.
-
-        Args:
-            group_name: Group name
-            members: List of member dicts with daily_contribution, daily_merit, etc.
-
-        Returns:
-            GroupStats dict
-        """
-        count = len(members)
+    def _compute_group_stats(
+        self,
+        group_name: str,
+        contributions: list[float],
+        merits: list[float],
+        assists: list[float],
+        donations: list[float],
+        powers: list[float],
+        ranks: list[float],
+    ) -> dict:
+        """Compute group statistics from pre-extracted numeric lists."""
+        count = len(contributions)
         if count == 0:
             return self._empty_group_stats(group_name)
 
-        # Extract values from member dicts
-        contributions = [m["daily_contribution"] for m in members]
-        merits = [m["daily_merit"] for m in members]
-        assists = [m["daily_assist"] for m in members]
-        donations = [m["daily_donation"] for m in members]
-        powers = [float(m["power"]) for m in members]
-        ranks = [m["contribution_rank"] for m in members]
-
-        # Calculate averages
         avg_contribution = sum(contributions) / count
         avg_merit = sum(merits) / count
-        avg_assist = sum(assists) / count
-        avg_donation = sum(donations) / count
-        avg_power = sum(powers) / count
-        avg_rank = sum(ranks) / count
 
-        # Calculate contribution quartiles for box plot
         sorted_contributions = sorted(contributions)
-        contribution_min = sorted_contributions[0] if sorted_contributions else 0
-        contribution_q1 = _percentile(sorted_contributions, 0.25)
-        contribution_median = _percentile(sorted_contributions, 0.5)
-        contribution_q3 = _percentile(sorted_contributions, 0.75)
-        contribution_max = sorted_contributions[-1] if sorted_contributions else 0
-
-        # Contribution coefficient of variation
-        contribution_std = stdev(contributions) if len(contributions) > 1 else 0
+        contribution_std = stdev(contributions) if count > 1 else 0
         contribution_cv = contribution_std / avg_contribution if avg_contribution > 0 else 0
 
-        # Calculate merit quartiles for box plot
         sorted_merits = sorted(merits)
-        merit_min = sorted_merits[0] if sorted_merits else 0
-        merit_q1 = _percentile(sorted_merits, 0.25)
-        merit_median = _percentile(sorted_merits, 0.5)
-        merit_q3 = _percentile(sorted_merits, 0.75)
-        merit_max = sorted_merits[-1] if sorted_merits else 0
-
-        # Merit coefficient of variation
-        merit_std = stdev(merits) if len(merits) > 1 else 0
+        merit_std = stdev(merits) if count > 1 else 0
         merit_cv = merit_std / avg_merit if avg_merit > 0 else 0
 
         return {
@@ -1006,25 +906,53 @@ class AnalyticsService:
             "member_count": count,
             "avg_daily_contribution": round(avg_contribution, 2),
             "avg_daily_merit": round(avg_merit, 2),
-            "avg_daily_assist": round(avg_assist, 2),
-            "avg_daily_donation": round(avg_donation, 2),
-            "avg_power": round(avg_power, 2),
-            "avg_rank": round(avg_rank, 1),
+            "avg_daily_assist": round(sum(assists) / count, 2),
+            "avg_daily_donation": round(sum(donations) / count, 2),
+            "avg_power": round(sum(powers) / count, 2),
+            "avg_rank": round(sum(ranks) / count, 1),
             "best_rank": min(ranks),
             "worst_rank": max(ranks),
-            "contribution_min": round(contribution_min, 2),
-            "contribution_q1": round(contribution_q1, 2),
-            "contribution_median": round(contribution_median, 2),
-            "contribution_q3": round(contribution_q3, 2),
-            "contribution_max": round(contribution_max, 2),
+            "contribution_min": round(sorted_contributions[0], 2),
+            "contribution_q1": round(_percentile(sorted_contributions, 0.25), 2),
+            "contribution_median": round(_percentile(sorted_contributions, 0.5), 2),
+            "contribution_q3": round(_percentile(sorted_contributions, 0.75), 2),
+            "contribution_max": round(sorted_contributions[-1], 2),
             "contribution_cv": round(contribution_cv, 3),
-            "merit_min": round(merit_min, 2),
-            "merit_q1": round(merit_q1, 2),
-            "merit_median": round(merit_median, 2),
-            "merit_q3": round(merit_q3, 2),
-            "merit_max": round(merit_max, 2),
+            "merit_min": round(sorted_merits[0], 2),
+            "merit_q1": round(_percentile(sorted_merits, 0.25), 2),
+            "merit_median": round(_percentile(sorted_merits, 0.5), 2),
+            "merit_q3": round(_percentile(sorted_merits, 0.75), 2),
+            "merit_max": round(sorted_merits[-1], 2),
             "merit_cv": round(merit_cv, 3),
         }
+
+    def _calculate_group_stats(self, group_name: str, metrics: list[dict]) -> dict:
+        """Calculate group statistics from raw DB metrics data."""
+        if not metrics:
+            return self._empty_group_stats(group_name)
+        return self._compute_group_stats(
+            group_name,
+            contributions=[_db_float(m["daily_contribution"]) for m in metrics],
+            merits=[_db_float(m["daily_merit"]) for m in metrics],
+            assists=[_db_float(m["daily_assist"]) for m in metrics],
+            donations=[_db_float(m["daily_donation"]) for m in metrics],
+            powers=[float(m["end_power"]) for m in metrics],
+            ranks=[m["end_rank"] for m in metrics],
+        )
+
+    def _calculate_group_stats_from_members(self, group_name: str, members: list[dict]) -> dict:
+        """Calculate group statistics from pre-calculated member data (season view)."""
+        if not members:
+            return self._empty_group_stats(group_name)
+        return self._compute_group_stats(
+            group_name,
+            contributions=[m["daily_contribution"] for m in members],
+            merits=[m["daily_merit"] for m in members],
+            assists=[m["daily_assist"] for m in members],
+            donations=[m["daily_donation"] for m in members],
+            powers=[float(m["power"]) for m in members],
+            ranks=[m["contribution_rank"] for m in members],
+        )
 
     def _empty_group_stats(self, group_name: str) -> dict:
         """Return empty group stats structure"""
@@ -1073,7 +1001,7 @@ class AnalyticsService:
     # Alliance Analytics Methods
     # =========================================================================
 
-    async def get_alliance_analytics(self, season_id: UUID, view: str = "latest") -> dict:
+    async def get_alliance_analytics(self, season_id: UUID, view: ViewMode = "latest") -> dict:
         """
         Get complete alliance analytics for AllianceAnalytics page.
 
@@ -1090,13 +1018,12 @@ class AnalyticsService:
               call to get_by_period_with_member() for latest_period.
             - Latest view: Uses get_by_period_with_member() as before.
         """
-        # Get season and periods
-        season = await self._season_repo.get_by_id(season_id)
-        if not season:
-            return self._empty_alliance_analytics()
-
-        periods = await self._period_repo.get_by_season(season_id)
-        if not periods:
+        # Fetch season and periods in parallel (independent queries)
+        season, periods = await asyncio.gather(
+            self._season_repo.get_by_id(season_id),
+            self._period_repo.get_by_season(season_id),
+        )
+        if not season or not periods:
             return self._empty_alliance_analytics()
 
         latest_period = periods[-1]
@@ -1191,7 +1118,7 @@ class AnalyticsService:
         metrics_with_totals: list[dict] | None,
         prev_metrics_map: dict[UUID, dict],
         season_days: int,
-        view: str,
+        view: ViewMode,
     ) -> list[dict]:
         """
         Build unified member data list based on view mode.
@@ -1239,8 +1166,8 @@ class AnalyticsService:
         result = []
         for m in latest_metrics_raw:
             member_id = UUID(m["member_id"])
-            current_merit = float(Decimal(str(m["daily_merit"])))
-            current_assist = float(Decimal(str(m["daily_assist"])))
+            current_merit = _db_float(m["daily_merit"])
+            current_assist = _db_float(m["daily_assist"])
             prev_data = prev_metrics_map.get(member_id)
             merit_change = round(current_merit - prev_data["daily_merit"], 2) if prev_data else None
             assist_change = (
@@ -1252,10 +1179,10 @@ class AnalyticsService:
                     "member_id": str(member_id),
                     "name": m.get("member_name", ""),
                     "group": m["end_group"],
-                    "daily_contribution": float(Decimal(str(m["daily_contribution"]))),
+                    "daily_contribution": _db_float(m["daily_contribution"]),
                     "daily_merit": current_merit,
                     "daily_assist": current_assist,
-                    "daily_donation": float(Decimal(str(m["daily_donation"]))),
+                    "daily_donation": _db_float(m["daily_donation"]),
                     "power": m["end_power"],
                     "rank": m["end_rank"],
                     "rank_change": m.get("rank_change"),
@@ -1270,7 +1197,7 @@ class AnalyticsService:
         self,
         member_data: list[dict],
         prev_metrics_map: dict[UUID, dict],
-        view: str,
+        view: ViewMode,
     ) -> dict:
         """Calculate alliance-wide summary metrics."""
         if not member_data:
@@ -1305,21 +1232,14 @@ class AnalyticsService:
         power_change_pct = None
 
         if view == "latest" and prev_metrics_map:
-            prev_contributions = [
-                prev_metrics_map[UUID(m["member_id"])]["daily_contribution"]
-                for m in member_data
-                if UUID(m["member_id"]) in prev_metrics_map
-            ]
-            prev_merits = [
-                prev_metrics_map[UUID(m["member_id"])]["daily_merit"]
-                for m in member_data
-                if UUID(m["member_id"]) in prev_metrics_map
-            ]
-            prev_powers = [
-                prev_metrics_map[UUID(m["member_id"])]["end_power"]
-                for m in member_data
-                if UUID(m["member_id"]) in prev_metrics_map
-            ]
+            # Single-pass extraction of previous period values
+            prev_contributions, prev_merits, prev_powers = [], [], []
+            for m in member_data:
+                prev = prev_metrics_map.get(UUID(m["member_id"]))
+                if prev:
+                    prev_contributions.append(prev["daily_contribution"])
+                    prev_merits.append(prev["daily_merit"])
+                    prev_powers.append(prev["end_power"])
 
             if prev_contributions:
                 prev_avg_contribution = sum(prev_contributions) / len(prev_contributions)
@@ -1584,7 +1504,7 @@ class AnalyticsService:
         self,
         member_data: list[dict],
         median_contribution: float,
-        view: str,
+        view: ViewMode,
     ) -> list[dict]:
         """
         Calculate members needing attention.

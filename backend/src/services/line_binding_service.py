@@ -20,7 +20,11 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from src.models.battle_event import EventCategory
-from src.models.battle_event_metrics import BattleEventMetrics, BattleEventMetricsWithMember
+from src.models.battle_event_metrics import (
+    BattleEventMetrics,
+    BattleEventMetricsWithMember,
+    EventGroupAnalytics,
+)
 from src.models.line_binding import (
     EventListItem,
     EventListResponse,
@@ -30,6 +34,7 @@ from src.models.line_binding import (
     LineCustomCommandCreate,
     LineCustomCommandResponse,
     LineCustomCommandUpdate,
+    LineGroupBinding,
     LineGroupBindingResponse,
     MemberCandidate,
     MemberCandidatesResponse,
@@ -68,6 +73,62 @@ class LineBindingService:
         self._event_repo = BattleEventRepository()
         self._metrics_repo = BattleEventMetricsRepository()
         self._season_repo = SeasonRepository()
+
+    # =========================================================================
+    # Common Lookups (used by webhook handlers and endpoints)
+    # =========================================================================
+
+    async def get_group_binding(self, line_group_id: str) -> LineGroupBinding | None:
+        """Get group binding by LINE group ID."""
+        return await self.repository.get_group_binding_by_line_group_id(line_group_id)
+
+    async def get_current_season_id(self, alliance_id: UUID) -> UUID | None:
+        """Get the current season ID for an alliance."""
+        season = await self._season_repo.get_current_season(alliance_id)
+        return season.id if season else None
+
+    async def get_line_names_for_game_ids(
+        self, alliance_id: UUID, game_ids: list[str]
+    ) -> dict[str, str]:
+        """Get LINE display names for a list of game IDs."""
+        bindings = await self.repository.get_member_bindings_by_game_ids(
+            alliance_id=alliance_id,
+            game_ids=game_ids,
+        )
+        return {b.game_id: b.line_display_name for b in bindings}
+
+    async def enrich_analytics_with_line_names(
+        self,
+        alliance_id: UUID,
+        analytics: EventGroupAnalytics,
+    ) -> None:
+        """Enrich EventGroupAnalytics ranking lists with LINE display names."""
+        game_ids: list[str] = []
+        for lst in (
+            analytics.top_members,
+            analytics.top_contributors,
+            analytics.top_assisters,
+            analytics.violators,
+        ):
+            if lst:
+                game_ids.extend(m.member_name for m in lst)
+
+        if not game_ids:
+            return
+
+        name_map = await self.get_line_names_for_game_ids(
+            alliance_id=alliance_id,
+            game_ids=list(set(game_ids)),
+        )
+
+        for lst in (
+            analytics.top_members,
+            analytics.top_contributors,
+            analytics.top_assisters,
+            analytics.violators,
+        ):
+            for member in lst or []:
+                member.line_display_name = name_map.get(member.member_name)
 
     # =========================================================================
     # Binding Code Operations (Web App)
@@ -144,7 +205,9 @@ class LineBindingService:
             LineBindingStatusResponse with bindings list and pending code
         """
         # Get all active group bindings (production + test)
-        group_bindings = await self.repository.get_all_active_group_bindings_by_alliance(alliance_id)
+        group_bindings = await self.repository.get_all_active_group_bindings_by_alliance(
+            alliance_id
+        )
 
         bindings_response = []
         if group_bindings:
@@ -349,7 +412,9 @@ class LineBindingService:
         if not binding_code:
             logger.warning(f"[BIND] Code not found or expired: {code_upper}")
             return False, "綁定碼無效或已過期", None
-        logger.info(f"[BIND] Code valid: {code_upper}, is_test={binding_code.is_test}, expires_at={binding_code.expires_at}")
+        logger.info(
+            f"[BIND] Code valid: {code_upper}, is_test={binding_code.is_test}, expires_at={binding_code.expires_at}"
+        )
 
         # Get is_test from the binding code
         is_test = binding_code.is_test
@@ -416,7 +481,10 @@ class LineBindingService:
 
         registered_ids = [
             RegisteredAccount(
-                game_id=b.game_id, display_name=b.line_display_name, is_verified=b.is_verified, created_at=b.created_at
+                game_id=b.game_id,
+                display_name=b.line_display_name,
+                is_verified=b.is_verified,
+                created_at=b.created_at,
             )
             for b in bindings
         ]
@@ -489,7 +557,10 @@ class LineBindingService:
 
         registered_ids = [
             RegisteredAccount(
-                game_id=b.game_id, display_name=b.line_display_name, is_verified=b.is_verified, created_at=b.created_at
+                game_id=b.game_id,
+                display_name=b.line_display_name,
+                is_verified=b.is_verified,
+                created_at=b.created_at,
             )
             for b in bindings
         ]
@@ -551,7 +622,10 @@ class LineBindingService:
 
         registered_ids = [
             RegisteredAccount(
-                game_id=b.game_id, display_name=b.line_display_name, is_verified=b.is_verified, created_at=b.created_at
+                game_id=b.game_id,
+                display_name=b.line_display_name,
+                is_verified=b.is_verified,
+                created_at=b.created_at,
             )
             for b in bindings
         ]
@@ -909,15 +983,12 @@ class LineBindingService:
         data = await self.repository.get_active_member_candidates(group_binding.alliance_id)
 
         candidates = [
-            MemberCandidate(name=row["name"], group_name=row.get("group_name"))
-            for row in data
+            MemberCandidate(name=row["name"], group_name=row.get("group_name")) for row in data
         ]
 
         return MemberCandidatesResponse(candidates=candidates)
 
-    async def find_similar_members(
-        self, line_group_id: str, name: str
-    ) -> SimilarMembersResponse:
+    async def find_similar_members(self, line_group_id: str, name: str) -> SimilarMembersResponse:
         """
         Find members with similar names for fuzzy matching.
 
@@ -939,8 +1010,7 @@ class LineBindingService:
         )
 
         similar = [
-            MemberCandidate(name=row["name"], group_name=row.get("group_name"))
-            for row in data
+            MemberCandidate(name=row["name"], group_name=row.get("group_name")) for row in data
         ]
 
         # Check if first result is exact match
@@ -952,9 +1022,7 @@ class LineBindingService:
     # Event List Operations (LIFF Battle Tab)
     # =========================================================================
 
-    async def get_event_list_for_liff(
-        self, line_group_id: str, game_id: str
-    ) -> EventListResponse:
+    async def get_event_list_for_liff(self, line_group_id: str, game_id: str) -> EventListResponse:
         """
         Get list of completed events with user participation status for LIFF.
 
@@ -1077,11 +1145,15 @@ class LineBindingService:
             # For siege: use contribution as primary metric
             participated = user_metric.participated
             score = user_metric.contribution_diff + user_metric.assist_diff
-            rank = self._calculate_rank(
-                user_metric.contribution_diff + user_metric.assist_diff,
-                all_metrics,
-                lambda m: m.contribution_diff + m.assist_diff,
-            ) if participated else None
+            rank = (
+                self._calculate_rank(
+                    user_metric.contribution_diff + user_metric.assist_diff,
+                    all_metrics,
+                    lambda m: m.contribution_diff + m.assist_diff,
+                )
+                if participated
+                else None
+            )
 
             return UserEventParticipation(
                 participated=participated,
@@ -1095,11 +1167,15 @@ class LineBindingService:
             # For battle: use merit as primary metric
             participated = user_metric.participated
             score = user_metric.merit_diff
-            rank = self._calculate_rank(
-                user_metric.merit_diff,
-                all_metrics,
-                lambda m: m.merit_diff,
-            ) if participated else None
+            rank = (
+                self._calculate_rank(
+                    user_metric.merit_diff,
+                    all_metrics,
+                    lambda m: m.merit_diff,
+                )
+                if participated
+                else None
+            )
 
             return UserEventParticipation(
                 participated=participated,
