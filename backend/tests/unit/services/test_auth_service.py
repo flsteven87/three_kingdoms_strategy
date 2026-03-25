@@ -195,3 +195,28 @@ class TestCleanupCache:
 
     def test_no_error_on_empty_cache(self, auth_service):
         auth_service.cleanup_cache()
+
+
+class TestTokenCacheKey:
+    """Verify token cache uses hash-based keys to prevent collisions."""
+
+    def test_cache_key_is_sha256_hash(self):
+        """Cache key should be the full SHA-256 hex digest."""
+        import hashlib
+
+        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." + "a" * 100
+        expected = hashlib.sha256(token.encode()).hexdigest()
+        result = AuthService._token_cache_key(token)
+        assert result == expected
+
+    def test_different_tokens_produce_different_keys(self):
+        """Tokens that share a long prefix must produce distinct keys."""
+        prefix = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIx"
+        token_a = prefix + "AAAAAA"
+        token_b = prefix + "BBBBBB"
+        assert AuthService._token_cache_key(token_a) != AuthService._token_cache_key(token_b)
+
+    def test_cache_key_length(self):
+        """Cache key should be 64 hex characters (full SHA-256)."""
+        key = AuthService._token_cache_key("any-token")
+        assert len(key) == 64

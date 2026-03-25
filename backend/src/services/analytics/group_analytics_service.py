@@ -6,10 +6,15 @@ and statistical calculations (box plots, CV, percentiles).
 """
 
 from collections import defaultdict
-from statistics import stdev
 from uuid import UUID
 
-from ._helpers import UNGROUPED_LABEL, ViewMode, build_period_label, db_float, percentile
+from ._helpers import (
+    UNGROUPED_LABEL,
+    ViewMode,
+    build_period_label,
+    compute_box_plot_stats,
+    db_float,
+)
 from ._shared import SharedAnalyticsMixin
 
 
@@ -85,23 +90,21 @@ class GroupAnalyticsService(SharedAnalyticsMixin):
 
         # Get alliance averages for comparison (use season averages for season view)
         if view == "season":
+            season = await self._season_repo.get_by_id(season_id)
             alliance_averages = await self.get_season_alliance_averages(season_id)
-        else:
-            alliance_averages = await self.get_period_alliance_averages(latest_period.id)
-
-        if view == "season":
             return await self._build_season_view(
-                season_id, group_name, group_metrics, latest_period, trends, alliance_averages
+                season, group_name, group_metrics, latest_period, trends, alliance_averages
             )
 
         # Default: latest period view
+        alliance_averages = await self.get_period_alliance_averages(latest_period.id)
         return self._build_latest_view(
             group_name, group_metrics, trend_data, periods, trends, alliance_averages
         )
 
     async def _build_season_view(
         self,
-        season_id: UUID,
+        season,
         group_name: str,
         group_metrics: list[dict],
         latest_period,
@@ -109,7 +112,6 @@ class GroupAnalyticsService(SharedAnalyticsMixin):
         alliance_averages: dict,
     ) -> dict:
         """Build group analytics for season view using snapshot totals."""
-        season = await self._season_repo.get_by_id(season_id)
         if not season:
             return {
                 "stats": self._empty_group_stats(group_name),
@@ -281,14 +283,14 @@ class GroupAnalyticsService(SharedAnalyticsMixin):
             return []
 
         if view == "season":
-            return await self._groups_comparison_season_view(season_id, periods)
+            season = await self._season_repo.get_by_id(season_id)
+            return await self._groups_comparison_season_view(season, periods)
 
         # Default: latest period
         return await self._groups_comparison_latest_view(periods)
 
-    async def _groups_comparison_season_view(self, season_id: UUID, periods: list) -> list[dict]:
+    async def _groups_comparison_season_view(self, season, periods: list) -> list[dict]:
         """Build groups comparison for season view."""
-        season = await self._season_repo.get_by_id(season_id)
         if not season:
             return []
 
@@ -380,40 +382,32 @@ class GroupAnalyticsService(SharedAnalyticsMixin):
         if count == 0:
             return self._empty_group_stats(group_name)
 
-        avg_contribution = sum(contributions) / count
-        avg_merit = sum(merits) / count
-
-        sorted_contributions = sorted(contributions)
-        contribution_std = stdev(contributions) if count > 1 else 0
-        contribution_cv = contribution_std / avg_contribution if avg_contribution > 0 else 0
-
-        sorted_merits = sorted(merits)
-        merit_std = stdev(merits) if count > 1 else 0
-        merit_cv = merit_std / avg_merit if avg_merit > 0 else 0
+        c_stats = compute_box_plot_stats(contributions)
+        m_stats = compute_box_plot_stats(merits)
 
         return {
             "group_name": group_name,
             "member_count": count,
-            "avg_daily_contribution": round(avg_contribution, 2),
-            "avg_daily_merit": round(avg_merit, 2),
+            "avg_daily_contribution": round(sum(contributions) / count, 2),
+            "avg_daily_merit": round(sum(merits) / count, 2),
             "avg_daily_assist": round(sum(assists) / count, 2),
             "avg_daily_donation": round(sum(donations) / count, 2),
             "avg_power": round(sum(powers) / count, 2),
             "avg_rank": round(sum(ranks) / count, 1),
             "best_rank": min(ranks),
             "worst_rank": max(ranks),
-            "contribution_min": round(sorted_contributions[0], 2),
-            "contribution_q1": round(percentile(sorted_contributions, 0.25), 2),
-            "contribution_median": round(percentile(sorted_contributions, 0.5), 2),
-            "contribution_q3": round(percentile(sorted_contributions, 0.75), 2),
-            "contribution_max": round(sorted_contributions[-1], 2),
-            "contribution_cv": round(contribution_cv, 3),
-            "merit_min": round(sorted_merits[0], 2),
-            "merit_q1": round(percentile(sorted_merits, 0.25), 2),
-            "merit_median": round(percentile(sorted_merits, 0.5), 2),
-            "merit_q3": round(percentile(sorted_merits, 0.75), 2),
-            "merit_max": round(sorted_merits[-1], 2),
-            "merit_cv": round(merit_cv, 3),
+            "contribution_min": round(c_stats["min"], 2),
+            "contribution_q1": round(c_stats["q1"], 2),
+            "contribution_median": round(c_stats["median"], 2),
+            "contribution_q3": round(c_stats["q3"], 2),
+            "contribution_max": round(c_stats["max"], 2),
+            "contribution_cv": round(c_stats["cv"], 3),
+            "merit_min": round(m_stats["min"], 2),
+            "merit_q1": round(m_stats["q1"], 2),
+            "merit_median": round(m_stats["median"], 2),
+            "merit_q3": round(m_stats["q3"], 2),
+            "merit_max": round(m_stats["max"], 2),
+            "merit_cv": round(m_stats["cv"], 3),
         }
 
     def _calculate_group_stats(self, group_name: str, metrics: list[dict]) -> dict:

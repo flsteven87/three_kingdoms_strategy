@@ -14,6 +14,7 @@ Data access layer for LINE Bot integration tables:
 
 import asyncio
 import logging
+import re
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -329,13 +330,30 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
 
+    @staticmethod
+    def _sanitize_search_query(query: str) -> str:
+        """Sanitize search query to prevent PostgREST filter injection.
+
+        Strips characters that could be used to inject additional filters:
+        - Commas (filter separator)
+        - Sequences like .eq. .neq. .like. etc. (operator patterns)
+        """
+        sanitized = query.replace(",", "")
+        sanitized = re.sub(
+            r"\.(eq|neq|gt|lt|gte|lte|like|ilike|is|in|cs|cd|sl|sr|nxl|nxr|adj|ov|fts|plfts|phfts|wfts|not|or|and)\.",
+            "",
+            sanitized,
+        )
+        return sanitized
+
     async def search_id_bindings(self, alliance_id: UUID, query: str) -> list[MemberLineBinding]:
         """Search member bindings by game ID or LINE display name (case-insensitive)."""
+        safe_query = self._sanitize_search_query(query)
         result = await self._execute_async(
             lambda: self.client.from_("member_line_bindings")
             .select("*")
             .eq("alliance_id", str(alliance_id))
-            .or_(f"game_id.ilike.%{query}%,line_display_name.ilike.%{query}%")
+            .or_(f"game_id.ilike.%{safe_query}%,line_display_name.ilike.%{safe_query}%")
             .execute()
         )
 

@@ -1,31 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
-  formatNumber,
   formatScore,
   formatDuration,
   formatPercent,
   formatEventTime,
 } from '../format-utils'
 
-// =============================================================================
-// formatNumber (LINE Bot style — different from chart-utils)
-// =============================================================================
-describe('formatNumber', () => {
-  it('formats millions with decimal only when needed', () => {
-    expect(formatNumber(1500000)).toBe('1.5M')
-    expect(formatNumber(2000000)).toBe('2M')
-  })
-
-  it('formats tens of thousands with K suffix', () => {
-    expect(formatNumber(85000)).toBe('85K')
-    expect(formatNumber(10000)).toBe('10K')
-  })
-
-  it('returns locale string under 10K', () => {
-    expect(formatNumber(8500)).toBe('8,500')
-    expect(formatNumber(999)).toBe('999')
-  })
-})
+// Note: formatNumber is now in chart-utils.ts (single canonical implementation)
+// See chart-utils.test.ts for its tests
 
 // =============================================================================
 // formatScore

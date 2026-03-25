@@ -3,27 +3,9 @@
  *
  * Number and duration formatting functions aligned with LINE Bot output.
  * Provides consistent display across LIFF and main app.
- */
-
-/**
- * Format large numbers with K/M suffixes.
- * Matches LINE Bot Flex Message format.
  *
- * Examples:
- * - 8500 -> "8,500"
- * - 85000 -> "85K"
- * - 1500000 -> "1.5M"
+ * Note: formatNumber is in chart-utils.ts (single canonical implementation).
  */
-export function formatNumber(value: number): string {
-  if (value >= 1_000_000) {
-    const millions = value / 1_000_000;
-    return millions % 1 === 0 ? `${millions}M` : `${millions.toFixed(1)}M`;
-  }
-  if (value >= 10_000) {
-    return `${Math.round(value / 1000)}K`;
-  }
-  return value.toLocaleString();
-}
 
 /**
  * Format score with Chinese unit suffix.

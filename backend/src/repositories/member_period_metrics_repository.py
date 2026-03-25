@@ -11,6 +11,7 @@ from uuid import UUID
 
 from src.models.member_period_metrics import MemberPeriodMetrics
 from src.repositories.base import SupabaseRepository
+from src.utils.numeric import db_float
 
 
 class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
@@ -181,7 +182,6 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
             return {}
 
         from collections import defaultdict
-        from decimal import Decimal
         from statistics import median
 
         # Query all metrics for these periods
@@ -210,11 +210,11 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
             period_uuid = UUID(period_id_str)
 
             # Extract values for median calculation
-            contributions = [float(Decimal(str(m["daily_contribution"]))) for m in metrics_list]
-            merits = [float(Decimal(str(m["daily_merit"]))) for m in metrics_list]
-            assists = [float(Decimal(str(m["daily_assist"]))) for m in metrics_list]
-            donations = [float(Decimal(str(m["daily_donation"]))) for m in metrics_list]
-            powers = [float(Decimal(str(m["end_power"]))) for m in metrics_list]
+            contributions = [db_float(m["daily_contribution"]) for m in metrics_list]
+            merits = [db_float(m["daily_merit"]) for m in metrics_list]
+            assists = [db_float(m["daily_assist"]) for m in metrics_list]
+            donations = [db_float(m["daily_donation"]) for m in metrics_list]
+            powers = [db_float(m["end_power"]) for m in metrics_list]
 
             averages[period_uuid] = {
                 "member_count": count,
@@ -259,7 +259,6 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
         # Group by end_group and calculate averages in Python
         # For production, consider using a Postgres view or function
         from collections import defaultdict
-        from decimal import Decimal
 
         groups: dict[str, list[dict]] = defaultdict(list)
         for row in data:
@@ -274,13 +273,12 @@ class MemberPeriodMetricsRepository(SupabaseRepository[MemberPeriodMetrics]):
                     "group_name": group_name,
                     "member_count": count,
                     "avg_daily_contribution": sum(
-                        Decimal(str(m["daily_contribution"])) for m in members
+                        db_float(m["daily_contribution"]) for m in members
                     )
                     / count,
-                    "avg_daily_merit": sum(Decimal(str(m["daily_merit"])) for m in members) / count,
-                    "avg_daily_assist": sum(Decimal(str(m["daily_assist"])) for m in members)
-                    / count,
-                    "avg_daily_donation": sum(Decimal(str(m["daily_donation"])) for m in members)
+                    "avg_daily_merit": sum(db_float(m["daily_merit"]) for m in members) / count,
+                    "avg_daily_assist": sum(db_float(m["daily_assist"]) for m in members) / count,
+                    "avg_daily_donation": sum(db_float(m["daily_donation"]) for m in members)
                     / count,
                 }
             )

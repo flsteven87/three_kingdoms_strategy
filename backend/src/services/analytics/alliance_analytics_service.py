@@ -8,12 +8,17 @@ distributions, group box plots, top/bottom performers, needs attention.
 import asyncio
 from collections import defaultdict
 from statistics import median as calc_median
-from statistics import stdev
 from uuid import UUID
 
 from src.models.period import Period
 
-from ._helpers import UNGROUPED_LABEL, ViewMode, build_period_label, db_float, percentile
+from ._helpers import (
+    UNGROUPED_LABEL,
+    ViewMode,
+    build_period_label,
+    compute_box_plot_stats,
+    db_float,
+)
 from ._shared import SharedAnalyticsMixin
 
 
@@ -416,32 +421,28 @@ class AllianceAnalyticsService(SharedAnalyticsMixin):
             powers = [float(m["power"]) for m in members]
             ranks = [m["rank"] for m in members]
 
-            sorted_contributions = sorted(contributions)
-            sorted_merits = sorted(merits)
-
-            avg_contribution = sum(contributions) / count
-            contribution_std = stdev(contributions) if count > 1 else 0
-            contribution_cv = contribution_std / avg_contribution if avg_contribution > 0 else 0
+            c_stats = compute_box_plot_stats(contributions)
+            m_stats = compute_box_plot_stats(merits)
 
             result.append(
                 {
                     "name": group_name,
                     "member_count": count,
-                    "avg_daily_contribution": round(avg_contribution, 2),
+                    "avg_daily_contribution": round(sum(contributions) / count, 2),
                     "avg_daily_merit": round(sum(merits) / count, 2),
                     "avg_rank": round(sum(ranks) / count, 1),
                     "avg_power": round(sum(powers) / count, 2),
-                    "contribution_cv": round(contribution_cv, 3),
-                    "contribution_min": round(sorted_contributions[0], 2),
-                    "contribution_q1": round(percentile(sorted_contributions, 0.25), 2),
-                    "contribution_median": round(percentile(sorted_contributions, 0.5), 2),
-                    "contribution_q3": round(percentile(sorted_contributions, 0.75), 2),
-                    "contribution_max": round(sorted_contributions[-1], 2),
-                    "merit_min": round(sorted_merits[0], 2),
-                    "merit_q1": round(percentile(sorted_merits, 0.25), 2),
-                    "merit_median": round(percentile(sorted_merits, 0.5), 2),
-                    "merit_q3": round(percentile(sorted_merits, 0.75), 2),
-                    "merit_max": round(sorted_merits[-1], 2),
+                    "contribution_cv": round(c_stats["cv"], 3),
+                    "contribution_min": round(c_stats["min"], 2),
+                    "contribution_q1": round(c_stats["q1"], 2),
+                    "contribution_median": round(c_stats["median"], 2),
+                    "contribution_q3": round(c_stats["q3"], 2),
+                    "contribution_max": round(c_stats["max"], 2),
+                    "merit_min": round(m_stats["min"], 2),
+                    "merit_q1": round(m_stats["q1"], 2),
+                    "merit_median": round(m_stats["median"], 2),
+                    "merit_q3": round(m_stats["q3"], 2),
+                    "merit_max": round(m_stats["max"], 2),
                 }
             )
 

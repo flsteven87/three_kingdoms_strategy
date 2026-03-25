@@ -6,7 +6,7 @@
  */
 
 import { Card, CardContent } from "@/components/ui/card";
-import { formatNumber } from "@/lib/format-utils";
+import { formatNumber } from "@/lib/chart-utils";
 import { useLiffEventReport } from "../hooks/use-liff-event";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
 import type {

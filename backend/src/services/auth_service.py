@@ -4,6 +4,7 @@ Authentication service for JWT token validation and user management.
 Provides high-performance JWT validation with caching and proper error handling.
 """
 
+import hashlib
 import time
 from functools import lru_cache
 
@@ -50,6 +51,11 @@ class AuthService:
         self._token_cache: dict[str, tuple[TokenClaims, float]] = {}
         self._cache_ttl = 300  # 5 minutes cache TTL
 
+    @staticmethod
+    def _token_cache_key(token: str) -> str:
+        """Generate a collision-resistant cache key from a JWT token."""
+        return hashlib.sha256(token.encode()).hexdigest()
+
     def _extract_token(self, authorization: str | None) -> str:
         """
         Extract JWT token from Authorization header.
@@ -90,7 +96,7 @@ class AuthService:
             TokenExpiredError: If token is expired
         """
         # Check cache first
-        cache_key = token[:50]  # Use first 50 chars as cache key
+        cache_key = self._token_cache_key(token)
         if cache_key in self._token_cache:
             cached_claims, cached_at = self._token_cache[cache_key]
             if time.time() - cached_at < self._cache_ttl:
