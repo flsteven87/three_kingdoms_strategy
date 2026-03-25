@@ -29,7 +29,11 @@ from src.core.auth import get_current_user_id
 from src.core.database import get_supabase_client
 from src.services.alliance_collaborator_service import AllianceCollaboratorService
 from src.services.alliance_service import AllianceService
-from src.services.analytics_service import AnalyticsService
+from src.services.analytics import (
+    AllianceAnalyticsService,
+    GroupAnalyticsService,
+    MemberAnalyticsService,
+)
 from src.services.battle_event_service import BattleEventService
 from src.services.copper_mine_rule_service import CopperMineRuleService
 from src.services.copper_mine_service import CopperMineService
@@ -86,9 +90,19 @@ def get_period_metrics_service() -> PeriodMetricsService:
     return PeriodMetricsService()
 
 
-def get_analytics_service() -> AnalyticsService:
-    """Get analytics service instance"""
-    return AnalyticsService()
+def get_member_analytics_service() -> MemberAnalyticsService:
+    """Get member analytics service instance"""
+    return MemberAnalyticsService()
+
+
+def get_group_analytics_service() -> GroupAnalyticsService:
+    """Get group analytics service instance"""
+    return GroupAnalyticsService()
+
+
+def get_alliance_analytics_service() -> AllianceAnalyticsService:
+    """Get alliance analytics service instance"""
+    return AllianceAnalyticsService()
 
 
 def get_battle_event_service() -> BattleEventService:
@@ -137,7 +151,11 @@ AllianceCollaboratorServiceDep = Annotated[
 PermissionServiceDep = Annotated[PermissionService, Depends(get_permission_service)]
 HegemonyWeightServiceDep = Annotated[HegemonyWeightService, Depends(get_hegemony_weight_service)]
 PeriodMetricsServiceDep = Annotated[PeriodMetricsService, Depends(get_period_metrics_service)]
-AnalyticsServiceDep = Annotated[AnalyticsService, Depends(get_analytics_service)]
+MemberAnalyticsServiceDep = Annotated[MemberAnalyticsService, Depends(get_member_analytics_service)]
+GroupAnalyticsServiceDep = Annotated[GroupAnalyticsService, Depends(get_group_analytics_service)]
+AllianceAnalyticsServiceDep = Annotated[
+    AllianceAnalyticsService, Depends(get_alliance_analytics_service)
+]
 BattleEventServiceDep = Annotated[BattleEventService, Depends(get_battle_event_service)]
 LineBindingServiceDep = Annotated[LineBindingService, Depends(get_line_binding_service)]
 CopperMineServiceDep = Annotated[CopperMineService, Depends(get_copper_mine_service)]

@@ -21,7 +21,8 @@ import pytest
 
 from src.models.period import Period
 from src.models.season import Season
-from src.services.analytics_service import AnalyticsService
+from src.services.analytics import AllianceAnalyticsService
+from src.services.analytics.group_analytics_service import GroupAnalyticsService
 
 # =============================================================================
 # Fixtures
@@ -88,9 +89,9 @@ def analytics_service(
     mock_period_repo: MagicMock,
     mock_metrics_repo: MagicMock,
     mock_member_repo: MagicMock,
-) -> AnalyticsService:
-    """Create AnalyticsService with mocked dependencies"""
-    service = AnalyticsService()
+) -> AllianceAnalyticsService:
+    """Create AllianceAnalyticsService with mocked dependencies"""
+    service = AllianceAnalyticsService()
     service._season_repo = mock_season_repo
     service._period_repo = mock_period_repo
     service._metrics_repo = mock_metrics_repo
@@ -186,7 +187,7 @@ class TestGetAllianceAnalyticsQueryOptimization:
     @pytest.mark.asyncio
     async def test_season_view_uses_single_query_for_latest_period(
         self,
-        analytics_service: AnalyticsService,
+        analytics_service: AllianceAnalyticsService,
         mock_season_repo: MagicMock,
         mock_period_repo: MagicMock,
         mock_metrics_repo: MagicMock,
@@ -262,7 +263,7 @@ class TestGetAllianceAnalyticsQueryOptimization:
     @pytest.mark.asyncio
     async def test_latest_view_calls_get_by_period_with_member(
         self,
-        analytics_service: AnalyticsService,
+        analytics_service: AllianceAnalyticsService,
         mock_season_repo: MagicMock,
         mock_period_repo: MagicMock,
         mock_metrics_repo: MagicMock,
@@ -319,7 +320,7 @@ class TestGetAllianceAnalyticsSeasonViewData:
     @pytest.mark.asyncio
     async def test_season_view_returns_correct_daily_averages(
         self,
-        analytics_service: AnalyticsService,
+        analytics_service: AllianceAnalyticsService,
         mock_season_repo: MagicMock,
         mock_period_repo: MagicMock,
         mock_metrics_repo: MagicMock,
@@ -396,7 +397,7 @@ class TestDbFloat:
 
     def test_converts_decimal_to_float(self):
         """Should convert Decimal to float with identical numerical value."""
-        from src.services.analytics_service import _db_float
+        from src.services.analytics._helpers import db_float as _db_float
 
         result = _db_float(Decimal("1234.56"))
         assert isinstance(result, float)
@@ -404,7 +405,7 @@ class TestDbFloat:
 
     def test_converts_float_passthrough(self):
         """Should convert a Python float input correctly."""
-        from src.services.analytics_service import _db_float
+        from src.services.analytics._helpers import db_float as _db_float
 
         result = _db_float(3.14)
         assert isinstance(result, float)
@@ -412,7 +413,7 @@ class TestDbFloat:
 
     def test_converts_string_representation(self):
         """Should convert a string representation of a number to float."""
-        from src.services.analytics_service import _db_float
+        from src.services.analytics._helpers import db_float as _db_float
 
         result = _db_float("9999.99")
         assert isinstance(result, float)
@@ -420,7 +421,7 @@ class TestDbFloat:
 
     def test_converts_integer(self):
         """Should convert integer input to float."""
-        from src.services.analytics_service import _db_float
+        from src.services.analytics._helpers import db_float as _db_float
 
         result = _db_float(42)
         assert isinstance(result, float)
@@ -428,14 +429,14 @@ class TestDbFloat:
 
     def test_converts_zero(self):
         """Should handle zero correctly."""
-        from src.services.analytics_service import _db_float
+        from src.services.analytics._helpers import db_float as _db_float
 
         result = _db_float(Decimal("0.00"))
         assert result == pytest.approx(0.0)
 
     def test_converts_high_precision_decimal(self):
         """Should handle high-precision Decimal without floating-point drift."""
-        from src.services.analytics_service import _db_float
+        from src.services.analytics._helpers import db_float as _db_float
 
         # Using Decimal(str(value)) is the safe conversion pattern
         decimal_val = Decimal("12345.678900")
@@ -444,7 +445,7 @@ class TestDbFloat:
 
     def test_result_identical_to_manual_conversion(self):
         """Must produce identical results to float(Decimal(str(value)))."""
-        from src.services.analytics_service import _db_float
+        from src.services.analytics._helpers import db_float as _db_float
 
         inputs = [Decimal("100.50"), 200.75, "300.25", 400]
         for val in inputs:
@@ -461,11 +462,11 @@ class TestComputeGroupStats:
     """Tests for the _compute_group_stats() method."""
 
     @pytest.fixture
-    def service(self) -> AnalyticsService:
-        """Create AnalyticsService instance (no repos needed for pure methods)."""
-        return AnalyticsService()
+    def service(self) -> GroupAnalyticsService:
+        """Create GroupAnalyticsService instance (no repos needed for pure methods)."""
+        return GroupAnalyticsService()
 
-    def test_returns_correct_averages_for_known_input(self, service: AnalyticsService):
+    def test_returns_correct_averages_for_known_input(self, service: GroupAnalyticsService):
         """Should calculate correct averages from known numeric lists."""
         # contributions: [100, 200, 300] → avg = 200
         result = service._compute_group_stats(
@@ -486,7 +487,7 @@ class TestComputeGroupStats:
         assert result["avg_power"] == pytest.approx(20000.0)
         assert result["avg_rank"] == pytest.approx(2.0)
 
-    def test_returns_correct_boxplot_fields(self, service: AnalyticsService):
+    def test_returns_correct_boxplot_fields(self, service: GroupAnalyticsService):
         """Should calculate min, Q1, median, Q3, max for contributions."""
         # sorted contributions: [100, 200, 300]
         result = service._compute_group_stats(
@@ -505,7 +506,7 @@ class TestComputeGroupStats:
         assert result["contribution_q1"] == pytest.approx(150.0)
         assert result["contribution_q3"] == pytest.approx(250.0)
 
-    def test_returns_correct_cv_for_known_variance(self, service: AnalyticsService):
+    def test_returns_correct_cv_for_known_variance(self, service: GroupAnalyticsService):
         """Should calculate coefficient of variation = std/mean."""
         import statistics
 
@@ -525,7 +526,7 @@ class TestComputeGroupStats:
         )
         assert result["contribution_cv"] == pytest.approx(expected_cv)
 
-    def test_returns_empty_stats_for_empty_lists(self, service: AnalyticsService):
+    def test_returns_empty_stats_for_empty_lists(self, service: GroupAnalyticsService):
         """Should return empty stats dict when given empty lists."""
         result = service._compute_group_stats(
             group_name="空組",
@@ -540,7 +541,7 @@ class TestComputeGroupStats:
         assert result["member_count"] == 0
         assert result["avg_daily_contribution"] == 0
 
-    def test_single_member_cv_is_zero(self, service: AnalyticsService):
+    def test_single_member_cv_is_zero(self, service: GroupAnalyticsService):
         """With a single member, std is 0, so CV should be 0."""
         result = service._compute_group_stats(
             group_name="Solo",
@@ -569,10 +570,10 @@ class TestGroupStatsEquivalence:
     """
 
     @pytest.fixture
-    def service(self) -> AnalyticsService:
-        return AnalyticsService()
+    def service(self) -> GroupAnalyticsService:
+        return GroupAnalyticsService()
 
-    def test_identical_output_for_equivalent_inputs(self, service: AnalyticsService):
+    def test_identical_output_for_equivalent_inputs(self, service: GroupAnalyticsService):
         """
         Both methods must produce identical stats for the same underlying data.
 
@@ -644,7 +645,7 @@ class TestGroupStatsEquivalence:
                 f"members={stats_from_members[key]}"
             )
 
-    def test_empty_input_returns_identical_empty_stats(self, service: AnalyticsService):
+    def test_empty_input_returns_identical_empty_stats(self, service: GroupAnalyticsService):
         """Both methods must return the same empty stats structure."""
         group_name = "空組"
         stats_from_raw = service._calculate_group_stats(group_name, [])
@@ -652,7 +653,7 @@ class TestGroupStatsEquivalence:
 
         assert stats_from_raw == stats_from_members
 
-    def test_output_contains_all_required_keys(self, service: AnalyticsService):
+    def test_output_contains_all_required_keys(self, service: GroupAnalyticsService):
         """Output dict must contain all expected box-plot and summary keys."""
         required_keys = {
             "group_name",

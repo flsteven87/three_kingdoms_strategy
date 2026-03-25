@@ -56,7 +56,7 @@ from src.repositories.battle_event_metrics_repository import BattleEventMetricsR
 from src.repositories.battle_event_repository import BattleEventRepository
 from src.repositories.line_binding_repository import LineBindingRepository
 from src.repositories.season_repository import SeasonRepository
-from src.services.analytics_service import AnalyticsService
+from src.services.analytics import MemberAnalyticsService
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class LineBindingService:
         self._event_repo = BattleEventRepository()
         self._metrics_repo = BattleEventMetricsRepository()
         self._season_repo = SeasonRepository()
-        self._analytics_service = AnalyticsService()
+        self._analytics_service = MemberAnalyticsService()
 
     # =========================================================================
     # Common Lookups (used by webhook handlers and endpoints)

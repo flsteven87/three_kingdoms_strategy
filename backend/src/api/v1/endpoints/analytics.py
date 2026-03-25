@@ -27,7 +27,9 @@ from src.api.v1.schemas.analytics import (
     SeasonSummaryResponse,
 )
 from src.core.dependencies import (
-    AnalyticsServiceDep,
+    AllianceAnalyticsServiceDep,
+    GroupAnalyticsServiceDep,
+    MemberAnalyticsServiceDep,
     PeriodMetricsServiceDep,
     SeasonServiceDep,
     UserIdDep,
@@ -36,11 +38,16 @@ from src.core.dependencies import (
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
+# =============================================================================
+# Member Analytics Endpoints
+# =============================================================================
+
+
 @router.get("/members", response_model=list[MemberListItem])
 async def get_members(
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: MemberAnalyticsServiceDep,
     season_service: SeasonServiceDep,
     active_only: bool = Query(True, description="Only return active members"),
 ) -> list[MemberListItem]:
@@ -64,7 +71,7 @@ async def get_member_trend(
     member_id: UUID,
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: MemberAnalyticsServiceDep,
     season_service: SeasonServiceDep,
 ) -> list[MemberTrendItem]:
     """
@@ -93,7 +100,7 @@ async def get_member_season_summary(
     member_id: UUID,
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: MemberAnalyticsServiceDep,
     season_service: SeasonServiceDep,
 ) -> SeasonSummaryResponse:
     """
@@ -112,9 +119,7 @@ async def get_member_season_summary(
     summary = await service.get_season_summary(member_id, season_id)
 
     if not summary:
-        raise FileNotFoundError(
-            "No metrics data available for this member in this season"
-        )
+        raise FileNotFoundError("No metrics data available for this member in this season")
 
     return SeasonSummaryResponse(**summary)
 
@@ -124,7 +129,7 @@ async def get_member_comparison(
     member_id: UUID,
     period_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: MemberAnalyticsServiceDep,
     period_service: PeriodMetricsServiceDep,
 ) -> MemberComparisonResponse:
     """
@@ -144,9 +149,7 @@ async def get_member_comparison(
     result = await service.get_member_with_comparison(member_id, period_id)
 
     if not result:
-        raise FileNotFoundError(
-            "Member metrics not found for this period"
-        )
+        raise FileNotFoundError("Member metrics not found for this period")
 
     return MemberComparisonResponse(**result)
 
@@ -155,7 +158,7 @@ async def get_member_comparison(
 async def get_period_averages(
     period_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: AllianceAnalyticsServiceDep,
     period_service: PeriodMetricsServiceDep,
 ) -> AllianceAveragesResponse:
     """
@@ -177,7 +180,7 @@ async def get_period_averages(
 async def get_alliance_trend(
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: AllianceAnalyticsServiceDep,
     season_service: SeasonServiceDep,
 ) -> list[AllianceTrendItem]:
     """
@@ -198,7 +201,7 @@ async def get_alliance_trend(
 async def get_season_averages(
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: AllianceAnalyticsServiceDep,
     season_service: SeasonServiceDep,
 ) -> AllianceAveragesResponse:
     """
@@ -227,7 +230,7 @@ async def get_season_averages(
 async def get_alliance_analytics(
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: AllianceAnalyticsServiceDep,
     season_service: SeasonServiceDep,
     view: str = Query(
         "latest", description="View mode: 'latest' for latest period, 'season' for season average"
@@ -260,7 +263,7 @@ async def get_alliance_analytics(
 async def get_groups(
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: GroupAnalyticsServiceDep,
     season_service: SeasonServiceDep,
 ) -> list[GroupListItem]:
     """
@@ -281,7 +284,7 @@ async def get_groups(
 async def get_groups_comparison(
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: GroupAnalyticsServiceDep,
     season_service: SeasonServiceDep,
     view: str = Query(
         "latest", description="View mode: 'latest' for latest period, 'season' for season average"
@@ -309,7 +312,7 @@ async def get_group_analytics(
     group_name: str,
     season_id: UUID,
     user_id: UserIdDep,
-    service: AnalyticsServiceDep,
+    service: GroupAnalyticsServiceDep,
     season_service: SeasonServiceDep,
     view: str = Query(
         "latest", description="View mode: 'latest' for latest period, 'season' for season average"
