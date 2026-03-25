@@ -50,7 +50,7 @@ export function GroupTab({
         canUpdate={canUpdate}
         onRegenerate={onGenerateCode}
         isRegenerating={isGenerating}
-        countdown={formatted}
+        countdown={formatted ?? "00:00"}
         isUrgent={isUrgent}
       />
     )
