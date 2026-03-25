@@ -5,9 +5,13 @@ Stores processed webhook events for idempotency dedup.
 符合 CLAUDE.md 🔴: Inherits SupabaseRepository, uses _handle_supabase_result()
 """
 
+import logging
+
 from pydantic import BaseModel, ConfigDict
 
 from src.repositories.base import SupabaseRepository
+
+logger = logging.getLogger(__name__)
 
 
 class WebhookEvent(BaseModel):
@@ -30,22 +34,43 @@ class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
     def __init__(self):
         super().__init__(table_name="webhook_events", model_class=WebhookEvent)
 
-    async def exists_by_event_id(self, event_id: str) -> bool:
-        """Check if an event has already been processed."""
-        result = await self._execute_async(
+    async def try_claim_event(self, event_id: str, event_type: str) -> bool:
+        """
+        Atomically claim an event for processing via INSERT + UNIQUE constraint.
+
+        Returns True if claimed (first to insert), False if already exists (duplicate).
+        This is the idempotency gate — only the winner processes the payment.
+        """
+        try:
+            await self._execute_async(
+                lambda: self.client.from_(self.table_name)
+                .insert({"event_id": event_id, "event_type": event_type})
+                .execute()
+            )
+            return True
+        except Exception:
+            # UNIQUE violation = already claimed by another request
+            logger.info(f"Event already claimed - event_id={event_id}")
+            return False
+
+    async def update_event_details(
+        self,
+        *,
+        event_id: str,
+        alliance_id: str,
+        user_id: str,
+        seasons_added: int,
+        payload: dict,
+    ) -> None:
+        """Update a claimed event with processing details after successful payment."""
+        await self._execute_async(
             lambda: self.client.from_(self.table_name)
-            .select("id")
+            .update({
+                "alliance_id": alliance_id,
+                "user_id": user_id,
+                "seasons_added": seasons_added,
+                "payload": payload,
+            })
             .eq("event_id", event_id)
-            .limit(1)
             .execute()
         )
-        data = self._handle_supabase_result(result, allow_empty=True)
-        return len(data) > 0
-
-    async def create(self, event_data: dict) -> WebhookEvent:
-        """Record a processed webhook event."""
-        result = await self._execute_async(
-            lambda: self.client.from_(self.table_name).insert(event_data).execute()
-        )
-        data = self._handle_supabase_result(result, expect_single=True)
-        return self._build_model(data)

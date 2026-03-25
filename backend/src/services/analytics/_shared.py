@@ -10,6 +10,7 @@ from datetime import date
 from statistics import median as calc_median
 from uuid import UUID
 
+from src.models.period import Period
 from src.repositories.member_period_metrics_repository import MemberPeriodMetricsRepository
 from src.repositories.period_repository import PeriodRepository
 from src.repositories.season_repository import SeasonRepository
@@ -94,7 +95,7 @@ class SharedAnalyticsMixin:
         }
 
     async def get_season_alliance_averages(
-        self, season_id: UUID, *, periods: list | None = None
+        self, season_id: UUID, *, periods: list[Period] | None = None
     ) -> dict:
         """
         Calculate alliance average and median metrics for season-to-date.

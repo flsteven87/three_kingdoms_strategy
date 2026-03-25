@@ -87,9 +87,9 @@ class PaymentService:
         Raises:
             ValueError: If required data is missing or invalid
         """
-        # --- Dedup check ---
+        # --- Dedup gate: INSERT first, UNIQUE(event_id) prevents concurrent dupes ---
         if event_id:
-            if await self._webhook_repo.exists_by_event_id(event_id):
+            if not await self._webhook_repo.try_claim_event(event_id, "checkout.completed"):
                 logger.info(f"Duplicate webhook event skipped - event_id={event_id}")
                 return {"success": True, "duplicate": True, "event_id": event_id}
 
@@ -116,20 +116,18 @@ class PaymentService:
             seasons=quantity,
         )
 
-        # --- Record event for dedup ---
+        # Update the claimed event with processing details
         if event_id:
             try:
-                await self._webhook_repo.create({
-                    "event_id": event_id,
-                    "event_type": "checkout.completed",
-                    "alliance_id": str(alliance.id),
-                    "user_id": str(user_id),
-                    "seasons_added": quantity,
-                    "payload": event_data,
-                })
+                await self._webhook_repo.update_event_details(
+                    event_id=event_id,
+                    alliance_id=str(alliance.id),
+                    user_id=str(user_id),
+                    seasons_added=quantity,
+                    payload=event_data,
+                )
             except Exception as e:
-                # Log but don't fail — the seasons were already added
-                logger.warning(f"Failed to record webhook event for dedup: {e}")
+                logger.warning(f"Failed to update webhook event details: {e}")
 
         logger.info(
             f"Seasons added successfully - alliance_id={alliance.id}, "

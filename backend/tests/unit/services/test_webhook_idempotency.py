@@ -2,9 +2,9 @@
 Tests for webhook idempotency (event dedup).
 
 Covers:
-- First event processes normally
-- Duplicate event_id returns cached result without re-processing
-- Missing event_id still processes (graceful degradation)
+- First event: try_claim_event succeeds → process + update details
+- Duplicate event_id: try_claim_event fails → skip processing
+- Missing event_id: process without dedup (graceful degradation)
 - Atomic increment prevents read-modify-write race
 """
 
@@ -39,12 +39,12 @@ class TestWebhookIdempotency:
 
     @pytest.mark.asyncio
     async def test_first_event_processes_normally(self, payment_service, sample_event_data):
-        """First time seeing an event_id should process and record."""
+        """First time seeing an event_id should claim, process, and update details."""
         event_data, user_id = sample_event_data
         alliance = MagicMock(id=uuid4())
 
-        payment_service._webhook_repo.exists_by_event_id = AsyncMock(return_value=False)
-        payment_service._webhook_repo.create = AsyncMock()
+        payment_service._webhook_repo.try_claim_event = AsyncMock(return_value=True)
+        payment_service._webhook_repo.update_event_details = AsyncMock()
         payment_service._quota_service.get_alliance_by_user = AsyncMock(return_value=alliance)
         payment_service._quota_service.add_purchased_seasons = AsyncMock(return_value=3)
 
@@ -55,16 +55,19 @@ class TestWebhookIdempotency:
         assert result["success"] is True
         assert result["seasons_added"] == 3
         payment_service._quota_service.add_purchased_seasons.assert_called_once()
-        payment_service._webhook_repo.create.assert_called_once()
+        payment_service._webhook_repo.try_claim_event.assert_called_once_with(
+            "evt_abc123", "checkout.completed"
+        )
+        payment_service._webhook_repo.update_event_details.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_duplicate_event_returns_cached_without_processing(
+    async def test_duplicate_event_returns_without_processing(
         self, payment_service, sample_event_data
     ):
-        """Duplicate event_id should return success without adding seasons again."""
+        """Duplicate event_id (claim fails) should return success without adding seasons."""
         event_data, user_id = sample_event_data
 
-        payment_service._webhook_repo.exists_by_event_id = AsyncMock(return_value=True)
+        payment_service._webhook_repo.try_claim_event = AsyncMock(return_value=False)
 
         result = await payment_service.handle_checkout_completed(
             event_data, event_id="evt_abc123"
@@ -88,7 +91,7 @@ class TestWebhookIdempotency:
         )
 
         assert result["success"] is True
-        payment_service._webhook_repo.exists_by_event_id.assert_not_called()
+        payment_service._webhook_repo.try_claim_event.assert_not_called()
 
 
 class TestAtomicIncrement:
