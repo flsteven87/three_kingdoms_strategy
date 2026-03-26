@@ -166,7 +166,12 @@ function PurchaseSeason() {
         externalCustomerId,
         successUrl: `${baseUrl}/purchase?payment=success`,
         onError: (checkoutError) => {
-          setError(`付款錯誤：${checkoutError.message}`)
+          const msg = typeof checkoutError?.message === 'string'
+            ? checkoutError.message
+            : typeof checkoutError === 'object' && checkoutError !== null
+              ? JSON.stringify(checkoutError)
+              : String(checkoutError ?? '未知錯誤')
+          setError(`付款錯誤：${msg}`)
         },
         onPaymentComplete: async () => {
           // Refresh quota status and show success banner
@@ -208,7 +213,20 @@ function PurchaseSeason() {
         },
       })
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : JSON.stringify(err)
+      let errorMessage: string
+      if (err instanceof Error) {
+        // Recur SDK may wrap error objects, resulting in "[object Object]" as message
+        errorMessage = err.message === '[object Object]'
+          ? '付款處理失敗，請稍後再試或聯繫客服'
+          : err.message
+      } else if (typeof err === 'object' && err !== null) {
+        const errObj = err as Record<string, unknown>
+        errorMessage = (typeof errObj.message === 'string' ? errObj.message : null)
+          ?? (typeof errObj.error === 'string' ? errObj.error : null)
+          ?? JSON.stringify(err)
+      } else {
+        errorMessage = String(err)
+      }
       setError(`付款過程發生錯誤：${errorMessage}`)
     }
   }
@@ -278,7 +296,7 @@ function PurchaseSeason() {
 
           {/* Product Description */}
           <p className="text-center text-sm text-muted-foreground">
-            每次購買可開啟一個新賽季，需要更多可重複購買
+            一次性購買，不自動續訂。需要更多賽季可重複購買
           </p>
 
           {/* Error Message */}

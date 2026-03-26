@@ -84,7 +84,7 @@ export function TermsOfService() {
           </li>
         </ul>
 
-        <SectionHeading>八、付款與不退款條款</SectionHeading>
+        <SectionHeading id="refund">八、付款與不退款條款</SectionHeading>
         <ul className="list-disc pl-6 space-y-1">
           <li>賽季額度為數位服務商品，購買完成後即可使用</li>
           <li>所有購買均為最終銷售，<strong>不提供退款</strong></li>

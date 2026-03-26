@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 const FOOTER_LINKS = [
   { label: '隱私權政策', to: '/privacy' },
   { label: '服務條款', to: '/terms' },
+  { label: '退款政策', to: '/terms#refund' },
 ] as const
 
 export function PublicFooter() {
