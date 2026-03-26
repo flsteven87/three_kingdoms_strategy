@@ -316,10 +316,13 @@ function PurchaseSeason() {
             {isCheckingOut ? '處理中...' : '立即購買'}
           </Button>
 
-          {/* Legal consent */}
-          <p className="text-center text-xs text-muted-foreground">
-            購買即表示您同意
-            <Link to="/terms" className="text-primary hover:underline">服務條款</Link>
+          {/* Legal disclosure & consent */}
+          <p className="text-center text-xs text-muted-foreground leading-relaxed">
+            本服務提供 14 天免費試用，購買後即開通使用。依消保法規定，數位服務一經提供不適用
+            7 天鑑賞期。購買即表示您同意{' '}
+            <Link to="/terms" className="text-primary hover:underline">服務條款</Link>{' '}
+            及{' '}
+            <Link to="/terms#refund" className="text-primary hover:underline">退款政策</Link>
           </p>
         </div>
       </div>

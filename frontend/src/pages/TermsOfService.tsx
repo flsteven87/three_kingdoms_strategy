@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { PRICE_PER_SEASON } from '@/constants'
 import { SectionHeading } from '@/components/layout/LegalTypography'
 
@@ -84,12 +85,40 @@ export function TermsOfService() {
           </li>
         </ul>
 
-        <SectionHeading id="refund">八、付款與不退款條款</SectionHeading>
+        <SectionHeading id="refund">八、退款政策</SectionHeading>
+
+        <p className="font-medium text-foreground">免費試用</p>
         <ul className="list-disc pl-6 space-y-1">
-          <li>賽季額度為數位服務商品，購買完成後即可使用</li>
-          <li>所有購買均為最終銷售，<strong>不提供退款</strong></li>
-          <li>如因系統錯誤導致重複扣款，我們將主動退回多收的款項</li>
-          <li>購買前請善用 14 天免費試用期充分體驗服務</li>
+          <li>新用戶首次使用可享 14 天免費試用，期間可使用完整功能</li>
+          <li>試用期結束不會自動收費，由您自行決定是否購買</li>
+        </ul>
+
+        <p className="font-medium text-foreground">不退款條款</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li>
+            賽季額度為數位服務商品，購買後立即開通使用。依據消費者保護法第 19
+            條及「通訊交易解除權合理例外情事適用準則」第 2 條第 5
+            款，本服務屬一經提供即為完成之線上服務，不適用 7 天猶豫期間
+          </li>
+          <li>
+            您在購買前已享有 14
+            天免費試用期，可充分體驗所有功能後再決定是否購買。因此，所有購買均為最終銷售，<strong>不提供退款</strong>
+          </li>
+        </ul>
+
+        <p className="font-medium text-foreground">例外情形</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li>系統錯誤導致重複扣款，我們將主動退回多收款項</li>
+          <li>因本服務之過失造成服務持續無法使用超過 72 小時，可申請補償</li>
+        </ul>
+
+        <p className="font-medium text-foreground">付款爭議</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li>
+            如有任何付款相關問題，請透過
+            <Link to="/contact" className="text-primary hover:underline">聯絡我們</Link>
+            頁面提交表單，我們將於 2 個工作日內回覆處理
+          </li>
         </ul>
 
         <SectionHeading>九、帳戶終止</SectionHeading>
