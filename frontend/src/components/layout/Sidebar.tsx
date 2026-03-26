@@ -132,16 +132,16 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <div className={cn('flex h-full w-64 flex-col bg-card border-r border-border', className)}>
       {/* Logo Section */}
-      <div className="flex h-16 items-center px-6 border-b border-border">
-        <Link to="/analytics" className="flex items-center gap-2">
+      <div className="flex h-20 items-center px-5 border-b border-border">
+        <Link to="/analytics" className="flex items-center gap-3">
           <img
             src="/assets/logo.svg"
             alt="三國志戰略版"
-            className="h-8 w-8 object-contain"
+            className="h-12 w-12 object-contain"
           />
           <div className="flex flex-col">
             <span className="font-bold text-sm leading-tight">三國志戰略版</span>
-            <span className="text-xs text-muted-foreground leading-tight">盟友表現管理</span>
+            <span className="text-xs text-muted-foreground leading-tight">同盟管理中心</span>
           </div>
         </Link>
       </div>

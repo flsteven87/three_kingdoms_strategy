@@ -6,14 +6,14 @@ export function PublicLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="border-b">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/landing" className="flex items-center gap-2.5">
+        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+          <Link to="/landing" className="flex items-center gap-3.5">
             <img
               src="/assets/logo.svg"
               alt="三國志戰略版"
-              className="h-8 w-8 object-contain"
+              className="h-12 w-12 object-contain"
             />
-            <span className="font-semibold text-sm">
+            <span className="font-semibold text-lg">
               三國志戰略版 · 同盟管理中心
             </span>
           </Link>

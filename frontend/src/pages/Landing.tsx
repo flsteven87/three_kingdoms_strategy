@@ -134,7 +134,7 @@ const INCLUDED_FEATURES = [
   "綜合排名計算",
   "戰役事件追蹤",
   "LINE 身份綁定",
-  "多人協作（免費）",
+  "多人協作",
   "資料永久保存",
 ] as const;
 
@@ -208,30 +208,40 @@ export function Landing() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* ── Header (sticky) ── */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
             <img
               src="/assets/logo.svg"
               alt="三國志戰略版"
-              className="h-7 w-7 object-contain"
+              className="h-12 w-12 object-contain"
             />
-            <span className="font-semibold text-sm">同盟管理中心</span>
+            <span className="font-semibold text-lg">同盟管理中心</span>
           </div>
           <nav className="hidden sm:flex items-center gap-6">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-base text-muted-foreground hover:text-foreground transition-colors"
               >
                 {link.label}
               </a>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Button size="sm" onClick={scrollToHero}>
-              免費開始
+            <Button
+              onClick={() => handleOAuthLogin("google")}
+              disabled={isLoading !== null || webViewInfo?.isWebView}
+            >
+              {isLoading === "google" ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  登入中...
+                </>
+              ) : (
+                "免費開始"
+              )}
             </Button>
           </div>
         </div>
@@ -242,16 +252,16 @@ export function Landing() {
         <section id="hero" className="scroll-mt-14 px-4 py-20 md:py-28">
           <div className="mx-auto max-w-2xl text-center space-y-8">
             <div className="space-y-4">
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <span className="inline-flex items-center rounded-full bg-primary/10 px-3.5 py-1 text-sm font-medium text-primary">
                 三國志戰略版 · 同盟管理工具
               </span>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-balance">
-                讓每一份付出都被看見
+              <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-balance">
+                同盟數據，盡在掌握
               </h1>
-              <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed text-balance">
+              <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto leading-relaxed text-balance">
                 出席、貢獻、活躍度全自動追蹤。
                 <br className="hidden sm:block" />
-                獎懲有據，管理不靠感覺。
+                誰該賞、誰該罰，數據替你說話。
               </p>
             </div>
 
@@ -312,11 +322,11 @@ export function Landing() {
             <div className="grid gap-10 md:grid-cols-3">
               {PAIN_POINTS.map((pain) => (
                 <div key={pain.title} className="space-y-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-                    <pain.icon className="h-5 w-5 text-destructive" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
+                    <pain.icon className="h-6 w-6 text-destructive" />
                   </div>
-                  <h3 className="font-semibold">{pain.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <h3 className="text-lg font-semibold">{pain.title}</h3>
+                  <p className="text-base text-muted-foreground leading-relaxed">
                     {pain.description}
                   </p>
                 </div>
@@ -329,19 +339,19 @@ export function Landing() {
         <section className="px-4 py-20 border-t">
           <div className="mx-auto max-w-3xl space-y-12">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight text-balance">三步開始</h2>
-              <p className="text-sm text-muted-foreground">
+              <h2 className="text-3xl font-bold tracking-tight text-balance">三步開始</h2>
+              <p className="text-base text-muted-foreground">
                 簡單上手，立刻掌握同盟全局
               </p>
             </div>
             <div className="grid gap-8 md:grid-cols-3">
               {STEPS.map((step, i) => (
                 <div key={step.title} className="text-center space-y-3">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-base">
                     {i + 1}
                   </div>
-                  <h3 className="font-semibold">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed text-balance">
+                  <h3 className="text-lg font-semibold">{step.title}</h3>
+                  <p className="text-base text-muted-foreground leading-relaxed text-balance">
                     {step.description}
                   </p>
                 </div>
@@ -352,21 +362,21 @@ export function Landing() {
 
         {/* ── 4. Features ── */}
         <section id="features" className="scroll-mt-14 px-4 py-20 border-t">
-          <div className="mx-auto max-w-4xl space-y-12">
+          <div className="mx-auto max-w-5xl space-y-12">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight">核心功能</h2>
-              <p className="text-sm text-muted-foreground">
+              <h2 className="text-3xl font-bold tracking-tight">核心功能</h2>
+              <p className="text-base text-muted-foreground">
                 專為三國志戰略版同盟官員打造
               </p>
             </div>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((f) => (
                 <div key={f.title} className="space-y-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <f.icon className="h-5 w-5 text-primary" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                    <f.icon className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-medium">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <h3 className="text-lg font-medium">{f.title}</h3>
+                  <p className="text-base text-muted-foreground leading-relaxed">
                     {f.description}
                   </p>
                 </div>
@@ -382,10 +392,10 @@ export function Landing() {
         >
           <div className="mx-auto max-w-md space-y-10">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight">
+              <h2 className="text-3xl font-bold tracking-tight">
                 一個價格，全部功能
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 14 天免費體驗，不滿意不用付錢
               </p>
             </div>
@@ -398,7 +408,7 @@ export function Landing() {
               </div>
 
               <div className="text-center space-y-1">
-                <div className="text-4xl font-bold tracking-tight">
+                <div className="text-5xl font-bold tracking-tight">
                   NT$ {PRICE_PER_SEASON.toLocaleString()}
                 </div>
                 <div className="text-sm text-muted-foreground">
@@ -410,7 +420,7 @@ export function Landing() {
                 {INCLUDED_FEATURES.map((feature) => (
                   <li
                     key={feature}
-                    className="flex items-center gap-2.5 text-sm"
+                    className="flex items-center gap-2.5 text-base"
                   >
                     <Check className="h-4 w-4 flex-shrink-0 text-primary" />
                     <span>{feature}</span>
@@ -433,7 +443,7 @@ export function Landing() {
         <section id="faq" className="scroll-mt-14 px-4 py-20 border-t">
           <div className="mx-auto max-w-2xl space-y-10">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight">常見問題</h2>
+              <h2 className="text-3xl font-bold tracking-tight">常見問題</h2>
             </div>
             <Accordion type="single" collapsible className="w-full">
               {FAQ_ITEMS.map((item) => (
@@ -453,7 +463,7 @@ export function Landing() {
         {/* ── 7. Final CTA ── */}
         <section className="px-4 py-20 border-t bg-muted/30">
           <div className="mx-auto max-w-md text-center space-y-6">
-            <h2 className="text-2xl font-bold tracking-tight text-balance">
+            <h2 className="text-3xl font-bold tracking-tight text-balance">
               準備好用數據管理你的同盟了嗎？
             </h2>
             <Button size="lg" onClick={scrollToHero}>

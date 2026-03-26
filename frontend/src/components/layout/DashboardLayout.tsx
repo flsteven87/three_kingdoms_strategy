@@ -39,7 +39,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top header */}
-        <header className="h-16 border-b border-border bg-card flex items-center justify-between px-4 lg:px-6 shrink-0">
+        <header className="h-20 border-b border-border bg-card flex items-center justify-between px-4 lg:px-6 shrink-0">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -50,13 +50,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </button>
 
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-3 lg:hidden">
             <img
               src="/assets/logo.svg"
               alt="三國志戰略版"
-              className="h-6 w-6 object-contain"
+              className="h-11 w-11 object-contain"
             />
-            <span className="font-bold text-sm">三國志戰略版</span>
+            <span className="font-bold text-lg">三國志戰略版</span>
           </div>
 
           {/* Spacer for desktop */}
