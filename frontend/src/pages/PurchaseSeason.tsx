@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecur } from 'recur-tw'
 import { Info, CheckCircle, X } from 'lucide-react'
@@ -297,6 +297,12 @@ function PurchaseSeason() {
           >
             {isCheckingOut ? '處理中...' : '立即購買'}
           </Button>
+
+          {/* Legal consent */}
+          <p className="text-center text-xs text-muted-foreground">
+            購買即表示您同意
+            <Link to="/terms" className="text-primary hover:underline">服務條款</Link>
+          </p>
         </div>
       </div>
 

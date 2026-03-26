@@ -18,6 +18,9 @@ import { Settings } from './pages/Settings'
 import { PurchaseSeason } from './pages/PurchaseSeason'
 import { LineBinding } from './pages/LineBinding'
 import { CopperMines } from './pages/CopperMines'
+import { PrivacyPolicy } from './pages/PrivacyPolicy'
+import { TermsOfService } from './pages/TermsOfService'
+import { PublicLayout } from './components/layout/PublicLayout'
 import { LiffLayout } from './liff/components/LiffLayout'
 import { LiffHome } from './liff/pages/LiffHome'
 
@@ -49,6 +52,12 @@ function App() {
         <Routes>
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+
+          {/* Public legal pages - no auth required */}
+          <Route element={<PublicLayout />}>
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+          </Route>
 
           {/* LIFF Routes - No Supabase auth required */}
           <Route path="/liff" element={<LiffLayout />}>

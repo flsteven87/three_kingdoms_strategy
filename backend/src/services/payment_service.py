@@ -124,8 +124,12 @@ class PaymentService:
                     payload=event_data,
                 )
             except Exception:
-                logger.exception(
-                    "Failed to update webhook audit record - event_id=%s", event_id,
+                logger.critical(
+                    "AUDIT RECORD FAILED - payment processed but not recorded. "
+                    "event_id=%s, user_id=%s, alliance_id=%s, quantity=%s "
+                    "— MANUAL RECONCILIATION NEEDED",
+                    event_id, user_id, alliance.id, quantity,
+                    exc_info=True,
                 )
 
         logger.info(
