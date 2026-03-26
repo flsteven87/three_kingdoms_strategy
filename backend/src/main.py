@@ -20,6 +20,7 @@ from src.api.v1.endpoints import (
     alliance_collaborators,
     alliances,
     analytics,
+    contact_forms,
     copper_mines,
     donations,
     events,
@@ -88,6 +89,7 @@ app.include_router(copper_mines.router, prefix="/api/v1")
 app.include_router(linebot.router, prefix="/api/v1")
 app.include_router(season_quota.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
+app.include_router(contact_forms.router, prefix="/api/v1")
 
 
 # Global Exception Handlers

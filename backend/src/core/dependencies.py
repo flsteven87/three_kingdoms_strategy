@@ -35,6 +35,7 @@ from src.services.analytics import (
     MemberAnalyticsService,
 )
 from src.services.battle_event_service import BattleEventService
+from src.services.contact_form_service import ContactFormService
 from src.services.copper_mine_rule_service import CopperMineRuleService
 from src.services.copper_mine_service import CopperMineService
 from src.services.csv_upload_service import CSVUploadService
@@ -125,6 +126,11 @@ def get_copper_mine_rule_service() -> CopperMineRuleService:
     return CopperMineRuleService()
 
 
+def get_contact_form_service() -> ContactFormService:
+    """Get contact form service instance"""
+    return ContactFormService()
+
+
 def get_season_quota_service() -> SeasonQuotaService:
     """Get season quota service instance"""
     return SeasonQuotaService()
@@ -160,4 +166,5 @@ BattleEventServiceDep = Annotated[BattleEventService, Depends(get_battle_event_s
 LineBindingServiceDep = Annotated[LineBindingService, Depends(get_line_binding_service)]
 CopperMineServiceDep = Annotated[CopperMineService, Depends(get_copper_mine_service)]
 CopperMineRuleServiceDep = Annotated[CopperMineRuleService, Depends(get_copper_mine_rule_service)]
+ContactFormServiceDep = Annotated[ContactFormService, Depends(get_contact_form_service)]
 SeasonQuotaServiceDep = Annotated[SeasonQuotaService, Depends(get_season_quota_service)]

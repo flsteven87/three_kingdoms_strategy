@@ -4,6 +4,7 @@ const FOOTER_LINKS = [
   { label: '隱私權政策', to: '/privacy' },
   { label: '服務條款', to: '/terms' },
   { label: '退款政策', to: '/terms#refund' },
+  { label: '聯繫我們', to: '/contact' },
 ] as const
 
 export function PublicFooter() {
@@ -23,7 +24,7 @@ export function PublicFooter() {
         </nav>
         <div className="text-center space-y-1">
           <p className="text-xs text-muted-foreground">
-            聯繫我們：support@tktmanager.com
+            support@tktmanager.com
           </p>
           <p className="text-xs text-muted-foreground">
             © 2026 三國志戰略版同盟管理中心

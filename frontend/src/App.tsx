@@ -20,6 +20,7 @@ import { LineBinding } from './pages/LineBinding'
 import { CopperMines } from './pages/CopperMines'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import { TermsOfService } from './pages/TermsOfService'
+import { Contact } from './pages/Contact'
 import { PublicLayout } from './components/layout/PublicLayout'
 import { LiffLayout } from './liff/components/LiffLayout'
 import { LiffHome } from './liff/pages/LiffHome'
@@ -57,6 +58,7 @@ function App() {
           <Route element={<PublicLayout />}>
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/contact" element={<Contact />} />
           </Route>
 
           {/* LIFF Routes - No Supabase auth required */}
