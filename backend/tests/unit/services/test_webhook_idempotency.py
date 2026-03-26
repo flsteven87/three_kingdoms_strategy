@@ -48,7 +48,7 @@ class TestWebhookIdempotency:
         payment_service._quota_service.get_alliance_by_user = AsyncMock(return_value=alliance)
         payment_service._quota_service.add_purchased_seasons = AsyncMock(return_value=3)
 
-        result = await payment_service.handle_checkout_completed(event_data, event_id="evt_abc123")
+        result = await payment_service.handle_payment_success(event_data, event_id="evt_abc123")
 
         assert result["success"] is True
         assert result["seasons_added"] == 3
@@ -67,7 +67,7 @@ class TestWebhookIdempotency:
 
         payment_service._webhook_repo.try_claim_event = AsyncMock(return_value=False)
 
-        result = await payment_service.handle_checkout_completed(event_data, event_id="evt_abc123")
+        result = await payment_service.handle_payment_success(event_data, event_id="evt_abc123")
 
         assert result["success"] is True
         assert result["duplicate"] is True
@@ -82,7 +82,7 @@ class TestWebhookIdempotency:
         payment_service._quota_service.get_alliance_by_user = AsyncMock(return_value=alliance)
         payment_service._quota_service.add_purchased_seasons = AsyncMock(return_value=3)
 
-        result = await payment_service.handle_checkout_completed(event_data, event_id=None)
+        result = await payment_service.handle_payment_success(event_data, event_id=None)
 
         assert result["success"] is True
         payment_service._webhook_repo.try_claim_event.assert_not_called()

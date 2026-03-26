@@ -52,7 +52,7 @@ class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
             return True
         except APIError as e:
             if e.code == POSTGRES_UNIQUE_VIOLATION:
-                logger.info(f"Event already claimed - event_id={event_id}")
+                logger.info("Event already claimed - event_id=%s", event_id)
                 return False
             raise
 

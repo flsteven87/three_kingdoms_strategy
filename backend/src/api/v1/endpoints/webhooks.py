@@ -69,7 +69,8 @@ async def recur_webhook(
     Handle Recur payment webhook events.
 
     Supported events:
-    - checkout.completed: Payment successful, add purchased seasons
+    - checkout.completed / order.paid: Payment successful, add purchased seasons
+    - order.payment_failed: Logged for monitoring, no action taken
 
     Security:
     - Verifies X-Recur-Signature header using HMAC-SHA256
@@ -101,7 +102,7 @@ async def recur_webhook(
     try:
         event = await request.json()
     except Exception as e:
-        logger.error(f"Failed to parse webhook payload: {e}")
+        logger.error("Failed to parse webhook payload: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid JSON payload",
@@ -111,29 +112,40 @@ async def recur_webhook(
     event_id = event.get("id")
     event_data = event.get("data", {})
 
-    logger.info(f"Received Recur webhook - type={event_type}, id={event_id}")
+    logger.info("Received Recur webhook - type=%s, id=%s", event_type, event_id)
 
     # Handle events
     payment_service = PaymentService()
 
     try:
-        if event_type == "checkout.completed":
-            result = await payment_service.handle_checkout_completed(event_data, event_id=event_id)
-            logger.info(f"checkout.completed processed successfully: {result}")
+        if event_type in ("checkout.completed", "order.paid"):
+            result = await payment_service.handle_payment_success(
+                event_data, event_id=event_id, event_type=event_type,
+            )
+            logger.info("Webhook %s processed: %s", event_type, result)
+
+        elif event_type == "order.payment_failed":
+            # Log failed payments for monitoring — no action needed
+            # (Recur handles retry logic on their side)
+            logger.warning(
+                "Payment failed - event_id=%s, customer=%s, amount=%s, reason=%s",
+                event_id,
+                event_data.get("externalCustomerId"),
+                event_data.get("amount"),
+                event_data.get("failureReason"),
+            )
+
         else:
-            # Log unhandled events but return success
-            logger.info(f"Unhandled Recur event type: {event_type}")
+            logger.info("Unhandled Recur event type: %s", event_type)
 
     except ValueError as e:
-        # Business logic errors - log but don't fail the webhook
-        # (Recur will retry if we return non-2xx)
-        logger.error(f"Error processing webhook {event_type}: {e}")
-        # Return 200 to prevent retries for business logic errors
+        # Business logic errors - return 200 to prevent Recur retries
+        logger.error("Error processing webhook %s: %s", event_type, e)
         return {"received": True, "error": str(e)}
 
     except Exception as e:
-        # Unexpected errors - log and return 500 for retry
-        logger.exception(f"Unexpected error processing webhook {event_type}: {e}")
+        # Unexpected errors - return 500 for retry
+        logger.exception("Unexpected error processing webhook %s", event_type)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal error processing webhook",

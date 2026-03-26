@@ -207,7 +207,7 @@ class TestRecurWebhookEndpoint:
         ):
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
             mock_instance = MockPaymentService.return_value
-            mock_instance.handle_checkout_completed = AsyncMock(
+            mock_instance.handle_payment_success = AsyncMock(
                 return_value={"success": True}
             )
 
@@ -219,7 +219,7 @@ class TestRecurWebhookEndpoint:
 
         assert response.status_code == 200
         assert response.json()["received"] is True
-        mock_instance.handle_checkout_completed.assert_called_once()
+        mock_instance.handle_payment_success.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_returns_200_for_unknown_event_type(self, async_client):
@@ -251,7 +251,7 @@ class TestRecurWebhookEndpoint:
         ):
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
             mock_instance = MockPaymentService.return_value
-            mock_instance.handle_checkout_completed = AsyncMock(
+            mock_instance.handle_payment_success = AsyncMock(
                 side_effect=ValueError("No alliance found")
             )
 
@@ -276,7 +276,7 @@ class TestRecurWebhookEndpoint:
         ):
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
             mock_instance = MockPaymentService.return_value
-            mock_instance.handle_checkout_completed = AsyncMock(
+            mock_instance.handle_payment_success = AsyncMock(
                 side_effect=RuntimeError("Database connection failed")
             )
 

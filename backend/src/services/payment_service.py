@@ -27,7 +27,6 @@ class PaymentService:
     """
 
     def __init__(self):
-        """Initialize payment service with dependencies."""
         self._quota_service = SeasonQuotaService()
         self._webhook_repo = WebhookEventRepository()
 
@@ -71,25 +70,25 @@ class PaymentService:
 
         return user_id, quantity
 
-    async def handle_checkout_completed(
-        self, event_data: dict, *, event_id: str | None = None
+    async def handle_payment_success(
+        self,
+        event_data: dict,
+        *,
+        event_id: str | None = None,
+        event_type: str = "checkout.completed",
     ) -> dict:
         """
-        Handle checkout.completed webhook event with idempotency.
+        Handle successful payment events (checkout.completed, order.paid).
 
-        Args:
-            event_data: Webhook event data containing externalCustomerId, amount, productId
-            event_id: Recur event ID for dedup. If provided, duplicate events are skipped.
-
-        Returns:
-            Dict with processing result
+        Parses externalCustomerId, grants seasons, and records the event.
+        Idempotent via webhook_events UNIQUE constraint on event_id.
 
         Raises:
-            ValueError: If required data is missing or invalid
+            ValueError: If required data is missing or invalid.
         """
         if event_id:
-            if not await self._webhook_repo.try_claim_event(event_id, "checkout.completed"):
-                logger.info(f"Duplicate webhook event skipped - event_id={event_id}")
+            if not await self._webhook_repo.try_claim_event(event_id, event_type):
+                logger.info("Duplicate webhook event skipped - event_id=%s", event_id)
                 return {"success": True, "duplicate": True, "event_id": event_id}
 
         external_customer_id = event_data.get("externalCustomerId")
@@ -102,8 +101,8 @@ class PaymentService:
         user_id, quantity = self._parse_external_customer_id(external_customer_id)
 
         logger.info(
-            f"Processing checkout.completed - user_id={user_id}, quantity={quantity}, "
-            f"amount={event_data.get('amount')}, event_id={event_id}"
+            "Processing checkout.completed - user_id=%s, quantity=%s, amount=%s, event_id=%s",
+            user_id, quantity, event_data.get("amount"), event_id,
         )
 
         alliance = await self._quota_service.get_alliance_by_user(user_id)
@@ -124,15 +123,14 @@ class PaymentService:
                     seasons_added=quantity,
                     payload=event_data,
                 )
-            except Exception as e:
-                logger.error(
-                    f"Failed to update webhook audit record - event_id={event_id}",
-                    exc_info=e,
+            except Exception:
+                logger.exception(
+                    "Failed to update webhook audit record - event_id=%s", event_id,
                 )
 
         logger.info(
-            f"Seasons added successfully - alliance_id={alliance.id}, "
-            f"quantity={quantity}, new_available={new_available}"
+            "Seasons added successfully - alliance_id=%s, quantity=%s, new_available=%s",
+            alliance.id, quantity, new_available,
         )
 
         return {

@@ -3,7 +3,7 @@ Unit Tests for PaymentService
 
 Tests cover:
 1. _parse_external_customer_id validation
-2. handle_checkout_completed webhook processing
+2. handle_payment_success webhook processing
 3. Error handling for invalid inputs
 
 符合 test-writing skill 規範:
@@ -164,12 +164,12 @@ class TestParseExternalCustomerId:
 
 
 # =============================================================================
-# Tests for handle_checkout_completed
+# Tests for handle_payment_success
 # =============================================================================
 
 
 class TestHandleCheckoutCompleted:
-    """Tests for handle_checkout_completed method"""
+    """Tests for handle_payment_success method"""
 
     @pytest.mark.asyncio
     async def test_should_process_checkout_successfully(
@@ -192,7 +192,7 @@ class TestHandleCheckoutCompleted:
         }
 
         # Act
-        result = await payment_service.handle_checkout_completed(event_data)
+        result = await payment_service.handle_payment_success(event_data)
 
         # Assert
         assert result["success"] is True
@@ -226,7 +226,7 @@ class TestHandleCheckoutCompleted:
         }
 
         # Act
-        result = await payment_service.handle_checkout_completed(event_data)
+        result = await payment_service.handle_payment_success(event_data)
 
         # Assert
         assert result["success"] is True
@@ -244,7 +244,7 @@ class TestHandleCheckoutCompleted:
         with pytest.raises(
             ValueError, match="Missing externalCustomerId in checkout.completed event"
         ):
-            await payment_service.handle_checkout_completed(event_data)
+            await payment_service.handle_payment_success(event_data)
 
     @pytest.mark.asyncio
     async def test_should_raise_error_when_user_has_no_alliance(
@@ -261,7 +261,7 @@ class TestHandleCheckoutCompleted:
 
         # Act & Assert
         with pytest.raises(ValueError, match="No alliance found for user"):
-            await payment_service.handle_checkout_completed(event_data)
+            await payment_service.handle_payment_success(event_data)
 
     @pytest.mark.asyncio
     async def test_should_propagate_parse_errors(
@@ -273,7 +273,7 @@ class TestHandleCheckoutCompleted:
 
         # Act & Assert
         with pytest.raises(ValueError, match="Invalid externalCustomerId format"):
-            await payment_service.handle_checkout_completed(event_data)
+            await payment_service.handle_payment_success(event_data)
 
     @pytest.mark.asyncio
     async def test_should_raise_when_add_purchased_seasons_fails(
@@ -295,11 +295,11 @@ class TestHandleCheckoutCompleted:
 
         # Act & Assert
         with pytest.raises(ValueError, match="Alliance not found"):
-            await payment_service.handle_checkout_completed(event_data)
+            await payment_service.handle_payment_success(event_data)
 
     @pytest.mark.asyncio
     async def test_should_raise_for_empty_event_data(self, payment_service: PaymentService):
         """Should raise ValueError for empty event data dict"""
         # Act & Assert
         with pytest.raises(ValueError, match="Missing externalCustomerId"):
-            await payment_service.handle_checkout_completed({})
+            await payment_service.handle_payment_success({})

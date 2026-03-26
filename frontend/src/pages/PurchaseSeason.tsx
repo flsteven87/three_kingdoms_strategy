@@ -177,11 +177,30 @@ function PurchaseSeason() {
           const errorCode = err?.code
           switch (errorCode) {
             case 'CARD_DECLINED':
+            case 'PAYUNI_DECLINED':
+            case 'UNAPPROVED':
+              return {
+                action: 'custom' as const,
+                customTitle: '付款被拒絕',
+                customMessage: '請確認卡片狀態或聯繫發卡銀行',
+              }
             case 'INSUFFICIENT_FUNDS':
               return {
                 action: 'custom' as const,
-                customTitle: '付款失敗',
+                customTitle: '餘額不足',
                 customMessage: '請確認卡片餘額或使用其他付款方式',
+              }
+            case 'EXPIRED_CARD':
+              return {
+                action: 'custom' as const,
+                customTitle: '卡片已過期',
+                customMessage: '請使用有效的信用卡重新付款',
+              }
+            case 'INVALID_CARD':
+              return {
+                action: 'custom' as const,
+                customTitle: '卡號無效',
+                customMessage: '請確認卡號是否正確',
               }
             default:
               return { action: 'retry' as const }
