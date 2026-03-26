@@ -7,16 +7,36 @@
 ## Deployment Architecture
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    Frontend     │────→│    Backend      │────→│    Supabase     │
-│   (Zeabur)      │     │   (Zeabur)      │     │  (PostgreSQL)   │
-│   Port: 443     │     │   Port: 8087    │     │   + RLS         │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Cloudflare │────→│    Frontend     │────→│    Backend      │────→│    Supabase     │
+│  DNS + CDN  │     │   (Zeabur)      │     │   (Zeabur)      │     │  (PostgreSQL)   │
+│  tktmanager │     │   Nginx + React │     │   FastAPI       │     │   + RLS         │
+│    .com     │     │   Port: 443     │     │   Port: 8087    │     │                 │
+└─────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
 **Hosting**: Zeabur (Docker-based deployment)
+**DNS/CDN**: Cloudflare (DNS proxy, SSL termination, CDN)
 **Database**: Supabase (PostgreSQL 17 with RLS)
 **Auth**: Supabase Auth (Google OAuth)
+
+---
+
+## Domain & DNS
+
+| Service | Domain | Provider |
+|---------|--------|----------|
+| Frontend | `tktmanager.com` | Cloudflare DNS → Zeabur |
+| Backend API | `api.tktmanager.com` | Cloudflare DNS → Zeabur |
+| Database | `kseaylvmxjpbqahtlypb.supabase.co` | Supabase |
+
+**Cloudflare Settings:**
+- SSL/TLS: Full (strict)
+- Always HTTPS: Enabled
+- www → apex redirect: 301
+- Proxy: Enabled (orange cloud) on all records
+
+**DNS Management:** Cloudflare Dashboard → tktmanager.com → DNS
 
 ---
 
@@ -77,14 +97,14 @@ SUPABASE_JWT_SECRET=<secret>
 SECRET_KEY=<generated-secret>
 ENVIRONMENT=production
 DEBUG=false
-CORS_ORIGINS=https://your-frontend-domain.zeabur.app
+CORS_ORIGINS=https://tktmanager.com
 ```
 
 **Frontend Production**:
 ```
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=<key>
-VITE_API_BASE_URL=https://your-backend-domain.zeabur.app
+VITE_API_BASE_URL=https://api.tktmanager.com
 ```
 
 ---
@@ -94,7 +114,7 @@ VITE_API_BASE_URL=https://your-backend-domain.zeabur.app
 ### Backend Health Endpoint
 
 ```bash
-curl https://your-backend.zeabur.app/health
+curl https://api.tktmanager.com/health
 
 # Expected response:
 {
@@ -130,7 +150,7 @@ curl https://your-backend.zeabur.app/health
 **Fix**:
 ```bash
 # Check backend CORS_ORIGINS includes exact frontend domain
-CORS_ORIGINS=https://your-frontend.zeabur.app
+CORS_ORIGINS=https://tktmanager.com
 # Restart backend after changing
 ```
 
@@ -241,7 +261,7 @@ ALTER TABLE table_name DROP COLUMN new_column;
 - [ ] `DEBUG=false` in production
 - [ ] `ENVIRONMENT=production` set
 - [ ] `SECRET_KEY` is unique and secure (32+ bytes)
-- [ ] HTTPS enforced (Zeabur handles this)
+- [ ] HTTPS enforced (Cloudflare + Zeabur)
 - [ ] RLS enabled on all tables
 - [ ] No `FOR ALL TO public USING (true)` policies
 - [ ] `FORWARDED_ALLOW_IPS` is NOT `*`
@@ -317,5 +337,5 @@ npm run build
 
 ---
 
-**Last Updated**: 2026-02-01
+**Last Updated**: 2026-03-26
 **Version**: 0.9.0
