@@ -12,6 +12,8 @@ Follows CLAUDE.md:
 import logging
 from uuid import UUID
 
+from postgrest.exceptions import APIError
+
 from src.repositories.webhook_event_repository import WebhookEventRepository
 from src.services.season_quota_service import SeasonQuotaService
 
@@ -86,10 +88,12 @@ class PaymentService:
         Raises:
             ValueError: If required data is missing or invalid.
         """
-        if event_id:
-            if not await self._webhook_repo.try_claim_event(event_id, event_type):
-                logger.info("Duplicate webhook event skipped - event_id=%s", event_id)
-                return {"success": True, "duplicate": True, "event_id": event_id}
+        if not event_id:
+            raise ValueError("Missing event_id — cannot process webhook without idempotency guard")
+
+        if not await self._webhook_repo.try_claim_event(event_id, event_type):
+            logger.info("Duplicate webhook event skipped - event_id=%s", event_id)
+            return {"success": True, "duplicate": True, "event_id": event_id}
 
         external_customer_id = event_data.get("externalCustomerId")
         if not external_customer_id:
@@ -102,7 +106,10 @@ class PaymentService:
 
         logger.info(
             "Processing checkout.completed - user_id=%s, quantity=%s, amount=%s, event_id=%s",
-            user_id, quantity, event_data.get("amount"), event_id,
+            user_id,
+            quantity,
+            event_data.get("amount"),
+            event_id,
         )
 
         alliance = await self._quota_service.get_alliance_by_user(user_id)
@@ -114,27 +121,31 @@ class PaymentService:
             seasons=quantity,
         )
 
-        if event_id:
-            try:
-                await self._webhook_repo.update_event_details(
-                    event_id=event_id,
-                    alliance_id=str(alliance.id),
-                    user_id=str(user_id),
-                    seasons_added=quantity,
-                    payload=event_data,
-                )
-            except Exception:
-                logger.critical(
-                    "AUDIT RECORD FAILED - payment processed but not recorded. "
-                    "event_id=%s, user_id=%s, alliance_id=%s, quantity=%s "
-                    "— MANUAL RECONCILIATION NEEDED",
-                    event_id, user_id, alliance.id, quantity,
-                    exc_info=True,
-                )
+        try:
+            await self._webhook_repo.update_event_details(
+                event_id=event_id,
+                alliance_id=str(alliance.id),
+                user_id=str(user_id),
+                seasons_added=quantity,
+                payload=event_data,
+            )
+        except (APIError, OSError):
+            logger.critical(
+                "AUDIT RECORD FAILED - payment processed but not recorded. "
+                "event_id=%s, user_id=%s, alliance_id=%s, quantity=%s "
+                "— MANUAL RECONCILIATION NEEDED",
+                event_id,
+                user_id,
+                alliance.id,
+                quantity,
+                exc_info=True,
+            )
 
         logger.info(
             "Seasons added successfully - alliance_id=%s, quantity=%s, new_available=%s",
-            alliance.id, quantity, new_available,
+            alliance.id,
+            quantity,
+            new_available,
         )
 
         return {

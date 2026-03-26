@@ -639,7 +639,8 @@ class TestConsumeSeason:
         # Arrange
         alliance = create_mock_alliance(alliance_id, purchased_seasons=5, used_seasons=2)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        mock_alliance_repo.update = AsyncMock()
+        # Atomic increment returns (new_used=3, purchased=5)
+        mock_alliance_repo.increment_used_seasons = AsyncMock(return_value=(3, 5))
         mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=2)
 
         # Act
@@ -649,7 +650,7 @@ class TestConsumeSeason:
         assert remaining == 2  # 5 - 3 = 2
         assert used_trial is False
         assert trial_ends_at is None
-        mock_alliance_repo.update.assert_called_once_with(alliance_id, {"used_seasons": 3})
+        mock_alliance_repo.increment_used_seasons.assert_called_once_with(alliance_id)
 
     @pytest.mark.asyncio
     async def test_uses_trial_when_no_purchased_seasons(

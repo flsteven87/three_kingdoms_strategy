@@ -266,23 +266,24 @@ class SeasonQuotaService:
             raise ValueError(f"Alliance not found: {alliance_id}")
 
         available = self._calculate_available_seasons(alliance)
-        has_trial = await self._has_trial_available(alliance_id)
 
         # Priority: use purchased seasons first, then trial
         if available > 0:
-            new_used = alliance.used_seasons + 1
-            await self._alliance_repo.update(alliance_id, {"used_seasons": new_used})
-            remaining = alliance.purchased_seasons - new_used
+            new_used, purchased = await self._alliance_repo.increment_used_seasons(alliance_id)
+            remaining = purchased - new_used
             logger.info(
-                f"Season consumed (paid) - alliance_id={alliance_id}, remaining={remaining}"
+                "Season consumed (paid) - alliance_id=%s, remaining=%s",
+                alliance_id,
+                remaining,
             )
             return (remaining, False, None)
 
-        if has_trial:
+        if await self._has_trial_available(alliance_id):
             trial_end = datetime.now(UTC) + timedelta(days=TRIAL_DURATION_DAYS)
             logger.info(
-                f"Season activated using trial - alliance_id={alliance_id}, "
-                f"trial_ends={trial_end.isoformat()}"
+                "Season activated using trial - alliance_id=%s, trial_ends=%s",
+                alliance_id,
+                trial_end.isoformat(),
             )
             return (0, True, trial_end.isoformat())
 

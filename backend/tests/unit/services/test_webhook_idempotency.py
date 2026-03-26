@@ -74,18 +74,24 @@ class TestWebhookIdempotency:
         payment_service._quota_service.add_purchased_seasons.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_missing_event_id_still_processes(self, payment_service, sample_event_data):
-        """If event_id is None (shouldn't happen but graceful), process without dedup."""
+    async def test_missing_event_id_raises_error(self, payment_service, sample_event_data):
+        """If event_id is None, reject the webhook to prevent unguarded processing."""
         event_data, user_id = sample_event_data
-        alliance = MagicMock(id=uuid4())
 
-        payment_service._quota_service.get_alliance_by_user = AsyncMock(return_value=alliance)
-        payment_service._quota_service.add_purchased_seasons = AsyncMock(return_value=3)
+        with pytest.raises(ValueError, match="Missing event_id"):
+            await payment_service.handle_payment_success(event_data, event_id=None)
 
-        result = await payment_service.handle_payment_success(event_data, event_id=None)
+        payment_service._quota_service.add_purchased_seasons.assert_not_called()
 
-        assert result["success"] is True
-        payment_service._webhook_repo.try_claim_event.assert_not_called()
+    @pytest.mark.asyncio
+    async def test_empty_event_id_raises_error(self, payment_service, sample_event_data):
+        """Empty string event_id should also be rejected."""
+        event_data, user_id = sample_event_data
+
+        with pytest.raises(ValueError, match="Missing event_id"):
+            await payment_service.handle_payment_success(event_data, event_id="")
+
+        payment_service._quota_service.add_purchased_seasons.assert_not_called()
 
 
 class TestAtomicIncrement:

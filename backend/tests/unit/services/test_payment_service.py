@@ -43,10 +43,20 @@ def mock_quota_service() -> MagicMock:
 
 
 @pytest.fixture
-def payment_service(mock_quota_service: MagicMock) -> PaymentService:
+def mock_webhook_repo() -> MagicMock:
+    """Create mock WebhookEventRepository"""
+    repo = MagicMock()
+    repo.try_claim_event = AsyncMock(return_value=True)
+    repo.update_event_details = AsyncMock()
+    return repo
+
+
+@pytest.fixture
+def payment_service(mock_quota_service: MagicMock, mock_webhook_repo: MagicMock) -> PaymentService:
     """Create PaymentService with mocked dependencies"""
     service = PaymentService()
     service._quota_service = mock_quota_service
+    service._webhook_repo = mock_webhook_repo
     return service
 
 
@@ -192,7 +202,7 @@ class TestHandleCheckoutCompleted:
         }
 
         # Act
-        result = await payment_service.handle_payment_success(event_data)
+        result = await payment_service.handle_payment_success(event_data, event_id="evt_test")
 
         # Assert
         assert result["success"] is True
@@ -226,7 +236,7 @@ class TestHandleCheckoutCompleted:
         }
 
         # Act
-        result = await payment_service.handle_payment_success(event_data)
+        result = await payment_service.handle_payment_success(event_data, event_id="evt_test")
 
         # Assert
         assert result["success"] is True
@@ -244,7 +254,7 @@ class TestHandleCheckoutCompleted:
         with pytest.raises(
             ValueError, match="Missing externalCustomerId in checkout.completed event"
         ):
-            await payment_service.handle_payment_success(event_data)
+            await payment_service.handle_payment_success(event_data, event_id="evt_test")
 
     @pytest.mark.asyncio
     async def test_should_raise_error_when_user_has_no_alliance(
@@ -261,7 +271,7 @@ class TestHandleCheckoutCompleted:
 
         # Act & Assert
         with pytest.raises(ValueError, match="No alliance found for user"):
-            await payment_service.handle_payment_success(event_data)
+            await payment_service.handle_payment_success(event_data, event_id="evt_test")
 
     @pytest.mark.asyncio
     async def test_should_propagate_parse_errors(
@@ -273,7 +283,7 @@ class TestHandleCheckoutCompleted:
 
         # Act & Assert
         with pytest.raises(ValueError, match="Invalid externalCustomerId format"):
-            await payment_service.handle_payment_success(event_data)
+            await payment_service.handle_payment_success(event_data, event_id="evt_test")
 
     @pytest.mark.asyncio
     async def test_should_raise_when_add_purchased_seasons_fails(
@@ -295,11 +305,11 @@ class TestHandleCheckoutCompleted:
 
         # Act & Assert
         with pytest.raises(ValueError, match="Alliance not found"):
-            await payment_service.handle_payment_success(event_data)
+            await payment_service.handle_payment_success(event_data, event_id="evt_test")
 
     @pytest.mark.asyncio
     async def test_should_raise_for_empty_event_data(self, payment_service: PaymentService):
         """Should raise ValueError for empty event data dict"""
         # Act & Assert
         with pytest.raises(ValueError, match="Missing externalCustomerId"):
-            await payment_service.handle_payment_success({})
+            await payment_service.handle_payment_success({}, event_id="evt_test")
