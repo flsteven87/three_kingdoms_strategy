@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3D2B1F"/>
+      <stop offset="50%" stop-color="#2A1810"/>
+      <stop offset="100%" stop-color="#1A0F0A"/>
+    </linearGradient>
+    <linearGradient id="gold-line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#C8A96E" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#C8A96E" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#C8A96E" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="divider" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#C8A96E" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#C8A96E" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#C8A96E" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="220" height="220" rx="32" ry="32" fill="url(#bg)" stroke="#5A3D2B" stroke-width="2"/>
+
+  <!-- Top gold line -->
+  <rect x="0" y="1" width="220" height="3" rx="1.5" fill="url(#gold-line)"/>
+
+  <!-- 三國志 -->
+  <text x="110" y="82" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="52" font-weight="900" fill="#C8A96E" letter-spacing="8">
+    <tspan>三國志</tspan>
+  </text>
+
+  <!-- 戰略版 -->
+  <text x="110" y="112" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="18" font-weight="700" fill="#A08050" letter-spacing="10">
+    <tspan>戰略版</tspan>
+  </text>
+
+  <!-- Divider line -->
+  <rect x="60" y="124" width="100" height="1" fill="url(#divider)"/>
+
+  <!-- 同盟管理中心 -->
+  <text x="110" y="148" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="15" font-weight="600" fill="#E8C87E" letter-spacing="6">
+    <tspan>同盟管理中心</tspan>
+  </text>
+
+  <!-- TKT MANAGER -->
+  <text x="110" y="166" text-anchor="middle" font-family="'Inter', 'Helvetica', sans-serif" font-size="7" font-weight="500" fill="#5A4530" letter-spacing="4">
+    <tspan>TKT MANAGER</tspan>
+  </text>
+
+  <!-- Bottom gold line -->
+  <rect x="0" y="216" width="220" height="3" rx="1.5" fill="url(#gold-line)"/>
+
+  <!-- Red seal stamp: 盟 (bottom-right, overlapping corner) -->
+  <g transform="translate(172, 168) rotate(-15)">
+    <rect x="-28" y="-28" width="56" height="56" rx="6" ry="6" fill="rgba(204,51,51,0.06)" stroke="#CC3333" stroke-width="2.5"/>
+    <text x="0" y="12" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="34" font-weight="900" fill="#CC3333">盟</text>
+  </g>
+</svg>

@@ -9,7 +9,7 @@ export function PublicLayout() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/landing" className="flex items-center gap-2.5">
             <img
-              src="/assets/logo.png"
+              src="/assets/logo.svg"
               alt="三國志戰略版"
               className="h-8 w-8 object-contain"
             />

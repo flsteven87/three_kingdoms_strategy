@@ -52,7 +52,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Mobile logo */}
           <div className="flex items-center gap-2 lg:hidden">
             <img
-              src="/assets/logo.png"
+              src="/assets/logo.svg"
               alt="三國志戰略版"
               className="h-6 w-6 object-contain"
             />

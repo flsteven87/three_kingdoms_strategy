@@ -135,7 +135,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className="flex h-16 items-center px-6 border-b border-border">
         <Link to="/analytics" className="flex items-center gap-2">
           <img
-            src="/assets/logo.png"
+            src="/assets/logo.svg"
             alt="三國志戰略版"
             className="h-8 w-8 object-contain"
           />

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3D2B1F"/>
+      <stop offset="50%" stop-color="#2A1810"/>
+      <stop offset="100%" stop-color="#1A0F0A"/>
+    </linearGradient>
+    <linearGradient id="gold-line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#C8A96E" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#C8A96E" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#C8A96E" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="64" height="64" rx="12" ry="12" fill="url(#bg)" stroke="#5A3D2B" stroke-width="1"/>
+
+  <!-- Top gold line -->
+  <rect x="0" y="1" width="64" height="1.5" rx="0.75" fill="url(#gold-line)"/>
+
+  <!-- 三國志 -->
+  <text x="32" y="28" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="16" font-weight="900" fill="#C8A96E" letter-spacing="2">
+    <tspan>三國志</tspan>
+  </text>
+
+  <!-- 戰略版 -->
+  <text x="32" y="40" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="7" font-weight="700" fill="#A08050" letter-spacing="3">
+    <tspan>戰略版</tspan>
+  </text>
+
+  <!-- 同盟管理中心 -->
+  <text x="32" y="52" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="6" font-weight="600" fill="#E8C87E" letter-spacing="1.5">
+    <tspan>同盟管理中心</tspan>
+  </text>
+
+  <!-- Bottom gold line -->
+  <rect x="0" y="61.5" width="64" height="1.5" rx="0.75" fill="url(#gold-line)"/>
+
+  <!-- Tiny seal -->
+  <g transform="translate(52, 48) rotate(-15)">
+    <rect x="-8" y="-8" width="16" height="16" rx="2" ry="2" fill="rgba(204,51,51,0.06)" stroke="#CC3333" stroke-width="1"/>
+    <text x="0" y="5" text-anchor="middle" font-family="'Noto Serif TC', 'Source Han Serif TC', serif" font-size="10" font-weight="900" fill="#CC3333">盟</text>
+  </g>
+</svg>

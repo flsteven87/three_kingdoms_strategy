@@ -211,7 +211,7 @@ export function Landing() {
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img
-              src="/assets/logo.png"
+              src="/assets/logo.svg"
               alt="三國志戰略版"
               className="h-7 w-7 object-contain"
             />
