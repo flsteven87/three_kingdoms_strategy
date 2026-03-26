@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { ThemeToggle } from '../theme-toggle'
 import { QuotaWarningBanner } from '../season-quota/QuotaWarningBanner'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { cn } from '@/lib/utils'
 
 interface DashboardLayoutProps {
@@ -12,6 +13,7 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { pathname } = useLocation()
 
   return (
     <div className="h-screen flex bg-background">
@@ -72,7 +74,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
           <div className="container mx-auto p-6 max-w-7xl">
-            {children ?? <Outlet />}
+            <ErrorBoundary key={pathname} variant="route">
+              {children ?? <Outlet />}
+            </ErrorBoundary>
           </div>
         </main>
       </div>

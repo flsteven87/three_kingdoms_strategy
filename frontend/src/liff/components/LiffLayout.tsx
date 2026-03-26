@@ -15,6 +15,7 @@ import {
   type LiffSessionWithGroup,
 } from "../hooks/use-liff-session";
 import { LiffEventReport } from "../pages/LiffEventReport";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || "";
 
@@ -75,18 +76,15 @@ export function LiffLayout() {
     lineGroupId: state.session.lineGroupId,
   };
 
-  // If eventId is present, render the event report page directly
-  if (session.eventId) {
-    return (
-      <div className="h-full bg-background overflow-auto">
-        <LiffEventReport session={session} eventId={session.eventId} />
-      </div>
-    );
-  }
-
   return (
     <div className="h-full bg-background overflow-auto">
-      <Outlet context={{ session } satisfies LiffContextType} />
+      <ErrorBoundary variant="compact">
+        {session.eventId ? (
+          <LiffEventReport session={session} eventId={session.eventId} />
+        ) : (
+          <Outlet context={{ session } satisfies LiffContextType} />
+        )}
+      </ErrorBoundary>
     </div>
   );
 }

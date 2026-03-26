@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from './components/theme-provider'
 import { RecurProvider } from './providers/RecurProvider'
+import { ErrorBoundary } from './components/ui/error-boundary'
 import './index.css'
 import App from './App.tsx'
 
@@ -52,9 +53,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider defaultTheme="light" storageKey="three-kingdoms-theme">
       <QueryClientProvider client={queryClient}>
-        <RecurProvider>
-          <App />
-        </RecurProvider>
+        <ErrorBoundary variant="full" onReset={() => window.location.reload()}>
+          <RecurProvider>
+            <App />
+          </RecurProvider>
+        </ErrorBoundary>
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
     </ThemeProvider>
