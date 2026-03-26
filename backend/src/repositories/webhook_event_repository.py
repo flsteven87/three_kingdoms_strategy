@@ -11,10 +11,9 @@ from postgrest.exceptions import APIError
 from pydantic import BaseModel, ConfigDict
 
 from src.repositories.base import SupabaseRepository
+from src.utils.postgrest import POSTGRES_UNIQUE_VIOLATION
 
 logger = logging.getLogger(__name__)
-
-POSTGRES_UNIQUE_VIOLATION = "23505"
 
 
 class WebhookEvent(BaseModel):

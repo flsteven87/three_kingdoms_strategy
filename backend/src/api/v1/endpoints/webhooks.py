@@ -17,6 +17,7 @@ import logging
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from src.core.config import settings
+from src.core.rate_limit import WEBHOOK_RATE, limiter
 from src.services.payment_service import PaymentService
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ def verify_recur_signature(payload: bytes, signature: str, secret: str) -> bool:
 
 
 @router.post("/recur")
+@limiter.limit(WEBHOOK_RATE)
 async def recur_webhook(
     request: Request,
     x_recur_signature: str | None = Header(None, alias="x-recur-signature"),
@@ -116,9 +118,7 @@ async def recur_webhook(
 
     try:
         if event_type == "checkout.completed":
-            result = await payment_service.handle_checkout_completed(
-                event_data, event_id=event_id
-            )
+            result = await payment_service.handle_checkout_completed(event_data, event_id=event_id)
             logger.info(f"checkout.completed processed successfully: {result}")
         else:
             # Log unhandled events but return success

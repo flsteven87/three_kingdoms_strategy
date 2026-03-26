@@ -13,6 +13,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from src.api.v1.endpoints import (
     alliance_collaborators,
@@ -31,12 +33,13 @@ from src.api.v1.endpoints import (
 )
 from src.core.config import settings
 from src.core.exceptions import SeasonQuotaExhaustedError
-from src.core.idempotency import IdempotencyMiddleware, InMemoryIdempotencyStorage
+from src.core.idempotency import IdempotencyMiddleware, create_idempotency_storage
+from src.core.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
-# Create idempotency storage for preventing duplicate mutations
-idempotency_storage = InMemoryIdempotencyStorage()
+# Create idempotency storage (Supabase in production, in-memory in development)
+idempotency_storage = create_idempotency_storage()
 
 # Create FastAPI app
 # 符合 CLAUDE.md 🔴: redirect_slashes=False for cloud deployment
@@ -48,6 +51,10 @@ app = FastAPI(
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
 )
+
+# Rate limiter (per-IP, applied via decorators on individual endpoints)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Idempotency middleware (must be added before CORS)
 # Prevents duplicate mutations from network retries
@@ -145,8 +152,9 @@ async def season_quota_exhausted_handler(
     )
 
 
-# Health check endpoint (public)
+# Health check endpoint (public, exempt from rate limiting for load balancers)
 @app.get("/health")
+@limiter.exempt
 async def health_check():
     """Health check endpoint (no auth required)"""
     return {"status": "healthy", "environment": settings.environment, "version": settings.version}

@@ -18,7 +18,7 @@ import re
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from linebot.v3.messaging import ApiException, ReplyMessageRequest, TextMessage
 
 from src.core.config import GAME_TIMEZONE, Settings, get_settings
@@ -31,6 +31,7 @@ from src.core.dependencies import (
     UserIdDep,
 )
 from src.core.line_auth import WebhookBodyDep, create_liff_url, get_group_info, get_line_bot_api
+from src.core.rate_limit import PUBLIC_MUTATION_RATE, PUBLIC_RATE, WEBHOOK_RATE, limiter
 from src.lib.line_flex_builder import (
     build_event_list_carousel,
     build_event_report_flex,
@@ -332,7 +333,9 @@ async def delete_custom_command(
     summary="Get member info",
     description="Get member registration info for LIFF display",
 )
+@limiter.limit(PUBLIC_RATE)
 async def get_member_info(
+    request: Request,
     service: LineBindingServiceDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
@@ -347,7 +350,9 @@ async def get_member_info(
     summary="Get member performance",
     description="Get member performance analytics for LIFF display",
 )
+@limiter.limit(PUBLIC_RATE)
 async def get_member_performance(
+    request: Request,
     service: LineBindingServiceDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
@@ -364,7 +369,9 @@ async def get_member_performance(
     summary="Register game ID",
     description="Register a game ID for a LINE user",
 )
+@limiter.limit(PUBLIC_MUTATION_RATE)
 async def register_game_id(
+    request: Request,
     service: LineBindingServiceDep,
     data: MemberLineBindingCreate,
 ) -> RegisterMemberResponse:
@@ -383,7 +390,9 @@ async def register_game_id(
     summary="Unregister game ID",
     description="Remove a game ID registration for a LINE user",
 )
+@limiter.limit(PUBLIC_MUTATION_RATE)
 async def unregister_game_id(
+    request: Request,
     service: LineBindingServiceDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
@@ -399,7 +408,9 @@ async def unregister_game_id(
     summary="Get member candidates",
     description="Get active members for autocomplete in LIFF",
 )
+@limiter.limit(PUBLIC_RATE)
 async def get_member_candidates(
+    request: Request,
     service: LineBindingServiceDep,
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> MemberCandidatesResponse:
@@ -413,7 +424,9 @@ async def get_member_candidates(
     summary="Find similar members",
     description="Find members with similar names for fuzzy matching",
 )
+@limiter.limit(PUBLIC_RATE)
 async def find_similar_members(
+    request: Request,
     service: LineBindingServiceDep,
     g: Annotated[str, Query(description="LINE group ID")],
     name: Annotated[str, Query(description="Name to search for", min_length=1)],
@@ -428,7 +441,9 @@ async def find_similar_members(
     summary="Get event list for LIFF",
     description="Get completed battle events with user participation status",
 )
+@limiter.limit(PUBLIC_RATE)
 async def get_event_list_for_liff(
+    request: Request,
     service: LineBindingServiceDep,
     g: Annotated[str, Query(description="LINE group ID")],
     game_id: Annotated[str, Query(description="Game ID to check participation")],
@@ -448,7 +463,9 @@ async def get_event_list_for_liff(
     summary="Get event report for LIFF",
     description="Get battle event group analytics for LIFF display",
 )
+@limiter.limit(PUBLIC_RATE)
 async def get_event_report_for_liff(
+    request: Request,
     service: LineBindingServiceDep,
     battle_event_service: BattleEventServiceDep,
     g: Annotated[str, Query(description="LINE group ID")],
@@ -517,7 +534,9 @@ async def get_event_report_for_liff(
     summary="Get copper mine rules",
     description="Get copper mine rules for LIFF display",
 )
+@limiter.limit(PUBLIC_RATE)
 async def get_copper_rules(
+    request: Request,
     service: CopperMineServiceDep,
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> list:
@@ -531,7 +550,9 @@ async def get_copper_rules(
     summary="Get copper mines list",
     description="Get copper mines for LIFF display",
 )
+@limiter.limit(PUBLIC_RATE)
 async def get_copper_mines(
+    request: Request,
     service: CopperMineServiceDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
@@ -547,7 +568,9 @@ async def get_copper_mines(
     summary="Register copper mine",
     description="Register a new copper mine location",
 )
+@limiter.limit(PUBLIC_MUTATION_RATE)
 async def register_copper_mine(
+    request: Request,
     service: CopperMineServiceDep,
     data: CopperMineCreate,
 ) -> RegisterCopperResponse:
@@ -569,7 +592,9 @@ async def register_copper_mine(
     summary="Delete copper mine",
     description="Remove a copper mine record",
 )
+@limiter.limit(PUBLIC_MUTATION_RATE)
 async def delete_copper_mine(
+    request: Request,
     mine_id: str,
     service: CopperMineServiceDep,
     u: Annotated[str, Query(description="LINE user ID")],
@@ -586,7 +611,9 @@ async def delete_copper_mine(
 
 
 @router.post("/webhook", summary="LINE webhook", description="Handle LINE webhook events")
+@limiter.limit(WEBHOOK_RATE)
 async def handle_webhook(
+    request: Request,
     body: WebhookBodyDep,
     service: LineBindingServiceDep,
     battle_event_service: BattleEventServiceDep,

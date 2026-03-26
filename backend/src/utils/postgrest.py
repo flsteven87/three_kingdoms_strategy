@@ -2,6 +2,9 @@
 
 import re
 
+# PostgreSQL error codes used across repositories and infrastructure
+POSTGRES_UNIQUE_VIOLATION = "23505"
+
 _POSTGREST_OPERATOR_RE = re.compile(
     r"\.(eq|neq|gt|lt|gte|lte|like|ilike|is|in|cs|cd|sl|sr|nxl|nxr|adj|ov|fts|plfts|phfts|wfts|not|or|and)\."
 )
