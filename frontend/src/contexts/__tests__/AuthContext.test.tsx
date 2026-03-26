@@ -12,7 +12,6 @@ import { createTestQueryClient } from "@/__tests__/test-utils";
 // =============================================================================
 
 const mockUnsubscribe = vi.fn();
-const mockGetSession = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockSignInWithOAuth = vi.fn();
 const mockSignOut = vi.fn();
@@ -20,7 +19,6 @@ const mockSignOut = vi.fn();
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
-      getSession: () => mockGetSession(),
       onAuthStateChange: (cb: unknown) => mockOnAuthStateChange(cb),
       signInWithOAuth: (opts: unknown) => mockSignInWithOAuth(opts),
       signOut: () => mockSignOut(),
@@ -56,6 +54,24 @@ function defaultSession(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * Mock onAuthStateChange to immediately invoke callback with INITIAL_SESSION.
+ * Returns the captured callback for later event simulation.
+ */
+function mockAuthStateWithSession(session: unknown) {
+  let capturedCallback: ((event: string, session: unknown) => void) | null =
+    null;
+  mockOnAuthStateChange.mockImplementation(
+    (cb: (event: string, session: unknown) => void) => {
+      capturedCallback = cb;
+      // Simulate INITIAL_SESSION — fires synchronously at registration
+      cb("INITIAL_SESSION", session);
+      return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
+    }
+  );
+  return () => capturedCallback!;
+}
+
 // Consumer component to surface context values in DOM for assertions
 function AuthStateDisplay() {
   const { user, loading, session } = useAuth();
@@ -75,21 +91,18 @@ function AuthStateDisplay() {
 describe("AuthProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Default: resolved session listener (no active session) + subscription
-    mockGetSession.mockResolvedValue({ data: { session: null } });
-    mockOnAuthStateChange.mockReturnValue({
-      data: { subscription: { unsubscribe: mockUnsubscribe } },
-    });
+    mockAuthStateWithSession(null);
   });
 
   // ---------------------------------------------------------------------------
   // Initial loading state
   // ---------------------------------------------------------------------------
 
-  it("starts in loading state before session resolves", async () => {
-    // Never resolve so we can observe the loading state
-    mockGetSession.mockReturnValue(new Promise(() => {}));
+  it("starts in loading state before onAuthStateChange fires", async () => {
+    // Override: never invoke callback so we can observe loading state
+    mockOnAuthStateChange.mockReturnValue({
+      data: { subscription: { unsubscribe: mockUnsubscribe } },
+    });
 
     renderWithAuth(
       <AuthProvider>
@@ -106,8 +119,6 @@ describe("AuthProvider", () => {
   // ---------------------------------------------------------------------------
 
   it("resolves to unauthenticated state when there is no session", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
-
     renderWithAuth(
       <AuthProvider>
         <AuthStateDisplay />
@@ -123,8 +134,6 @@ describe("AuthProvider", () => {
   });
 
   it("sets auth token to null when no session", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
-
     renderWithAuth(
       <AuthProvider>
         <AuthStateDisplay />
@@ -142,9 +151,9 @@ describe("AuthProvider", () => {
   // Authenticated state
   // ---------------------------------------------------------------------------
 
-  it("populates user and session from getSession result", async () => {
+  it("populates user and session from INITIAL_SESSION", async () => {
     const session = defaultSession();
-    mockGetSession.mockResolvedValue({ data: { session } });
+    mockAuthStateWithSession(session);
 
     renderWithAuth(
       <AuthProvider>
@@ -162,7 +171,7 @@ describe("AuthProvider", () => {
 
   it("calls setAuthToken with the access token when session exists", async () => {
     const session = defaultSession({ access_token: "my-token-123" });
-    mockGetSession.mockResolvedValue({ data: { session } });
+    mockAuthStateWithSession(session);
 
     renderWithAuth(
       <AuthProvider>
@@ -182,14 +191,8 @@ describe("AuthProvider", () => {
   // ---------------------------------------------------------------------------
 
   it("updates auth state when SIGNED_IN event fires", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
     mockProcessPendingInvitations.mockResolvedValue({ processed_count: 0 });
-
-    let capturedCallback: ((event: string, session: unknown) => void) | null = null;
-    mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
-      capturedCallback = cb;
-      return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
-    });
+    const getCallback = mockAuthStateWithSession(null);
 
     renderWithAuth(
       <AuthProvider>
@@ -205,9 +208,11 @@ describe("AuthProvider", () => {
     expect(screen.getByTestId("user-id").textContent).toBe("null");
 
     // Simulate sign-in event
-    const newSession = defaultSession({ user: { id: "user-99", email: "new@test.com" } });
+    const newSession = defaultSession({
+      user: { id: "user-99", email: "new@test.com" },
+    });
     await act(async () => {
-      capturedCallback!("SIGNED_IN", newSession);
+      getCallback()("SIGNED_IN", newSession);
     });
 
     await waitFor(() =>
@@ -218,13 +223,7 @@ describe("AuthProvider", () => {
 
   it("clears auth state when SIGNED_OUT event fires", async () => {
     const session = defaultSession();
-    mockGetSession.mockResolvedValue({ data: { session } });
-
-    let capturedCallback: ((event: string, session: unknown) => void) | null = null;
-    mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
-      capturedCallback = cb;
-      return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
-    });
+    const getCallback = mockAuthStateWithSession(session);
 
     renderWithAuth(
       <AuthProvider>
@@ -237,7 +236,7 @@ describe("AuthProvider", () => {
     );
 
     await act(async () => {
-      capturedCallback!("SIGNED_OUT", null);
+      getCallback()("SIGNED_OUT", null);
     });
 
     await waitFor(() =>
@@ -251,8 +250,6 @@ describe("AuthProvider", () => {
   // ---------------------------------------------------------------------------
 
   it("unsubscribes from auth state change on unmount", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
-
     const { unmount } = renderWithAuth(
       <AuthProvider>
         <AuthStateDisplay />
@@ -273,10 +270,8 @@ describe("AuthProvider", () => {
   // ---------------------------------------------------------------------------
 
   it("calls supabase signInWithOAuth with the given provider", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
     mockSignInWithOAuth.mockResolvedValue({ error: null });
 
-    // Render with a consumer that calls signInWithOAuth
     function TriggerSignIn() {
       const { signInWithOAuth } = useAuth();
       return (
@@ -302,8 +297,9 @@ describe("AuthProvider", () => {
   });
 
   it("throws when signInWithOAuth returns an error", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
-    mockSignInWithOAuth.mockResolvedValue({ error: new Error("OAuth failed") });
+    mockSignInWithOAuth.mockResolvedValue({
+      error: new Error("OAuth failed"),
+    });
 
     let thrownError: unknown;
     function TriggerSignIn() {
@@ -344,7 +340,6 @@ describe("AuthProvider", () => {
   // ---------------------------------------------------------------------------
 
   it("calls supabase signOut", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
     mockSignOut.mockResolvedValue({ error: null });
 
     function TriggerSignOut() {
@@ -368,7 +363,6 @@ describe("AuthProvider", () => {
   });
 
   it("throws when signOut returns an error", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
     mockSignOut.mockResolvedValue({ error: new Error("Sign out failed") });
 
     let thrownError: unknown;
@@ -406,18 +400,12 @@ describe("AuthProvider", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Pending invitations on SIGNED_IN
+  // Pending invitations on SIGNED_IN (deferred via setTimeout)
   // ---------------------------------------------------------------------------
 
   it("processes pending invitations when SIGNED_IN fires", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
     mockProcessPendingInvitations.mockResolvedValue({ processed_count: 2 });
-
-    let capturedCallback: ((event: string, session: unknown) => void) | null = null;
-    mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
-      capturedCallback = cb;
-      return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
-    });
+    const getCallback = mockAuthStateWithSession(null);
 
     renderWithAuth(
       <AuthProvider>
@@ -431,21 +419,18 @@ describe("AuthProvider", () => {
 
     const newSession = defaultSession();
     await act(async () => {
-      capturedCallback!("SIGNED_IN", newSession);
+      getCallback()("SIGNED_IN", newSession);
     });
 
-    await waitFor(() => expect(mockProcessPendingInvitations).toHaveBeenCalledTimes(1));
+    // processPendingInvitations is deferred via setTimeout — wait for it
+    await waitFor(() =>
+      expect(mockProcessPendingInvitations).toHaveBeenCalledTimes(1)
+    );
   });
 
   it("does not throw when processPendingInvitations fails during sign-in", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
     mockProcessPendingInvitations.mockRejectedValue(new Error("network error"));
-
-    let capturedCallback: ((event: string, session: unknown) => void) | null = null;
-    mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
-      capturedCallback = cb;
-      return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
-    });
+    const getCallback = mockAuthStateWithSession(null);
 
     renderWithAuth(
       <AuthProvider>
@@ -462,7 +447,7 @@ describe("AuthProvider", () => {
     // Should not throw even though processPendingInvitations rejects
     await expect(
       act(async () => {
-        capturedCallback!("SIGNED_IN", newSession);
+        getCallback()("SIGNED_IN", newSession);
       })
     ).resolves.not.toThrow();
 
@@ -478,7 +463,7 @@ describe("AuthProvider", () => {
 
   it("provides context value to nested consumers", async () => {
     const session = defaultSession();
-    mockGetSession.mockResolvedValue({ data: { session } });
+    mockAuthStateWithSession(session);
 
     renderWithAuth(
       <AuthProvider>

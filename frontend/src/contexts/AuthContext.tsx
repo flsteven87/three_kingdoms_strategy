@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase, type Session, type User } from '@/lib/supabase'
@@ -19,19 +19,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: true
   })
   const queryClient = useQueryClient()
+  const invitationsProcessedRef = useRef(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      apiClient.setAuthToken(session?.access_token ?? null)
-      setAuthState({
-        user: session?.user ?? null,
-        session,
-        loading: false
-      })
-    })
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         apiClient.setAuthToken(session?.access_token ?? null)
         setAuthState({
           user: session?.user ?? null,
@@ -39,15 +31,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loading: false
         })
 
-        if (event === 'SIGNED_IN' && session) {
-          try {
-            const result = await apiClient.processPendingInvitations()
-            if (result.processed_count > 0) {
-              await queryClient.invalidateQueries({ queryKey: ['alliance'] })
-            }
-          } catch {
-            // Don't block login on invitation processing failure
-          }
+        // Deferred to avoid deadlocking Supabase's auth queue (auth-js #762).
+        // Ref guard prevents re-running on TOKEN_REFRESHED (fires as SIGNED_IN).
+        if (event === 'SIGNED_IN' && session && !invitationsProcessedRef.current) {
+          invitationsProcessedRef.current = true
+          setTimeout(() => {
+            apiClient.processPendingInvitations()
+              .then(result => {
+                if (result.processed_count > 0) {
+                  queryClient.invalidateQueries({ queryKey: ['alliance'] })
+                }
+              })
+              .catch(() => {})
+          }, 0)
+        }
+
+        if (event === 'SIGNED_OUT') {
+          invitationsProcessedRef.current = false
         }
       }
     )
