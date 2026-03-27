@@ -105,52 +105,47 @@ const STEPS = [
 
 const SCREENSHOTS = [
   {
-    src: "/assets/screenshots/alliance-overview.png",
+    src: "/assets/screenshots/alliance-overview.jpg",
     title: "誰在衝、誰停滯？",
     description: "同盟整體貢獻趨勢與分佈，活躍度變化不用猜",
   },
   {
-    src: "/assets/screenshots/battle-events.png",
+    src: "/assets/screenshots/battle-events.jpg",
     title: "戰役打完，誰沒來？",
     description: "參與率、缺席名單、戰功統計，事後不用翻紀錄",
   },
   {
-    src: "/assets/screenshots/battle-event-detail.png",
+    src: "/assets/screenshots/battle-event-detail.jpg",
     title: "每場戰役都有數據",
     description: "戰功分佈箱型圖，誰扛傷害誰划水一目瞭然",
   },
   {
-    src: "/assets/screenshots/member-radar.png",
+    src: "/assets/screenshots/member-radar.jpg",
     title: "成員實力一張圖看完",
     description: "五維能力雷達圖，貢獻、戰功、助攻全面評估",
   },
   {
-    src: "/assets/screenshots/member-combat-detail.png",
+    src: "/assets/screenshots/member-combat-detail.jpg",
     title: "戰功明細逐日追蹤",
     description: "每日戰功與助攻趨勢，對比同盟平均不留死角",
   },
   {
-    src: "/assets/screenshots/group-comparison.png",
+    src: "/assets/screenshots/group-comparison.jpg",
     title: "分組強弱立見",
     description: "各組參與率、貢獻值並排比較，資源分配有據",
   },
   {
-    src: "/assets/screenshots/line-report.png",
-    title: "戰報直送 LINE 群組",
-    description: "戰役結束自動產出報告，出席率一鍵推送",
-  },
-  {
-    src: "/assets/screenshots/line-binding.png",
+    src: "/assets/screenshots/line-binding.jpg",
     title: "遊戲名對不上 LINE？",
     description: "成員自助綁定，找人一搜就到，不用群裡喊",
   },
   {
-    src: "/assets/screenshots/medal-management.png",
+    src: "/assets/screenshots/medal-management.jpg",
     title: "獎懲怎麼讓人服氣？",
     description: "銅碼申請規則透明，功勳門檻公開可查",
   },
   {
-    src: "/assets/screenshots/hegemony-weights.png",
+    src: "/assets/screenshots/hegemony-weights.jpg",
     title: "排名公式你決定",
     description: "自訂貢獻、戰功、助攻權重，論功行賞有客觀依據",
   },
