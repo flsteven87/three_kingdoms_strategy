@@ -156,7 +156,9 @@ const SCREENSHOTS = [
   },
 ] as const;
 
-const CAROUSEL_PLUGINS = [AutoplayPlugin({ delay: 5000, stopOnInteraction: true })];
+function useCarouselPlugins() {
+  return [AutoplayPlugin({ delay: 5000, stopOnInteraction: false, stopOnMouseEnter: true })];
+}
 
 const FEATURES = [
   {
@@ -241,6 +243,7 @@ export function Landing() {
   const [isLoading, setIsLoading] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [webViewInfo] = useState(() => detectWebView());
+  const carouselPlugins = useCarouselPlugins();
   const { user, loading, signInWithOAuth } = useAuth();
   const navigate = useNavigate();
 
@@ -389,7 +392,7 @@ export function Landing() {
 
             <Carousel
               opts={{ loop: true }}
-              plugins={CAROUSEL_PLUGINS}
+              plugins={carouselPlugins}
               className="w-full"
             >
               <CarouselContent>
@@ -406,7 +409,7 @@ export function Landing() {
                             src={screenshot.src}
                             alt={`三國志戰略版管理系統 - ${screenshot.title}`}
                             className="w-full h-auto"
-                            loading="lazy"
+                            loading={i === 0 ? "eager" : "lazy"}
                           />
                         </div>
                       </div>

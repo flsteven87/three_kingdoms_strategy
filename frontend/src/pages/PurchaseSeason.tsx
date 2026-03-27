@@ -345,7 +345,7 @@ function PurchaseSeason() {
         <h2 className="text-2xl font-semibold text-center">常見問題</h2>
         <Accordion type="single" collapsible className="w-full">
           {FAQ_ITEMS.map((item, index) => (
-            <AccordionItem key={index} value={`item-${index}`}>
+            <AccordionItem key={item.question} value={`item-${index}`}>
               <AccordionTrigger className="text-left text-base">
                 {item.question}
               </AccordionTrigger>

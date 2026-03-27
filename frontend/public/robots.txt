@@ -1,22 +1,8 @@
 User-agent: *
+Disallow: /
 Allow: /landing
 Allow: /privacy
 Allow: /terms
 Allow: /contact
-Disallow: /analytics
-Disallow: /seasons
-Disallow: /data
-Disallow: /members
-Disallow: /groups
-Disallow: /events
-Disallow: /hegemony
-Disallow: /copper-mines
-Disallow: /donations
-Disallow: /line-binding
-Disallow: /purchase
-Disallow: /settings
-Disallow: /auth
-Disallow: /liff
-Disallow: /api/
 
 Sitemap: https://tktmanager.com/sitemap.xml
