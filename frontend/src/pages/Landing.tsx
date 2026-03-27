@@ -424,7 +424,7 @@ export function Landing() {
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <div className="flex justify-center gap-2 mt-8">
+              <div className="flex justify-center gap-1 mt-4">
                 <CarouselPrevious className="static translate-y-0" />
                 <CarouselNext className="static translate-y-0" />
               </div>
