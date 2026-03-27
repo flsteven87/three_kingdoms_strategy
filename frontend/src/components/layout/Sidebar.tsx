@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { SeasonSelector } from './SeasonSelector'
+import { APP_VERSION } from '@/constants'
 
 interface SidebarProps {
   readonly className?: string
@@ -276,7 +277,7 @@ export function Sidebar({ className }: SidebarProps) {
         )}
 
         <div className="text-xs text-muted-foreground px-2">
-          <p className="font-medium">Version {import.meta.env.VITE_APP_VERSION || '0.3.0'}</p>
+          <p className="font-medium">Version {APP_VERSION}</p>
         </div>
       </div>
     </div>

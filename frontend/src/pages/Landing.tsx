@@ -135,6 +135,11 @@ const SCREENSHOTS = [
     description: "各組參與率、貢獻值並排比較，資源分配有據",
   },
   {
+    src: "/assets/screenshots/line-report.jpg",
+    title: "戰報直送 LINE 群組",
+    description: "戰役結束自動產出報告，出席率一鍵推送",
+  },
+  {
     src: "/assets/screenshots/line-binding.jpg",
     title: "遊戲名對不上 LINE？",
     description: "成員自助綁定，找人一搜就到，不用群裡喊",
