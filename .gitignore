@@ -3,6 +3,7 @@
 .env.local
 .env.*.local
 .env.zeabur
+.recur-production-keys
 
 # Python
 __pycache__/
