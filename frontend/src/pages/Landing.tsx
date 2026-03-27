@@ -349,6 +349,48 @@ export function Landing() {
           </div>
         </section>
 
+        {/* ── 1.5. Screenshot Showcase ── */}
+        <section className="px-4 py-20 border-t bg-muted/30">
+          <div className="mx-auto max-w-6xl space-y-12">
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-bold tracking-tight">
+                實際畫面
+              </h2>
+              <p className="text-base text-muted-foreground">
+                真實後台截圖，所見即所得
+              </p>
+            </div>
+
+            <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-hide">
+              {SCREENSHOTS.map((screenshot) => (
+                <div
+                  key={screenshot.title}
+                  className="flex-none w-[85vw] sm:w-[70vw] md:w-[45vw] lg:w-[40vw] snap-center"
+                >
+                  <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+                    <div className="overflow-hidden">
+                      <img
+                        src={screenshot.src}
+                        alt={screenshot.title}
+                        className="w-full h-auto"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="p-4 space-y-1">
+                      <h3 className="text-base font-semibold">
+                        {screenshot.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {screenshot.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── 2. Pain Points ── */}
         <section className="px-4 py-20 border-t bg-muted/30">
           <div className="mx-auto max-w-4xl">
@@ -387,48 +429,6 @@ export function Landing() {
                   <p className="text-base text-muted-foreground leading-relaxed text-balance">
                     {step.description}
                   </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── 3.5. Screenshot Showcase ── */}
-        <section className="px-4 py-20 border-t bg-muted/30">
-          <div className="mx-auto max-w-6xl space-y-12">
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold tracking-tight">
-                實際畫面
-              </h2>
-              <p className="text-base text-muted-foreground">
-                真實後台截圖，所見即所得
-              </p>
-            </div>
-
-            <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-hide">
-              {SCREENSHOTS.map((screenshot) => (
-                <div
-                  key={screenshot.title}
-                  className="flex-none w-[85vw] sm:w-[70vw] md:w-[45vw] lg:w-[40vw] snap-center"
-                >
-                  <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-                    <div className="overflow-hidden">
-                      <img
-                        src={screenshot.src}
-                        alt={screenshot.title}
-                        className="w-full h-auto"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="p-4 space-y-1">
-                      <h3 className="text-base font-semibold">
-                        {screenshot.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {screenshot.description}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
