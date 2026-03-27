@@ -95,6 +95,9 @@ function App() {
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
+
+          {/* Catch-all: redirect unknown routes to landing */}
+          <Route path="*" element={<Navigate to="/landing" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
