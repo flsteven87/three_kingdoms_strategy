@@ -156,6 +156,8 @@ const SCREENSHOTS = [
   },
 ] as const;
 
+const CAROUSEL_PLUGINS = [AutoplayPlugin({ delay: 5000, stopOnInteraction: true })];
+
 const FEATURES = [
   {
     icon: Activity,
@@ -238,15 +240,9 @@ function scrollToHero() {
 export function Landing() {
   const [isLoading, setIsLoading] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [webViewInfo, setWebViewInfo] = useState<ReturnType<
-    typeof detectWebView
-  > | null>(null);
+  const [webViewInfo] = useState(() => detectWebView());
   const { user, loading, signInWithOAuth } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    setWebViewInfo(detectWebView());
-  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -273,8 +269,10 @@ export function Landing() {
           <div className="flex items-center gap-3.5">
             <img
               src="/assets/logo.svg"
-              alt="三國志戰略版"
+              alt="三國志戰略版同盟管理中心"
               className="h-12 w-12 object-contain"
+              width={48}
+              height={48}
             />
             <span className="font-semibold text-lg">同盟管理中心</span>
           </div>
@@ -391,7 +389,7 @@ export function Landing() {
 
             <Carousel
               opts={{ loop: true }}
-              plugins={[AutoplayPlugin({ delay: 5000, stopOnInteraction: true })]}
+              plugins={CAROUSEL_PLUGINS}
               className="w-full"
             >
               <CarouselContent>
@@ -406,7 +404,7 @@ export function Landing() {
                         <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
                           <img
                             src={screenshot.src}
-                            alt={screenshot.title}
+                            alt={`三國志戰略版管理系統 - ${screenshot.title}`}
                             className="w-full h-auto"
                             loading="lazy"
                           />
