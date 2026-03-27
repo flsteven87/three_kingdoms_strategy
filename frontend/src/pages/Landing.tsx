@@ -97,34 +97,54 @@ const STEPS = [
 
 const SCREENSHOTS = [
   {
-    src: "/assets/screenshots/alliance-analytics.png",
-    title: "同盟整體分析",
-    description: "貢獻趨勢、戰功分佈，同盟全局一眼掌握",
-  },
-  {
-    src: "/assets/screenshots/member-analytics.png",
-    title: "成員表現分析",
-    description: "五維能力雷達圖，個人趨勢完整追蹤",
-  },
-  {
-    src: "/assets/screenshots/group-analytics.png",
-    title: "組別對比分析",
-    description: "各組排名、參與率並排比較，強弱立見",
+    src: "/assets/screenshots/alliance-overview.png",
+    title: "誰在衝、誰停滯？",
+    description: "同盟整體貢獻趨勢與分佈，活躍度變化不用猜",
   },
   {
     src: "/assets/screenshots/battle-events.png",
-    title: "戰役事件追蹤",
-    description: "參與率、戰功分佈、缺席名單一目瞭然",
+    title: "戰役打完，誰沒來？",
+    description: "參與率、缺席名單、戰功統計，事後不用翻紀錄",
   },
   {
-    src: "/assets/screenshots/line-report-preview.png",
-    title: "LINE 戰報推送",
-    description: "戰役結束自動產出報告，直送 LINE 群組",
+    src: "/assets/screenshots/battle-event-detail.png",
+    title: "每場戰役都有數據",
+    description: "戰功分佈箱型圖，誰扛傷害誰划水一目瞭然",
+  },
+  {
+    src: "/assets/screenshots/member-radar.png",
+    title: "成員實力一張圖看完",
+    description: "五維能力雷達圖，貢獻、戰功、助攻全面評估",
+  },
+  {
+    src: "/assets/screenshots/member-combat-detail.png",
+    title: "戰功明細逐日追蹤",
+    description: "每日戰功與助攻趨勢，對比同盟平均不留死角",
+  },
+  {
+    src: "/assets/screenshots/group-comparison.png",
+    title: "分組強弱立見",
+    description: "各組參與率、貢獻值並排比較，資源分配有據",
+  },
+  {
+    src: "/assets/screenshots/line-report.png",
+    title: "戰報直送 LINE 群組",
+    description: "戰役結束自動產出報告，出席率一鍵推送",
+  },
+  {
+    src: "/assets/screenshots/line-binding.png",
+    title: "遊戲名對不上 LINE？",
+    description: "成員自助綁定，找人一搜就到，不用群裡喊",
+  },
+  {
+    src: "/assets/screenshots/medal-management.png",
+    title: "獎懲怎麼讓人服氣？",
+    description: "銅碼申請規則透明，功勳門檻公開可查",
   },
   {
     src: "/assets/screenshots/hegemony-weights.png",
-    title: "霸業權重配置",
-    description: "自訂貢獻、戰功、助攻權重，排名公式你決定",
+    title: "排名公式你決定",
+    description: "自訂貢獻、戰功、助攻權重，論功行賞有客觀依據",
   },
 ] as const;
 
@@ -354,10 +374,10 @@ export function Landing() {
           <div className="mx-auto max-w-6xl space-y-12">
             <div className="text-center space-y-2">
               <h2 className="text-3xl font-bold tracking-tight">
-                實際畫面
+                管同盟，不再靠感覺
               </h2>
               <p className="text-base text-muted-foreground">
-                真實後台截圖，所見即所得
+                每個決策都有數據撐腰
               </p>
             </div>
 
