@@ -9,6 +9,14 @@ import {
 } from "@/components/ui/accordion";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from "@/components/ui/carousel";
+import AutoplayPlugin from "embla-carousel-autoplay";
+import {
   Loader2,
   Check,
   UserX,
@@ -371,7 +379,7 @@ export function Landing() {
 
         {/* ── 1.5. Screenshot Showcase ── */}
         <section className="px-4 py-20 border-t bg-muted/30">
-          <div className="mx-auto max-w-6xl space-y-12">
+          <div className="mx-auto max-w-5xl space-y-12">
             <div className="text-center space-y-2">
               <h2 className="text-3xl font-bold tracking-tight">
                 管同盟，不再靠感覺
@@ -381,33 +389,46 @@ export function Landing() {
               </p>
             </div>
 
-            <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-hide">
-              {SCREENSHOTS.map((screenshot) => (
-                <div
-                  key={screenshot.title}
-                  className="flex-none w-[85vw] sm:w-[70vw] md:w-[45vw] lg:w-[40vw] snap-center"
-                >
-                  <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-                    <div className="overflow-hidden">
-                      <img
-                        src={screenshot.src}
-                        alt={screenshot.title}
-                        className="w-full h-auto"
-                        loading="lazy"
-                      />
+            <Carousel
+              opts={{ loop: true }}
+              plugins={[AutoplayPlugin({ delay: 5000, stopOnInteraction: true })]}
+              className="w-full"
+            >
+              <CarouselContent>
+                {SCREENSHOTS.map((screenshot, i) => (
+                  <CarouselItem key={screenshot.title}>
+                    <div
+                      className={`flex flex-col gap-8 items-center ${
+                        i % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+                          <img
+                            src={screenshot.src}
+                            alt={screenshot.title}
+                            className="w-full h-auto"
+                            loading="lazy"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 md:w-64 space-y-3 text-center md:text-left">
+                        <h3 className="text-xl font-bold">
+                          {screenshot.title}
+                        </h3>
+                        <p className="text-base text-muted-foreground leading-relaxed">
+                          {screenshot.description}
+                        </p>
+                      </div>
                     </div>
-                    <div className="p-4 space-y-1">
-                      <h3 className="text-base font-semibold">
-                        {screenshot.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {screenshot.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <div className="flex justify-center gap-2 mt-8">
+                <CarouselPrevious className="static translate-y-0" />
+                <CarouselNext className="static translate-y-0" />
+              </div>
+            </Carousel>
           </div>
         </section>
 
