@@ -1,8 +1,20 @@
+# =============================================================================
+# tktmanager.com robots.txt
+# SPA with prerendered public pages — block app routes, allow public + assets
+# =============================================================================
+
+# --- Search engines & all bots ---
+# Allow public pages + static assets (CSS/JS/images needed to render pages)
+# Block authenticated app routes
 User-agent: *
-Disallow: /
 Allow: /landing
 Allow: /privacy
 Allow: /terms
 Allow: /contact
+Allow: /assets/
+Allow: /sitemap.xml
+Allow: /manifest.json
+Disallow: /
 
+# --- Sitemap ---
 Sitemap: https://tktmanager.com/sitemap.xml
