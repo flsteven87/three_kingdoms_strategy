@@ -14,7 +14,7 @@ Tests cover:
 """
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
@@ -25,7 +25,7 @@ from src.models.battle_event_metrics import (
     TopMemberItem,
     ViolatorItem,
 )
-from src.models.line_binding import LineGroupBinding
+from src.models.line_binding import LineGroupBinding, MemberLineBinding
 from src.services.line_binding_service import LineBindingService
 
 # =============================================================================
@@ -391,3 +391,140 @@ class TestEnrichAnalyticsWithLineNames:
         assert analytics.top_contributors[0].line_display_name == "Line-B"
         assert analytics.top_assisters[0].line_display_name == "Line-C"
         assert analytics.violators[0].line_display_name == "Line-D"
+
+
+# =============================================================================
+# Helpers for get_registered_members tests
+# =============================================================================
+
+
+def _make_member_binding(
+    line_user_id: str = "Uuser1",
+    game_id: str = "玩家A",
+    is_verified: bool = False,
+) -> MemberLineBinding:
+    """Factory for a MemberLineBinding model instance."""
+    now = datetime.now()
+    return MemberLineBinding(
+        id=UUID("55555555-5555-5555-5555-555555555555"),
+        alliance_id=ALLIANCE_ID,
+        group_binding_id=None,
+        member_id=None,
+        line_user_id=line_user_id,
+        line_display_name=f"Display-{line_user_id}",
+        game_id=game_id,
+        is_verified=is_verified,
+        bound_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+# =============================================================================
+# Tests for get_registered_members()
+# =============================================================================
+
+
+class TestGetRegisteredMembers:
+    """Tests for LineBindingService.get_registered_members()."""
+
+    @pytest.mark.asyncio
+    async def test_filters_by_line_group_members(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should only return members whose line_user_id is in the LINE group."""
+        binding = _make_group_binding()
+        mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(
+            return_value=[binding]
+        )
+        member_in_group = _make_member_binding(line_user_id="Uuser1", game_id="玩家A")
+        mock_repository.get_member_bindings_by_line_user_ids = AsyncMock(
+            return_value=[member_in_group]
+        )
+
+        with patch(
+            "src.services.line_binding_service.get_line_group_member_ids",
+            return_value={"Uuser1", "Uuser_not_registered"},
+        ):
+            result = await service.get_registered_members(ALLIANCE_ID)
+
+        assert result.total == 1
+        assert result.members[0].game_id == "玩家A"
+        mock_repository.get_member_bindings_by_line_user_ids.assert_called_once_with(
+            ALLIANCE_ID, {"Uuser1", "Uuser_not_registered"}
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_no_active_bindings(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should return empty list when no active group bindings exist."""
+        mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(return_value=[])
+
+        result = await service.get_registered_members(ALLIANCE_ID)
+
+        assert result.total == 0
+        assert result.members == []
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_line_api_returns_no_members(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should return empty list when LINE API returns empty set (e.g. bot removed)."""
+        binding = _make_group_binding()
+        mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(
+            return_value=[binding]
+        )
+
+        with patch(
+            "src.services.line_binding_service.get_line_group_member_ids",
+            return_value=set(),
+        ):
+            result = await service.get_registered_members(ALLIANCE_ID)
+
+        assert result.total == 0
+        assert result.members == []
+
+    @pytest.mark.asyncio
+    async def test_merges_members_from_multiple_active_groups(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should collect member IDs from all active groups and return union."""
+        now = datetime.now()
+        binding1 = _make_group_binding()
+        binding2 = LineGroupBinding(
+            id=UUID("66666666-6666-6666-6666-666666666666"),
+            alliance_id=ALLIANCE_ID,
+            line_group_id="Cgroup5678",
+            group_name="測試群",
+            bound_by_line_user_id="Uadmin",
+            is_active=True,
+            is_test=True,
+            bound_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(
+            return_value=[binding1, binding2]
+        )
+        member_a = _make_member_binding(line_user_id="Uuser1", game_id="玩家A")
+        member_b = _make_member_binding(line_user_id="Uuser2", game_id="玩家B")
+        mock_repository.get_member_bindings_by_line_user_ids = AsyncMock(
+            return_value=[member_a, member_b]
+        )
+
+        async def mock_get_ids(group_id: str) -> set[str]:
+            if group_id == GROUP_ID:
+                return {"Uuser1"}
+            return {"Uuser2"}
+
+        with patch(
+            "src.services.line_binding_service.get_line_group_member_ids",
+            side_effect=mock_get_ids,
+        ):
+            result = await service.get_registered_members(ALLIANCE_ID)
+
+        assert result.total == 2
+        mock_repository.get_member_bindings_by_line_user_ids.assert_called_once_with(
+            ALLIANCE_ID, {"Uuser1", "Uuser2"}
+        )

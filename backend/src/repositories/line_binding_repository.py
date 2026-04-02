@@ -373,56 +373,61 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, expect_single=True)
         return MemberLineBinding(**data)
 
-    async def count_member_bindings_by_alliance(
-        self, alliance_id: UUID, group_binding_id: UUID | None = None
-    ) -> int:
-        """Count member bindings for an alliance, optionally filtered by group binding."""
-
-        def _query():
-            q = (
-                self.client.from_("member_line_bindings")
-                .select("id", count="exact")
-                .eq("alliance_id", str(alliance_id))
-            )
-            if group_binding_id is not None:
-                q = q.eq("group_binding_id", str(group_binding_id))
-            return q.execute()
-
-        result = await self._execute_async(_query)
-
-        return result.count or 0
-
     async def get_all_member_bindings_by_alliance(
-        self,
-        alliance_id: UUID,
-        group_binding_ids: list[UUID] | None = None,
+        self, alliance_id: UUID
     ) -> list[MemberLineBinding]:
-        """Get member LINE bindings for an alliance, optionally filtered by group binding(s).
-
-        Args:
-            alliance_id: Alliance UUID
-            group_binding_ids: If provided, only return bindings matching these group binding IDs.
-                               Used by admin view to show only members from active groups.
-        """
-
-        def _query():
-            q = (
-                self.client.from_("member_line_bindings")
-                .select("*")
-                .eq("alliance_id", str(alliance_id))
-            )
-            if group_binding_ids is not None:
-                q = q.in_("group_binding_id", [str(gid) for gid in group_binding_ids])
-            return q.order("created_at", desc=True).execute()
-
-        result = await self._execute_async(_query)
+        """Get all member LINE bindings for an alliance."""
+        result = await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .order("created_at", desc=True)
+            .execute()
+        )
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
 
-    async def update_member_binding_group(
-        self, binding_id: UUID, group_binding_id: UUID
-    ) -> None:
+    async def get_member_bindings_by_line_user_ids(
+        self, alliance_id: UUID, line_user_ids: set[str]
+    ) -> list[MemberLineBinding]:
+        """Get member bindings filtered by a set of LINE user IDs.
+
+        Used by get_registered_members() to show only members currently
+        in the active LINE group(s).
+        """
+        if not line_user_ids:
+            return []
+
+        result = await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .in_("line_user_id", list(line_user_ids))
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return [MemberLineBinding(**row) for row in data]
+
+    async def count_member_bindings_by_line_user_ids(
+        self, alliance_id: UUID, line_user_ids: set[str]
+    ) -> int:
+        """Count member bindings whose line_user_id is in the given set."""
+        if not line_user_ids:
+            return 0
+
+        result = await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .select("id", count="exact")
+            .eq("alliance_id", str(alliance_id))
+            .in_("line_user_id", list(line_user_ids))
+            .execute()
+        )
+        return result.count or 0
+
+    async def update_member_binding_group(self, binding_id: UUID, group_binding_id: UUID) -> None:
         """Update the group_binding_id of an existing member binding (for re-binding continuity)"""
         await self._execute_async(
             lambda: self.client.from_("member_line_bindings")

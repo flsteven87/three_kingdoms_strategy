@@ -12,6 +12,7 @@ Business logic for LINE Bot integration:
 - Exception handling with proper chaining
 """
 
+import asyncio
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -19,6 +20,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from src.core.line_auth import get_line_group_member_ids
 from src.models.battle_event import EventCategory
 from src.models.battle_event_metrics import (
     BattleEventMetrics,
@@ -215,10 +217,17 @@ class LineBindingService:
 
         bindings_response = []
         if group_bindings:
-            for binding in group_bindings:
-                member_count = await self.repository.count_member_bindings_by_alliance(
-                    alliance_id, group_binding_id=binding.id
+            # Fetch LINE group members and count registered members in parallel
+            group_member_id_sets = await asyncio.gather(
+                *(get_line_group_member_ids(b.line_group_id) for b in group_bindings)
+            )
+            member_counts = await asyncio.gather(
+                *(
+                    self.repository.count_member_bindings_by_line_user_ids(alliance_id, ids)
+                    for ids in group_member_id_sets
                 )
+            )
+            for binding, member_count in zip(group_bindings, member_counts, strict=True):
                 bindings_response.append(
                     LineGroupBindingResponse(
                         id=binding.id,
@@ -326,10 +335,14 @@ class LineBindingService:
             group_picture_url=group_info.picture_url,
         )
 
-        # Get member count scoped to this group binding
-        member_count = await self.repository.count_member_bindings_by_alliance(
-            alliance_id, group_binding_id=updated_binding.id
-        )
+        # Get member count from LINE group
+        group_member_ids = await get_line_group_member_ids(updated_binding.line_group_id)
+        if group_member_ids:
+            member_count = await self.repository.count_member_bindings_by_line_user_ids(
+                alliance_id, group_member_ids
+            )
+        else:
+            member_count = 0
 
         return LineGroupBindingResponse(
             id=updated_binding.id,
@@ -345,10 +358,11 @@ class LineBindingService:
 
     async def get_registered_members(self, alliance_id: UUID) -> RegisteredMembersResponse:
         """
-        Get registered LINE members for an alliance's active group(s) (admin view).
+        Get registered LINE members currently in the alliance's active group(s).
 
-        Only returns members whose group_binding_id matches a currently active
-        group binding. Historical members from previous bindings are excluded.
+        Uses LINE Messaging API to get actual group member list, then
+        cross-filters with member_line_bindings. Only members who are
+        both registered AND currently in an active LINE group are returned.
 
         Args:
             alliance_id: Alliance UUID
@@ -363,9 +377,20 @@ class LineBindingService:
         if not active_bindings:
             return RegisteredMembersResponse(members=[], total=0)
 
-        active_binding_ids = [b.id for b in active_bindings]
-        bindings = await self.repository.get_all_member_bindings_by_alliance(
-            alliance_id, group_binding_ids=active_binding_ids
+        # Fetch actual group members from LINE API for all active groups in parallel
+        group_member_id_sets = await asyncio.gather(
+            *(get_line_group_member_ids(b.line_group_id) for b in active_bindings)
+        )
+        all_line_user_ids: set[str] = set()
+        for ids in group_member_id_sets:
+            all_line_user_ids.update(ids)
+
+        if not all_line_user_ids:
+            return RegisteredMembersResponse(members=[], total=0)
+
+        # Get only registered members whose line_user_id is in the group
+        bindings = await self.repository.get_member_bindings_by_line_user_ids(
+            alliance_id, all_line_user_ids
         )
 
         members = [
