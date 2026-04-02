@@ -351,6 +351,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         line_display_name: str,
         game_id: str,
         member_id: UUID | None = None,
+        group_binding_id: UUID | None = None,
     ) -> MemberLineBinding:
         """Create a new member LINE binding"""
         insert_data = {
@@ -362,6 +363,8 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         }
         if member_id:
             insert_data["member_id"] = str(member_id)
+        if group_binding_id:
+            insert_data["group_binding_id"] = str(group_binding_id)
 
         result = await self._execute_async(
             lambda: self.client.from_("member_line_bindings").insert(insert_data).execute()
@@ -370,31 +373,68 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, expect_single=True)
         return MemberLineBinding(**data)
 
-    async def count_member_bindings_by_alliance(self, alliance_id: UUID) -> int:
-        """Count member bindings for an alliance"""
-        result = await self._execute_async(
-            lambda: self.client.from_("member_line_bindings")
-            .select("id", count="exact")
-            .eq("alliance_id", str(alliance_id))
-            .execute()
-        )
+    async def count_member_bindings_by_alliance(
+        self, alliance_id: UUID, group_binding_id: UUID | None = None
+    ) -> int:
+        """Count member bindings for an alliance, optionally filtered by group binding."""
+
+        def _query():
+            q = (
+                self.client.from_("member_line_bindings")
+                .select("id", count="exact")
+                .eq("alliance_id", str(alliance_id))
+            )
+            if group_binding_id is not None:
+                q = q.eq("group_binding_id", str(group_binding_id))
+            return q.execute()
+
+        result = await self._execute_async(_query)
 
         return result.count or 0
 
     async def get_all_member_bindings_by_alliance(
-        self, alliance_id: UUID
+        self,
+        alliance_id: UUID,
+        group_binding_ids: list[UUID] | None = None,
     ) -> list[MemberLineBinding]:
-        """Get all member LINE bindings for an alliance (for admin view)"""
-        result = await self._execute_async(
-            lambda: self.client.from_("member_line_bindings")
-            .select("*")
-            .eq("alliance_id", str(alliance_id))
-            .order("created_at", desc=True)
-            .execute()
-        )
+        """Get member LINE bindings for an alliance, optionally filtered by group binding(s).
+
+        Args:
+            alliance_id: Alliance UUID
+            group_binding_ids: If provided, only return bindings matching these group binding IDs.
+                               Used by admin view to show only members from active groups.
+        """
+
+        def _query():
+            q = (
+                self.client.from_("member_line_bindings")
+                .select("*")
+                .eq("alliance_id", str(alliance_id))
+            )
+            if group_binding_ids is not None:
+                q = q.in_("group_binding_id", [str(gid) for gid in group_binding_ids])
+            return q.order("created_at", desc=True).execute()
+
+        result = await self._execute_async(_query)
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
+
+    async def update_member_binding_group(
+        self, binding_id: UUID, group_binding_id: UUID
+    ) -> None:
+        """Update the group_binding_id of an existing member binding (for re-binding continuity)"""
+        await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .update(
+                {
+                    "group_binding_id": str(group_binding_id),
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
+            )
+            .eq("id", str(binding_id))
+            .execute()
+        )
 
     async def find_member_by_name(self, alliance_id: UUID, name: str) -> UUID | None:
         """Find member ID by name in members table (for auto-matching)"""

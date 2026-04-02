@@ -215,10 +215,10 @@ class LineBindingService:
 
         bindings_response = []
         if group_bindings:
-            # Get member count (shared across all bindings)
-            member_count = await self.repository.count_member_bindings_by_alliance(alliance_id)
-
             for binding in group_bindings:
+                member_count = await self.repository.count_member_bindings_by_alliance(
+                    alliance_id, group_binding_id=binding.id
+                )
                 bindings_response.append(
                     LineGroupBindingResponse(
                         id=binding.id,
@@ -326,8 +326,10 @@ class LineBindingService:
             group_picture_url=group_info.picture_url,
         )
 
-        # Get member count
-        member_count = await self.repository.count_member_bindings_by_alliance(alliance_id)
+        # Get member count scoped to this group binding
+        member_count = await self.repository.count_member_bindings_by_alliance(
+            alliance_id, group_binding_id=updated_binding.id
+        )
 
         return LineGroupBindingResponse(
             id=updated_binding.id,
@@ -343,7 +345,10 @@ class LineBindingService:
 
     async def get_registered_members(self, alliance_id: UUID) -> RegisteredMembersResponse:
         """
-        Get all registered LINE members for an alliance (admin view)
+        Get registered LINE members for an alliance's active group(s) (admin view).
+
+        Only returns members whose group_binding_id matches a currently active
+        group binding. Historical members from previous bindings are excluded.
 
         Args:
             alliance_id: Alliance UUID
@@ -351,7 +356,17 @@ class LineBindingService:
         Returns:
             RegisteredMembersResponse with member list
         """
-        bindings = await self.repository.get_all_member_bindings_by_alliance(alliance_id)
+        active_bindings = await self.repository.get_all_active_group_bindings_by_alliance(
+            alliance_id
+        )
+
+        if not active_bindings:
+            return RegisteredMembersResponse(members=[], total=0)
+
+        active_binding_ids = [b.id for b in active_bindings]
+        bindings = await self.repository.get_all_member_bindings_by_alliance(
+            alliance_id, group_binding_ids=active_binding_ids
+        )
 
         members = [
             RegisteredMemberItem(
@@ -544,7 +559,14 @@ class LineBindingService:
                 detail="Game ID already registered by another user",
             )
 
-        if not existing:
+        if existing and existing.line_user_id == line_user_id:
+            # Same user re-registering same game_id (e.g. after group re-binding).
+            # Update group_binding_id so the member appears in the new group's list.
+            if existing.group_binding_id != group_binding.id:
+                await self.repository.update_member_binding_group(
+                    binding_id=existing.id, group_binding_id=group_binding.id
+                )
+        else:
             # Try to auto-match with existing member
             member_id = await self.repository.find_member_by_name(
                 alliance_id=alliance_id, name=game_id
@@ -557,6 +579,7 @@ class LineBindingService:
                 line_display_name=line_display_name,
                 game_id=game_id,
                 member_id=member_id,
+                group_binding_id=group_binding.id,
             )
 
         # Return updated list

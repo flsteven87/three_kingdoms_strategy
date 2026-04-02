@@ -118,6 +118,7 @@ class MemberLineBinding(BaseModel):
 
     id: UUID
     alliance_id: UUID
+    group_binding_id: UUID | None = None
     member_id: UUID | None = None
     line_user_id: str
     line_display_name: str
