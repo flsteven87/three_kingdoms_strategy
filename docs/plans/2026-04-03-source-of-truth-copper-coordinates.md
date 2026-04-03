@@ -170,8 +170,8 @@
 
 ### Progress
 
-- [ ] Phase 1: Database Schema
-- [ ] Phase 2: Import Script
+- [X] Phase 1: Database Schema
+- [X] Phase 2: Import Script
 - [ ] Phase 3: Backend Models & Repository
 - [ ] Phase 4: Backend Service Logic
 - [ ] Phase 5: Backend API Endpoints

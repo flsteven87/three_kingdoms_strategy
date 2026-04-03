@@ -25,6 +25,9 @@ class SeasonBase(BaseModel):
         "draft", description="Season activation status: draft/activated/completed"
     )
     description: str | None = Field(None, max_length=500, description="Season description")
+    game_season_tag: str | None = Field(
+        None, max_length=10, description="Game season tag (e.g. PK23) for source of truth lookup"
+    )
     is_trial: bool = Field(False, description="Whether this season was activated using trial")
     activated_at: datetime | None = Field(None, description="When the season was activated")
 
@@ -66,6 +69,7 @@ class SeasonUpdate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     description: str | None = Field(None, max_length=500)
+    game_season_tag: str | None = Field(None, max_length=10)
 
 
 class Season(SeasonBase):

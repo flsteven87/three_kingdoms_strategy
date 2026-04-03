@@ -7,6 +7,7 @@ Export all repositories for easy import
 from src.repositories.alliance_repository import AllianceRepository
 from src.repositories.battle_event_metrics_repository import BattleEventMetricsRepository
 from src.repositories.battle_event_repository import BattleEventRepository
+from src.repositories.copper_mine_coordinate_repository import CopperMineCoordinateRepository
 from src.repositories.csv_upload_repository import CsvUploadRepository
 from src.repositories.donation_repository import DonationRepository
 from src.repositories.donation_target_repository import DonationTargetRepository
@@ -20,6 +21,7 @@ __all__ = [
     "AllianceRepository",
     "BattleEventRepository",
     "BattleEventMetricsRepository",
+    "CopperMineCoordinateRepository",
     "DonationRepository",
     "DonationTargetRepository",
     "SeasonRepository",

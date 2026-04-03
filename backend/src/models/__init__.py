@@ -18,6 +18,11 @@ from src.models.battle_event_metrics import (
     BattleEventMetricsWithMember,
     EventSummary,
 )
+from src.models.copper_mine_coordinate import (
+    CopperCoordinateSearchResult,
+    CopperMineCoordinate,
+    CopperMineCoordinateResponse,
+)
 from src.models.csv_upload import CsvUpload, CsvUploadCreate, CsvUploadUpdate
 from src.models.donation import (
     Donation,
@@ -59,6 +64,10 @@ __all__ = [
     "BattleEventMetricsCreate",
     "BattleEventMetricsWithMember",
     "EventSummary",
+    # Copper Mine Coordinate models
+    "CopperMineCoordinate",
+    "CopperMineCoordinateResponse",
+    "CopperCoordinateSearchResult",
     # Donation models
     "Donation",
     "DonationCreate",
