@@ -729,7 +729,10 @@ async def _handle_member_joined(
     if not line_group_id:
         return
 
-    user_ids = _extract_member_user_ids(event.joined)
+    bot_id = settings.line_bot_user_id
+    user_ids = [
+        uid for uid in _extract_member_user_ids(event.joined) if uid != bot_id
+    ]
     if user_ids:
         # Fetch profiles in parallel, non-blocking (LINE SDK is sync)
         names = await asyncio.gather(
@@ -810,8 +813,11 @@ async def _handle_group_message(
     if not line_group_id or not line_user_id or not reply_token:
         return
 
-    display_name = await asyncio.to_thread(get_group_member_display_name, line_group_id, line_user_id)
-    await service.track_group_presence(line_group_id, line_user_id, display_name)
+    if line_user_id != settings.line_bot_user_id:
+        display_name = await asyncio.to_thread(
+            get_group_member_display_name, line_group_id, line_user_id
+        )
+        await service.track_group_presence(line_group_id, line_user_id, display_name)
 
     # 1. 處理綁定指令
     if _is_bind_command(text):
