@@ -13,6 +13,7 @@ import type {
   CreateCopperMineRuleRequest,
   UpdateCopperMineRuleRequest,
   CreateCopperMineOwnershipRequest,
+  CopperCoordinateSearchResult,
   MemberCopperMineStatus,
 } from '@/types/copper-mine'
 
@@ -34,6 +35,10 @@ export const copperMineKeys = {
   // Member status (for validation)
   memberStatus: (seasonId: string, memberId: string) =>
     [...copperMineKeys.all, 'member-status', seasonId, memberId] as const,
+
+  // Coordinate search
+  coordinateSearch: (seasonId: string, query: string) =>
+    [...copperMineKeys.all, 'coordinate-search', seasonId, query] as const,
 }
 
 // =============================================================================
@@ -392,4 +397,16 @@ export function useMemberCopperMineStatus(
   }
 
   return status
+}
+
+/**
+ * Search copper mine coordinates by county/district name
+ */
+export function useCopperCoordinateSearch(seasonId: string | null, query: string) {
+  return useQuery<CopperCoordinateSearchResult[]>({
+    queryKey: copperMineKeys.coordinateSearch(seasonId ?? '', query),
+    queryFn: () => apiClient.searchCopperCoordinates(seasonId!, query),
+    enabled: !!seasonId && query.length >= 1,
+    staleTime: 30 * 1000,
+  })
 }

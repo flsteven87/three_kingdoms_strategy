@@ -50,6 +50,7 @@ from src.models.copper_mine import (
     CopperMineListResponse,
     RegisterCopperResponse,
 )
+from src.models.copper_mine_coordinate import CopperCoordinateSearchResult
 from src.models.line_binding import (
     EventListResponse,
     LineBindingCodeResponse,
@@ -610,6 +611,23 @@ async def delete_copper_mine(
     """Delete a copper mine by ID"""
     await service.delete_mine(mine_id=UUID(mine_id), line_group_id=g, line_user_id=u)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/copper/search",
+    response_model=list[CopperCoordinateSearchResult],
+    summary="Search copper coordinates",
+    description="Search available copper mine coordinates by county/district name",
+)
+@limiter.limit(PUBLIC_RATE)
+async def search_copper_coordinates(
+    request: Request,
+    service: CopperMineServiceDep,
+    g: Annotated[str, Query(description="LINE group ID")],
+    q: Annotated[str, Query(description="Search query (county/district name)", min_length=1)],
+) -> list[CopperCoordinateSearchResult]:
+    """Search copper mine coordinates by location name"""
+    return await service.search_copper_coordinates(line_group_id=g, query=q)
 
 
 # =============================================================================

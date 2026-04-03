@@ -147,6 +147,7 @@ export const apiClient = {
   createCopperMineOwnership: copperMineApi.createCopperMineOwnership,
   updateCopperMineOwnership: copperMineApi.updateCopperMineOwnership,
   deleteCopperMineOwnership: copperMineApi.deleteCopperMineOwnership,
+  searchCopperCoordinates: copperMineApi.searchCopperCoordinates,
 
   // Season Quota
   getSeasonQuotaStatus: seasonQuotaApi.getSeasonQuotaStatus,

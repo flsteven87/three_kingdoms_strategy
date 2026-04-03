@@ -173,8 +173,8 @@
 - [X] Phase 1: Database Schema
 - [X] Phase 2: Import Script
 - [X] Phase 3: Backend Models & Repository
-- [ ] Phase 4: Backend Service Logic
-- [ ] Phase 5: Backend API Endpoints
-- [ ] Phase 6: Frontend — Season Config
-- [ ] Phase 7: Frontend — LIFF 搜尋增強
-- [ ] Phase 8: Frontend — Dashboard 增強
+- [X] Phase 4: Backend Service Logic
+- [X] Phase 5: Backend API Endpoints
+- [X] Phase 6: Frontend — Season Config
+- [X] Phase 7: Frontend — LIFF 搜尋增強
+- [X] Phase 8: Frontend — Dashboard 增強

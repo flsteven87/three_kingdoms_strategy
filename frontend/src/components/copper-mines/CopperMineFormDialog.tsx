@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Search } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateCopperMineOwnership } from "@/hooks/use-copper-mines";
+import { useCreateCopperMineOwnership, useCopperCoordinateSearch } from "@/hooks/use-copper-mines";
 import { useAnalyticsMembers } from "@/hooks/use-analytics";
 
 // Constants for reserved copper mine (awarded as rewards, not assigned to specific member)
@@ -65,6 +65,19 @@ export function CopperMineFormDialog({
     true,
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [showLocationResults, setShowLocationResults] = useState(false);
+
+  const { data: locationResults } = useCopperCoordinateSearch(
+    seasonId,
+    debouncedQuery,
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(locationQuery), 300);
+    return () => clearTimeout(timer);
+  }, [locationQuery]);
 
   const {
     register,
@@ -104,6 +117,9 @@ export function CopperMineFormDialog({
   useEffect(() => {
     if (open) {
       setSubmitError(null);
+      setLocationQuery("");
+      setDebouncedQuery("");
+      setShowLocationResults(false);
       reset({
         member_id: "",
         coord_x: "",
@@ -192,6 +208,50 @@ export function CopperMineFormDialog({
               <p className="text-sm text-destructive">
                 {errors.member_id.message}
               </p>
+            )}
+          </div>
+
+          {/* Coordinate Search */}
+          <div className="space-y-2 relative">
+            <Label>搜尋銅礦座標</Label>
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                value={locationQuery}
+                onChange={(e) => {
+                  setLocationQuery(e.target.value);
+                  setShowLocationResults(true);
+                }}
+                onFocus={() => setShowLocationResults(true)}
+                placeholder="輸入郡/縣名搜尋..."
+              />
+            </div>
+            {showLocationResults && locationResults && locationResults.length > 0 && (
+              <div className="absolute z-10 left-0 right-0 bg-background border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {locationResults.map((result) => (
+                  <button
+                    key={`${result.coord_x}-${result.coord_y}`}
+                    type="button"
+                    disabled={result.is_taken}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between gap-2"
+                    onClick={() => {
+                      setValue("coord_x", String(result.coord_x));
+                      setValue("coord_y", String(result.coord_y));
+                      setValue("level", String(result.level) as "9" | "10");
+                      setLocationQuery("");
+                      setShowLocationResults(false);
+                    }}
+                  >
+                    <span className="truncate">
+                      {result.county} · {result.district}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground text-xs">
+                      Lv.{result.level} ({result.coord_x},{result.coord_y})
+                      {result.is_taken && " 已佔"}
+                    </span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 

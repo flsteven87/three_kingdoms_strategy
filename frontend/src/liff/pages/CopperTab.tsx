@@ -5,7 +5,7 @@
  * Compact copper mine registration for LIFF Tall mode.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Plus,
   MapPin,
@@ -30,6 +30,7 @@ import {
   useLiffCopperRules,
   useLiffRegisterCopper,
   useLiffDeleteCopper,
+  useLiffCopperSearch,
 } from "../hooks/use-liff-copper";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
@@ -49,6 +50,9 @@ export function CopperTab({ session }: Props) {
   const [showOtherMines, setShowOtherMines] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [showLocationResults, setShowLocationResults] = useState(false);
 
   const context = {
     lineUserId: session.lineUserId,
@@ -70,6 +74,18 @@ export function CopperTab({ session }: Props) {
   const { data: rules } = useLiffCopperRules(session.lineGroupId);
   const registerMutation = useLiffRegisterCopper(context);
   const deleteMutation = useLiffDeleteCopper(context);
+
+  // Location search with debounce
+  const hasSourceData = data?.has_source_data ?? false;
+  const { data: locationResults } = useLiffCopperSearch(
+    hasSourceData ? session.lineGroupId : null,
+    debouncedQuery,
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(locationQuery), 300);
+    return () => clearTimeout(timer);
+  }, [locationQuery]);
 
   // Get all game_ids owned by this user
   const myGameIds = new Set(
@@ -248,7 +264,7 @@ export function CopperTab({ session }: Props) {
                 </SelectContent>
               </Select>
             )}
-            <Select value={level} onValueChange={setLevel} disabled={!canApply}>
+            <Select value={level} onValueChange={setLevel} disabled={!canApply || hasSourceData}>
               <SelectTrigger className="h-10 w-20">
                 <SelectValue />
               </SelectTrigger>
@@ -258,6 +274,51 @@ export function CopperTab({ session }: Props) {
               </SelectContent>
             </Select>
           </div>
+          {hasSourceData && (
+            <div className="relative">
+              <div className="flex items-center gap-1.5">
+                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Input
+                  value={locationQuery}
+                  onChange={(e) => {
+                    setLocationQuery(e.target.value);
+                    setShowLocationResults(true);
+                  }}
+                  onFocus={() => setShowLocationResults(true)}
+                  placeholder="搜尋郡/縣名..."
+                  className="h-10"
+                />
+              </div>
+              {showLocationResults && locationResults && locationResults.length > 0 && (
+                <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {locationResults.map((result) => (
+                    <button
+                      key={`${result.coord_x}-${result.coord_y}`}
+                      type="button"
+                      disabled={result.is_taken}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between gap-2"
+                      onClick={() => {
+                        setCoordX(String(result.coord_x));
+                        setCoordY(String(result.coord_y));
+                        setLevel(String(result.level));
+                        setLocationQuery("");
+                        setShowLocationResults(false);
+                        setSearchResult(null);
+                      }}
+                    >
+                      <span className="truncate">
+                        {result.county} · {result.district}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground">
+                        Lv.{result.level} ({result.coord_x},{result.coord_y})
+                        {result.is_taken && " 已佔"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 flex-1">
               <span className="text-sm text-muted-foreground shrink-0">X</span>

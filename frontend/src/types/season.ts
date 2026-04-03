@@ -15,6 +15,7 @@ export interface Season {
   readonly is_current: boolean
   readonly activation_status: ActivationStatus
   readonly description: string | null
+  readonly game_season_tag: string | null
   readonly created_at: string
   readonly updated_at: string
   // Trial fields (Season-based trial system)
@@ -28,6 +29,7 @@ export interface SeasonCreate {
   readonly start_date: string
   readonly end_date?: string | null
   readonly description?: string | null
+  readonly game_season_tag?: string | null
 }
 
 export interface SeasonUpdate {
@@ -35,6 +37,7 @@ export interface SeasonUpdate {
   readonly start_date?: string
   readonly end_date?: string | null
   readonly description?: string | null
+  readonly game_season_tag?: string | null
 }
 
 export interface SeasonActivateResponse {

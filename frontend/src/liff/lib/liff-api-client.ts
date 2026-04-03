@@ -199,6 +199,7 @@ export interface CopperMineListResponse {
   total: number;
   mine_counts_by_game_id: Record<string, number>;
   max_allowed: number;
+  has_source_data: boolean;
 }
 
 export interface RegisterCopperResponse {
@@ -295,6 +296,36 @@ export async function deleteCopperMine(
       .catch(() => ({ detail: response.statusText }));
     throw new Error(error.detail || "Delete failed");
   }
+}
+
+export interface CopperCoordinateSearchResult {
+  coord_x: number;
+  coord_y: number;
+  level: number;
+  county: string;
+  district: string;
+  is_taken: boolean;
+}
+
+export async function searchCopperCoordinates(
+  options: Pick<LiffApiOptions, "lineGroupId"> & { query: string },
+): Promise<CopperCoordinateSearchResult[]> {
+  const url = new URL(`${API_BASE_URL}/api/v1/linebot/copper/search`);
+  url.searchParams.set("g", options.lineGroupId);
+  url.searchParams.set("q", options.query);
+
+  const response = await fetch(url.toString(), {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || "Request failed");
+  }
+
+  return response.json();
 }
 
 // Event Report API

@@ -11,9 +11,11 @@ import {
   getCopperRules,
   registerCopperMine,
   deleteCopperMine,
+  searchCopperCoordinates,
   type CopperMine,
   type CopperMineListResponse,
   type CopperMineRule,
+  type CopperCoordinateSearchResult,
   type RegisterCopperResponse,
 } from '../lib/liff-api-client'
 
@@ -28,6 +30,8 @@ export const liffCopperKeys = {
   list: (userId: string, groupId: string) =>
     [...liffCopperKeys.all, 'list', userId, groupId] as const,
   rules: (groupId: string) => [...liffCopperKeys.all, 'rules', groupId] as const,
+  search: (groupId: string, query: string) =>
+    [...liffCopperKeys.all, 'search', groupId, query] as const,
 }
 
 export function useLiffCopperMines(context: LiffContext | null) {
@@ -106,6 +110,7 @@ export function useLiffRegisterCopper(context: LiffContext | null) {
           total: (old?.total || 0) + 1,
           mine_counts_by_game_id: newCounts,
           max_allowed: old?.max_allowed || 0,
+          has_source_data: old?.has_source_data || false,
         }
       })
 
@@ -172,6 +177,7 @@ export function useLiffDeleteCopper(context: LiffContext | null) {
           total: Math.max((old?.total || 0) - 1, 0),
           mine_counts_by_game_id: newCounts,
           max_allowed: old?.max_allowed || 0,
+          has_source_data: old?.has_source_data || false,
         }
       })
 
@@ -196,5 +202,14 @@ export function useLiffDeleteCopper(context: LiffContext | null) {
         })
       }
     },
+  })
+}
+
+export function useLiffCopperSearch(groupId: string | null, query: string) {
+  return useQuery<CopperCoordinateSearchResult[]>({
+    queryKey: liffCopperKeys.search(groupId ?? '', query),
+    queryFn: () => searchCopperCoordinates({ lineGroupId: groupId!, query }),
+    enabled: !!groupId && query.length >= 1,
+    staleTime: 30 * 1000,
   })
 }

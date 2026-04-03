@@ -84,6 +84,15 @@ export interface CopperMineOwnershipListResponse {
   readonly total: number
 }
 
+export interface CopperCoordinateSearchResult {
+  readonly coord_x: number
+  readonly coord_y: number
+  readonly level: number
+  readonly county: string
+  readonly district: string
+  readonly is_taken: boolean
+}
+
 // =============================================================================
 // Member Status Types (For Validation)
 // =============================================================================

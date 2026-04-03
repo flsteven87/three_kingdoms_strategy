@@ -11,7 +11,8 @@ import type {
   UpdateCopperMineRuleRequest,
   CopperMineOwnership,
   CreateCopperMineOwnershipRequest,
-  CopperMineOwnershipListResponse
+  CopperMineOwnershipListResponse,
+  CopperCoordinateSearchResult,
 } from '@/types/copper-mine'
 
 // ==================== Copper Mine Rules API ====================
@@ -86,6 +87,21 @@ export async function updateCopperMineOwnership(
     data,
     {
       params: { season_id: seasonId }
+    }
+  )
+  return response.data
+}
+
+// ==================== Copper Mine Coordinate Search API ====================
+
+export async function searchCopperCoordinates(
+  seasonId: string,
+  query: string
+): Promise<CopperCoordinateSearchResult[]> {
+  const response = await axiosInstance.get<CopperCoordinateSearchResult[]>(
+    '/api/v1/copper-mines/coordinates/search',
+    {
+      params: { season_id: seasonId, q: query }
     }
   )
   return response.data

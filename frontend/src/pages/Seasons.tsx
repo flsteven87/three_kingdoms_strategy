@@ -22,6 +22,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -46,6 +53,33 @@ import {
 } from "@/hooks/use-seasons";
 import type { Season } from "@/types/season";
 
+const GAME_SEASON_TAGS = [
+  { value: "PK1", label: "PK1 群雄割據" },
+  { value: "PK2", label: "PK2 天下爭鋒" },
+  { value: "PK3", label: "PK3 英雄露穎" },
+  { value: "PK4", label: "PK4 赤壁之戰" },
+  { value: "PK5", label: "PK5 軍爭地利" },
+  { value: "PK6", label: "PK6 興師伐亂" },
+  { value: "PK7", label: "PK7 北定中原" },
+  { value: "PK8", label: "PK8 官渡之戰" },
+  { value: "PK9", label: "PK9 王師秉節" },
+  { value: "PK10", label: "PK10 英雄集結" },
+  { value: "PK11", label: "PK11 兵戰四時" },
+  { value: "PK12", label: "PK12 襄樊之戰" },
+  { value: "PK13", label: "PK13 雲起龍襄" },
+  { value: "PK14", label: "PK14 天師舉義" },
+  { value: "PK15", label: "PK15 陳倉之戰" },
+  { value: "PK16", label: "PK16 潼關之戰" },
+  { value: "PK17", label: "PK17 奇門八陣" },
+  { value: "PK18", label: "PK18 亂世烽煙" },
+  { value: "PK19", label: "PK19 兗州之戰" },
+  { value: "PK20", label: "PK20 定軍山之戰" },
+  { value: "PK21", label: "PK21 霸王討逆" },
+  { value: "PK22", label: "PK22 長安之亂" },
+  { value: "PK23", label: "PK23 英雄命世" },
+  { value: "PK24", label: "PK24 漢焰長明" },
+] as const;
+
 function Seasons() {
   const [isCreating, setIsCreating] = useState(false);
   const [newSeasonData, setNewSeasonData] = useState({
@@ -53,6 +87,7 @@ function Seasons() {
     start_date: new Date().toISOString().split("T")[0],
     end_date: "",
     description: "",
+    game_season_tag: "",
   });
 
   // Fetch alliance data
@@ -78,21 +113,21 @@ function Seasons() {
    */
   const sortedSeasons = seasons
     ? [...seasons].sort((a, b) => {
-        // Current season first
-        if (a.is_current && !b.is_current) return -1;
-        if (!a.is_current && b.is_current) return 1;
+      // Current season first
+      if (a.is_current && !b.is_current) return -1;
+      if (!a.is_current && b.is_current) return 1;
 
-        // Then by activation_status: activated > draft > completed
-        const statusOrder = { activated: 0, draft: 1, completed: 2 };
-        const statusDiff =
-          statusOrder[a.activation_status] - statusOrder[b.activation_status];
-        if (statusDiff !== 0) return statusDiff;
+      // Then by activation_status: activated > draft > completed
+      const statusOrder = { activated: 0, draft: 1, completed: 2 };
+      const statusDiff =
+        statusOrder[a.activation_status] - statusOrder[b.activation_status];
+      if (statusDiff !== 0) return statusDiff;
 
-        // Then by start_date descending
-        return (
-          new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-        );
-      })
+      // Then by start_date descending
+      return (
+        new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+      );
+    })
     : [];
 
   /**
@@ -109,6 +144,7 @@ function Seasons() {
       start_date: newSeasonData.start_date,
       end_date: newSeasonData.end_date || null,
       description: newSeasonData.description || null,
+      game_season_tag: newSeasonData.game_season_tag || null,
     });
 
     // Reset form
@@ -117,6 +153,7 @@ function Seasons() {
       start_date: new Date().toISOString().split("T")[0],
       end_date: "",
       description: "",
+      game_season_tag: "",
     });
     setIsCreating(false);
   };
@@ -173,6 +210,7 @@ function Seasons() {
       start_date: new Date().toISOString().split("T")[0],
       end_date: "",
       description: "",
+      game_season_tag: "",
     });
   };
 
@@ -195,7 +233,7 @@ function Seasons() {
                 {quotaDisplay.hasTrialAvailable
                   ? "可免費試用"
                   : quotaDisplay.trialDaysRemaining !== null &&
-                      quotaDisplay.trialDaysRemaining > 0
+                    quotaDisplay.trialDaysRemaining > 0
                     ? `試用 ${quotaDisplay.trialDaysRemaining} 天`
                     : quotaDisplay.availableSeasons > 0
                       ? `剩餘 ${quotaDisplay.availableSeasons} 季`
@@ -286,6 +324,31 @@ function Seasons() {
                       }
                       placeholder="選填：補充說明或備註"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="new-season-tag">遊戲賽季</Label>
+                    <Select
+                      value={newSeasonData.game_season_tag}
+                      onValueChange={(value) =>
+                        setNewSeasonData({
+                          ...newSeasonData,
+                          game_season_tag: value === "none" ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="new-season-tag">
+                        <SelectValue placeholder="選填：關聯銅礦資料" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        <SelectItem value="none">不設定</SelectItem>
+                        {GAME_SEASON_TAGS.map((tag) => (
+                          <SelectItem key={tag.value} value={tag.value}>
+                            {tag.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Existing seasons date reference */}

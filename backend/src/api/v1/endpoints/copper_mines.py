@@ -30,6 +30,7 @@ from src.models.copper_mine import (
     CopperMineRuleResponse,
     CopperMineRuleUpdate,
 )
+from src.models.copper_mine_coordinate import CopperCoordinateSearchResult
 
 router = APIRouter(prefix="/copper-mines", tags=["copper-mines"])
 
@@ -233,4 +234,31 @@ async def update_ownership(
         season_id=season_id,
         alliance_id=alliance.id,
         member_id=member_uuid,
+    )
+
+
+# =============================================================================
+# Copper Mine Coordinate Search Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/coordinates/search",
+    response_model=list[CopperCoordinateSearchResult],
+)
+async def search_coordinates(
+    mine_service: CopperMineServiceDep,
+    season_service: SeasonServiceDep,
+    user_id: UserIdDep,
+    season_id: UUID = Query(..., description="Season UUID"),
+    q: str = Query(..., description="Search query (county/district name)", min_length=1),
+) -> list[CopperCoordinateSearchResult]:
+    """
+    Search available copper mine coordinates by county/district name.
+
+    Returns matching 9/10 level coordinates with availability info.
+    """
+    await season_service.verify_user_access(user_id, season_id)
+    return await mine_service.search_copper_coordinates_by_season(
+        season_id=season_id, query=q
     )
