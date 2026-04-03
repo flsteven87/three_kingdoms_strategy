@@ -82,7 +82,9 @@ const mockRegisteredMembersResponse: RegisteredMembersResponse = {
       registered_at: "2026-01-01T00:00:00Z",
     },
   ],
+  unregistered: [],
   total: 1,
+  unregistered_count: 0,
 };
 
 const mockCustomCommand: LineCustomCommand = {
