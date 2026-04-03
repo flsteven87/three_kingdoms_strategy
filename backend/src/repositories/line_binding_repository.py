@@ -410,18 +410,21 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
     # Group Member Tracking (line_group_members table)
     # =========================================================================
 
-    async def upsert_group_member(self, line_group_id: str, line_user_id: str) -> None:
+    async def upsert_group_member(
+        self, line_group_id: str, line_user_id: str, line_display_name: str | None = None
+    ) -> None:
         """Track a user's presence in a LINE group (idempotent)."""
+        data: dict = {
+            "line_group_id": line_group_id,
+            "line_user_id": line_user_id,
+            "tracked_at": datetime.now(UTC).isoformat(),
+        }
+        if line_display_name:
+            data["line_display_name"] = line_display_name
+
         await self._execute_async(
             lambda: self.client.from_("line_group_members")
-            .upsert(
-                {
-                    "line_group_id": line_group_id,
-                    "line_user_id": line_user_id,
-                    "tracked_at": datetime.now(UTC).isoformat(),
-                },
-                on_conflict="line_group_id,line_user_id",
-            )
+            .upsert(data, on_conflict="line_group_id,line_user_id")
             .execute()
         )
 
@@ -449,6 +452,20 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
         data = self._handle_supabase_result(result, allow_empty=True)
         return {row["line_user_id"] for row in data}
+
+    async def get_group_members(self, line_group_ids: list[str]) -> list[dict]:
+        """Get all tracked group members with display names."""
+        if not line_group_ids:
+            return []
+
+        result = await self._execute_async(
+            lambda: self.client.from_("line_group_members")
+            .select("line_user_id, line_display_name, tracked_at")
+            .in_("line_group_id", line_group_ids)
+            .execute()
+        )
+
+        return self._handle_supabase_result(result, allow_empty=True)
 
     async def count_group_members_registered(self, alliance_id: UUID, line_group_id: str) -> int:
         """Count registered members who are also tracked in the given LINE group."""

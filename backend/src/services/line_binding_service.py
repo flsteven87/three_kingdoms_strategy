@@ -51,6 +51,7 @@ from src.models.line_binding import (
     RegisteredMembersResponse,
     RegisterMemberResponse,
     SimilarMembersResponse,
+    UnregisteredMemberItem,
     UserEventParticipation,
 )
 from src.repositories.battle_event_metrics_repository import BattleEventMetricsRepository
@@ -220,18 +221,18 @@ class LineBindingService:
                 alliance_id, binding.line_group_id
             )
             bindings_response.append(
-                    LineGroupBindingResponse(
-                        id=binding.id,
-                        alliance_id=binding.alliance_id,
-                        line_group_id=binding.line_group_id,
-                        group_name=binding.group_name,
-                        group_picture_url=binding.group_picture_url,
-                        bound_at=binding.bound_at,
-                        is_active=binding.is_active,
-                        is_test=binding.is_test,
-                        member_count=member_count,
-                    )
+                LineGroupBindingResponse(
+                    id=binding.id,
+                    alliance_id=binding.alliance_id,
+                    line_group_id=binding.line_group_id,
+                    group_name=binding.group_name,
+                    group_picture_url=binding.group_picture_url,
+                    bound_at=binding.bound_at,
+                    is_active=binding.is_active,
+                    is_test=binding.is_test,
+                    member_count=member_count,
                 )
+            )
 
         # Check for pending code
         pending_code = await self.repository.get_pending_code_by_alliance(alliance_id)
@@ -345,28 +346,43 @@ class LineBindingService:
 
     async def get_registered_members(self, alliance_id: UUID) -> RegisteredMembersResponse:
         """
-        Get registered LINE members currently in the alliance's active group(s).
+        Get registered and unregistered LINE members in the alliance's active group(s).
 
-        Cross-filters member_line_bindings with line_group_members table
-        (populated by webhook events). Only members who are both registered
-        AND tracked as present in an active LINE group are returned.
+        Registered = in group AND has game ID binding.
+        Unregistered = in group but NO game ID binding.
         """
         active_bindings = await self.repository.get_all_active_group_bindings_by_alliance(
             alliance_id
         )
 
+        empty = RegisteredMembersResponse(
+            members=[], unregistered=[], total=0, unregistered_count=0
+        )
+
         if not active_bindings:
-            return RegisteredMembersResponse(members=[], total=0)
+            return empty
 
         line_group_ids = [b.line_group_id for b in active_bindings]
-        tracked_user_ids = await self.repository.get_group_member_user_ids(line_group_ids)
 
-        if not tracked_user_ids:
-            return RegisteredMembersResponse(members=[], total=0)
+        all_group_members = await self.repository.get_group_members(line_group_ids)
+        if not all_group_members:
+            return empty
 
+        # Deduplicate by line_user_id (user may appear in multiple groups)
+        group_member_map: dict[str, dict] = {}
+        for m in all_group_members:
+            uid = m["line_user_id"]
+            if uid not in group_member_map or m["tracked_at"] > group_member_map[uid]["tracked_at"]:
+                group_member_map[uid] = m
+
+        tracked_user_ids = set(group_member_map.keys())
+
+        # Scoped query: only fetch bindings for users actually in the group
         bindings = await self.repository.get_member_bindings_by_line_user_ids(
             alliance_id, tracked_user_ids
         )
+
+        registered_user_ids = {b.line_user_id for b in bindings}
 
         members = [
             RegisteredMemberItem(
@@ -379,7 +395,21 @@ class LineBindingService:
             for b in bindings
         ]
 
-        return RegisteredMembersResponse(members=members, total=len(members))
+        unregistered = [
+            UnregisteredMemberItem(
+                line_user_id=uid,
+                line_display_name=group_member_map[uid].get("line_display_name"),
+                tracked_at=group_member_map[uid]["tracked_at"],
+            )
+            for uid in tracked_user_ids - registered_user_ids
+        ]
+
+        return RegisteredMembersResponse(
+            members=members,
+            unregistered=unregistered,
+            total=len(members),
+            unregistered_count=len(unregistered),
+        )
 
     async def search_registered_members(
         self, line_group_id: str, query: str
@@ -691,10 +721,19 @@ class LineBindingService:
     # Group Member Tracking (webhook-based)
     # =========================================================================
 
-    async def track_members_joined(self, line_group_id: str, user_ids: list[str]) -> None:
+    async def track_members_joined(
+        self,
+        line_group_id: str,
+        user_ids: list[str],
+        display_names: dict[str, str] | None = None,
+    ) -> None:
         """Track users who joined a LINE group (from memberJoined webhook)."""
+        names = display_names or {}
         await asyncio.gather(
-            *(self.repository.upsert_group_member(line_group_id, uid) for uid in user_ids)
+            *(
+                self.repository.upsert_group_member(line_group_id, uid, names.get(uid))
+                for uid in user_ids
+            )
         )
 
     async def track_members_left(self, line_group_id: str, user_ids: list[str]) -> None:
@@ -703,9 +742,11 @@ class LineBindingService:
             *(self.repository.remove_group_member(line_group_id, uid) for uid in user_ids)
         )
 
-    async def track_group_presence(self, line_group_id: str, user_id: str) -> None:
+    async def track_group_presence(
+        self, line_group_id: str, user_id: str, line_display_name: str | None = None
+    ) -> None:
         """Track a user's presence from any group event (passive tracking)."""
-        await self.repository.upsert_group_member(line_group_id, user_id)
+        await self.repository.upsert_group_member(line_group_id, user_id, line_display_name)
 
     # =========================================================================
     # LIFF Notification CD Operations (30 分鐘群組層級 CD)

@@ -83,19 +83,21 @@ async def verify_webhook_signature(
 WebhookBodyDep = Annotated[bytes, Depends(verify_webhook_signature)]
 
 
+_line_bot_api_instance = None
+_line_bot_api_resolved = False
+
+
 def get_line_bot_api():
-    """
-    Get LINE Bot API client (lazy initialization)
+    """Get LINE Bot API client (lazy singleton — reuses connection pool)."""
+    global _line_bot_api_instance, _line_bot_api_resolved
 
-    Returns:
-        LineBotApi instance or None if not configured
+    if _line_bot_api_resolved:
+        return _line_bot_api_instance
 
-    Note: Import line-bot-sdk only when needed to avoid
-    import errors if package not installed
-    """
     settings = get_settings()
 
     if not settings.line_bot_enabled:
+        _line_bot_api_resolved = True
         return None
 
     try:
@@ -109,9 +111,28 @@ def get_line_bot_api():
             access_token=settings.line_access_token  # type: ignore
         )
         api_client = ApiClient(configuration)
-        return MessagingApi(api_client)
+        _line_bot_api_instance = MessagingApi(api_client)
     except ImportError:
         logger.warning("line-bot-sdk not installed")
+
+    _line_bot_api_resolved = True
+    return _line_bot_api_instance
+
+
+def get_group_member_display_name(group_id: str, user_id: str) -> str | None:
+    """Fetch a group member's display name via LINE Messaging API.
+
+    Returns None if API is unavailable or call fails (best-effort).
+    """
+    line_bot = get_line_bot_api()
+    if not line_bot:
+        return None
+
+    try:
+        profile = line_bot.get_group_member_profile(group_id, user_id)
+        return profile.display_name
+    except Exception as e:
+        logger.debug("Failed to fetch profile for user %s in group %s: %s", user_id, group_id, e)
         return None
 
 

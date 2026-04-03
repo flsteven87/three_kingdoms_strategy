@@ -58,9 +58,17 @@ export interface RegisteredMemberItem {
   readonly registered_at: string
 }
 
+export interface UnregisteredMemberItem {
+  readonly line_user_id: string
+  readonly line_display_name: string | null
+  readonly tracked_at: string
+}
+
 export interface RegisteredMembersResponse {
   readonly members: RegisteredMemberItem[]
+  readonly unregistered: UnregisteredMemberItem[]
   readonly total: number
+  readonly unregistered_count: number
 }
 
 export interface LineCustomCommand {

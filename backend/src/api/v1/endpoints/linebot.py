@@ -12,6 +12,7 @@ Endpoints for LINE Bot integration:
 3. 觸發條件：被 @ / 新成員加入 / 未註冊者首次發言
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -30,7 +31,13 @@ from src.core.dependencies import (
     PermissionServiceDep,
     UserIdDep,
 )
-from src.core.line_auth import WebhookBodyDep, create_liff_url, get_group_info, get_line_bot_api
+from src.core.line_auth import (
+    WebhookBodyDep,
+    create_liff_url,
+    get_group_info,
+    get_group_member_display_name,
+    get_line_bot_api,
+)
 from src.core.rate_limit import PUBLIC_MUTATION_RATE, PUBLIC_RATE, WEBHOOK_RATE, limiter
 from src.lib.line_flex_builder import (
     build_event_list_carousel,
@@ -724,7 +731,12 @@ async def _handle_member_joined(
 
     user_ids = _extract_member_user_ids(event.joined)
     if user_ids:
-        await service.track_members_joined(line_group_id, user_ids)
+        # Fetch profiles in parallel, non-blocking (LINE SDK is sync)
+        names = await asyncio.gather(
+            *(asyncio.to_thread(get_group_member_display_name, line_group_id, uid) for uid in user_ids)
+        )
+        display_names = {uid: name for uid, name in zip(user_ids, names, strict=True) if name}
+        await service.track_members_joined(line_group_id, user_ids, display_names or None)
 
     if not reply_token or not settings.liff_id:
         return
@@ -798,7 +810,8 @@ async def _handle_group_message(
     if not line_group_id or not line_user_id or not reply_token:
         return
 
-    await service.track_group_presence(line_group_id, line_user_id)
+    display_name = await asyncio.to_thread(get_group_member_display_name, line_group_id, line_user_id)
+    await service.track_group_presence(line_group_id, line_user_id, display_name)
 
     # 1. 處理綁定指令
     if _is_bind_command(text):

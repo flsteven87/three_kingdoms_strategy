@@ -163,11 +163,21 @@ class RegisteredMemberItem(BaseModel):
     registered_at: datetime
 
 
+class UnregisteredMemberItem(BaseModel):
+    """Unregistered group member (in LINE group but no game ID registered)"""
+
+    line_user_id: str
+    line_display_name: str | None = None
+    tracked_at: datetime
+
+
 class RegisteredMembersResponse(BaseModel):
     """Response for registered members list"""
 
     members: list[RegisteredMemberItem]
+    unregistered: list[UnregisteredMemberItem]
     total: int
+    unregistered_count: int
 
 
 class LineCustomCommandBase(BaseModel):
