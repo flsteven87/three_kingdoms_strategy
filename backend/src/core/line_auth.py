@@ -8,7 +8,6 @@ Handles LINE webhook signature verification and authentication.
 - Annotated dependency injection pattern
 """
 
-import asyncio
 import base64
 import hashlib
 import hmac
@@ -114,44 +113,6 @@ def get_line_bot_api():
     except ImportError:
         logger.warning("line-bot-sdk not installed")
         return None
-
-
-async def get_line_group_member_ids(line_group_id: str) -> set[str]:
-    """
-    Fetch all member user IDs from a LINE group via Messaging API.
-
-    Handles pagination automatically. Returns empty set if bot is not
-    configured or if the API call fails (e.g. bot was removed from group).
-
-    Args:
-        line_group_id: LINE group ID (starts with 'C')
-
-    Returns:
-        Set of LINE user IDs currently in the group
-    """
-    line_bot = get_line_bot_api()
-    if not line_bot:
-        return set()
-
-    def _fetch_all() -> set[str]:
-        member_ids: set[str] = set()
-        try:
-            resp = line_bot.get_group_members_ids(line_group_id)
-            member_ids.update(resp.member_ids)
-
-            while resp.next:
-                resp = line_bot.get_group_members_ids(line_group_id, start=resp.next)
-                member_ids.update(resp.member_ids)
-        except Exception:
-            logger.warning(
-                f"Failed to fetch group members for {line_group_id}", exc_info=True
-            )
-            if not member_ids:
-                return set()
-
-        return member_ids
-
-    return await asyncio.to_thread(_fetch_all)
 
 
 def create_liff_url(liff_id: str, group_id: str) -> str:

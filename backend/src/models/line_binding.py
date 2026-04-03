@@ -242,6 +242,8 @@ class LineWebhookEvent(BaseModel):
     reply_token: str | None = Field(None, alias="replyToken")
     source: dict
     message: dict | None = None
+    joined: dict | None = None
+    left: dict | None = None
     timestamp: int
 
     model_config = ConfigDict(populate_by_name=True)

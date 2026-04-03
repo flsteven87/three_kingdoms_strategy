@@ -20,7 +20,6 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from src.core.line_auth import get_line_group_member_ids
 from src.models.battle_event import EventCategory
 from src.models.battle_event_metrics import (
     BattleEventMetrics,
@@ -216,19 +215,11 @@ class LineBindingService:
         )
 
         bindings_response = []
-        if group_bindings:
-            # Fetch LINE group members and count registered members in parallel
-            group_member_id_sets = await asyncio.gather(
-                *(get_line_group_member_ids(b.line_group_id) for b in group_bindings)
+        for binding in group_bindings:
+            member_count = await self.repository.count_group_members_registered(
+                alliance_id, binding.line_group_id
             )
-            member_counts = await asyncio.gather(
-                *(
-                    self.repository.count_member_bindings_by_line_user_ids(alliance_id, ids)
-                    for ids in group_member_id_sets
-                )
-            )
-            for binding, member_count in zip(group_bindings, member_counts, strict=True):
-                bindings_response.append(
+            bindings_response.append(
                     LineGroupBindingResponse(
                         id=binding.id,
                         alliance_id=binding.alliance_id,
@@ -335,14 +326,10 @@ class LineBindingService:
             group_picture_url=group_info.picture_url,
         )
 
-        # Get member count from LINE group
-        group_member_ids = await get_line_group_member_ids(updated_binding.line_group_id)
-        if group_member_ids:
-            member_count = await self.repository.count_member_bindings_by_line_user_ids(
-                alliance_id, group_member_ids
-            )
-        else:
-            member_count = 0
+        # Get member count from group member tracking table
+        member_count = await self.repository.count_group_members_registered(
+            alliance_id, updated_binding.line_group_id
+        )
 
         return LineGroupBindingResponse(
             id=updated_binding.id,
@@ -360,15 +347,9 @@ class LineBindingService:
         """
         Get registered LINE members currently in the alliance's active group(s).
 
-        Uses LINE Messaging API to get actual group member list, then
-        cross-filters with member_line_bindings. Only members who are
-        both registered AND currently in an active LINE group are returned.
-
-        Args:
-            alliance_id: Alliance UUID
-
-        Returns:
-            RegisteredMembersResponse with member list
+        Cross-filters member_line_bindings with line_group_members table
+        (populated by webhook events). Only members who are both registered
+        AND tracked as present in an active LINE group are returned.
         """
         active_bindings = await self.repository.get_all_active_group_bindings_by_alliance(
             alliance_id
@@ -377,20 +358,14 @@ class LineBindingService:
         if not active_bindings:
             return RegisteredMembersResponse(members=[], total=0)
 
-        # Fetch actual group members from LINE API for all active groups in parallel
-        group_member_id_sets = await asyncio.gather(
-            *(get_line_group_member_ids(b.line_group_id) for b in active_bindings)
-        )
-        all_line_user_ids: set[str] = set()
-        for ids in group_member_id_sets:
-            all_line_user_ids.update(ids)
+        line_group_ids = [b.line_group_id for b in active_bindings]
+        tracked_user_ids = await self.repository.get_group_member_user_ids(line_group_ids)
 
-        if not all_line_user_ids:
+        if not tracked_user_ids:
             return RegisteredMembersResponse(members=[], total=0)
 
-        # Get only registered members whose line_user_id is in the group
         bindings = await self.repository.get_member_bindings_by_line_user_ids(
-            alliance_id, all_line_user_ids
+            alliance_id, tracked_user_ids
         )
 
         members = [
@@ -711,6 +686,30 @@ class LineBindingService:
             return False
 
         return not await self._is_group_in_cooldown(line_group_id)
+
+    # =========================================================================
+    # Group Member Tracking (webhook-based)
+    # =========================================================================
+
+    async def track_members_joined(self, line_group_id: str, user_ids: list[str]) -> None:
+        """Track users who joined a LINE group (from memberJoined webhook)."""
+        await asyncio.gather(
+            *(self.repository.upsert_group_member(line_group_id, uid) for uid in user_ids)
+        )
+
+    async def track_members_left(self, line_group_id: str, user_ids: list[str]) -> None:
+        """Remove users who left a LINE group (from memberLeft webhook)."""
+        await asyncio.gather(
+            *(self.repository.remove_group_member(line_group_id, uid) for uid in user_ids)
+        )
+
+    async def track_group_presence(self, line_group_id: str, user_id: str) -> None:
+        """Track a user's presence from any group event (passive tracking)."""
+        await self.repository.upsert_group_member(line_group_id, user_id)
+
+    # =========================================================================
+    # LIFF Notification CD Operations (30 分鐘群組層級 CD)
+    # =========================================================================
 
     async def should_send_member_joined_notification(self, line_group_id: str) -> bool:
         """

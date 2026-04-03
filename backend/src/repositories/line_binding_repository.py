@@ -373,29 +373,24 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, expect_single=True)
         return MemberLineBinding(**data)
 
-    async def get_all_member_bindings_by_alliance(
-        self, alliance_id: UUID
-    ) -> list[MemberLineBinding]:
-        """Get all member LINE bindings for an alliance."""
-        result = await self._execute_async(
+    async def update_member_binding_group(self, binding_id: UUID, group_binding_id: UUID) -> None:
+        """Update the group_binding_id of an existing member binding (for re-binding continuity)"""
+        await self._execute_async(
             lambda: self.client.from_("member_line_bindings")
-            .select("*")
-            .eq("alliance_id", str(alliance_id))
-            .order("created_at", desc=True)
+            .update(
+                {
+                    "group_binding_id": str(group_binding_id),
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
+            )
+            .eq("id", str(binding_id))
             .execute()
         )
-
-        data = self._handle_supabase_result(result, allow_empty=True)
-        return [MemberLineBinding(**row) for row in data]
 
     async def get_member_bindings_by_line_user_ids(
         self, alliance_id: UUID, line_user_ids: set[str]
     ) -> list[MemberLineBinding]:
-        """Get member bindings filtered by a set of LINE user IDs.
-
-        Used by get_registered_members() to show only members currently
-        in the active LINE group(s).
-        """
+        """Get member bindings filtered by a set of LINE user IDs."""
         if not line_user_ids:
             return []
 
@@ -411,35 +406,64 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
 
-    async def count_member_bindings_by_line_user_ids(
-        self, alliance_id: UUID, line_user_ids: set[str]
-    ) -> int:
-        """Count member bindings whose line_user_id is in the given set."""
-        if not line_user_ids:
+    # =========================================================================
+    # Group Member Tracking (line_group_members table)
+    # =========================================================================
+
+    async def upsert_group_member(self, line_group_id: str, line_user_id: str) -> None:
+        """Track a user's presence in a LINE group (idempotent)."""
+        await self._execute_async(
+            lambda: self.client.from_("line_group_members")
+            .upsert(
+                {
+                    "line_group_id": line_group_id,
+                    "line_user_id": line_user_id,
+                    "tracked_at": datetime.now(UTC).isoformat(),
+                },
+                on_conflict="line_group_id,line_user_id",
+            )
+            .execute()
+        )
+
+    async def remove_group_member(self, line_group_id: str, line_user_id: str) -> None:
+        """Remove a user from group tracking (on memberLeft)."""
+        await self._execute_async(
+            lambda: self.client.from_("line_group_members")
+            .delete()
+            .eq("line_group_id", line_group_id)
+            .eq("line_user_id", line_user_id)
+            .execute()
+        )
+
+    async def get_group_member_user_ids(self, line_group_ids: list[str]) -> set[str]:
+        """Get all tracked LINE user IDs across the given group(s)."""
+        if not line_group_ids:
+            return set()
+
+        result = await self._execute_async(
+            lambda: self.client.from_("line_group_members")
+            .select("line_user_id")
+            .in_("line_group_id", line_group_ids)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return {row["line_user_id"] for row in data}
+
+    async def count_group_members_registered(self, alliance_id: UUID, line_group_id: str) -> int:
+        """Count registered members who are also tracked in the given LINE group."""
+        tracked_ids = await self.get_group_member_user_ids([line_group_id])
+        if not tracked_ids:
             return 0
 
         result = await self._execute_async(
             lambda: self.client.from_("member_line_bindings")
             .select("id", count="exact")
             .eq("alliance_id", str(alliance_id))
-            .in_("line_user_id", list(line_user_ids))
+            .in_("line_user_id", list(tracked_ids))
             .execute()
         )
         return result.count or 0
-
-    async def update_member_binding_group(self, binding_id: UUID, group_binding_id: UUID) -> None:
-        """Update the group_binding_id of an existing member binding (for re-binding continuity)"""
-        await self._execute_async(
-            lambda: self.client.from_("member_line_bindings")
-            .update(
-                {
-                    "group_binding_id": str(group_binding_id),
-                    "updated_at": datetime.now(UTC).isoformat(),
-                }
-            )
-            .eq("id", str(binding_id))
-            .execute()
-        )
 
     async def find_member_by_name(self, alliance_id: UUID, name: str) -> UUID | None:
         """Find member ID by name in members table (for auto-matching)"""

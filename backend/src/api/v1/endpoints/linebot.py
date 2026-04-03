@@ -662,6 +662,11 @@ async def _handle_event(
         await _handle_member_joined(event, service, settings)
         return
 
+    # 成員離開群組
+    if event.type == "memberLeft" and source_type == "group":
+        await _handle_member_left(event, service)
+        return
+
     # 用戶加好友
     if event.type == "follow":
         await _handle_follow_event(event)
@@ -709,15 +714,19 @@ async def _handle_member_joined(
     service: LineBindingService,
     settings: Settings,
 ) -> None:
-    """新成員加入 → 發送 LIFF 入口（群組層級 30 分鐘 CD）"""
+    """新成員加入 → 追蹤群組成員 + 發送 LIFF 入口（群組層級 30 分鐘 CD）"""
     source = event.source
     line_group_id = source.get("groupId")
     reply_token = event.reply_token
 
-    if not line_group_id or not reply_token:
+    if not line_group_id:
         return
 
-    if not settings.liff_id:
+    user_ids = _extract_member_user_ids(event.joined)
+    if user_ids:
+        await service.track_members_joined(line_group_id, user_ids)
+
+    if not reply_token or not settings.liff_id:
         return
 
     # 檢查是否應該發送通知（群組已綁定 + 群組層級 CD）
@@ -731,6 +740,20 @@ async def _handle_member_joined(
     # 發送歡迎訊息
     liff_url = create_liff_url(settings.liff_id, line_group_id)
     await _send_liff_welcome(reply_token, liff_url)
+
+
+async def _handle_member_left(
+    event: LineWebhookEvent,
+    service: LineBindingService,
+) -> None:
+    """成員離開群組 → 從追蹤表移除"""
+    line_group_id = event.source.get("groupId")
+    if not line_group_id:
+        return
+
+    user_ids = _extract_member_user_ids(event.left)
+    if user_ids:
+        await service.track_members_left(line_group_id, user_ids)
 
 
 async def _handle_follow_event(event: LineWebhookEvent) -> None:
@@ -774,6 +797,8 @@ async def _handle_group_message(
 
     if not line_group_id or not line_user_id or not reply_token:
         return
+
+    await service.track_group_presence(line_group_id, line_user_id)
 
     # 1. 處理綁定指令
     if _is_bind_command(text):
@@ -903,6 +928,13 @@ async def _handle_group_message(
 # =============================================================================
 # Command Handlers
 # =============================================================================
+
+
+def _extract_member_user_ids(event_data: dict | None) -> list[str]:
+    """Extract user IDs from a memberJoined/memberLeft event payload."""
+    if not event_data or "members" not in event_data:
+        return []
+    return [m["userId"] for m in event_data["members"] if "userId" in m]
 
 
 def _is_bind_command(text: str) -> bool:

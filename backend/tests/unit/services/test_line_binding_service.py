@@ -14,7 +14,7 @@ Tests cover:
 """
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -425,40 +425,79 @@ def _make_member_binding(
 # =============================================================================
 
 
-class TestGetRegisteredMembers:
-    """Tests for LineBindingService.get_registered_members()."""
+class TestGroupMemberTracking:
+    """Tests for group member webhook tracking methods."""
 
     @pytest.mark.asyncio
-    async def test_filters_by_line_group_members(
+    async def test_track_members_joined_calls_upsert_for_each(
         self, service: LineBindingService, mock_repository: MagicMock
     ):
-        """Should only return members whose line_user_id is in the LINE group."""
+        """Should upsert each joined user into line_group_members."""
+        mock_repository.upsert_group_member = AsyncMock()
+
+        await service.track_members_joined("Cgroup123", ["Uaaa", "Ubbb"])
+
+        assert mock_repository.upsert_group_member.call_count == 2
+        mock_repository.upsert_group_member.assert_any_call("Cgroup123", "Uaaa")
+        mock_repository.upsert_group_member.assert_any_call("Cgroup123", "Ubbb")
+
+    @pytest.mark.asyncio
+    async def test_track_members_left_calls_remove_for_each(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should remove each left user from line_group_members."""
+        mock_repository.remove_group_member = AsyncMock()
+
+        await service.track_members_left("Cgroup123", ["Uccc"])
+
+        mock_repository.remove_group_member.assert_called_once_with("Cgroup123", "Uccc")
+
+    @pytest.mark.asyncio
+    async def test_track_group_presence_upserts_single_user(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should upsert a single user on message event (passive tracking)."""
+        mock_repository.upsert_group_member = AsyncMock()
+
+        await service.track_group_presence("Cgroup123", "Uaaa")
+
+        mock_repository.upsert_group_member.assert_called_once_with("Cgroup123", "Uaaa")
+
+
+# =============================================================================
+# Tests for get_registered_members()
+# =============================================================================
+
+
+class TestGetRegisteredMembers:
+    """Tests for get_registered_members() — group member table filtering."""
+
+    @pytest.mark.asyncio
+    async def test_returns_only_members_in_active_groups(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should cross-filter registered members with group member tracking."""
         binding = _make_group_binding()
         mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(
             return_value=[binding]
         )
-        member_in_group = _make_member_binding(line_user_id="Uuser1", game_id="玩家A")
-        mock_repository.get_member_bindings_by_line_user_ids = AsyncMock(
-            return_value=[member_in_group]
+        mock_repository.get_group_member_user_ids = AsyncMock(
+            return_value={"Uuser1", "Uuser_not_registered"}
         )
+        member = _make_member_binding(line_user_id="Uuser1", game_id="玩家A")
+        mock_repository.get_member_bindings_by_line_user_ids = AsyncMock(return_value=[member])
 
-        with patch(
-            "src.services.line_binding_service.get_line_group_member_ids",
-            return_value={"Uuser1", "Uuser_not_registered"},
-        ):
-            result = await service.get_registered_members(ALLIANCE_ID)
+        result = await service.get_registered_members(ALLIANCE_ID)
 
         assert result.total == 1
         assert result.members[0].game_id == "玩家A"
-        mock_repository.get_member_bindings_by_line_user_ids.assert_called_once_with(
-            ALLIANCE_ID, {"Uuser1", "Uuser_not_registered"}
-        )
+        mock_repository.get_group_member_user_ids.assert_called_once_with([binding.line_group_id])
 
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_active_bindings(
         self, service: LineBindingService, mock_repository: MagicMock
     ):
-        """Should return empty list when no active group bindings exist."""
+        """Should return empty when no active group bindings exist."""
         mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(return_value=[])
 
         result = await service.get_registered_members(ALLIANCE_ID)
@@ -467,29 +506,26 @@ class TestGetRegisteredMembers:
         assert result.members == []
 
     @pytest.mark.asyncio
-    async def test_returns_empty_when_line_api_returns_no_members(
+    async def test_returns_empty_when_no_tracked_members(
         self, service: LineBindingService, mock_repository: MagicMock
     ):
-        """Should return empty list when LINE API returns empty set (e.g. bot removed)."""
+        """Should return empty when group tracking table has no members."""
         binding = _make_group_binding()
         mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(
             return_value=[binding]
         )
+        mock_repository.get_group_member_user_ids = AsyncMock(return_value=set())
 
-        with patch(
-            "src.services.line_binding_service.get_line_group_member_ids",
-            return_value=set(),
-        ):
-            result = await service.get_registered_members(ALLIANCE_ID)
+        result = await service.get_registered_members(ALLIANCE_ID)
 
         assert result.total == 0
         assert result.members == []
 
     @pytest.mark.asyncio
-    async def test_merges_members_from_multiple_active_groups(
+    async def test_merges_members_from_multiple_groups(
         self, service: LineBindingService, mock_repository: MagicMock
     ):
-        """Should collect member IDs from all active groups and return union."""
+        """Should collect tracked user IDs from all active group line_group_ids."""
         now = datetime.now()
         binding1 = _make_group_binding()
         binding2 = LineGroupBinding(
@@ -507,24 +543,14 @@ class TestGetRegisteredMembers:
         mock_repository.get_all_active_group_bindings_by_alliance = AsyncMock(
             return_value=[binding1, binding2]
         )
+        mock_repository.get_group_member_user_ids = AsyncMock(return_value={"Uuser1", "Uuser2"})
         member_a = _make_member_binding(line_user_id="Uuser1", game_id="玩家A")
         member_b = _make_member_binding(line_user_id="Uuser2", game_id="玩家B")
         mock_repository.get_member_bindings_by_line_user_ids = AsyncMock(
             return_value=[member_a, member_b]
         )
 
-        async def mock_get_ids(group_id: str) -> set[str]:
-            if group_id == GROUP_ID:
-                return {"Uuser1"}
-            return {"Uuser2"}
-
-        with patch(
-            "src.services.line_binding_service.get_line_group_member_ids",
-            side_effect=mock_get_ids,
-        ):
-            result = await service.get_registered_members(ALLIANCE_ID)
+        result = await service.get_registered_members(ALLIANCE_ID)
 
         assert result.total == 2
-        mock_repository.get_member_bindings_by_line_user_ids.assert_called_once_with(
-            ALLIANCE_ID, {"Uuser1", "Uuser2"}
-        )
+        mock_repository.get_group_member_user_ids.assert_called_once_with([GROUP_ID, "Cgroup5678"])
