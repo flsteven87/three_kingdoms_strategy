@@ -4,14 +4,20 @@ Application configuration
 符合 CLAUDE.md: Pydantic BaseSettings for environment variables
 """
 
+from datetime import timedelta, timezone
 from functools import lru_cache
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Game server timezone (Taiwan/China server time is UTC+8)
 # Centralized constant for consistent timezone handling across the application
-GAME_TIMEZONE = ZoneInfo("Asia/Taipei")
+try:
+    GAME_TIMEZONE = ZoneInfo("Asia/Taipei")
+except ZoneInfoNotFoundError:
+    # Windows can lack IANA timezone data until tzdata is installed.
+    # Asia/Taipei is a fixed UTC+8 offset for this application.
+    GAME_TIMEZONE = timezone(timedelta(hours=8), name="Asia/Taipei")
 
 
 class Settings(BaseSettings):
