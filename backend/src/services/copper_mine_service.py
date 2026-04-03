@@ -25,6 +25,8 @@ from src.models.copper_mine import (
     CopperMineResponse,
     RegisterCopperResponse,
 )
+from src.models.copper_mine_coordinate import CopperCoordinateSearchResult
+from src.repositories.copper_mine_coordinate_repository import CopperMineCoordinateRepository
 from src.repositories.copper_mine_repository import CopperMineRepository
 from src.repositories.copper_mine_rule_repository import CopperMineRuleRepository
 from src.repositories.line_binding_repository import LineBindingRepository
@@ -47,6 +49,7 @@ class CopperMineService:
         member_repository: MemberRepository | None = None,
         rule_repository: CopperMineRuleRepository | None = None,
         snapshot_repository: MemberSnapshotRepository | None = None,
+        coordinate_repository: CopperMineCoordinateRepository | None = None,
     ):
         self.repository = repository or CopperMineRepository()
         self.line_binding_repository = line_binding_repository or LineBindingRepository()
@@ -54,6 +57,7 @@ class CopperMineService:
         self.member_repository = member_repository or MemberRepository()
         self.rule_repository = rule_repository or CopperMineRuleRepository()
         self.snapshot_repository = snapshot_repository or MemberSnapshotRepository()
+        self.coordinate_repository = coordinate_repository or CopperMineCoordinateRepository()
 
     async def _get_alliance_id_from_group(self, line_group_id: str) -> UUID:
         """
@@ -139,6 +143,12 @@ class CopperMineService:
         rules = await self.rule_repository.get_rules_by_alliance(alliance_id)
         max_allowed = len(rules)
 
+        # Check if source of truth data exists for this season
+        game_season_tag = await self._get_game_season_tag(current_season_id)
+        has_source_data = False
+        if game_season_tag:
+            has_source_data = await self.coordinate_repository.has_data(game_season_tag)
+
         # 計算每個綁定 game_id 的銅礦數量
         mine_counts_by_game_id: dict[str, int] = {}
         member_bindings = await self.line_binding_repository.get_member_bindings_by_line_user(
@@ -158,6 +168,7 @@ class CopperMineService:
             total=len(mines),
             mine_counts_by_game_id=mine_counts_by_game_id,
             max_allowed=max_allowed,
+            has_source_data=has_source_data,
         )
 
     async def _get_current_season_id(self, alliance_id: UUID) -> UUID | None:
@@ -169,6 +180,58 @@ class CopperMineService:
         """Try to match game_id to a member"""
         member = await self.member_repository.get_by_name(alliance_id, game_id)
         return member.id if member else None
+
+    async def _get_game_season_tag(self, season_id: UUID | None) -> str | None:
+        """Get game_season_tag from a season, returning None if not set or no season."""
+        if not season_id:
+            return None
+        season = await self.season_repository.get_by_id(season_id)
+        if not season:
+            return None
+        return season.game_season_tag
+
+    async def _validate_source_of_truth(
+        self, game_season_tag: str | None, coord_x: int, coord_y: int, level: int
+    ) -> int:
+        """
+        Validate coordinates against source of truth and return the correct level.
+
+        When source of truth exists:
+        - Coordinate must exist in the reference table, otherwise 400
+        - Level is overridden by the reference data (silent override)
+
+        When no source of truth:
+        - Returns the user-provided level unchanged
+
+        Args:
+            game_season_tag: Game season tag (e.g. 'PK23'), or None
+            coord_x: X coordinate
+            coord_y: Y coordinate
+            level: User-provided mine level
+
+        Returns:
+            The validated/overridden level
+
+        Raises:
+            HTTPException 400: If coordinates not found in source of truth
+        """
+        if not game_season_tag:
+            return level
+
+        has_data = await self.coordinate_repository.has_data(game_season_tag)
+        if not has_data:
+            return level
+
+        coordinate = await self.coordinate_repository.get_by_coords(
+            game_season_tag, coord_x, coord_y
+        )
+        if not coordinate:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"座標 ({coord_x}, {coord_y}) 不在 {game_season_tag} 的銅礦資料中",
+            )
+
+        return coordinate.level
 
     async def _check_coord_available(
         self, alliance_id: UUID, coord_x: int, coord_y: int, season_id: UUID | None = None
@@ -372,6 +435,10 @@ class CopperMineService:
         # Auto-fill season_id and member_id first (needed for coord check)
         season_id = await self._get_current_season_id(alliance_id)
         member_id = await self._match_member_id(alliance_id, game_id)
+
+        # Source of truth: validate coordinates and override level
+        game_season_tag = await self._get_game_season_tag(season_id)
+        level = await self._validate_source_of_truth(game_season_tag, coord_x, coord_y, level)
 
         # P0 修復: 使用統一的座標檢查方法
         # 當有活躍賽季時，只檢查該賽季內的座標
@@ -607,6 +674,10 @@ class CopperMineService:
             alliance_id=alliance_id, coord_x=coord_x, coord_y=coord_y, season_id=season_id
         )
 
+        # Source of truth: validate coordinates and override level
+        game_season_tag = await self._get_game_season_tag(season_id)
+        level = await self._validate_source_of_truth(game_season_tag, coord_x, coord_y, level)
+
         # P0 修復: 驗證銅礦申請規則（與 LIFF 行為一致）
         # Skip validation for reserved mines
         claimed_tier = None
@@ -733,3 +804,108 @@ class CopperMineService:
             member_group=None,
             line_display_name=None,
         )
+
+    # =========================================================================
+    # Search Methods (Source of Truth)
+    # =========================================================================
+
+    async def search_copper_coordinates(
+        self, line_group_id: str, query: str
+    ) -> list[CopperCoordinateSearchResult]:
+        """
+        Search available 9/10 copper mine coordinates by county/district name (LIFF).
+
+        Args:
+            line_group_id: LINE group ID
+            query: Search text for county/district name
+
+        Returns:
+            List of matching coordinates with availability info
+        """
+        alliance_id = await self._get_alliance_id_from_group(line_group_id)
+        season_id = await self._get_current_season_id(alliance_id)
+        game_season_tag = await self._get_game_season_tag(season_id)
+
+        if not game_season_tag:
+            return []
+
+        has_data = await self.coordinate_repository.has_data(game_season_tag)
+        if not has_data:
+            return []
+
+        # Search for 9/10 level coordinates
+        coordinates = await self.coordinate_repository.search_by_location(
+            game_season_tag, query, level_filter=[9, 10]
+        )
+
+        if not coordinates:
+            return []
+
+        # Get registered mines in current season to mark taken ones
+        registered_mines = await self.repository.get_mines_by_alliance(
+            alliance_id, season_id=season_id
+        )
+        taken_coords = {(m.coord_x, m.coord_y) for m in registered_mines}
+
+        return [
+            CopperCoordinateSearchResult(
+                coord_x=c.coord_x,
+                coord_y=c.coord_y,
+                level=c.level,
+                county=c.county,
+                district=c.district,
+                is_taken=(c.coord_x, c.coord_y) in taken_coords,
+            )
+            for c in coordinates
+        ]
+
+    async def search_copper_coordinates_by_season(
+        self, season_id: UUID, query: str
+    ) -> list[CopperCoordinateSearchResult]:
+        """
+        Search available 9/10 copper mine coordinates by county/district name (Dashboard).
+
+        Args:
+            season_id: Season UUID
+            query: Search text for county/district name
+
+        Returns:
+            List of matching coordinates with availability info
+        """
+        game_season_tag = await self._get_game_season_tag(season_id)
+
+        if not game_season_tag:
+            return []
+
+        has_data = await self.coordinate_repository.has_data(game_season_tag)
+        if not has_data:
+            return []
+
+        coordinates = await self.coordinate_repository.search_by_location(
+            game_season_tag, query, level_filter=[9, 10]
+        )
+
+        if not coordinates:
+            return []
+
+        # Get season to find alliance_id
+        season = await self.season_repository.get_by_id(season_id)
+        if not season:
+            return []
+
+        registered_mines = await self.repository.get_mines_by_alliance(
+            season.alliance_id, season_id=season_id
+        )
+        taken_coords = {(m.coord_x, m.coord_y) for m in registered_mines}
+
+        return [
+            CopperCoordinateSearchResult(
+                coord_x=c.coord_x,
+                coord_y=c.coord_y,
+                level=c.level,
+                county=c.county,
+                district=c.district,
+                is_taken=(c.coord_x, c.coord_y) in taken_coords,
+            )
+            for c in coordinates
+        ]

@@ -92,6 +92,7 @@ class CopperMineListResponse(BaseModel):
     total: int = 0
     mine_counts_by_game_id: dict[str, int] = {}  # {game_id: count}
     max_allowed: int = 0
+    has_source_data: bool = False
 
 
 class RegisterCopperResponse(BaseModel):

@@ -172,7 +172,7 @@
 
 - [X] Phase 1: Database Schema
 - [X] Phase 2: Import Script
-- [ ] Phase 3: Backend Models & Repository
+- [X] Phase 3: Backend Models & Repository
 - [ ] Phase 4: Backend Service Logic
 - [ ] Phase 5: Backend API Endpoints
 - [ ] Phase 6: Frontend — Season Config
