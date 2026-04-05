@@ -105,13 +105,16 @@ export function SeasonCard({
   };
 
   const handleSave = async () => {
-    await onUpdate(season.id, {
-      name: editData.name,
-      start_date: editData.start_date,
-      end_date: editData.end_date || null,
-      description: editData.description || null,
-      game_season_tag: editData.game_season_tag || null,
-    });
+    const data: Record<string, string | null> = {};
+    if (editData.name !== season.name) data.name = editData.name;
+    if (editData.start_date !== season.start_date) data.start_date = editData.start_date;
+    if ((editData.end_date || null) !== (season.end_date || null)) data.end_date = editData.end_date || null;
+    if ((editData.description || null) !== (season.description || null)) data.description = editData.description || null;
+    if ((editData.game_season_tag || null) !== (season.game_season_tag || null)) data.game_season_tag = editData.game_season_tag || null;
+
+    if (Object.keys(data).length > 0) {
+      await onUpdate(season.id, data);
+    }
     setIsEditing(false);
   };
 
@@ -214,6 +217,11 @@ export function SeasonCard({
 
   const badge = (
     <div className="flex items-center gap-2">
+      {season.game_season_tag && (
+        <Badge variant="outline" className="text-xs">
+          {GAME_SEASON_TAGS.find((t) => t.value === season.game_season_tag)?.label ?? season.game_season_tag}
+        </Badge>
+      )}
       {season.is_trial && (
         <Badge variant="secondary" className="text-xs">
           試用
