@@ -31,6 +31,13 @@ import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { useCanManageSeasons } from "@/hooks/use-user-role";
 import { useCanActivateSeason } from "@/hooks/use-season-quota";
@@ -43,6 +50,7 @@ import {
   getActivationStatusColor,
 } from "@/types/season";
 import { formatDateTW } from "@/lib/date-utils";
+import { GAME_SEASON_TAGS } from "@/constants/game-seasons";
 
 interface SeasonCardProps {
   readonly season: Season;
@@ -74,6 +82,7 @@ export function SeasonCard({
     start_date: season.start_date,
     end_date: season.end_date || "",
     description: season.description || "",
+    game_season_tag: season.game_season_tag || "",
   });
 
   const canManageSeasons = useCanManageSeasons();
@@ -91,6 +100,7 @@ export function SeasonCard({
       start_date: season.start_date,
       end_date: season.end_date || "",
       description: season.description || "",
+      game_season_tag: season.game_season_tag || "",
     });
   };
 
@@ -100,6 +110,7 @@ export function SeasonCard({
       start_date: editData.start_date,
       end_date: editData.end_date || null,
       description: editData.description || null,
+      game_season_tag: editData.game_season_tag || null,
     });
     setIsEditing(false);
   };
@@ -295,6 +306,40 @@ export function SeasonCard({
                 />
               ) : (
                 <p className="text-foreground">{season.description}</p>
+              )}
+            </div>
+          )}
+
+          {/* Game Season Tag - always show in edit mode, conditional in view mode */}
+          {(isEditing || season.game_season_tag) && (
+            <div className="text-sm">
+              <p className="text-muted-foreground mb-1">遊戲賽季</p>
+              {isEditing ? (
+                <Select
+                  value={editData.game_season_tag || "none"}
+                  onValueChange={(value) =>
+                    setEditData({
+                      ...editData,
+                      game_season_tag: value === "none" ? "" : value,
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="選填：關聯遊戲賽季" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="none">不設定</SelectItem>
+                    {GAME_SEASON_TAGS.map((tag) => (
+                      <SelectItem key={tag.value} value={tag.value}>
+                        {tag.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-foreground">
+                  {GAME_SEASON_TAGS.find((t) => t.value === season.game_season_tag)?.label ?? season.game_season_tag}
+                </p>
               )}
             </div>
           )}
