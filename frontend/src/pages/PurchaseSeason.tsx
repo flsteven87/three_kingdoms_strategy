@@ -155,9 +155,10 @@ function PurchaseSeason() {
     const baseUrl = window.location.origin
 
     try {
-      // Format: user_id:quantity - used by webhook to grant seasons
-      // Fixed to 1 season per purchase (Recur ONE_TIME products don't support quantity)
-      const externalCustomerId = `${user.id}:1`
+      // externalCustomerId = user UUID ONLY. The server treats every successful
+      // checkout as exactly 1 season for the configured product. Do NOT encode
+      // quantity client-side — the webhook would trust it.
+      const externalCustomerId = user.id
 
       await checkout({
         productId,
