@@ -1,7 +1,7 @@
 """
-Application configuration
+Application configuration.
 
-符合 CLAUDE.md: Pydantic BaseSettings for environment variables
+符合 CLAUDE.md: Pydantic BaseSettings for environment variables.
 """
 
 from datetime import timedelta, timezone
