@@ -116,14 +116,30 @@ class PaymentService:
         """
         Pull the buyer's user UUID from the webhook payload.
 
+        Recur's webhook payloads nest the external customer id in a few
+        different places depending on event type (``checkout.completed`` vs
+        ``order.paid``). Search in order of specificity:
+
+        1. ``data.externalCustomerId`` / ``data.external_customer_id``
+        2. ``data.customer.externalId`` / ``data.customer.external_id``
+        3. ``data.order.customer.externalId`` / ``data.order.customer.external_id``
+
         Tolerates a legacy ``uuid:qty`` suffix: Recur's Customer.externalId is
         sticky per-email, so customers first seen under the old format keep
         sending that string forever. Any suffix after the first ``:`` is ignored
         — quantity is hardcoded by :data:`SEASONS_PER_PURCHASE`, so the suffix
         cannot inflate the grant even if it says ``:999``.
         """
-        raw = event_data.get("externalCustomerId") or event_data.get("external_customer_id")
+        raw = PaymentService._find_external_customer_id(event_data)
         if not raw:
+            logger.warning(
+                "Webhook missing externalCustomerId event_id=%s top_keys=%s customer_keys=%s",
+                event_id,
+                sorted(event_data.keys()),
+                sorted((event_data.get("customer") or {}).keys())
+                if isinstance(event_data.get("customer"), dict)
+                else None,
+            )
             raise WebhookPermanentError("missing_external_customer_id", event_id=event_id)
         uuid_part = str(raw).split(":", 1)[0]
         try:
@@ -132,6 +148,46 @@ class PaymentService:
             raise WebhookPermanentError(
                 "invalid_external_customer_id", event_id=event_id, raw=str(raw)
             ) from e
+
+    @staticmethod
+    def _find_external_customer_id(event_data: dict) -> str | None:
+        """Walk the known Recur payload shapes looking for the external customer id."""
+        def _first_str(*candidates: object) -> str | None:
+            for c in candidates:
+                if isinstance(c, str) and c:
+                    return c
+            return None
+
+        top = _first_str(
+            event_data.get("externalCustomerId"),
+            event_data.get("external_customer_id"),
+        )
+        if top:
+            return top
+
+        customer = event_data.get("customer")
+        if isinstance(customer, dict):
+            nested = _first_str(
+                customer.get("externalId"),
+                customer.get("external_id"),
+                customer.get("externalCustomerId"),
+                customer.get("external_customer_id"),
+            )
+            if nested:
+                return nested
+
+        order = event_data.get("order")
+        if isinstance(order, dict):
+            order_customer = order.get("customer")
+            if isinstance(order_customer, dict):
+                nested = _first_str(
+                    order_customer.get("externalId"),
+                    order_customer.get("external_id"),
+                )
+                if nested:
+                    return nested
+
+        return None
 
     @staticmethod
     def _validate_product(event_data: dict, *, event_id: str) -> None:

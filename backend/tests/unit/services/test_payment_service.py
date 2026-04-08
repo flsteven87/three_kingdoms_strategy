@@ -124,6 +124,37 @@ class TestHandlePaymentSuccess:
         assert kwargs["user_id"] == USER_ID
 
     @pytest.mark.asyncio
+    async def test_external_id_nested_under_customer(self, service):
+        """Recur may nest externalId under data.customer.externalId."""
+        data = _valid_event_data()
+        data.pop("externalCustomerId")
+        data["customer"] = {"id": "recur_cust_1", "externalId": str(USER_ID)}
+        result = await service.handle_payment_success(data, event_id="evt_nested_camel")
+        assert result["status"] == "granted"
+        assert result["user_id"] == str(USER_ID)
+
+    @pytest.mark.asyncio
+    async def test_external_id_nested_under_customer_snake(self, service):
+        """Same as above but using snake_case field name."""
+        data = _valid_event_data()
+        data.pop("externalCustomerId")
+        data["customer"] = {"id": "recur_cust_1", "external_id": str(USER_ID)}
+        result = await service.handle_payment_success(data, event_id="evt_nested_snake")
+        assert result["status"] == "granted"
+
+    @pytest.mark.asyncio
+    async def test_external_id_nested_under_order_customer(self, service):
+        """order.paid events may nest under data.order.customer.externalId."""
+        data = _valid_event_data()
+        data.pop("externalCustomerId")
+        data["order"] = {
+            "id": "ord_1",
+            "customer": {"id": "recur_cust_1", "externalId": str(USER_ID)},
+        }
+        result = await service.handle_payment_success(data, event_id="evt_order_nested")
+        assert result["status"] == "granted"
+
+    @pytest.mark.asyncio
     async def test_legacy_suffix_never_inflates_grant(self, service):
         """
         Defence-in-depth: even if the suffix claims a large quantity, the grant
