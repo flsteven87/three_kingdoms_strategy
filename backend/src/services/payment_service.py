@@ -1,10 +1,14 @@
 """
-Payment Service — Recur webhook processing.
+Payment Service — Recur webhook processing (purchase-level idempotency).
 
 Responsibilities:
-    1. Validate that the event's product/amount/currency match server config.
-    2. Resolve the buyer's alliance.
-    3. Call the atomic ``process_payment_webhook_event`` RPC to claim + grant.
+    1. Route by event type: only ``order.paid`` grants; ``checkout.completed``
+       is audit-only. Unknown types become permanent errors.
+    2. Extract purchase-level identifiers (``checkout_id``, ``order_id``)
+       from the real Recur payload shapes.
+    3. Validate server-authoritative product/amount/currency (strict).
+    4. Resolve the buyer's alliance.
+    5. Call the atomic ``process_payment_webhook_event`` v2 RPC.
 
 Errors are raised as ``WebhookPermanentError`` or ``WebhookTransientError``
 so the API layer can translate to the correct HTTP status.
@@ -28,6 +32,13 @@ logger = logging.getLogger(__name__)
 # One product = one season. Quantity is NEVER taken from the event.
 SEASONS_PER_PURCHASE = 1
 
+# Only ``order.paid`` actually grants a season; ``checkout.completed`` is
+# audit-only. Any other event type is a hard stop — we would rather 4xx and
+# alert than silently grant on an unknown event.
+GRANTING_EVENT_TYPE = "order.paid"
+AUDIT_ONLY_EVENT_TYPES = frozenset({"checkout.completed"})
+KNOWN_EVENT_TYPES = frozenset({GRANTING_EVENT_TYPE}) | AUDIT_ONLY_EVENT_TYPES
+
 
 class PaymentService:
     def __init__(self) -> None:
@@ -39,10 +50,9 @@ class PaymentService:
         event_data: dict,
         *,
         event_id: str | None = None,
-        event_type: str = "checkout.completed",
+        event_type: str = GRANTING_EVENT_TYPE,
     ) -> dict:
-        """
-        Validate + grant for a ``checkout.completed`` / ``order.paid`` event.
+        """Validate + (optionally) grant for a Recur webhook event.
 
         Returns a dict describing the outcome. Raises ``WebhookPermanentError``
         for unretryable problems and ``WebhookTransientError`` for retryable
@@ -50,8 +60,17 @@ class PaymentService:
         """
         if not event_id:
             raise WebhookPermanentError("missing_event_id")
+        if event_type not in KNOWN_EVENT_TYPES:
+            raise WebhookPermanentError(
+                "unsupported_event_type", event_id=event_id, event_type=event_type
+            )
 
         user_id = self._extract_user_id(event_data, event_id=event_id)
+        checkout_id = self._extract_checkout_id(
+            event_data, event_id=event_id, event_type=event_type
+        )
+        order_id = self._extract_order_id(event_data, event_type=event_type)
+
         self._validate_product(event_data, event_id=event_id)
         self._validate_amount(event_data, event_id=event_id)
         self._validate_currency(event_data, event_id=event_id)
@@ -68,13 +87,17 @@ class PaymentService:
                 "alliance_not_found", event_id=event_id, user_id=str(user_id)
             )
 
+        seasons = SEASONS_PER_PURCHASE if event_type == GRANTING_EVENT_TYPE else 0
+
         try:
             result: WebhookProcessingResult = await self._webhook_repo.process_event(
                 event_id=event_id,
                 event_type=event_type,
+                checkout_id=checkout_id,
+                order_id=order_id,
                 alliance_id=alliance.id,
                 user_id=user_id,
-                seasons=SEASONS_PER_PURCHASE,
+                seasons=seasons,
                 payload=event_data,
             )
         except APIError as e:
@@ -82,53 +105,40 @@ class PaymentService:
         except OSError as e:
             raise WebhookTransientError("rpc_os_error", event_id=event_id) from e
 
-        if result.status == "duplicate":
-            logger.info("Duplicate webhook skipped event_id=%s", event_id)
-            return {
-                "status": "duplicate",
-                "alliance_id": str(alliance.id),
-                "user_id": str(user_id),
-                "seasons_added": 0,
-                "available_seasons": result.available_seasons,
-            }
-
+        seasons_added = SEASONS_PER_PURCHASE if result.status == "granted" else 0
         logger.info(
-            "Season granted event_id=%s alliance_id=%s user_id=%s available=%s",
+            "Webhook processed status=%s event_id=%s event_type=%s "
+            "checkout_id=%s alliance_id=%s user_id=%s available=%s",
+            result.status,
             event_id,
+            event_type,
+            checkout_id,
             alliance.id,
             user_id,
             result.available_seasons,
         )
         return {
-            "status": "granted",
+            "status": result.status,
             "alliance_id": str(alliance.id),
             "user_id": str(user_id),
-            "seasons_added": SEASONS_PER_PURCHASE,
+            "checkout_id": checkout_id,
+            "order_id": order_id,
+            "seasons_added": seasons_added,
             "available_seasons": result.available_seasons,
         }
 
     # ------------------------------------------------------------------
-    # Validation helpers
+    # Extraction helpers
     # ------------------------------------------------------------------
 
     @staticmethod
     def _extract_user_id(event_data: dict, *, event_id: str) -> UUID:
-        """
-        Pull the buyer's user UUID from the webhook payload.
+        """Pull the buyer's user UUID from the webhook payload.
 
-        Recur's webhook payloads nest the external customer id in a few
-        different places depending on event type (``checkout.completed`` vs
-        ``order.paid``). Search in order of specificity:
-
-        1. ``data.externalCustomerId`` / ``data.external_customer_id``
-        2. ``data.customer.externalId`` / ``data.customer.external_id``
-        3. ``data.order.customer.externalId`` / ``data.order.customer.external_id``
-
-        Tolerates a legacy ``uuid:qty`` suffix: Recur's Customer.externalId is
-        sticky per-email, so customers first seen under the old format keep
-        sending that string forever. Any suffix after the first ``:`` is ignored
-        — quantity is hardcoded by :data:`SEASONS_PER_PURCHASE`, so the suffix
-        cannot inflate the grant even if it says ``:999``.
+        Real Recur payloads put it at ``data.customer.external_id`` (snake_case).
+        Camel-case and ``data.order.customer.externalId`` fallbacks exist for
+        defensive coverage but are never observed in production and should
+        eventually be pruned.
         """
         raw = PaymentService._find_external_customer_id(event_data)
         if not raw:
@@ -141,6 +151,16 @@ class PaymentService:
                 else None,
             )
             raise WebhookPermanentError("missing_external_customer_id", event_id=event_id)
+
+        if ":" in str(raw):
+            # Legacy sticky-per-email customers created before the 2026-04-08
+            # rewrite still send ``uuid:qty``. Suffix is ignored; quantity is
+            # hardcoded by SEASONS_PER_PURCHASE. Log so we can detect when
+            # the last legacy customer stops firing and delete this path.
+            logger.warning(
+                "legacy_external_id_suffix event_id=%s raw=%s", event_id, raw
+            )
+
         uuid_part = str(raw).split(":", 1)[0]
         try:
             return UUID(uuid_part)
@@ -168,8 +188,8 @@ class PaymentService:
         customer = event_data.get("customer")
         if isinstance(customer, dict):
             nested = _first_str(
-                customer.get("externalId"),
                 customer.get("external_id"),
+                customer.get("externalId"),
                 customer.get("externalCustomerId"),
                 customer.get("external_customer_id"),
             )
@@ -181,8 +201,8 @@ class PaymentService:
             order_customer = order.get("customer")
             if isinstance(order_customer, dict):
                 nested = _first_str(
-                    order_customer.get("externalId"),
                     order_customer.get("external_id"),
+                    order_customer.get("externalId"),
                 )
                 if nested:
                     return nested
@@ -190,9 +210,47 @@ class PaymentService:
         return None
 
     @staticmethod
+    def _extract_checkout_id(
+        event_data: dict, *, event_id: str, event_type: str
+    ) -> str:
+        """Checkout id = purchase-level idempotency key. Mandatory.
+
+        ``checkout.completed.payload.id``    → the checkout id itself
+        ``order.paid.payload.checkout_id``   → explicit field
+        """
+        if event_type == "checkout.completed":
+            raw = event_data.get("id")
+        else:  # order.paid
+            raw = event_data.get("checkout_id") or event_data.get("checkoutId")
+
+        if not isinstance(raw, str) or not raw:
+            raise WebhookPermanentError(
+                "missing_checkout_id",
+                event_id=event_id,
+                event_type=event_type,
+            )
+        return raw
+
+    @staticmethod
+    def _extract_order_id(event_data: dict, *, event_type: str) -> str | None:
+        """Order id only exists on ``order.paid``. Return None otherwise."""
+        if event_type != "order.paid":
+            return None
+        raw = (
+            event_data.get("order_id")
+            or event_data.get("orderId")
+            or event_data.get("id")  # order.paid.payload.id is also the order id
+        )
+        return raw if isinstance(raw, str) and raw else None
+
+    # ------------------------------------------------------------------
+    # Validation helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
     def _validate_product(event_data: dict, *, event_id: str) -> None:
         expected = settings.recur_product_id
-        actual = event_data.get("productId") or event_data.get("product_id")
+        actual = event_data.get("product_id") or event_data.get("productId")
         if not expected or actual != expected:
             raise WebhookPermanentError(
                 "product_mismatch", event_id=event_id, expected=expected, actual=actual
@@ -206,7 +264,7 @@ class PaymentService:
             actual = int(raw) if raw is not None else None
         except (TypeError, ValueError) as e:
             raise WebhookPermanentError(
-                "amount_mismatch", event_id=event_id, expected=expected, actual=raw
+                "amount_unparseable", event_id=event_id, expected=expected, actual=raw
             ) from e
         if actual != expected:
             raise WebhookPermanentError(
@@ -215,8 +273,14 @@ class PaymentService:
 
     @staticmethod
     def _validate_currency(event_data: dict, *, event_id: str) -> None:
+        """Strict currency check — real Recur payloads always include it."""
         expected = (settings.recur_expected_currency or "TWD").upper()
-        actual = (event_data.get("currency") or expected).upper()
+        raw = event_data.get("currency")
+        if raw is None:
+            raise WebhookPermanentError(
+                "currency_missing", event_id=event_id, expected=expected
+            )
+        actual = str(raw).upper()
         if actual != expected:
             raise WebhookPermanentError(
                 "currency_mismatch", event_id=event_id, expected=expected, actual=actual

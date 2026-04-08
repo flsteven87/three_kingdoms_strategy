@@ -73,11 +73,18 @@ SEASON_ID_2 = UUID("33333333-3333-3333-3333-333333333334")
 PRODUCT_ID = "prod_test_999"
 
 
+CHECKOUT_ID = "chk_integration_test"
+ORDER_ID = "ord_integration_test"
+
+
 def valid_event_data() -> dict:
-    """Event payload matching server-authoritative config (bare-UUID customer id)."""
+    """``order.paid`` payload matching server-authoritative config."""
     return {
-        "externalCustomerId": str(USER_ID),
-        "productId": PRODUCT_ID,
+        "id": ORDER_ID,
+        "order_id": ORDER_ID,
+        "checkout_id": CHECKOUT_ID,
+        "customer": {"external_id": str(USER_ID)},
+        "product_id": PRODUCT_ID,
         "amount": 999,
         "currency": "TWD",
     }
@@ -192,7 +199,7 @@ class TestPaymentIncreasesQuota:
         result = await payment_service.handle_payment_success(
             valid_event_data(),
             event_id="evt_001",
-            event_type="checkout.completed",
+            event_type="order.paid",
         )
 
         assert result["status"] == "granted"
@@ -217,16 +224,16 @@ class TestWebhookIdempotency:
         alliance = make_alliance(ALLIANCE_ID, purchased_seasons=1, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
         mock_webhook_repo.process_event = AsyncMock(
-            return_value=WebhookProcessingResult(status="duplicate", available_seasons=1)
+            return_value=WebhookProcessingResult(status="duplicate_event", available_seasons=1)
         )
 
         result = await payment_service.handle_payment_success(
             valid_event_data(),
             event_id="evt_001",
-            event_type="checkout.completed",
+            event_type="order.paid",
         )
 
-        assert result["status"] == "duplicate"
+        assert result["status"] == "duplicate_event"
         assert result["seasons_added"] == 0
         assert result["available_seasons"] == 1
 
@@ -246,22 +253,22 @@ class TestWebhookIdempotency:
         result1 = await payment_service.handle_payment_success(
             valid_event_data(),
             event_id="evt_003",
-            event_type="checkout.completed",
+            event_type="order.paid",
         )
 
-        # Redelivery: RPC reports duplicate
+        # Redelivery: RPC reports duplicate_event
         mock_webhook_repo.process_event = AsyncMock(
-            return_value=WebhookProcessingResult(status="duplicate", available_seasons=1)
+            return_value=WebhookProcessingResult(status="duplicate_event", available_seasons=1)
         )
         result2 = await payment_service.handle_payment_success(
             valid_event_data(),
             event_id="evt_003",
-            event_type="checkout.completed",
+            event_type="order.paid",
         )
 
         assert result1["status"] == "granted"
         assert result1["seasons_added"] == 1
-        assert result2["status"] == "duplicate"
+        assert result2["status"] == "duplicate_event"
         assert result2["seasons_added"] == 0
 
 
@@ -351,7 +358,7 @@ class TestFullPaymentToActivationFlow:
         payment_result = await payment_service.handle_payment_success(
             valid_event_data(),
             event_id="evt_100",
-            event_type="checkout.completed",
+            event_type="order.paid",
         )
         assert payment_result["status"] == "granted"
         assert payment_result["available_seasons"] == 1
