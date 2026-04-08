@@ -111,7 +111,12 @@ async def recur_webhook(
         return {"received": True, "status": "ignored"}
 
     except WebhookPermanentError as e:
-        await alert_critical("recur.webhook.permanent", code=e.code, **e.context)
+        # Note: keyword is `error_code`, not `code` — alert_critical's first
+        # parameter is named `code`, so passing `code=...` collides. The
+        # domain error's code is ferried through as context metadata.
+        await alert_critical(
+            "recur.webhook.permanent", error_code=e.code, **e.context
+        )
         return {"received": True, "status": "permanent_failure", "code": e.code}
 
     except WebhookTransientError as e:

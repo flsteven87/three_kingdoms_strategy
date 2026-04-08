@@ -242,8 +242,16 @@ class TestRecurWebhookEndpoint:
 
     @pytest.mark.asyncio
     async def test_permanent_error_returns_200_and_alerts(self, async_client, checkout_request):
-        """WebhookPermanentError → 200 + alert_critical (no Recur retry)."""
+        """WebhookPermanentError → 200 + alert_critical (no Recur retry).
+
+        The alert_critical mock uses `spec=alert_critical` so the real
+        function's signature is enforced at the mock boundary — a previous
+        version of the handler passed both a positional and a ``code=``
+        keyword for the same parameter, and a loose mock silently accepted
+        it. Keeping the spec guarantees that class of bug trips in tests.
+        """
         from src.core.webhook_errors import WebhookPermanentError
+        from src.core.alerts import alert_critical
 
         payload, signature = checkout_request
 
@@ -251,12 +259,15 @@ class TestRecurWebhookEndpoint:
             patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
             patch("src.api.v1.endpoints.webhooks.PaymentService") as MockPaymentService,
             patch(
-                "src.api.v1.endpoints.webhooks.alert_critical", new=AsyncMock()
+                "src.api.v1.endpoints.webhooks.alert_critical",
+                new=AsyncMock(spec=alert_critical),
             ) as mock_alert,
         ):
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
             MockPaymentService.return_value.handle_payment_success = AsyncMock(
-                side_effect=WebhookPermanentError("product_mismatch", event_id="evt_123")
+                side_effect=WebhookPermanentError(
+                    "product_mismatch", event_id="evt_123", expected="prod_a", actual="prod_b"
+                )
             )
 
             response = await async_client.post(
@@ -270,7 +281,13 @@ class TestRecurWebhookEndpoint:
         assert body["status"] == "permanent_failure"
         assert body["code"] == "product_mismatch"
         mock_alert.assert_awaited_once()
-        assert mock_alert.await_args.args[0] == "recur.webhook.permanent"
+        call = mock_alert.await_args
+        assert call.args[0] == "recur.webhook.permanent"
+        # The domain error's code is ferried as `error_code`, not `code`, to
+        # avoid colliding with alert_critical's own first parameter.
+        assert call.kwargs["error_code"] == "product_mismatch"
+        assert call.kwargs["event_id"] == "evt_123"
+        assert "code" not in call.kwargs
 
     @pytest.mark.asyncio
     async def test_transient_error_returns_500(self, async_client, checkout_request):
