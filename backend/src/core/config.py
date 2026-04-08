@@ -65,6 +65,14 @@ class Settings(BaseSettings):
     recur_secret_key: str | None = None  # sk_test_* or sk_live_* for backend API calls
     recur_webhook_secret: str | None = None  # Webhook signing secret for signature verification
 
+    # Recur product catalog — server is the source of truth for price/product.
+    recur_product_id: str | None = None              # Recur product id (prod_*)
+    recur_expected_amount_twd: int = 999             # Expected charge in TWD (integer dollars)
+    recur_expected_currency: str = "TWD"             # Expected currency code
+
+    # Critical alert webhook (Discord/Slack-compatible). Optional.
+    alert_webhook_url: str | None = None
+
     @property
     def line_bot_enabled(self) -> bool:
         """Check if LINE Bot is configured"""
