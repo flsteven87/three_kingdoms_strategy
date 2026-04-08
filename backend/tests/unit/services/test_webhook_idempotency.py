@@ -1,121 +1,103 @@
-"""
-Tests for webhook idempotency (event dedup).
+"""Tests for WebhookEventRepository.process_event (RPC wrapper)."""
 
-Covers:
-- First event: try_claim_event succeeds → process + update details
-- Duplicate event_id: try_claim_event fails → skip processing
-- Missing event_id: process without dedup (graceful degradation)
-- Atomic increment prevents read-modify-write race
-"""
-
-from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from unittest.mock import MagicMock, patch
+from uuid import UUID
 
 import pytest
+from postgrest.exceptions import APIError
 
-from src.services.payment_service import PaymentService
+from src.repositories.webhook_event_repository import (
+    WebhookEventRepository,
+    WebhookProcessingResult,
+)
 
-
-@pytest.fixture
-def payment_service():
-    service = PaymentService()
-    service._quota_service = AsyncMock()
-    service._webhook_repo = AsyncMock()
-    return service
-
-
-@pytest.fixture
-def sample_event_data():
-    user_id = uuid4()
-    return {
-        "externalCustomerId": f"{user_id}:3",
-        "amount": 1000,
-        "productId": "prod_season",
-    }, user_id
+ALLIANCE_ID = UUID("22222222-2222-2222-2222-222222222222")
+USER_ID = UUID("11111111-1111-1111-1111-111111111111")
 
 
-class TestWebhookIdempotency:
-    """Webhook event dedup prevents duplicate season credits."""
+def _make_repo() -> WebhookEventRepository:
+    with patch("src.repositories.base.get_supabase_client"):
+        return WebhookEventRepository()
 
-    @pytest.mark.asyncio
-    async def test_first_event_processes_normally(self, payment_service, sample_event_data):
-        """First time seeing an event_id should claim, process, and update details."""
-        event_data, user_id = sample_event_data
-        alliance = MagicMock(id=uuid4())
 
-        payment_service._webhook_repo.try_claim_event = AsyncMock(return_value=True)
-        payment_service._webhook_repo.update_event_details = AsyncMock()
-        payment_service._quota_service.get_alliance_by_user = AsyncMock(return_value=alliance)
-        payment_service._quota_service.add_purchased_seasons = AsyncMock(return_value=3)
+@pytest.mark.asyncio
+async def test_process_event_returns_granted_result():
+    repo = _make_repo()
+    rpc_result = MagicMock()
+    rpc_result.data = [{"status": "granted", "available_seasons": 5}]
+    repo.client.rpc = MagicMock(return_value=MagicMock(execute=MagicMock(return_value=rpc_result)))
 
-        result = await payment_service.handle_payment_success(event_data, event_id="evt_abc123")
+    result = await repo.process_event(
+        event_id="evt_1",
+        event_type="checkout.completed",
+        alliance_id=ALLIANCE_ID,
+        user_id=USER_ID,
+        seasons=1,
+        payload={"amount": 999},
+    )
 
-        assert result["success"] is True
-        assert result["seasons_added"] == 3
-        payment_service._quota_service.add_purchased_seasons.assert_called_once()
-        payment_service._webhook_repo.try_claim_event.assert_called_once_with(
-            "evt_abc123", "checkout.completed"
+    assert result == WebhookProcessingResult(status="granted", available_seasons=5)
+    repo.client.rpc.assert_called_once_with(
+        "process_payment_webhook_event",
+        {
+            "p_event_id": "evt_1",
+            "p_event_type": "checkout.completed",
+            "p_alliance_id": str(ALLIANCE_ID),
+            "p_user_id": str(USER_ID),
+            "p_seasons": 1,
+            "p_payload": {"amount": 999},
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_process_event_returns_duplicate_result():
+    repo = _make_repo()
+    rpc_result = MagicMock()
+    rpc_result.data = [{"status": "duplicate", "available_seasons": 3}]
+    repo.client.rpc = MagicMock(return_value=MagicMock(execute=MagicMock(return_value=rpc_result)))
+
+    result = await repo.process_event(
+        event_id="evt_dup",
+        event_type="checkout.completed",
+        alliance_id=ALLIANCE_ID,
+        user_id=USER_ID,
+        seasons=1,
+        payload={},
+    )
+    assert result == WebhookProcessingResult(status="duplicate", available_seasons=3)
+
+
+@pytest.mark.asyncio
+async def test_process_event_raises_on_empty_rpc_response():
+    repo = _make_repo()
+    rpc_result = MagicMock()
+    rpc_result.data = []
+    repo.client.rpc = MagicMock(return_value=MagicMock(execute=MagicMock(return_value=rpc_result)))
+
+    with pytest.raises(RuntimeError, match="RPC returned no rows"):
+        await repo.process_event(
+            event_id="evt_2",
+            event_type="checkout.completed",
+            alliance_id=ALLIANCE_ID,
+            user_id=USER_ID,
+            seasons=1,
+            payload={},
         )
-        payment_service._webhook_repo.update_event_details.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_duplicate_event_returns_without_processing(
-        self, payment_service, sample_event_data
-    ):
-        """Duplicate event_id (claim fails) should return success without adding seasons."""
-        event_data, user_id = sample_event_data
-
-        payment_service._webhook_repo.try_claim_event = AsyncMock(return_value=False)
-
-        result = await payment_service.handle_payment_success(event_data, event_id="evt_abc123")
-
-        assert result["success"] is True
-        assert result["duplicate"] is True
-        payment_service._quota_service.add_purchased_seasons.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_missing_event_id_raises_error(self, payment_service, sample_event_data):
-        """If event_id is None, reject the webhook to prevent unguarded processing."""
-        event_data, user_id = sample_event_data
-
-        with pytest.raises(ValueError, match="Missing event_id"):
-            await payment_service.handle_payment_success(event_data, event_id=None)
-
-        payment_service._quota_service.add_purchased_seasons.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_empty_event_id_raises_error(self, payment_service, sample_event_data):
-        """Empty string event_id should also be rejected."""
-        event_data, user_id = sample_event_data
-
-        with pytest.raises(ValueError, match="Missing event_id"):
-            await payment_service.handle_payment_success(event_data, event_id="")
-
-        payment_service._quota_service.add_purchased_seasons.assert_not_called()
 
 
-class TestAtomicIncrement:
-    """Atomic DB increment prevents race conditions."""
+@pytest.mark.asyncio
+async def test_process_event_propagates_api_error():
+    repo = _make_repo()
+    api_err = APIError({"message": "boom", "code": "XX000"})
+    repo.client.rpc = MagicMock(return_value=MagicMock(execute=MagicMock(side_effect=api_err)))
 
-    @pytest.mark.asyncio
-    async def test_add_purchased_seasons_uses_atomic_increment(self):
-        """add_purchased_seasons should use SQL increment, not read-modify-write."""
-        from src.services.season_quota_service import SeasonQuotaService
-
-        service = SeasonQuotaService()
-        service._alliance_repo = AsyncMock()
-
-        mock_alliance = MagicMock()
-        mock_alliance.id = uuid4()
-        mock_alliance.purchased_seasons = 5
-        mock_alliance.used_seasons = 2
-
-        # RPC now returns (new_purchased, used_seasons) tuple
-        service._alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(8, 2))
-
-        result = await service.add_purchased_seasons(mock_alliance.id, 3)
-
-        assert result == 6  # 8 purchased - 2 used
-        service._alliance_repo.increment_purchased_seasons.assert_called_once_with(
-            mock_alliance.id, 3
+    with pytest.raises(APIError):
+        await repo.process_event(
+            event_id="evt_3",
+            event_type="checkout.completed",
+            alliance_id=ALLIANCE_ID,
+            user_id=USER_ID,
+            seasons=1,
+            payload={},
         )

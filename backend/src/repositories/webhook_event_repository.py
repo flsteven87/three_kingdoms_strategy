@@ -1,23 +1,29 @@
 """
 Webhook Event Repository
 
-Stores processed webhook events for idempotency dedup.
-符合 CLAUDE.md 🔴: Inherits SupabaseRepository, uses _handle_supabase_result()
+Thin wrapper around the atomic Postgres RPC ``process_payment_webhook_event``
+which performs idempotency claim + audit write + season grant in one
+transaction.
+
+符合 CLAUDE.md 🔴: Inherits SupabaseRepository; no direct table mutation for
+payment-grant logic — all behavior goes through the RPC.
 """
 
 import logging
+from typing import Literal
+from uuid import UUID
 
-from postgrest.exceptions import APIError
 from pydantic import BaseModel, ConfigDict
 
 from src.repositories.base import SupabaseRepository
-from src.utils.postgrest import POSTGRES_UNIQUE_VIOLATION
 
 logger = logging.getLogger(__name__)
 
+RPC_NAME = "process_payment_webhook_event"
+
 
 class WebhookEvent(BaseModel):
-    """Webhook event record for dedup."""
+    """Audit row in ``webhook_events``. Read-only from the app layer."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -30,52 +36,57 @@ class WebhookEvent(BaseModel):
     payload: dict[str, object] | None = None
 
 
-class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
-    """Repository for webhook event dedup records."""
+class WebhookProcessingResult(BaseModel):
+    """Result returned by the atomic RPC."""
 
-    def __init__(self):
+    status: Literal["granted", "duplicate"]
+    available_seasons: int
+
+
+class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
+    """Repository wrapping the atomic payment-webhook RPC."""
+
+    def __init__(self) -> None:
         super().__init__(table_name="webhook_events", model_class=WebhookEvent)
 
-    async def try_claim_event(self, event_id: str, event_type: str) -> bool:
-        """
-        Atomically claim an event for processing via INSERT + UNIQUE constraint.
-
-        Returns True if claimed (first to insert), False if already exists (duplicate).
-        This is the idempotency gate — only the winner processes the payment.
-        """
-        try:
-            await self._execute_async(
-                lambda: self.client.from_(self.table_name)
-                .insert({"event_id": event_id, "event_type": event_type})
-                .execute()
-            )
-            return True
-        except APIError as e:
-            if e.code == POSTGRES_UNIQUE_VIOLATION:
-                logger.info("Event already claimed - event_id=%s", event_id)
-                return False
-            raise
-
-    async def update_event_details(
+    async def process_event(
         self,
         *,
         event_id: str,
-        alliance_id: str,
-        user_id: str,
-        seasons_added: int,
+        event_type: str,
+        alliance_id: UUID,
+        user_id: UUID,
+        seasons: int,
         payload: dict,
-    ) -> None:
-        """Update a claimed event with processing details after successful payment."""
-        await self._execute_async(
-            lambda: self.client.from_(self.table_name)
-            .update(
-                {
-                    "alliance_id": alliance_id,
-                    "user_id": user_id,
-                    "seasons_added": seasons_added,
-                    "payload": payload,
-                }
-            )
-            .eq("event_id", event_id)
-            .execute()
+    ) -> WebhookProcessingResult:
+        """
+        Atomically claim + audit + grant via ``process_payment_webhook_event``.
+
+        Returns ``WebhookProcessingResult(status="granted"|"duplicate", available_seasons=int)``.
+
+        Raises:
+            postgrest.exceptions.APIError: transient DB/RPC failures.
+            RuntimeError: RPC returned an empty result (should not happen).
+        """
+        params = {
+            "p_event_id": event_id,
+            "p_event_type": event_type,
+            "p_alliance_id": str(alliance_id),
+            "p_user_id": str(user_id),
+            "p_seasons": seasons,
+            "p_payload": payload,
+        }
+
+        result = await self._execute_async(
+            lambda: self.client.rpc(RPC_NAME, params).execute()
+        )
+
+        rows = result.data or []
+        if not rows:
+            raise RuntimeError(f"{RPC_NAME} RPC returned no rows for event_id={event_id}")
+
+        row = rows[0]
+        return WebhookProcessingResult(
+            status=row["status"],
+            available_seasons=int(row["available_seasons"]),
         )
