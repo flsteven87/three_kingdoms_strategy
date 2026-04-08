@@ -241,18 +241,22 @@ class TestRecurWebhookEndpoint:
         assert response.json()["received"] is True
 
     @pytest.mark.asyncio
-    async def test_returns_200_with_error_for_value_error(self, async_client, checkout_request):
-        """Should return 200 with error message for business logic errors (prevent Recur retry)"""
+    async def test_permanent_error_returns_200_and_alerts(self, async_client, checkout_request):
+        """WebhookPermanentError → 200 + alert_critical (no Recur retry)."""
+        from src.core.webhook_errors import WebhookPermanentError
+
         payload, signature = checkout_request
 
         with (
             patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
             patch("src.api.v1.endpoints.webhooks.PaymentService") as MockPaymentService,
+            patch(
+                "src.api.v1.endpoints.webhooks.alert_critical", new=AsyncMock()
+            ) as mock_alert,
         ):
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
-            mock_instance = MockPaymentService.return_value
-            mock_instance.handle_payment_success = AsyncMock(
-                side_effect=ValueError("No alliance found")
+            MockPaymentService.return_value.handle_payment_success = AsyncMock(
+                side_effect=WebhookPermanentError("product_mismatch", event_id="evt_123")
             )
 
             response = await async_client.post(
@@ -262,8 +266,56 @@ class TestRecurWebhookEndpoint:
             )
 
         assert response.status_code == 200
-        assert response.json()["received"] is True
-        assert "No alliance found" in response.json()["error"]
+        body = response.json()
+        assert body["status"] == "permanent_failure"
+        assert body["code"] == "product_mismatch"
+        mock_alert.assert_awaited_once()
+        assert mock_alert.await_args.args[0] == "recur.webhook.permanent"
+
+    @pytest.mark.asyncio
+    async def test_transient_error_returns_500(self, async_client, checkout_request):
+        """WebhookTransientError → 500 so Recur retries."""
+        from src.core.webhook_errors import WebhookTransientError
+
+        payload, signature = checkout_request
+
+        with (
+            patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
+            patch("src.api.v1.endpoints.webhooks.PaymentService") as MockPaymentService,
+        ):
+            mock_settings.recur_webhook_secret = WEBHOOK_SECRET
+            MockPaymentService.return_value.handle_payment_success = AsyncMock(
+                side_effect=WebhookTransientError("rpc_api_error", event_id="evt_123")
+            )
+
+            response = await async_client.post(
+                "/api/v1/webhooks/recur",
+                content=payload,
+                headers={"x-recur-signature": signature},
+            )
+
+        assert response.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_signature_failure_alerts(self, async_client):
+        """Signature verification failure → 401 + alert_critical."""
+        with (
+            patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
+            patch(
+                "src.api.v1.endpoints.webhooks.alert_critical", new=AsyncMock()
+            ) as mock_alert,
+        ):
+            mock_settings.recur_webhook_secret = WEBHOOK_SECRET
+
+            response = await async_client.post(
+                "/api/v1/webhooks/recur",
+                content=b'{"type": "test"}',
+                headers={"x-recur-signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+            )
+
+        assert response.status_code == 401
+        mock_alert.assert_awaited_once()
+        assert mock_alert.await_args.args[0] == "recur.webhook.signature_failed"
 
     @pytest.mark.asyncio
     async def test_returns_500_for_unexpected_error(self, async_client, checkout_request):
