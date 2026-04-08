@@ -182,7 +182,7 @@ def season_service(
 
 
 class TestPaymentIncreasesQuota:
-    """Webhook checkout.completed → RPC grants exactly 1 season."""
+    """Webhook order.paid → RPC grants exactly 1 season."""
 
     async def test_payment_success_grants_one_season(
         self,

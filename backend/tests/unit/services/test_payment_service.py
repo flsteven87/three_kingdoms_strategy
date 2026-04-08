@@ -95,9 +95,7 @@ class TestEventTypeRouting:
     @pytest.mark.asyncio
     async def test_duplicate_purchase_status_propagated(self, service):
         service._webhook_repo.process_event = AsyncMock(
-            return_value=WebhookProcessingResult(
-                status="duplicate_purchase", available_seasons=6
-            )
+            return_value=WebhookProcessingResult(status="duplicate_purchase", available_seasons=6)
         )
         result = await service.handle_payment_success(
             order_paid(), event_id="evt_sibling", event_type="order.paid"
@@ -119,9 +117,7 @@ class TestCheckoutIdExtraction:
     @pytest.mark.asyncio
     async def test_order_paid_reads_checkout_id_field(self, service):
         payload = clone(order_paid(checkout_id="chk_from_order_paid"))
-        await service.handle_payment_success(
-            payload, event_id="evt_2", event_type="order.paid"
-        )
+        await service.handle_payment_success(payload, event_id="evt_2", event_type="order.paid")
         kwargs = service._webhook_repo.process_event.await_args.kwargs
         assert kwargs["checkout_id"] == "chk_from_order_paid"
         assert kwargs["order_id"] == TEST_ORDER_ID
@@ -131,9 +127,7 @@ class TestCheckoutIdExtraction:
         payload = clone(order_paid())
         payload.pop("checkout_id")
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_3", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_3", event_type="order.paid")
         assert ei.value.code == "missing_checkout_id"
 
 
@@ -151,9 +145,7 @@ class TestUserIdExtraction:
         payload = clone(order_paid())
         payload["customer"].pop("external_id")
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_1", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
         assert ei.value.code == "missing_external_customer_id"
 
     @pytest.mark.asyncio
@@ -161,9 +153,7 @@ class TestUserIdExtraction:
         payload = clone(order_paid())
         payload["customer"]["external_id"] = "not-a-uuid"
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_1", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
         assert ei.value.code == "invalid_external_customer_id"
 
     @pytest.mark.asyncio
@@ -176,9 +166,9 @@ class TestUserIdExtraction:
             )
         assert result["status"] == "granted"
         assert result["seasons_added"] == 1
-        assert any(
-            "legacy_external_id_suffix" in rec.message for rec in caplog.records
-        ), "legacy suffix usage must be logged at WARNING"
+        assert any("legacy_external_id_suffix" in rec.message for rec in caplog.records), (
+            "legacy suffix usage must be logged at WARNING"
+        )
 
 
 class TestValidation:
@@ -186,18 +176,14 @@ class TestValidation:
     async def test_product_mismatch_is_permanent(self, service):
         payload = clone(order_paid(product_id="prod_other"))
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_1", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
         assert ei.value.code == "product_mismatch"
 
     @pytest.mark.asyncio
     async def test_amount_mismatch_is_permanent(self, service):
         payload = clone(order_paid(amount=1))
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_1", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
         assert ei.value.code == "amount_mismatch"
 
     @pytest.mark.asyncio
@@ -205,30 +191,22 @@ class TestValidation:
         payload = clone(order_paid())
         payload["amount"] = "not-a-number"
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_1", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
         assert ei.value.code == "amount_unparseable"
 
     @pytest.mark.asyncio
     async def test_currency_mismatch_is_permanent(self, service):
         payload = clone(order_paid(currency="USD"))
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_1", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
         assert ei.value.code == "currency_mismatch"
 
     @pytest.mark.asyncio
     async def test_currency_missing_is_permanent_strict(self, service):
-        """Lenient fallback was removed 2026-04-09 — real Recur payloads
-        always include currency, so missing = schema drift = halt loudly."""
         payload = clone(order_paid())
         payload.pop("currency")
         with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(
-                payload, event_id="evt_1", event_type="order.paid"
-            )
+            await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
         assert ei.value.code == "currency_missing"
 
 

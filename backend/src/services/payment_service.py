@@ -133,114 +133,53 @@ class PaymentService:
 
     @staticmethod
     def _extract_user_id(event_data: dict, *, event_id: str) -> UUID:
-        """Pull the buyer's user UUID from the webhook payload.
-
-        Real Recur payloads put it at ``data.customer.external_id`` (snake_case).
-        Camel-case and ``data.order.customer.externalId`` fallbacks exist for
-        defensive coverage but are never observed in production and should
-        eventually be pruned.
-        """
-        raw = PaymentService._find_external_customer_id(event_data)
-        if not raw:
+        """Pull the buyer's user UUID from ``data.customer.external_id``."""
+        customer = event_data.get("customer")
+        raw = customer.get("external_id") if isinstance(customer, dict) else None
+        if not isinstance(raw, str) or not raw:
             logger.warning(
-                "Webhook missing externalCustomerId event_id=%s top_keys=%s customer_keys=%s",
+                "Webhook missing customer.external_id event_id=%s top_keys=%s",
                 event_id,
                 sorted(event_data.keys()),
-                sorted((event_data.get("customer") or {}).keys())
-                if isinstance(event_data.get("customer"), dict)
-                else None,
             )
             raise WebhookPermanentError("missing_external_customer_id", event_id=event_id)
 
-        if ":" in str(raw):
-            # Legacy sticky-per-email customers created before the 2026-04-08
-            # rewrite still send ``uuid:qty``. Suffix is ignored; quantity is
-            # hardcoded by SEASONS_PER_PURCHASE. Log so we can detect when
-            # the last legacy customer stops firing and delete this path.
-            logger.warning(
-                "legacy_external_id_suffix event_id=%s raw=%s", event_id, raw
-            )
+        if ":" in raw:
+            # Legacy sticky-per-email customers created before 2026-04-08 still
+            # send ``uuid:qty``. Suffix is ignored; grant is hardcoded by
+            # SEASONS_PER_PURCHASE. Log so we can detect when the last legacy
+            # customer stops firing and delete this branch.
+            logger.warning("legacy_external_id_suffix event_id=%s raw=%s", event_id, raw)
 
-        uuid_part = str(raw).split(":", 1)[0]
+        uuid_part = raw.split(":", 1)[0]
         try:
             return UUID(uuid_part)
-        except (ValueError, TypeError) as e:
+        except ValueError as e:
             raise WebhookPermanentError(
-                "invalid_external_customer_id", event_id=event_id, raw=str(raw)
+                "invalid_external_customer_id", event_id=event_id, raw=raw
             ) from e
 
     @staticmethod
-    def _find_external_customer_id(event_data: dict) -> str | None:
-        """Walk the known Recur payload shapes looking for the external customer id."""
-        def _first_str(*candidates: object) -> str | None:
-            for c in candidates:
-                if isinstance(c, str) and c:
-                    return c
-            return None
+    def _extract_checkout_id(event_data: dict, *, event_id: str, event_type: str) -> str:
+        """Purchase-level idempotency key. Mandatory.
 
-        top = _first_str(
-            event_data.get("externalCustomerId"),
-            event_data.get("external_customer_id"),
-        )
-        if top:
-            return top
-
-        customer = event_data.get("customer")
-        if isinstance(customer, dict):
-            nested = _first_str(
-                customer.get("external_id"),
-                customer.get("externalId"),
-                customer.get("externalCustomerId"),
-                customer.get("external_customer_id"),
-            )
-            if nested:
-                return nested
-
-        order = event_data.get("order")
-        if isinstance(order, dict):
-            order_customer = order.get("customer")
-            if isinstance(order_customer, dict):
-                nested = _first_str(
-                    order_customer.get("external_id"),
-                    order_customer.get("externalId"),
-                )
-                if nested:
-                    return nested
-
-        return None
-
-    @staticmethod
-    def _extract_checkout_id(
-        event_data: dict, *, event_id: str, event_type: str
-    ) -> str:
-        """Checkout id = purchase-level idempotency key. Mandatory.
-
-        ``checkout.completed.payload.id``    → the checkout id itself
-        ``order.paid.payload.checkout_id``   → explicit field
+        ``checkout.completed.payload.id``  → the checkout id itself
+        ``order.paid.payload.checkout_id`` → explicit field
         """
-        if event_type == "checkout.completed":
-            raw = event_data.get("id")
-        else:  # order.paid
-            raw = event_data.get("checkout_id") or event_data.get("checkoutId")
-
+        key = "id" if event_type == "checkout.completed" else "checkout_id"
+        raw = event_data.get(key)
         if not isinstance(raw, str) or not raw:
             raise WebhookPermanentError(
-                "missing_checkout_id",
-                event_id=event_id,
-                event_type=event_type,
+                "missing_checkout_id", event_id=event_id, event_type=event_type
             )
         return raw
 
     @staticmethod
     def _extract_order_id(event_data: dict, *, event_type: str) -> str | None:
-        """Order id only exists on ``order.paid``. Return None otherwise."""
+        """Order id only exists on ``order.paid`` (``order_id`` == ``id``)."""
         if event_type != "order.paid":
             return None
-        raw = (
-            event_data.get("order_id")
-            or event_data.get("orderId")
-            or event_data.get("id")  # order.paid.payload.id is also the order id
-        )
+        raw = event_data.get("order_id") or event_data.get("id")
         return raw if isinstance(raw, str) and raw else None
 
     # ------------------------------------------------------------------
@@ -250,7 +189,7 @@ class PaymentService:
     @staticmethod
     def _validate_product(event_data: dict, *, event_id: str) -> None:
         expected = settings.recur_product_id
-        actual = event_data.get("product_id") or event_data.get("productId")
+        actual = event_data.get("product_id")
         if not expected or actual != expected:
             raise WebhookPermanentError(
                 "product_mismatch", event_id=event_id, expected=expected, actual=actual
@@ -276,11 +215,9 @@ class PaymentService:
         """Strict currency check — real Recur payloads always include it."""
         expected = (settings.recur_expected_currency or "TWD").upper()
         raw = event_data.get("currency")
-        if raw is None:
-            raise WebhookPermanentError(
-                "currency_missing", event_id=event_id, expected=expected
-            )
-        actual = str(raw).upper()
+        if not isinstance(raw, str):
+            raise WebhookPermanentError("currency_missing", event_id=event_id, expected=expected)
+        actual = raw.upper()
         if actual != expected:
             raise WebhookPermanentError(
                 "currency_mismatch", event_id=event_id, expected=expected, actual=actual

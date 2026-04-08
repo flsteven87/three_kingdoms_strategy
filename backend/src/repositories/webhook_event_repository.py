@@ -4,9 +4,7 @@ Webhook Event Repository
 Thin wrapper around the atomic Postgres RPC ``process_payment_webhook_event``
 (v2, 2026-04-09) which performs idempotency claim + audit write + optional
 season grant in one transaction, keyed on the purchase-level ``checkout_id``.
-
-符合 CLAUDE.md 🔴: Inherits SupabaseRepository; no direct table mutation for
-payment-grant logic — all behavior goes through the RPC.
+All payment-grant logic goes through the RPC; no direct table mutation here.
 """
 
 import logging
@@ -99,17 +97,13 @@ class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
             "p_payload": payload,
         }
 
-        result = await self._execute_async(
-            lambda: self.client.rpc(RPC_NAME, params).execute()
-        )
+        result = await self._execute_async(lambda: self.client.rpc(RPC_NAME, params).execute())
 
         rows = result.data or []
         if not rows:
             raise RuntimeError(f"{RPC_NAME} RPC returned no rows for event_id={event_id}")
         if len(rows) != 1:
-            raise RuntimeError(
-                f"{RPC_NAME} RPC returned {len(rows)} rows; expected exactly 1"
-            )
+            raise RuntimeError(f"{RPC_NAME} RPC returned {len(rows)} rows; expected exactly 1")
 
         row = rows[0]
         return WebhookProcessingResult(
