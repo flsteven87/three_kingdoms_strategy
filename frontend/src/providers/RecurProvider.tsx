@@ -24,7 +24,7 @@ export function RecurProvider({ children }: RecurProviderProps) {
     <RecurSDKProvider
       config={{
         publishableKey: publishableKey || '',
-        checkoutMode: 'hosted',
+        checkoutMode: 'redirect',
       }}
     >
       {children}
