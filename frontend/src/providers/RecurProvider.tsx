@@ -2,8 +2,10 @@
  * Recur Payment Provider
  *
  * Wraps the app with Recur SDK provider for payment integration.
- * Uses hosted checkout mode (redirect to Recur) — modal mode currently
- * returns 500 from `POST /v1/checkouts` for ONE_TIME products (Recur SDK bug).
+ * Uses modal checkout — the 'redirect' mode is marked deprecated in the SDK
+ * and falls through to embedded (requires containerElementId). The original
+ * sandbox 500s we saw on /v1/checkouts were caused by a sticky externalId
+ * mismatch on the customer, not the modal path itself.
  *
  * Note: Always wraps with RecurSDKProvider even when key is not configured,
  * to ensure useRecur hook works. The checkout function will fail gracefully
@@ -24,7 +26,7 @@ export function RecurProvider({ children }: RecurProviderProps) {
     <RecurSDKProvider
       config={{
         publishableKey: publishableKey || '',
-        checkoutMode: 'redirect',
+        checkoutMode: 'modal',
       }}
     >
       {children}
