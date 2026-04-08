@@ -28,7 +28,7 @@ async def alert_critical(code: str, **context: Any) -> None:
     """
     logger.critical("ALERT %s %s", code, context)
 
-    url = getattr(settings, "alert_webhook_url", None)
+    url = settings.alert_webhook_url
     if not url:
         return
 
