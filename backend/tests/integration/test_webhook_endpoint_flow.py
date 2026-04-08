@@ -31,13 +31,18 @@ def sign_payload(payload: bytes, secret: str = WEBHOOK_SECRET) -> str:
     return base64.b64encode(computed).decode("utf-8")
 
 
-def make_checkout_event(user_id: UUID, quantity: int = 1) -> dict:
+PRODUCT_ID = "prod_test_999"
+
+
+def make_checkout_event(user_id: UUID) -> dict:
+    """Event payload matching server-authoritative config (bare-UUID customer id)."""
     return {
         "type": "checkout.completed",
         "id": "evt_test_001",
         "data": {
-            "externalCustomerId": f"{user_id}:{quantity}",
-            "amount": 999 * quantity,
+            "externalCustomerId": str(user_id),
+            "productId": PRODUCT_ID,
+            "amount": 999,
             "currency": "TWD",
         },
     }
@@ -75,7 +80,7 @@ class TestWebhookEndpointIntegration:
         mock_service = MagicMock()
         mock_service.handle_payment_success = AsyncMock(
             return_value={
-                "success": True,
+                "status": "granted",
                 "alliance_id": str(ALLIANCE_ID),
                 "user_id": str(USER_ID),
                 "seasons_added": 1,

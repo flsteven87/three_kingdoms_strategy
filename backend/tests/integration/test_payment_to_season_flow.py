@@ -6,7 +6,7 @@ to verify state transitions are correct end-to-end.
 """
 
 from datetime import UTC, date, datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
@@ -14,6 +14,7 @@ import pytest
 from src.core.exceptions import SeasonQuotaExhaustedError
 from src.models.alliance import Alliance
 from src.models.season import Season
+from src.repositories.webhook_event_repository import WebhookProcessingResult
 from src.services.payment_service import PaymentService
 from src.services.season_quota_service import SeasonQuotaService
 from src.services.season_service import SeasonService
@@ -69,9 +70,30 @@ USER_ID = UUID("11111111-1111-1111-1111-111111111111")
 ALLIANCE_ID = UUID("22222222-2222-2222-2222-222222222222")
 SEASON_ID = UUID("33333333-3333-3333-3333-333333333333")
 SEASON_ID_2 = UUID("33333333-3333-3333-3333-333333333334")
+PRODUCT_ID = "prod_test_999"
+
+
+def valid_event_data() -> dict:
+    """Event payload matching server-authoritative config (bare-UUID customer id)."""
+    return {
+        "externalCustomerId": str(USER_ID),
+        "productId": PRODUCT_ID,
+        "amount": 999,
+        "currency": "TWD",
+    }
 
 
 # --- Fixtures ---
+
+
+@pytest.fixture(autouse=True)
+def fake_payment_settings():
+    """Patch PaymentService settings so validation knows the product/amount."""
+    with patch("src.services.payment_service.settings") as s:
+        s.recur_product_id = PRODUCT_ID
+        s.recur_expected_amount_twd = 999
+        s.recur_expected_currency = "TWD"
+        yield s
 
 
 @pytest.fixture
@@ -79,7 +101,6 @@ def mock_alliance_repo() -> MagicMock:
     repo = MagicMock()
     repo.get_by_collaborator = AsyncMock(return_value=None)
     repo.get_by_id = AsyncMock(return_value=None)
-    repo.increment_purchased_seasons = AsyncMock(return_value=(0, 0))
     repo.increment_used_seasons = AsyncMock(return_value=(0, 0))
     return repo
 
@@ -98,8 +119,9 @@ def mock_season_repo() -> MagicMock:
 @pytest.fixture
 def mock_webhook_repo() -> MagicMock:
     repo = MagicMock()
-    repo.try_claim_event = AsyncMock(return_value=True)
-    repo.update_event_details = AsyncMock(return_value=None)
+    repo.process_event = AsyncMock(
+        return_value=WebhookProcessingResult(status="granted", available_seasons=1)
+    )
     return repo
 
 
@@ -153,85 +175,60 @@ def season_service(
 
 
 class TestPaymentIncreasesQuota:
-    """Webhook checkout.completed → purchased_seasons increases."""
+    """Webhook checkout.completed → RPC grants exactly 1 season."""
 
-    async def test_payment_success_adds_seasons_to_alliance(
+    async def test_payment_success_grants_one_season(
         self,
         payment_service: PaymentService,
         mock_alliance_repo: MagicMock,
         mock_webhook_repo: MagicMock,
     ):
-        # Arrange: alliance exists with 0 purchased seasons
         alliance = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
-        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(1, 0))
+        mock_webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(status="granted", available_seasons=1)
+        )
 
-        event_data = {"externalCustomerId": f"{USER_ID}:1"}
-
-        # Act: simulate webhook
         result = await payment_service.handle_payment_success(
-            event_data,
+            valid_event_data(),
             event_id="evt_001",
             event_type="checkout.completed",
         )
 
-        # Assert: seasons added, quota updated
-        assert result["success"] is True
+        assert result["status"] == "granted"
         assert result["seasons_added"] == 1
         assert result["available_seasons"] == 1
-        mock_alliance_repo.increment_purchased_seasons.assert_awaited_once_with(ALLIANCE_ID, 1)
-        mock_webhook_repo.try_claim_event.assert_awaited_once_with("evt_001", "checkout.completed")
-
-    async def test_payment_adds_multiple_seasons(
-        self,
-        payment_service: PaymentService,
-        mock_alliance_repo: MagicMock,
-    ):
-        # Arrange: buy 3 seasons at once
-        alliance = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
-        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
-        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(3, 0))
-
-        event_data = {"externalCustomerId": f"{USER_ID}:3"}
-
-        # Act
-        result = await payment_service.handle_payment_success(
-            event_data,
-            event_id="evt_002",
-            event_type="checkout.completed",
-        )
-
-        # Assert
-        assert result["seasons_added"] == 3
-        assert result["available_seasons"] == 3
-        mock_alliance_repo.increment_purchased_seasons.assert_awaited_once_with(ALLIANCE_ID, 3)
+        mock_webhook_repo.process_event.assert_awaited_once()
+        kwargs = mock_webhook_repo.process_event.await_args.kwargs
+        assert kwargs["alliance_id"] == ALLIANCE_ID
+        assert kwargs["user_id"] == USER_ID
+        assert kwargs["seasons"] == 1
 
 
 class TestWebhookIdempotency:
     """Duplicate webhook events must not double-credit seasons."""
 
-    async def test_duplicate_event_returns_success_without_adding_seasons(
+    async def test_duplicate_event_returns_duplicate_without_extra_grant(
         self,
         payment_service: PaymentService,
         mock_alliance_repo: MagicMock,
         mock_webhook_repo: MagicMock,
     ):
-        # Arrange: event already claimed (duplicate)
-        mock_webhook_repo.try_claim_event = AsyncMock(return_value=False)
+        alliance = make_alliance(ALLIANCE_ID, purchased_seasons=1, used_seasons=0)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
+        mock_webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(status="duplicate", available_seasons=1)
+        )
 
-        event_data = {"externalCustomerId": f"{USER_ID}:1"}
-
-        # Act: send same event again
         result = await payment_service.handle_payment_success(
-            event_data,
+            valid_event_data(),
             event_id="evt_001",
             event_type="checkout.completed",
         )
 
-        # Assert: returned success but did NOT touch quota
-        assert result["success"] is True
-        assert result["duplicate"] is True
-        mock_alliance_repo.increment_purchased_seasons.assert_not_awaited()
+        assert result["status"] == "duplicate"
+        assert result["seasons_added"] == 0
+        assert result["available_seasons"] == 1
 
     async def test_first_then_duplicate_only_credits_once(
         self,
@@ -239,35 +236,33 @@ class TestWebhookIdempotency:
         mock_alliance_repo: MagicMock,
         mock_webhook_repo: MagicMock,
     ):
-        # Arrange
         alliance = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
-        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(1, 0))
 
-        event_data = {"externalCustomerId": f"{USER_ID}:1"}
-
-        # Act 1: first delivery — claim succeeds
-        mock_webhook_repo.try_claim_event = AsyncMock(return_value=True)
+        # First delivery: RPC claims + grants
+        mock_webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(status="granted", available_seasons=1)
+        )
         result1 = await payment_service.handle_payment_success(
-            event_data,
+            valid_event_data(),
             event_id="evt_003",
             event_type="checkout.completed",
         )
 
-        # Act 2: redelivery — claim fails (duplicate)
-        mock_webhook_repo.try_claim_event = AsyncMock(return_value=False)
+        # Redelivery: RPC reports duplicate
+        mock_webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(status="duplicate", available_seasons=1)
+        )
         result2 = await payment_service.handle_payment_success(
-            event_data,
+            valid_event_data(),
             event_id="evt_003",
             event_type="checkout.completed",
         )
 
-        # Assert: credited exactly once
-        assert result1["success"] is True
-        assert result1.get("duplicate") is not True
-        assert result2["success"] is True
-        assert result2["duplicate"] is True
-        assert mock_alliance_repo.increment_purchased_seasons.await_count == 1
+        assert result1["status"] == "granted"
+        assert result1["seasons_added"] == 1
+        assert result2["status"] == "duplicate"
+        assert result2["seasons_added"] == 0
 
 
 class TestSeasonActivationConsumesQuota:
@@ -279,7 +274,6 @@ class TestSeasonActivationConsumesQuota:
         mock_season_repo: MagicMock,
         mock_alliance_repo: MagicMock,
     ):
-        # Arrange: alliance has 1 purchased season, draft season ready
         alliance = make_alliance(ALLIANCE_ID, purchased_seasons=1, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
@@ -289,7 +283,6 @@ class TestSeasonActivationConsumesQuota:
         mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
         mock_season_repo.get_by_alliance = AsyncMock(return_value=[])
 
-        # Mock update to return activated season
         activated_season = make_season(
             SEASON_ID,
             ALLIANCE_ID,
@@ -298,10 +291,8 @@ class TestSeasonActivationConsumesQuota:
         )
         mock_season_repo.update = AsyncMock(return_value=activated_season)
 
-        # Act
         result = await season_service.activate_season(USER_ID, SEASON_ID)
 
-        # Assert: season activated, quota consumed
         assert result.success is True
         assert result.used_trial is False
         assert result.remaining_seasons == 0
@@ -313,7 +304,6 @@ class TestSeasonActivationConsumesQuota:
         mock_season_repo: MagicMock,
         mock_alliance_repo: MagicMock,
     ):
-        # Arrange: no purchased seasons, no prior activations (trial available)
         alliance = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
@@ -332,10 +322,8 @@ class TestSeasonActivationConsumesQuota:
         )
         mock_season_repo.update = AsyncMock(return_value=activated_season)
 
-        # Act
         result = await season_service.activate_season(USER_ID, SEASON_ID)
 
-        # Assert: trial used, no purchased quota consumed
         assert result.success is True
         assert result.used_trial is True
         assert result.trial_ends_at is not None
@@ -353,17 +341,19 @@ class TestFullPaymentToActivationFlow:
         mock_season_repo: MagicMock,
         mock_webhook_repo: MagicMock,
     ):
-        # --- Phase 1: Payment adds 1 season ---
+        # --- Phase 1: Payment grants 1 season via RPC ---
         alliance_before = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance_before)
-        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(1, 0))
+        mock_webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(status="granted", available_seasons=1)
+        )
 
         payment_result = await payment_service.handle_payment_success(
-            {"externalCustomerId": f"{USER_ID}:1"},
+            valid_event_data(),
             event_id="evt_100",
             event_type="checkout.completed",
         )
-        assert payment_result["success"] is True
+        assert payment_result["status"] == "granted"
         assert payment_result["available_seasons"] == 1
 
         # --- Phase 2: Activate season (consumes the 1 purchased) ---
@@ -429,18 +419,20 @@ class TestFullPaymentToActivationFlow:
         result1 = await season_service.activate_season(USER_ID, SEASON_ID)
         assert result1.used_trial is True
 
-        # --- Phase 2: Purchase 1 season ---
+        # --- Phase 2: Purchase 1 season via RPC ---
         mock_alliance_repo.get_by_collaborator = AsyncMock(
             return_value=make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0),
         )
-        mock_alliance_repo.increment_purchased_seasons = AsyncMock(return_value=(1, 0))
+        mock_webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(status="granted", available_seasons=1)
+        )
 
         pay_result = await payment_service.handle_payment_success(
-            {"externalCustomerId": f"{USER_ID}:1"},
+            valid_event_data(),
             event_id="evt_200",
             event_type="order.paid",
         )
-        assert pay_result["success"] is True
+        assert pay_result["status"] == "granted"
 
         # --- Phase 3: Second activation uses purchased quota ---
         alliance_paid = make_alliance(ALLIANCE_ID, purchased_seasons=1, used_seasons=0)
