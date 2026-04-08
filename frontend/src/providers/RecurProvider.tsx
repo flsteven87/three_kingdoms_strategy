@@ -2,7 +2,8 @@
  * Recur Payment Provider
  *
  * Wraps the app with Recur SDK provider for payment integration.
- * Uses modal checkout mode for seamless payment experience.
+ * Uses hosted checkout mode (redirect to Recur) — modal mode currently
+ * returns 500 from `POST /v1/checkouts` for ONE_TIME products (Recur SDK bug).
  *
  * Note: Always wraps with RecurSDKProvider even when key is not configured,
  * to ensure useRecur hook works. The checkout function will fail gracefully
@@ -23,7 +24,7 @@ export function RecurProvider({ children }: RecurProviderProps) {
     <RecurSDKProvider
       config={{
         publishableKey: publishableKey || '',
-        checkoutMode: 'modal',
+        checkoutMode: 'hosted',
       }}
     >
       {children}
