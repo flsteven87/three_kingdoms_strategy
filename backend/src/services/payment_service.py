@@ -94,7 +94,10 @@ class PaymentService:
 
         logger.info(
             "Season granted event_id=%s alliance_id=%s user_id=%s available=%s",
-            event_id, alliance.id, user_id, result.available_seasons,
+            event_id,
+            alliance.id,
+            user_id,
+            result.available_seasons,
         )
         return {
             "status": "granted",
@@ -110,11 +113,21 @@ class PaymentService:
 
     @staticmethod
     def _extract_user_id(event_data: dict, *, event_id: str) -> UUID:
+        """
+        Pull the buyer's user UUID from the webhook payload.
+
+        Tolerates a legacy ``uuid:qty`` suffix: Recur's Customer.externalId is
+        sticky per-email, so customers first seen under the old format keep
+        sending that string forever. Any suffix after the first ``:`` is ignored
+        — quantity is hardcoded by :data:`SEASONS_PER_PURCHASE`, so the suffix
+        cannot inflate the grant even if it says ``:999``.
+        """
         raw = event_data.get("externalCustomerId") or event_data.get("external_customer_id")
         if not raw:
             raise WebhookPermanentError("missing_external_customer_id", event_id=event_id)
+        uuid_part = str(raw).split(":", 1)[0]
         try:
-            return UUID(str(raw))
+            return UUID(uuid_part)
         except (ValueError, TypeError) as e:
             raise WebhookPermanentError(
                 "invalid_external_customer_id", event_id=event_id, raw=str(raw)

@@ -107,13 +107,35 @@ class TestHandlePaymentSuccess:
         assert ei.value.code == "invalid_external_customer_id"
 
     @pytest.mark.asyncio
-    async def test_legacy_quantity_format_rejected(self, service):
-        """The old `user_id:quantity` format must be rejected — no back-compat."""
+    async def test_legacy_quantity_suffix_is_tolerated(self, service):
+        """
+        Recur stores Customer.externalId sticky-per-email. Customers created under
+        the old ``uuid:qty`` format still send that string back in webhook payloads
+        forever. Parse defensively — the UUID part is all that matters. Quantity is
+        already hardcoded by SEASONS_PER_PURCHASE, so any suffix is ignored noise.
+        """
         data = _valid_event_data()
         data["externalCustomerId"] = f"{USER_ID}:1"
-        with pytest.raises(WebhookPermanentError) as ei:
-            await service.handle_payment_success(data, event_id="evt_1")
-        assert ei.value.code == "invalid_external_customer_id"
+        result = await service.handle_payment_success(data, event_id="evt_legacy")
+        assert result["status"] == "granted"
+        assert result["user_id"] == str(USER_ID)
+        assert result["seasons_added"] == 1
+        kwargs = service._webhook_repo.process_event.await_args.kwargs
+        assert kwargs["user_id"] == USER_ID
+
+    @pytest.mark.asyncio
+    async def test_legacy_suffix_never_inflates_grant(self, service):
+        """
+        Defence-in-depth: even if the suffix claims a large quantity, the grant
+        stays at SEASONS_PER_PURCHASE. The old quantity-inflation exploit MUST
+        remain closed regardless of what the suffix says.
+        """
+        data = _valid_event_data()
+        data["externalCustomerId"] = f"{USER_ID}:999"
+        result = await service.handle_payment_success(data, event_id="evt_exploit")
+        assert result["seasons_added"] == 1
+        kwargs = service._webhook_repo.process_event.await_args.kwargs
+        assert kwargs["seasons"] == 1
 
     @pytest.mark.asyncio
     async def test_product_mismatch_is_permanent(self, service):
