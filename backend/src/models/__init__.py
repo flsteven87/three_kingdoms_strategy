@@ -19,6 +19,7 @@ from src.models.battle_event_metrics import (
     EventSummary,
 )
 from src.models.copper_mine_coordinate import (
+    CopperCoordinateLookupResult,
     CopperCoordinateSearchResult,
     CopperMineCoordinate,
     CopperMineCoordinateResponse,
@@ -67,6 +68,7 @@ __all__ = [
     # Copper Mine Coordinate models
     "CopperMineCoordinate",
     "CopperMineCoordinateResponse",
+    "CopperCoordinateLookupResult",
     "CopperCoordinateSearchResult",
     # Donation models
     "Donation",

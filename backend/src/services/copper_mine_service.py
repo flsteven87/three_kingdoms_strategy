@@ -25,7 +25,10 @@ from src.models.copper_mine import (
     CopperMineResponse,
     RegisterCopperResponse,
 )
-from src.models.copper_mine_coordinate import CopperCoordinateSearchResult
+from src.models.copper_mine_coordinate import (
+    CopperCoordinateLookupResult,
+    CopperCoordinateSearchResult,
+)
 from src.repositories.copper_mine_coordinate_repository import CopperMineCoordinateRepository
 from src.repositories.copper_mine_repository import CopperMineRepository
 from src.repositories.copper_mine_rule_repository import CopperMineRuleRepository
@@ -865,6 +868,58 @@ class CopperMineService:
             )
             for c in coordinates
         ]
+
+    async def lookup_copper_coordinate(
+        self, line_group_id: str, coord_x: int, coord_y: int
+    ) -> CopperCoordinateLookupResult:
+        """
+        Look up a single coordinate with optional source-of-truth enrichment (LIFF).
+
+        Returns county/level when reference data exists, plus current registration status.
+        """
+        alliance_id = await self._get_alliance_id_from_group(line_group_id)
+        season_id = await self._get_current_season_id(alliance_id)
+        game_season_tag = await self._get_game_season_tag(season_id)
+        existing_mine = await self.repository.get_mine_by_coords(
+            alliance_id=alliance_id, coord_x=coord_x, coord_y=coord_y, season_id=season_id
+        )
+
+        has_source_data = False
+        if game_season_tag:
+            has_source_data = await self.coordinate_repository.has_data(game_season_tag)
+
+        if has_source_data and game_season_tag:
+            coordinate = await self.coordinate_repository.get_by_coords(
+                game_season_tag, coord_x, coord_y
+            )
+            if not coordinate:
+                return CopperCoordinateLookupResult(
+                    coord_x=coord_x,
+                    coord_y=coord_y,
+                    is_taken=existing_mine is not None,
+                    can_register=False,
+                    message=f"座標 ({coord_x}, {coord_y}) 不在 {game_season_tag} 的銅礦資料中",
+                )
+
+            return CopperCoordinateLookupResult(
+                coord_x=coord_x,
+                coord_y=coord_y,
+                level=coordinate.level,
+                county=coordinate.county,
+                district=coordinate.district,
+                is_taken=existing_mine is not None,
+                can_register=existing_mine is None,
+                message="此座標已被註冊" if existing_mine else None,
+            )
+
+        return CopperCoordinateLookupResult(
+            coord_x=coord_x,
+            coord_y=coord_y,
+            is_taken=existing_mine is not None,
+            can_register=existing_mine is None,
+            requires_manual_level=True,
+            message="此座標已被註冊" if existing_mine else None,
+        )
 
     async def search_copper_coordinates_by_season(
         self, season_id: UUID, query: str

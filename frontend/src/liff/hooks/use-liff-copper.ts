@@ -11,8 +11,10 @@ import {
   getCopperRules,
   registerCopperMine,
   deleteCopperMine,
+  lookupCopperCoordinate,
   searchCopperCoordinates,
   type CopperMine,
+  type CopperCoordinateLookupResult,
   type CopperMineListResponse,
   type CopperMineRule,
   type CopperCoordinateSearchResult,
@@ -30,6 +32,8 @@ export const liffCopperKeys = {
   list: (userId: string, groupId: string) =>
     [...liffCopperKeys.all, 'list', userId, groupId] as const,
   rules: (groupId: string) => [...liffCopperKeys.all, 'rules', groupId] as const,
+  lookup: (groupId: string, coordX: number, coordY: number) =>
+    [...liffCopperKeys.all, 'lookup', groupId, coordX, coordY] as const,
   search: (groupId: string, query: string) =>
     [...liffCopperKeys.all, 'search', groupId, query] as const,
 }
@@ -216,5 +220,12 @@ export function useLiffCopperSearch(groupId: string | null, query: string) {
     queryFn: () => searchCopperCoordinates({ lineGroupId: groupId!, query }),
     enabled: !!groupId && query.length >= 1,
     staleTime: 30 * 1000,
+  })
+}
+
+export function useLiffCopperCoordinateLookup(groupId: string | null) {
+  return useMutation<CopperCoordinateLookupResult, Error, { coordX: number; coordY: number }>({
+    mutationFn: ({ coordX, coordY }) =>
+      lookupCopperCoordinate({ lineGroupId: groupId!, coordX, coordY }),
   })
 }

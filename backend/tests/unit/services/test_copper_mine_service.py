@@ -54,6 +54,7 @@ def mock_copper_mine_repo() -> MagicMock:
     repo.count_member_mines = AsyncMock(return_value=0)
     repo.get_claimed_tiers = AsyncMock(return_value=set())
     repo.get_mines_by_alliance = AsyncMock(return_value=[])
+    repo.get_mine_by_coords = AsyncMock(return_value=None)
     return repo
 
 
@@ -95,6 +96,7 @@ def mock_coordinate_repo() -> MagicMock:
     repo = MagicMock()
     repo.has_data = AsyncMock(return_value=False)
     repo.list_searchable_counties = AsyncMock(return_value=[])
+    repo.get_by_coords = AsyncMock(return_value=None)
     return repo
 
 
@@ -173,6 +175,23 @@ def create_mock_mine(
     mine.notes = None
     mine.registered_at = datetime(2026, 4, 9, 12, 0, 0)
     return mine
+
+
+def create_mock_coordinate(
+    coord_x: int = 123,
+    coord_y: int = 456,
+    county: str = "巴郡",
+    district: str = "江州",
+    level: int = 9,
+) -> MagicMock:
+    """Factory for creating mock source-of-truth coordinate records"""
+    coordinate = MagicMock()
+    coordinate.coord_x = coord_x
+    coordinate.coord_y = coord_y
+    coordinate.county = county
+    coordinate.district = district
+    coordinate.level = level
+    return coordinate
 
 
 # =============================================================================
@@ -652,3 +671,94 @@ class TestGetMinesListMetadata:
         assert result.current_game_season_tag == "PK24"
         assert result.available_counties == []
         mock_coordinate_repo.list_searchable_counties.assert_not_awaited()
+
+
+class TestLookupCopperCoordinate:
+    """Tests for single-coordinate lookup in LIFF."""
+
+    @pytest.mark.asyncio
+    async def test_should_return_source_of_truth_metadata_when_coordinate_exists(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_line_binding_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should include county and level when source-of-truth data exists."""
+        mock_line_binding_repo.get_group_binding_by_line_group_id.return_value = MagicMock(
+            alliance_id=alliance_id
+        )
+        mock_season_repo.get_current_season.return_value = MagicMock(id=season_id)
+        mock_season_repo.get_by_id.return_value = MagicMock(game_season_tag="PK23")
+        mock_coordinate_repo.has_data.return_value = True
+        mock_coordinate_repo.get_by_coords.return_value = create_mock_coordinate(level=10)
+
+        result = await copper_mine_list_service.lookup_copper_coordinate("Cgroup123", 123, 456)
+
+        assert result.coord_x == 123
+        assert result.coord_y == 456
+        assert result.county == "巴郡"
+        assert result.district == "江州"
+        assert result.level == 10
+        assert result.is_taken is False
+        assert result.can_register is True
+        assert result.requires_manual_level is False
+        assert result.message is None
+
+    @pytest.mark.asyncio
+    async def test_should_return_validation_message_when_coordinate_missing_from_source_data(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_line_binding_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should reject coordinates missing from source-of-truth data."""
+        mock_line_binding_repo.get_group_binding_by_line_group_id.return_value = MagicMock(
+            alliance_id=alliance_id
+        )
+        mock_season_repo.get_current_season.return_value = MagicMock(id=season_id)
+        mock_season_repo.get_by_id.return_value = MagicMock(game_season_tag="PK23")
+        mock_coordinate_repo.has_data.return_value = True
+        mock_coordinate_repo.get_by_coords.return_value = None
+
+        result = await copper_mine_list_service.lookup_copper_coordinate("Cgroup123", 999, 888)
+
+        assert result.coord_x == 999
+        assert result.coord_y == 888
+        assert result.county is None
+        assert result.level is None
+        assert result.can_register is False
+        assert result.requires_manual_level is False
+        assert "PK23" in (result.message or "")
+
+    @pytest.mark.asyncio
+    async def test_should_require_manual_level_when_source_data_unavailable(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_line_binding_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should allow registration with manual level when no source-of-truth exists."""
+        mock_line_binding_repo.get_group_binding_by_line_group_id.return_value = MagicMock(
+            alliance_id=alliance_id
+        )
+        mock_season_repo.get_current_season.return_value = MagicMock(id=season_id)
+        mock_season_repo.get_by_id.return_value = MagicMock(game_season_tag="PK24")
+        mock_coordinate_repo.has_data.return_value = False
+
+        result = await copper_mine_list_service.lookup_copper_coordinate("Cgroup123", 321, 654)
+
+        assert result.coord_x == 321
+        assert result.coord_y == 654
+        assert result.county is None
+        assert result.level is None
+        assert result.can_register is True
+        assert result.requires_manual_level is True

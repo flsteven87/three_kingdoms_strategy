@@ -309,12 +309,49 @@ export interface CopperCoordinateSearchResult {
   is_taken: boolean;
 }
 
+export interface CopperCoordinateLookupResult {
+  coord_x: number;
+  coord_y: number;
+  level: number | null;
+  county: string | null;
+  district: string | null;
+  is_taken: boolean;
+  can_register: boolean;
+  requires_manual_level: boolean;
+  message: string | null;
+}
+
 export async function searchCopperCoordinates(
   options: Pick<LiffApiOptions, "lineGroupId"> & { query: string },
 ): Promise<CopperCoordinateSearchResult[]> {
   const url = new URL(`${API_BASE_URL}/api/v1/linebot/copper/search`);
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("q", options.query);
+
+  const response = await fetch(url.toString(), {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || "Request failed");
+  }
+
+  return response.json();
+}
+
+export async function lookupCopperCoordinate(
+  options: Pick<LiffApiOptions, "lineGroupId"> & {
+    coordX: number;
+    coordY: number;
+  },
+): Promise<CopperCoordinateLookupResult> {
+  const url = new URL(`${API_BASE_URL}/api/v1/linebot/copper/lookup`);
+  url.searchParams.set("g", options.lineGroupId);
+  url.searchParams.set("x", String(options.coordX));
+  url.searchParams.set("y", String(options.coordY));
 
   const response = await fetch(url.toString(), {
     headers: { "Content-Type": "application/json" },

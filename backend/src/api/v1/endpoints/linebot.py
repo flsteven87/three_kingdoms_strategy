@@ -52,7 +52,10 @@ from src.models.copper_mine import (
     CopperMineListResponse,
     RegisterCopperResponse,
 )
-from src.models.copper_mine_coordinate import CopperCoordinateSearchResult
+from src.models.copper_mine_coordinate import (
+    CopperCoordinateLookupResult,
+    CopperCoordinateSearchResult,
+)
 from src.models.line_binding import (
     EventListResponse,
     LineBindingCodeResponse,
@@ -639,6 +642,24 @@ async def search_copper_coordinates(
 ) -> list[CopperCoordinateSearchResult]:
     """Search copper mine coordinates by location name"""
     return await service.search_copper_coordinates(line_group_id=g, query=q)
+
+
+@router.get(
+    "/copper/lookup",
+    response_model=CopperCoordinateLookupResult,
+    summary="Lookup copper coordinate",
+    description="Lookup a single copper mine coordinate by X/Y",
+)
+@limiter.limit(PUBLIC_RATE)
+async def lookup_copper_coordinate(
+    request: Request,
+    service: CopperMineServiceDep,
+    g: Annotated[str, Query(description="LINE group ID")],
+    x: Annotated[int, Query(description="X coordinate", ge=0)],
+    y: Annotated[int, Query(description="Y coordinate", ge=0)],
+) -> CopperCoordinateLookupResult:
+    """Lookup a single copper mine coordinate by X/Y"""
+    return await service.lookup_copper_coordinate(line_group_id=g, coord_x=x, coord_y=y)
 
 
 # =============================================================================

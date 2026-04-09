@@ -19,12 +19,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  useLiffCopperCoordinateLookup,
   useLiffCopperMines,
   useLiffCopperSearch,
   useLiffRegisterCopper,
 } from "../hooks/use-liff-copper";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
-import type { CopperCoordinateSearchResult } from "../lib/liff-api-client";
+import type {
+  CopperCoordinateLookupResult,
+  CopperCoordinateSearchResult,
+} from "../lib/liff-api-client";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
@@ -37,9 +41,7 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [coordX, setCoordX] = useState("");
   const [coordY, setCoordY] = useState("");
-  const [coordSearchResult, setCoordSearchResult] = useState<string | null>(
-    null,
-  );
+  const [manualLookupLevel, setManualLookupLevel] = useState("9");
   const [registeringCoord, setRegisteringCoord] = useState<string | null>(null);
 
   const context = {
@@ -49,6 +51,7 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
 
   // Reads from TanStack Query cache (already fetched by CopperTab)
   const { data } = useLiffCopperMines(context);
+  const coordLookupMutation = useLiffCopperCoordinateLookup(session.lineGroupId);
   const registerMutation = useLiffRegisterCopper(context);
 
   const hasSourceData = data?.has_source_data ?? false;
@@ -70,6 +73,7 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
     hasCountySearch ? session.lineGroupId : null,
     debouncedQuery,
   );
+  const coordLookupResult = coordLookupMutation.data;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(locationQuery), 300);
@@ -79,7 +83,7 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
   // Coordinate lookup
   const handleCoordSearch = () => {
     if (!coordX.trim() || !coordY.trim()) {
-      setCoordSearchResult(null);
+      coordLookupMutation.reset();
       return;
     }
 
@@ -87,21 +91,11 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
     const y = parseInt(coordY, 10);
 
     if (isNaN(x) || x < 0 || isNaN(y) || y < 0) {
-      setCoordSearchResult(null);
+      coordLookupMutation.reset();
       return;
     }
 
-    const existingMine = mines.find(
-      (mine) => mine.coord_x === x && mine.coord_y === y,
-    );
-
-    if (existingMine) {
-      setCoordSearchResult(
-        `已被 ${existingMine.game_id} 註冊 (Lv.${existingMine.level})`,
-      );
-    } else {
-      setCoordSearchResult("座標可用");
-    }
+    coordLookupMutation.mutate({ coordX: x, coordY: y });
   };
 
   // Register from search result
@@ -114,6 +108,27 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
         coordX: result.coord_x,
         coordY: result.coord_y,
         level: result.level,
+      });
+      onBack();
+    } catch {
+      // Error handled by mutation
+    } finally {
+      setRegisteringCoord(null);
+    }
+  };
+
+  const handleRegisterLookup = async (result: CopperCoordinateLookupResult) => {
+    if (!result.can_register) return;
+
+    const coordKey = `${result.coord_x}-${result.coord_y}`;
+    const level = result.level ?? parseInt(manualLookupLevel, 10);
+    setRegisteringCoord(coordKey);
+    try {
+      await registerMutation.mutateAsync({
+        gameId,
+        coordX: result.coord_x,
+        coordY: result.coord_y,
+        level,
       });
       onBack();
     } catch {
@@ -165,9 +180,129 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
           </div>
         )}
 
+        {/* Coordinate search (always available) */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">依座標查詢</p>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-1">
+              <span className="text-sm text-muted-foreground shrink-0">X</span>
+              <Input
+                value={coordX}
+                onChange={(e) => {
+                  setCoordX(e.target.value);
+                  coordLookupMutation.reset();
+                }}
+                placeholder="123"
+                className="h-10"
+                inputMode="numeric"
+                pattern="[0-9]*"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 flex-1">
+              <span className="text-sm text-muted-foreground shrink-0">Y</span>
+              <Input
+                value={coordY}
+                onChange={(e) => {
+                  setCoordY(e.target.value);
+                  coordLookupMutation.reset();
+                }}
+                placeholder="456"
+                className="h-10"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                onKeyDown={(e) => e.key === "Enter" && handleCoordSearch()}
+              />
+            </div>
+            <Button
+              onClick={handleCoordSearch}
+              disabled={!coordX.trim() || !coordY.trim()}
+              variant="outline"
+              className="h-10"
+            >
+              {coordLookupMutation.isPending ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          {coordLookupResult && (
+            <div className="rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex items-center gap-2 text-xs">
+                  <span className="font-medium tabular-nums">
+                    ({coordLookupResult.coord_x},{coordLookupResult.coord_y})
+                  </span>
+                  {coordLookupResult.county && (
+                    <span className="truncate text-muted-foreground">
+                      {coordLookupResult.county}
+                      {coordLookupResult.district
+                        ? ` · ${coordLookupResult.district}`
+                        : ""}
+                    </span>
+                  )}
+                  {coordLookupResult.level != null ? (
+                    <span className="shrink-0 text-muted-foreground">
+                      Lv.{coordLookupResult.level}
+                    </span>
+                  ) : coordLookupResult.requires_manual_level ? (
+                    <Select
+                      value={manualLookupLevel}
+                      onValueChange={setManualLookupLevel}
+                    >
+                      <SelectTrigger className="h-8 w-20 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10 級</SelectItem>
+                        <SelectItem value="9">9 級</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                </div>
+                <div className="shrink-0">
+                  {coordLookupResult.is_taken ? (
+                    <span className="text-xs text-muted-foreground">已佔</span>
+                  ) : coordLookupResult.can_register ? (
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => handleRegisterLookup(coordLookupResult)}
+                      disabled={registerMutation.isPending}
+                    >
+                      {registerMutation.isPending &&
+                      registeringCoord ===
+                        `${coordLookupResult.coord_x}-${coordLookupResult.coord_y}` ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <>
+                          <Plus className="h-3 w-3 mr-1" />
+                          註冊
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">不可註冊</span>
+                  )}
+                </div>
+              </div>
+              {coordLookupResult.message && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {coordLookupResult.message}
+                </p>
+              )}
+            </div>
+          )}
+          {coordLookupMutation.error && (
+            <p className="text-xs text-destructive">
+              {coordLookupMutation.error.message}
+            </p>
+          )}
+        </div>
+
         {/* County search (when source data exists) */}
         {hasCountySearch && (
-          <div className="space-y-2">
+          <div className="space-y-2 border-t pt-3">
             <p className="text-xs text-muted-foreground">選擇郡/縣名</p>
             <div className="flex items-center gap-2">
               <Select
@@ -263,57 +398,6 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
               )}
           </div>
         )}
-
-        {/* Coordinate search (always available) */}
-        <div className={`space-y-2 ${hasCountySearch ? "border-t pt-3" : ""}`}>
-          <p className="text-xs text-muted-foreground">依座標查詢</p>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 flex-1">
-              <span className="text-sm text-muted-foreground shrink-0">X</span>
-              <Input
-                value={coordX}
-                onChange={(e) => {
-                  setCoordX(e.target.value);
-                  setCoordSearchResult(null);
-                }}
-                placeholder="123"
-                className="h-10"
-                inputMode="numeric"
-                pattern="[0-9]*"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 flex-1">
-              <span className="text-sm text-muted-foreground shrink-0">Y</span>
-              <Input
-                value={coordY}
-                onChange={(e) => {
-                  setCoordY(e.target.value);
-                  setCoordSearchResult(null);
-                }}
-                placeholder="456"
-                className="h-10"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                onKeyDown={(e) => e.key === "Enter" && handleCoordSearch()}
-              />
-            </div>
-            <Button
-              onClick={handleCoordSearch}
-              disabled={!coordX.trim() || !coordY.trim()}
-              variant="outline"
-              className="h-10"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
-          {coordSearchResult && (
-            <p
-              className={`text-xs ${coordSearchResult === "座標可用" ? "text-green-600" : "text-amber-600"}`}
-            >
-              {coordSearchResult}
-            </p>
-          )}
-        </div>
 
         {/* Mutation error */}
         {registerMutation.error && (

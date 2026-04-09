@@ -42,3 +42,19 @@ class CopperCoordinateSearchResult(BaseModel):
     county: str
     district: str
     is_taken: bool = Field(False, description="Whether this coordinate is already registered")
+
+
+class CopperCoordinateLookupResult(BaseModel):
+    """Single-coordinate lookup result with optional source-of-truth metadata."""
+
+    coord_x: int
+    coord_y: int
+    level: int | None = None
+    county: str | None = None
+    district: str | None = None
+    is_taken: bool = Field(False, description="Whether this coordinate is already registered")
+    can_register: bool = Field(False, description="Whether this coordinate can be registered")
+    requires_manual_level: bool = Field(
+        False, description="Whether the caller must choose the level manually"
+    )
+    message: str | None = Field(None, description="Contextual status or validation message")
