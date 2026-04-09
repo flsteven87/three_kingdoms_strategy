@@ -46,6 +46,7 @@ export function useLiffMemberInfo(context: LiffContext | null) {
         lineGroupId: context!.lineGroupId,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId,
+    staleTime: 30_000,
   });
 }
 

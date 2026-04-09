@@ -43,7 +43,7 @@ export function useLiffEventList(
   });
 }
 
-export function useLiffEventReportInline(
+export function useLiffEventReport(
   context: LiffContext | null,
   eventId: string | null,
 ) {
@@ -55,5 +55,6 @@ export function useLiffEventReportInline(
         eventId: eventId!,
       }),
     enabled: !!context?.lineGroupId && !!eventId,
+    staleTime: 60_000,
   });
 }

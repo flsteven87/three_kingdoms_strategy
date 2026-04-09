@@ -43,6 +43,7 @@ export function useLiffCopperMines(context: LiffContext | null) {
         lineGroupId: context!.lineGroupId,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId,
+    staleTime: 15_000,
   })
 }
 

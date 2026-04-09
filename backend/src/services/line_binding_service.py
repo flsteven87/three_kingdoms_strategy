@@ -707,7 +707,9 @@ class LineBindingService:
         3. Group is NOT in cooldown (30 minutes)
         """
         result = await self.repository.check_liff_notification_eligibility(
-            line_group_id, line_user_id, cooldown_minutes=self.NOTIFICATION_COOLDOWN_MINUTES,
+            line_group_id,
+            line_user_id,
+            cooldown_minutes=self.NOTIFICATION_COOLDOWN_MINUTES,
         )
         return result["is_bound"] and not result["is_registered"] and not result["in_cooldown"]
 
@@ -923,9 +925,10 @@ class LineBindingService:
 
         alliance_id = group_binding.alliance_id
 
-        # Verify user owns this game_id
-        member_binding = await self.repository.get_member_binding_by_game_id(
-            alliance_id=alliance_id, game_id=game_id
+        # Round 2: member_binding and season are independent — fetch in parallel
+        member_binding, current_season = await asyncio.gather(
+            self.repository.get_member_binding_by_game_id(alliance_id=alliance_id, game_id=game_id),
+            self._season_repo.get_current_season(alliance_id),
         )
 
         if not member_binding or member_binding.line_user_id != line_user_id:
@@ -933,21 +936,21 @@ class LineBindingService:
                 status_code=status.HTTP_403_FORBIDDEN, detail="Game ID not registered by this user"
             )
 
-        # Get member_id from binding
         member_id = member_binding.member_id
         if not member_id:
-            # Game ID registered but not matched to member yet
             return MemberPerformanceResponse(has_data=False, game_id=game_id)
-
-        # Get current (selected) season
-        current_season = await self._season_repo.get_current_season(alliance_id)
 
         if not current_season:
             return MemberPerformanceResponse(has_data=False, game_id=game_id)
 
-        # Get member trend data
-        trend_data = await self._analytics_service.get_member_trend(
-            member_id=member_id, season_id=current_season.id
+        # Round 3: trend and summary are independent — fetch in parallel
+        trend_data, season_summary = await asyncio.gather(
+            self._analytics_service.get_member_trend(
+                member_id=member_id, season_id=current_season.id
+            ),
+            self._analytics_service.get_season_summary(
+                member_id=member_id, season_id=current_season.id
+            ),
         )
 
         if not trend_data:
@@ -955,12 +958,6 @@ class LineBindingService:
                 has_data=False, game_id=game_id, season_name=current_season.name
             )
 
-        # Get season summary
-        season_summary = await self._analytics_service.get_season_summary(
-            member_id=member_id, season_id=current_season.id
-        )
-
-        # Get latest period data
         latest = trend_data[-1]
 
         # Build rank info
@@ -1152,7 +1149,9 @@ class LineBindingService:
             )
         else:
             user_metrics_map = {}
-            all_metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(event_ids)
+            all_metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(
+                event_ids
+            )
 
         # 7. Build response items
         items: list[EventListItem] = []

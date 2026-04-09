@@ -27,7 +27,7 @@ import { AccountSelector } from "../components/AccountSelector";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import {
   useLiffEventList,
-  useLiffEventReportInline,
+  useLiffEventReport,
   liffBattleKeys,
 } from "../hooks/use-liff-battle";
 import { type EventType } from "@/constants/event-types";
@@ -148,7 +148,7 @@ function ExpandedEventReport({
   );
 
   const context = { lineGroupId };
-  const { data: report, isLoading } = useLiffEventReportInline(
+  const { data: report, isLoading } = useLiffEventReport(
     context,
     eventId,
   );
