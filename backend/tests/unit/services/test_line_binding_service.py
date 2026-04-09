@@ -588,3 +588,56 @@ class TestGetRegisteredMembers:
 
         assert result.unregistered_count == 1
         assert result.unregistered[0].line_display_name is None
+
+
+# =============================================================================
+# should_send_liff_notification — single RPC path
+# =============================================================================
+
+
+@pytest.mark.asyncio
+class TestShouldSendLiffNotification:
+    """Tests for the consolidated RPC-based should_send_liff_notification."""
+
+    async def test_returns_true_when_eligible(self, service, mock_repository):
+        """Returns True when group is bound, user unregistered, group not in cooldown."""
+        mock_repository.check_liff_notification_eligibility = AsyncMock(
+            return_value={"is_bound": True, "is_registered": False, "in_cooldown": False}
+        )
+
+        result = await service.should_send_liff_notification("Cgroup1", "Uuser1")
+
+        assert result is True
+        mock_repository.check_liff_notification_eligibility.assert_awaited_once_with(
+            "Cgroup1", "Uuser1", cooldown_minutes=30
+        )
+
+    async def test_returns_false_when_group_not_bound(self, service, mock_repository):
+        """Returns False when group is not bound to any alliance."""
+        mock_repository.check_liff_notification_eligibility = AsyncMock(
+            return_value={"is_bound": False, "is_registered": False, "in_cooldown": False}
+        )
+
+        result = await service.should_send_liff_notification("Cgroup1", "Uuser1")
+
+        assert result is False
+
+    async def test_returns_false_when_user_registered(self, service, mock_repository):
+        """Returns False when user has already registered a game ID."""
+        mock_repository.check_liff_notification_eligibility = AsyncMock(
+            return_value={"is_bound": True, "is_registered": True, "in_cooldown": False}
+        )
+
+        result = await service.should_send_liff_notification("Cgroup1", "Uuser1")
+
+        assert result is False
+
+    async def test_returns_false_when_in_cooldown(self, service, mock_repository):
+        """Returns False when group is within the 30-minute notification cooldown."""
+        mock_repository.check_liff_notification_eligibility = AsyncMock(
+            return_value={"is_bound": True, "is_registered": False, "in_cooldown": True}
+        )
+
+        result = await service.should_send_liff_notification("Cgroup1", "Uuser1")
+
+        assert result is False

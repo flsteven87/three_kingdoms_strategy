@@ -731,6 +731,23 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .execute()
         )
 
+    async def check_liff_notification_eligibility(
+        self, line_group_id: str, line_user_id: str, cooldown_minutes: int = 30,
+    ) -> dict:
+        """Single RPC: check bound + registered + cooldown status."""
+        result = await self._execute_async(
+            lambda: self.client.rpc(
+                "check_liff_notification_eligibility",
+                {
+                    "p_line_group_id": line_group_id,
+                    "p_line_user_id": line_user_id,
+                    "p_cooldown_minutes": cooldown_minutes,
+                },
+            ).execute()
+        )
+        # RPC scalar return: result.data is the JSON value directly
+        return result.data
+
     # =========================================================================
     # Member Candidates Operations (for autocomplete)
     # =========================================================================

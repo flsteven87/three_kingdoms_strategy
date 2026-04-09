@@ -698,24 +698,18 @@ class LineBindingService:
 
     async def should_send_liff_notification(self, line_group_id: str, line_user_id: str) -> bool:
         """
-        Check if we should send LIFF notification for unregistered user message
+        Check if we should send LIFF notification for unregistered user message.
+        Single RPC replaces 3 sequential queries.
 
         Conditions:
         1. Group is bound to an alliance
         2. User has NOT registered any game ID
         3. Group is NOT in cooldown (30 minutes)
         """
-        group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
-        if not group_binding:
-            return False
-
-        bindings = await self.repository.get_member_bindings_by_line_user(
-            alliance_id=group_binding.alliance_id, line_user_id=line_user_id
+        result = await self.repository.check_liff_notification_eligibility(
+            line_group_id, line_user_id, cooldown_minutes=self.NOTIFICATION_COOLDOWN_MINUTES,
         )
-        if bindings:
-            return False
-
-        return not await self._is_group_in_cooldown(line_group_id)
+        return result["is_bound"] and not result["is_registered"] and not result["in_cooldown"]
 
     # =========================================================================
     # Group Member Tracking (webhook-based)
