@@ -29,8 +29,10 @@ from src.core.dependencies import (
     CopperMineServiceDep,
     LineBindingServiceDep,
     PermissionServiceDep,
+    SeasonQuotaServiceDep,
     UserIdDep,
 )
+from src.core.exceptions import SeasonQuotaExhaustedError
 from src.core.line_auth import (
     WebhookBodyDep,
     create_liff_url,
@@ -71,6 +73,7 @@ from src.models.line_binding import (
 )
 from src.services.battle_event_service import BattleEventService
 from src.services.line_binding_service import LineBindingService
+from src.services.season_quota_service import SeasonQuotaService
 
 logger = logging.getLogger(__name__)
 
@@ -642,6 +645,7 @@ async def handle_webhook(
     body: WebhookBodyDep,
     service: LineBindingServiceDep,
     battle_event_service: BattleEventServiceDep,
+    season_quota_service: SeasonQuotaServiceDep,
     settings: Settings = Depends(get_settings),
 ) -> str:
     """Handle LINE webhook events"""
@@ -653,7 +657,7 @@ async def handle_webhook(
         return "OK"
 
     for event in webhook_request.events:
-        await _handle_event(event, service, battle_event_service, settings)
+        await _handle_event(event, service, battle_event_service, season_quota_service, settings)
 
     return "OK"
 
@@ -662,6 +666,7 @@ async def _handle_event(
     event: LineWebhookEvent,
     service: LineBindingService,
     battle_event_service: BattleEventService,
+    season_quota_service: SeasonQuotaService,
     settings: Settings,
 ) -> None:
     """
@@ -710,7 +715,9 @@ async def _handle_event(
 
         # 群組訊息
         if source_type == "group":
-            await _handle_group_message(event, service, battle_event_service, settings)
+            await _handle_group_message(
+                event, service, battle_event_service, settings, season_quota_service
+            )
             return
 
 
@@ -748,13 +755,14 @@ async def _handle_member_joined(
         return
 
     bot_id = settings.line_bot_user_id
-    user_ids = [
-        uid for uid in _extract_member_user_ids(event.joined) if uid != bot_id
-    ]
+    user_ids = [uid for uid in _extract_member_user_ids(event.joined) if uid != bot_id]
     if user_ids:
         # Fetch profiles in parallel, non-blocking (LINE SDK is sync)
         names = await asyncio.gather(
-            *(asyncio.to_thread(get_group_member_display_name, line_group_id, uid) for uid in user_ids)
+            *(
+                asyncio.to_thread(get_group_member_display_name, line_group_id, uid)
+                for uid in user_ids
+            )
         )
         display_names = {uid: name for uid, name in zip(user_ids, names, strict=True) if name}
         await service.track_members_joined(line_group_id, user_ids, display_names or None)
@@ -814,6 +822,7 @@ async def _handle_group_message(
     service: LineBindingService,
     battle_event_service: BattleEventService,
     settings: Settings,
+    season_quota_service: SeasonQuotaService,
 ) -> None:
     """
     群組訊息處理：
@@ -836,6 +845,23 @@ async def _handle_group_message(
             get_group_member_display_name, line_group_id, line_user_id
         )
         await service.track_group_presence(line_group_id, line_user_id, display_name)
+
+    # Trial/quota gate: if this group is already bound to an alliance, require
+    # active quota before dispatching ANY command (including re-bind attempts).
+    # Unbound groups bypass so first-time /綁定 CODE still works.
+    group_binding = await service.get_group_binding(line_group_id)
+    if group_binding is not None:
+        try:
+            await season_quota_service.require_write_access(
+                group_binding.alliance_id, action="使用 LINE 小幫手"
+            )
+        except SeasonQuotaExhaustedError as e:
+            purchase_url = f"{settings.frontend_url}/purchase"
+            await _reply_text(
+                reply_token,
+                f"❌ {e.message}\n\n請盟主前往 {purchase_url} 購買季數後即可繼續使用 🙏",
+            )
+            return
 
     # 1. 處理綁定指令
     if _is_bind_command(text):
