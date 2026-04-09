@@ -21,9 +21,9 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from src.core.alerts import alert_critical
 from src.core.config import settings
+from src.core.dependencies import PaymentServiceDep
 from src.core.rate_limit import WEBHOOK_RATE, limiter
 from src.core.webhook_errors import WebhookPermanentError, WebhookTransientError
-from src.services.payment_service import PaymentService
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ def verify_recur_signature(payload: bytes, signature: str, secret: str) -> bool:
 @limiter.limit(WEBHOOK_RATE)
 async def recur_webhook(
     request: Request,
+    payment_service: PaymentServiceDep,
     x_recur_signature: str | None = Header(None, alias="x-recur-signature"),
 ):
     payload = await request.body()
@@ -88,8 +89,6 @@ async def recur_webhook(
 
     logger.info("Recur webhook received type=%s id=%s", event_type, event_id)
 
-    payment_service = PaymentService()
-
     try:
         if event_type in ("checkout.completed", "order.paid"):
             result = await payment_service.handle_payment_success(
@@ -98,12 +97,13 @@ async def recur_webhook(
             return {"received": True, **result}
 
         if event_type == "order.payment_failed":
+            customer = event_data.get("customer") or {}
             logger.warning(
                 "Payment failed event_id=%s customer=%s amount=%s reason=%s",
                 event_id,
-                event_data.get("externalCustomerId"),
+                customer.get("external_id") if isinstance(customer, dict) else None,
                 event_data.get("amount"),
-                event_data.get("failureReason"),
+                event_data.get("failure_reason"),
             )
             return {"received": True, "status": "payment_failed_logged"}
 

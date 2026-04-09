@@ -15,13 +15,15 @@ import base64
 import hashlib
 import hmac
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from src.api.v1.endpoints.webhooks import router, verify_recur_signature
+from src.core.dependencies import get_payment_service
+from src.services.payment_service import PaymentService
 
 # =============================================================================
 # Fixtures
@@ -41,11 +43,21 @@ def compute_valid_signature(payload: bytes, secret: str = WEBHOOK_SECRET) -> str
 
 
 @pytest.fixture
-def app() -> FastAPI:
-    """Create test FastAPI app with webhook router."""
+def mock_payment_service() -> MagicMock:
+    """Create a mock PaymentService for DI override."""
+    svc = MagicMock(spec=PaymentService)
+    svc.handle_payment_success = AsyncMock(return_value={"success": True})
+    return svc
+
+
+@pytest.fixture
+def app(mock_payment_service: MagicMock) -> FastAPI:
+    """Create test FastAPI app with webhook router and DI overrides."""
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
-    return app
+    app.dependency_overrides[get_payment_service] = lambda: mock_payment_service
+    yield app
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -197,19 +209,14 @@ class TestRecurWebhookEndpoint:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_returns_200_for_checkout_completed(self, async_client, checkout_request):
+    async def test_returns_200_for_checkout_completed(
+        self, async_client, checkout_request, mock_payment_service
+    ):
         """Should process checkout.completed and return 200"""
         payload, signature = checkout_request
 
-        with (
-            patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
-            patch("src.api.v1.endpoints.webhooks.PaymentService") as MockPaymentService,
-        ):
+        with patch("src.api.v1.endpoints.webhooks.settings") as mock_settings:
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
-            mock_instance = MockPaymentService.return_value
-            mock_instance.handle_payment_success = AsyncMock(
-                return_value={"success": True}
-            )
 
             response = await async_client.post(
                 "/api/v1/webhooks/recur",
@@ -219,7 +226,7 @@ class TestRecurWebhookEndpoint:
 
         assert response.status_code == 200
         assert response.json()["received"] is True
-        mock_instance.handle_payment_success.assert_called_once()
+        mock_payment_service.handle_payment_success.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_returns_200_for_unknown_event_type(self, async_client):
@@ -241,7 +248,9 @@ class TestRecurWebhookEndpoint:
         assert response.json()["received"] is True
 
     @pytest.mark.asyncio
-    async def test_permanent_error_returns_200_and_alerts(self, async_client, checkout_request):
+    async def test_permanent_error_returns_200_and_alerts(
+        self, async_client, checkout_request, mock_payment_service
+    ):
         """WebhookPermanentError → 200 + alert_critical (no Recur retry).
 
         The alert_critical mock uses `spec=alert_critical` so the real
@@ -250,25 +259,25 @@ class TestRecurWebhookEndpoint:
         keyword for the same parameter, and a loose mock silently accepted
         it. Keeping the spec guarantees that class of bug trips in tests.
         """
-        from src.core.webhook_errors import WebhookPermanentError
         from src.core.alerts import alert_critical
+        from src.core.webhook_errors import WebhookPermanentError
 
         payload, signature = checkout_request
 
+        mock_payment_service.handle_payment_success = AsyncMock(
+            side_effect=WebhookPermanentError(
+                "product_mismatch", event_id="evt_123", expected="prod_a", actual="prod_b"
+            )
+        )
+
         with (
             patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
-            patch("src.api.v1.endpoints.webhooks.PaymentService") as MockPaymentService,
             patch(
                 "src.api.v1.endpoints.webhooks.alert_critical",
                 new=AsyncMock(spec=alert_critical),
             ) as mock_alert,
         ):
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
-            MockPaymentService.return_value.handle_payment_success = AsyncMock(
-                side_effect=WebhookPermanentError(
-                    "product_mismatch", event_id="evt_123", expected="prod_a", actual="prod_b"
-                )
-            )
 
             response = await async_client.post(
                 "/api/v1/webhooks/recur",
@@ -290,20 +299,20 @@ class TestRecurWebhookEndpoint:
         assert "code" not in call.kwargs
 
     @pytest.mark.asyncio
-    async def test_transient_error_returns_500(self, async_client, checkout_request):
+    async def test_transient_error_returns_500(
+        self, async_client, checkout_request, mock_payment_service
+    ):
         """WebhookTransientError → 500 so Recur retries."""
         from src.core.webhook_errors import WebhookTransientError
 
         payload, signature = checkout_request
 
-        with (
-            patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
-            patch("src.api.v1.endpoints.webhooks.PaymentService") as MockPaymentService,
-        ):
+        mock_payment_service.handle_payment_success = AsyncMock(
+            side_effect=WebhookTransientError("rpc_api_error", event_id="evt_123")
+        )
+
+        with patch("src.api.v1.endpoints.webhooks.settings") as mock_settings:
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
-            MockPaymentService.return_value.handle_payment_success = AsyncMock(
-                side_effect=WebhookTransientError("rpc_api_error", event_id="evt_123")
-            )
 
             response = await async_client.post(
                 "/api/v1/webhooks/recur",
@@ -318,9 +327,7 @@ class TestRecurWebhookEndpoint:
         """Signature verification failure → 401 + alert_critical."""
         with (
             patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
-            patch(
-                "src.api.v1.endpoints.webhooks.alert_critical", new=AsyncMock()
-            ) as mock_alert,
+            patch("src.api.v1.endpoints.webhooks.alert_critical", new=AsyncMock()) as mock_alert,
         ):
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
 
@@ -335,19 +342,18 @@ class TestRecurWebhookEndpoint:
         assert mock_alert.await_args.args[0] == "recur.webhook.signature_failed"
 
     @pytest.mark.asyncio
-    async def test_returns_500_for_unexpected_error(self, async_client, checkout_request):
+    async def test_returns_500_for_unexpected_error(
+        self, async_client, checkout_request, mock_payment_service
+    ):
         """Should return 500 for unexpected errors (trigger Recur retry)"""
         payload, signature = checkout_request
 
-        with (
-            patch("src.api.v1.endpoints.webhooks.settings") as mock_settings,
-            patch("src.api.v1.endpoints.webhooks.PaymentService") as MockPaymentService,
-        ):
+        mock_payment_service.handle_payment_success = AsyncMock(
+            side_effect=RuntimeError("Database connection failed")
+        )
+
+        with patch("src.api.v1.endpoints.webhooks.settings") as mock_settings:
             mock_settings.recur_webhook_secret = WEBHOOK_SECRET
-            mock_instance = MockPaymentService.return_value
-            mock_instance.handle_payment_success = AsyncMock(
-                side_effect=RuntimeError("Database connection failed")
-            )
 
             response = await async_client.post(
                 "/api/v1/webhooks/recur",

@@ -41,6 +41,7 @@ from src.services.copper_mine_service import CopperMineService
 from src.services.csv_upload_service import CSVUploadService
 from src.services.hegemony_weight_service import HegemonyWeightService
 from src.services.line_binding_service import LineBindingService
+from src.services.payment_service import PaymentService
 from src.services.period_metrics_service import PeriodMetricsService
 from src.services.permission_service import PermissionService
 from src.services.season_quota_service import SeasonQuotaService
@@ -131,6 +132,11 @@ def get_contact_form_service() -> ContactFormService:
     return ContactFormService()
 
 
+def get_payment_service() -> PaymentService:
+    """Get payment service instance"""
+    return PaymentService()
+
+
 def get_season_quota_service() -> SeasonQuotaService:
     """Get season quota service instance"""
     return SeasonQuotaService()
@@ -167,4 +173,5 @@ LineBindingServiceDep = Annotated[LineBindingService, Depends(get_line_binding_s
 CopperMineServiceDep = Annotated[CopperMineService, Depends(get_copper_mine_service)]
 CopperMineRuleServiceDep = Annotated[CopperMineRuleService, Depends(get_copper_mine_rule_service)]
 ContactFormServiceDep = Annotated[ContactFormService, Depends(get_contact_form_service)]
+PaymentServiceDep = Annotated[PaymentService, Depends(get_payment_service)]
 SeasonQuotaServiceDep = Annotated[SeasonQuotaService, Depends(get_season_quota_service)]

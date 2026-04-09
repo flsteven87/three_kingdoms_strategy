@@ -15,9 +15,13 @@ Follows CLAUDE.md:
 - Exception chaining with 'from e'
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import UUID
+
+from postgrest.exceptions import APIError
 
 from src.core.exceptions import SeasonQuotaExhaustedError
 from src.models.alliance import Alliance, SeasonQuotaStatus
@@ -45,6 +49,7 @@ class SeasonQuotaService:
         """Initialize season quota service with repositories."""
         self._alliance_repo = AllianceRepository()
         self._season_repo = SeasonRepository()
+        self._client = self._alliance_repo.client
 
     # =========================================================================
     # Alliance Retrieval
@@ -229,7 +234,7 @@ class SeasonQuotaService:
         can_write = await self._can_write_to_season(alliance, current_season)
 
         if not can_write:
-            logger.warning(f"Write access denied - alliance_id={alliance_id}, action={action}")
+            logger.warning("Write access denied - alliance_id=%s, action=%s", alliance_id, action)
 
             if current_season and current_season.is_trial:
                 message = f"您的 14 天試用期已結束，請購買季數以繼續{action}。"
@@ -246,7 +251,7 @@ class SeasonQuotaService:
 
         can_activate = await self._can_activate_season(alliance)
         if not can_activate:
-            logger.warning(f"Season activation denied - alliance_id={alliance_id}")
+            logger.warning("Season activation denied - alliance_id=%s", alliance_id)
             message = "您的可用季數已用完，請購買季數以啟用新賽季。"
             raise SeasonQuotaExhaustedError(message)
 
@@ -258,19 +263,38 @@ class SeasonQuotaService:
         """
         Consume one season from alliance's quota or use trial.
 
+        Uses the atomic ``consume_season_quota`` RPC to close the TOCTOU
+        window between availability check and increment.  The RPC acquires
+        a ``FOR UPDATE`` row lock on the alliance, so concurrent calls are
+        serialised at the DB level.
+
         Returns:
             Tuple of (remaining_seasons, used_trial, trial_ends_at)
+
+        Raises:
+            ValueError: If alliance not found or quota exhausted.
         """
-        alliance = await self.get_alliance_by_id(alliance_id)
-        if not alliance:
+        try:
+            result = await asyncio.to_thread(
+                lambda: self._client.rpc(
+                    "consume_season_quota",
+                    {"p_alliance_id": str(alliance_id)},
+                ).execute()
+            )
+        except APIError as e:
+            if "Alliance not found" in str(e):
+                raise ValueError(f"Alliance not found: {alliance_id}") from e
+            raise
+
+        rows = result.data or []
+        if not rows:
             raise ValueError(f"Alliance not found: {alliance_id}")
 
-        available = self._calculate_available_seasons(alliance)
+        row = rows[0]
+        status: Literal["paid", "trial", "exhausted"] = row["status"]
+        remaining: int = int(row["remaining_seasons"])
 
-        # Priority: use purchased seasons first, then trial
-        if available > 0:
-            new_used, purchased = await self._alliance_repo.increment_used_seasons(alliance_id)
-            remaining = purchased - new_used
+        if status == "paid":
             logger.info(
                 "Season consumed (paid) - alliance_id=%s, remaining=%s",
                 alliance_id,
@@ -278,7 +302,7 @@ class SeasonQuotaService:
             )
             return (remaining, False, None)
 
-        if await self._has_trial_available(alliance_id):
+        if status == "trial":
             trial_end = datetime.now(UTC) + timedelta(days=TRIAL_DURATION_DAYS)
             logger.info(
                 "Season activated using trial - alliance_id=%s, trial_ends=%s",
@@ -287,6 +311,7 @@ class SeasonQuotaService:
             )
             return (0, True, trial_end.isoformat())
 
+        # status == "exhausted"
         raise ValueError("No available seasons or trial to consume")
 
     async def add_purchased_seasons(self, alliance_id: UUID, seasons: int) -> int:
@@ -300,8 +325,10 @@ class SeasonQuotaService:
         new_available = new_purchased - used
 
         logger.info(
-            f"Seasons purchased - alliance_id={alliance_id}, "
-            f"added={seasons}, available={new_available}"
+            "Seasons purchased - alliance_id=%s, added=%s, available=%s",
+            alliance_id,
+            seasons,
+            new_available,
         )
 
         return new_available

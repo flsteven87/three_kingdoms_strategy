@@ -33,6 +33,7 @@ from src.api.v1.endpoints import (
     uploads,
     webhooks,
 )
+from src.core.alerts import close_alert_client
 from src.core.config import settings
 from src.core.exceptions import SeasonQuotaExhaustedError
 from src.core.idempotency import IdempotencyMiddleware, create_idempotency_storage
@@ -51,6 +52,7 @@ async def lifespan(app: FastAPI):
     assert_production_config(settings)
     logger.info("Startup config validated (environment=%s)", settings.environment)
     yield
+    await close_alert_client()
 
 
 # Create FastAPI app
@@ -111,7 +113,7 @@ async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     """Handle FastAPI request validation errors."""
-    logger.warning(f"Validation error on {request.method} {request.url.path}: {exc.errors()}")
+    logger.warning("Validation error on %s %s: %s", request.method, request.url.path, exc.errors())
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors()},
@@ -126,7 +128,7 @@ async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse
     Converts ValueError (domain exceptions) to HTTP 400 Bad Request
     This eliminates the need for repetitive try/except blocks in endpoints
     """
-    logger.error(f"[ValueError] URL: {request.url}, Error: {exc}")
+    logger.error("[ValueError] URL: %s, Error: %s", request.url, exc)
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
 
 

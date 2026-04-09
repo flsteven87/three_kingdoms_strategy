@@ -61,11 +61,22 @@ def mock_season_repo() -> MagicMock:
 
 
 @pytest.fixture
-def quota_service(mock_alliance_repo: MagicMock, mock_season_repo: MagicMock) -> SeasonQuotaService:
+def mock_supabase_client() -> MagicMock:
+    """Mock Supabase client for consume_season_quota RPC."""
+    return MagicMock()
+
+
+@pytest.fixture
+def quota_service(
+    mock_alliance_repo: MagicMock,
+    mock_season_repo: MagicMock,
+    mock_supabase_client: MagicMock,
+) -> SeasonQuotaService:
     """Create SeasonQuotaService with mocked repositories"""
     service = SeasonQuotaService()
     service._alliance_repo = mock_alliance_repo
     service._season_repo = mock_season_repo
+    service._client = mock_supabase_client
     return service
 
 
@@ -631,40 +642,39 @@ class TestConsumeSeason:
     async def test_consumes_purchased_season_first(
         self,
         quota_service: SeasonQuotaService,
-        mock_alliance_repo: MagicMock,
-        mock_season_repo: MagicMock,
+        mock_supabase_client: MagicMock,
         alliance_id: UUID,
     ):
-        """Should consume purchased season when available"""
-        # Arrange
-        alliance = create_mock_alliance(alliance_id, purchased_seasons=5, used_seasons=2)
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        # Atomic increment returns (new_used=3, purchased=5)
-        mock_alliance_repo.increment_used_seasons = AsyncMock(return_value=(3, 5))
-        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=2)
+        """Should consume purchased season when available (via atomic RPC)"""
+        # Arrange — RPC returns 'paid' with remaining=2
+        rpc_result = MagicMock()
+        rpc_result.data = [{"status": "paid", "remaining_seasons": 2}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         # Act
         remaining, used_trial, trial_ends_at = await quota_service.consume_season(alliance_id)
 
         # Assert
-        assert remaining == 2  # 5 - 3 = 2
+        assert remaining == 2
         assert used_trial is False
         assert trial_ends_at is None
-        mock_alliance_repo.increment_used_seasons.assert_called_once_with(alliance_id)
+        mock_supabase_client.rpc.assert_called_once_with(
+            "consume_season_quota",
+            {"p_alliance_id": str(alliance_id)},
+        )
 
     @pytest.mark.asyncio
     async def test_uses_trial_when_no_purchased_seasons(
         self,
         quota_service: SeasonQuotaService,
-        mock_alliance_repo: MagicMock,
-        mock_season_repo: MagicMock,
+        mock_supabase_client: MagicMock,
         alliance_id: UUID,
     ):
-        """Should use trial when no purchased seasons available"""
-        # Arrange
-        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=0)
+        """Should use trial when no purchased seasons available (via atomic RPC)"""
+        # Arrange — RPC returns 'trial'
+        rpc_result = MagicMock()
+        rpc_result.data = [{"status": "trial", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         # Act
         remaining, used_trial, trial_ends_at = await quota_service.consume_season(alliance_id)
@@ -678,15 +688,14 @@ class TestConsumeSeason:
     async def test_raises_when_no_quota_and_no_trial(
         self,
         quota_service: SeasonQuotaService,
-        mock_alliance_repo: MagicMock,
-        mock_season_repo: MagicMock,
+        mock_supabase_client: MagicMock,
         alliance_id: UUID,
     ):
         """Should raise when no purchased seasons and trial already used"""
-        # Arrange
-        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+        # Arrange — RPC returns 'exhausted'
+        rpc_result = MagicMock()
+        rpc_result.data = [{"status": "exhausted", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         # Act & Assert
         with pytest.raises(ValueError) as exc_info:
@@ -1030,11 +1039,13 @@ class TestConsumeSeasonAdditional:
     async def test_raises_when_alliance_not_found(
         self,
         quota_service: SeasonQuotaService,
-        mock_alliance_repo: MagicMock,
+        mock_supabase_client: MagicMock,
         alliance_id: UUID,
     ):
-        """Should raise ValueError when alliance doesn't exist"""
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
+        """Should raise ValueError when alliance doesn't exist (RPC returns empty)"""
+        rpc_result = MagicMock()
+        rpc_result.data = []
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         with pytest.raises(ValueError, match="Alliance not found"):
             await quota_service.consume_season(alliance_id)

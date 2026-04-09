@@ -140,13 +140,21 @@ def mock_permission_service() -> MagicMock:
 
 
 @pytest.fixture
+def mock_supabase_client() -> MagicMock:
+    """Mock Supabase client used by SeasonQuotaService for the consume_season_quota RPC."""
+    return MagicMock()
+
+
+@pytest.fixture
 def quota_service(
     mock_alliance_repo: MagicMock,
     mock_season_repo: MagicMock,
+    mock_supabase_client: MagicMock,
 ) -> SeasonQuotaService:
     svc = SeasonQuotaService()
     svc._alliance_repo = mock_alliance_repo
     svc._season_repo = mock_season_repo
+    svc._client = mock_supabase_client
     return svc
 
 
@@ -280,11 +288,16 @@ class TestSeasonActivationConsumesQuota:
         season_service: SeasonService,
         mock_season_repo: MagicMock,
         mock_alliance_repo: MagicMock,
+        mock_supabase_client: MagicMock,
     ):
         alliance = make_alliance(ALLIANCE_ID, purchased_seasons=1, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        mock_alliance_repo.increment_used_seasons = AsyncMock(return_value=(1, 1))
+
+        # Mock the atomic consume_season_quota RPC
+        rpc_result = MagicMock()
+        rpc_result.data = [{"status": "paid", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         draft_season = make_season(SEASON_ID, ALLIANCE_ID, activation_status="draft")
         mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
@@ -303,18 +316,27 @@ class TestSeasonActivationConsumesQuota:
         assert result.success is True
         assert result.used_trial is False
         assert result.remaining_seasons == 0
-        mock_alliance_repo.increment_used_seasons.assert_awaited_once_with(ALLIANCE_ID)
+        mock_supabase_client.rpc.assert_called_once_with(
+            "consume_season_quota",
+            {"p_alliance_id": str(ALLIANCE_ID)},
+        )
 
     async def test_first_activation_uses_trial_when_no_purchased(
         self,
         season_service: SeasonService,
         mock_season_repo: MagicMock,
         mock_alliance_repo: MagicMock,
+        mock_supabase_client: MagicMock,
     ):
         alliance = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
         mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=0)
+
+        # Mock the atomic consume_season_quota RPC — trial path
+        rpc_result = MagicMock()
+        rpc_result.data = [{"status": "trial", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         draft_season = make_season(SEASON_ID, ALLIANCE_ID, activation_status="draft")
         mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
@@ -334,7 +356,6 @@ class TestSeasonActivationConsumesQuota:
         assert result.success is True
         assert result.used_trial is True
         assert result.trial_ends_at is not None
-        mock_alliance_repo.increment_used_seasons.assert_not_awaited()
 
 
 class TestFullPaymentToActivationFlow:
@@ -347,6 +368,7 @@ class TestFullPaymentToActivationFlow:
         mock_alliance_repo: MagicMock,
         mock_season_repo: MagicMock,
         mock_webhook_repo: MagicMock,
+        mock_supabase_client: MagicMock,
     ):
         # --- Phase 1: Payment grants 1 season via RPC ---
         alliance_before = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
@@ -363,12 +385,15 @@ class TestFullPaymentToActivationFlow:
         assert payment_result["status"] == "granted"
         assert payment_result["available_seasons"] == 1
 
-        # --- Phase 2: Activate season (consumes the 1 purchased) ---
+        # --- Phase 2: Activate season (consumes the 1 purchased via atomic RPC) ---
         alliance_after_pay = make_alliance(ALLIANCE_ID, purchased_seasons=1, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance_after_pay)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance_after_pay)
-        mock_alliance_repo.increment_used_seasons = AsyncMock(return_value=(1, 1))
         mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        rpc_result = MagicMock()
+        rpc_result.data = [{"status": "paid", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         draft = make_season(SEASON_ID, ALLIANCE_ID, activation_status="draft")
         mock_season_repo.get_by_id = AsyncMock(return_value=draft)
@@ -404,12 +429,17 @@ class TestFullPaymentToActivationFlow:
         mock_alliance_repo: MagicMock,
         mock_season_repo: MagicMock,
         mock_webhook_repo: MagicMock,
+        mock_supabase_client: MagicMock,
     ):
-        # --- Phase 1: First activation uses trial (no purchase) ---
+        # --- Phase 1: First activation uses trial (via atomic RPC) ---
         alliance_new = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance_new)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance_new)
         mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=0)
+
+        rpc_trial = MagicMock()
+        rpc_trial.data = [{"status": "trial", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_trial
 
         draft1 = make_season(SEASON_ID, ALLIANCE_ID, activation_status="draft")
         mock_season_repo.get_by_id = AsyncMock(return_value=draft1)
@@ -426,7 +456,7 @@ class TestFullPaymentToActivationFlow:
         result1 = await season_service.activate_season(USER_ID, SEASON_ID)
         assert result1.used_trial is True
 
-        # --- Phase 2: Purchase 1 season via RPC ---
+        # --- Phase 2: Purchase 1 season via webhook RPC ---
         mock_alliance_repo.get_by_collaborator = AsyncMock(
             return_value=make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0),
         )
@@ -441,12 +471,15 @@ class TestFullPaymentToActivationFlow:
         )
         assert pay_result["status"] == "granted"
 
-        # --- Phase 3: Second activation uses purchased quota ---
+        # --- Phase 3: Second activation uses purchased quota (via atomic RPC) ---
         alliance_paid = make_alliance(ALLIANCE_ID, purchased_seasons=1, used_seasons=0)
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance_paid)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance_paid)
-        mock_alliance_repo.increment_used_seasons = AsyncMock(return_value=(1, 1))
         mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        rpc_paid = MagicMock()
+        rpc_paid.data = [{"status": "paid", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_paid
 
         draft2 = make_season(SEASON_ID_2, ALLIANCE_ID, activation_status="draft")
         mock_season_repo.get_by_id = AsyncMock(return_value=draft2)

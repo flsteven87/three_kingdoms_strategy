@@ -379,7 +379,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if existing:
             if existing.status == IdempotencyStatus.PROCESSING:
                 # Another request is processing - reject
-                logger.warning(f"Concurrent request with same idempotency key: {idempotency_key}")
+                logger.warning("Concurrent request with same idempotency key: %s", idempotency_key)
                 return JSONResponse(
                     status_code=409,
                     content={
@@ -390,7 +390,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
             if existing.status == IdempotencyStatus.COMPLETED:
                 # Return cached response
-                logger.info(f"Returning cached response for idempotency key: {idempotency_key}")
+                logger.info("Returning cached response for idempotency key: %s", idempotency_key)
                 return Response(
                     content=existing.response_body,
                     status_code=existing.status_code or 200,

@@ -270,7 +270,7 @@ class SeasonService:
             data["end_date"] = data["end_date"].isoformat()
 
         season = await self._repo.create(data)
-        logger.info(f"Season created as draft - season_id={season.id}, alliance_id={alliance.id}")
+        logger.info("Season created as draft - season_id=%s, alliance_id=%s", season.id, alliance.id)
 
         return season
 
@@ -329,8 +329,10 @@ class SeasonService:
         updated_season = await self._repo.update(season_id, update_data)
 
         logger.info(
-            f"Season activated - season_id={season_id}, "
-            f"used_trial={used_trial}, remaining_seasons={remaining}"
+            "Season activated - season_id=%s, used_trial=%s, remaining_seasons=%s",
+            season_id,
+            used_trial,
+            remaining,
         )
 
         return SeasonActivateResponse(
