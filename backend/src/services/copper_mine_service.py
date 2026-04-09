@@ -174,6 +174,7 @@ class CopperMineService:
             mine_counts_by_game_id=mine_counts_by_game_id,
             max_allowed=max_allowed,
             has_source_data=has_source_data,
+            current_game_season_tag=game_season_tag,
             available_counties=available_counties,
         )
 

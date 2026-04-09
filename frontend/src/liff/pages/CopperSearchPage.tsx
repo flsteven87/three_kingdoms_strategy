@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Search, Plus, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { GAME_SEASON_TAGS } from "@/constants/game-seasons";
 import {
   Select,
   SelectContent,
@@ -22,17 +23,16 @@ import {
   useLiffCopperSearch,
   useLiffRegisterCopper,
 } from "../hooks/use-liff-copper";
-import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
 import type { CopperCoordinateSearchResult } from "../lib/liff-api-client";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
+  readonly gameId: string;
   readonly onBack: () => void;
 }
 
-export function CopperSearchPage({ session, onBack }: Props) {
-  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+export function CopperSearchPage({ session, gameId, onBack }: Props) {
   const [locationQuery, setLocationQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [coordX, setCoordX] = useState("");
@@ -47,28 +47,21 @@ export function CopperSearchPage({ session, onBack }: Props) {
     lineGroupId: session.lineGroupId,
   };
 
-  const memberContext = {
-    ...context,
-    lineDisplayName: session.lineDisplayName,
-  };
-
   // Reads from TanStack Query cache (already fetched by CopperTab)
   const { data } = useLiffCopperMines(context);
-  const { data: memberInfo } = useLiffMemberInfo(memberContext);
   const registerMutation = useLiffRegisterCopper(context);
 
   const hasSourceData = data?.has_source_data ?? false;
+  const sourceDataLabel = data?.current_game_season_tag
+    ? (GAME_SEASON_TAGS.find((tag) => tag.value === data.current_game_season_tag)?.label ??
+      data.current_game_season_tag)
+    : "資料來源";
   const availableCounties = data?.available_counties ?? [];
   const mines = data?.mines ?? [];
   const maxAllowed = data?.max_allowed ?? 0;
 
-  const effectiveGameId =
-    selectedGameId || memberInfo?.registered_ids?.[0]?.game_id || null;
-
   // Count mines for selected game_id
-  const myCount = effectiveGameId
-    ? mines.filter((m) => m.game_id === effectiveGameId).length
-    : 0;
+  const myCount = mines.filter((m) => m.game_id === gameId).length;
   const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
   // County search with debounce
@@ -113,12 +106,11 @@ export function CopperSearchPage({ session, onBack }: Props) {
 
   // Register from search result
   const handleRegister = async (result: CopperCoordinateSearchResult) => {
-    if (!effectiveGameId) return;
     const coordKey = `${result.coord_x}-${result.coord_y}`;
     setRegisteringCoord(coordKey);
     try {
       await registerMutation.mutateAsync({
-        gameId: effectiveGameId,
+        gameId,
         coordX: result.coord_x,
         coordY: result.coord_y,
         level: result.level,
@@ -147,7 +139,7 @@ export function CopperSearchPage({ session, onBack }: Props) {
           <h1 className="text-base font-medium">搜尋銅礦</h1>
           {hasSourceData && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-              資料來源
+              {sourceDataLabel}
             </span>
           )}
         </div>
@@ -155,28 +147,6 @@ export function CopperSearchPage({ session, onBack }: Props) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-3 space-y-4">
-        {/* Account selector (when multiple accounts) */}
-        {memberInfo?.registered_ids && memberInfo.registered_ids.length > 1 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">註冊帳號</p>
-            <Select
-              value={effectiveGameId || ""}
-              onValueChange={setSelectedGameId}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="選擇帳號" />
-              </SelectTrigger>
-              <SelectContent>
-                {memberInfo.registered_ids.map((acc) => (
-                  <SelectItem key={acc.game_id} value={acc.game_id}>
-                    {acc.game_id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
         {/* Quota status */}
         {maxAllowed > 0 && (
           <div
@@ -187,7 +157,7 @@ export function CopperSearchPage({ session, onBack }: Props) {
                 canApply ? "text-muted-foreground" : "text-destructive"
               }
             >
-              {effectiveGameId}: 已申請 {myCount} / {maxAllowed} 座
+              {gameId}: 已申請 {myCount} / {maxAllowed} 座
             </span>
             {!canApply && (
               <span className="text-destructive font-medium">已達上限</span>
@@ -198,30 +168,33 @@ export function CopperSearchPage({ session, onBack }: Props) {
         {/* County search (when source data exists) */}
         {hasCountySearch && (
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-              <Input
-                value={locationQuery}
-                onChange={(e) => setLocationQuery(e.target.value)}
-                placeholder="搜尋郡/縣名..."
-                className="h-10"
-              />
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {availableCounties.map((county) => (
-                <button
-                  key={county}
-                  type="button"
-                  className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                    locationQuery === county
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  }`}
-                  onClick={() => setLocationQuery(county)}
-                >
-                  {county}
-                </button>
-              ))}
+            <p className="text-xs text-muted-foreground">選擇郡/縣名</p>
+            <div className="flex items-center gap-2">
+              <Select
+                value={locationQuery || ""}
+                onValueChange={setLocationQuery}
+              >
+                <SelectTrigger className="h-10 flex-1">
+                  <SelectValue placeholder="選擇郡/縣名" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCounties.map((county) => (
+                    <SelectItem key={county} value={county}>
+                      {county}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-10 shrink-0 px-3 text-xs"
+                onClick={() => setLocationQuery("")}
+                disabled={!locationQuery}
+              >
+                清除
+              </Button>
             </div>
 
             {/* Search results */}
@@ -254,7 +227,7 @@ export function CopperSearchPage({ session, onBack }: Props) {
                           <span className="text-xs text-muted-foreground">
                             已佔
                           </span>
-                        ) : canApply && effectiveGameId ? (
+                        ) : canApply ? (
                           <Button
                             size="sm"
                             variant="outline"
@@ -272,9 +245,7 @@ export function CopperSearchPage({ session, onBack }: Props) {
                             )}
                           </Button>
                         ) : (
-                          <span className="text-xs text-muted-foreground">
-                            {!effectiveGameId ? "未選帳號" : "已達上限"}
-                          </span>
+                          <span className="text-xs text-muted-foreground">已達上限</span>
                         )}
                       </div>
                     </div>

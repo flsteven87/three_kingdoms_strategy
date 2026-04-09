@@ -93,6 +93,7 @@ class CopperMineListResponse(BaseModel):
     mine_counts_by_game_id: dict[str, int] = Field(default_factory=dict)  # {game_id: count}
     max_allowed: int = 0
     has_source_data: bool = False
+    current_game_season_tag: str | None = None
     available_counties: list[str] = Field(default_factory=list)
 
 

@@ -28,6 +28,7 @@ export function LiffHome() {
   const { session } = useLiffContext();
   const [activeTab, setActiveTab] = useState("performance");
   const [pageView, setPageView] = useState<PageView>("main");
+  const [copperSearchGameId, setCopperSearchGameId] = useState<string | null>(null);
 
   // Onboarding state: null = not determined, true = show, false = hide
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
@@ -92,7 +93,14 @@ export function LiffHome() {
   // Copper search page (full screen)
   if (pageView === "copper-search") {
     return (
-      <CopperSearchPage session={session} onBack={() => setPageView("main")} />
+      <CopperSearchPage
+        session={session}
+        gameId={copperSearchGameId ?? registeredIds[0].game_id}
+        onBack={() => {
+          setCopperSearchGameId(null);
+          setPageView("main");
+        }}
+      />
     );
   }
 
@@ -154,7 +162,13 @@ export function LiffHome() {
           <BattleTab session={session} />
         </TabsContent>
         <TabsContent value="copper" className="m-0">
-          <CopperTab session={session} onNavigateSearch={() => setPageView("copper-search")} />
+          <CopperTab
+            session={session}
+            onNavigateSearch={(gameId) => {
+              setCopperSearchGameId(gameId);
+              setPageView("copper-search");
+            }}
+          />
         </TabsContent>
       </div>
     </Tabs>

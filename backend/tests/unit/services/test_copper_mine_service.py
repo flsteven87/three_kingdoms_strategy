@@ -613,6 +613,7 @@ class TestGetMinesListMetadata:
 
         # Assert
         assert result.has_source_data is True
+        assert result.current_game_season_tag == "PK23"
         assert result.available_counties == ["巴郡", "漢中郡"]
         assert result.max_allowed == 2
         assert result.mine_counts_by_game_id == {"Jason": 1, "Alice": 0}
@@ -648,5 +649,6 @@ class TestGetMinesListMetadata:
 
         # Assert
         assert result.has_source_data is False
+        assert result.current_game_season_tag == "PK24"
         assert result.available_counties == []
         mock_coordinate_repo.list_searchable_counties.assert_not_awaited()

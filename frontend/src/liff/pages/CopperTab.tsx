@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { GAME_SEASON_TAGS } from "@/constants/game-seasons";
 import { liffTypography } from "@/lib/typography";
 import {
   useLiffCopperMines,
@@ -37,7 +38,7 @@ import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
-  readonly onNavigateSearch: () => void;
+  readonly onNavigateSearch: (gameId: string) => void;
 }
 
 export function CopperTab({ session, onNavigateSearch }: Props) {
@@ -72,6 +73,11 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
   const deleteMutation = useLiffDeleteCopper(context);
 
   const hasSourceData = data?.has_source_data ?? false;
+  const sourceDataLabel = data?.current_game_season_tag
+    ? (GAME_SEASON_TAGS.find((tag) => tag.value === data.current_game_season_tag)?.label ??
+      data.current_game_season_tag)
+    : "資料來源";
+  const canUseSearch = !!effectiveGameId;
 
   // Get all game_ids owned by this user
   const myGameIds = new Set(
@@ -237,13 +243,14 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
           <Button
             variant="outline"
             className="w-full h-10"
-            onClick={onNavigateSearch}
+            onClick={() => effectiveGameId && onNavigateSearch(effectiveGameId)}
+            disabled={!canUseSearch}
           >
             <Search className="h-4 w-4 mr-2" />
             搜尋銅礦
             {hasSourceData && (
               <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                資料來源
+                {sourceDataLabel}
               </span>
             )}
           </Button>
