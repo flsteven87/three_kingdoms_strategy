@@ -37,6 +37,7 @@ export function useLiffEventList(
         gameId: gameId!,
       }),
     enabled: !!context?.lineGroupId && !!gameId,
+    staleTime: 30_000,
   });
 }
 

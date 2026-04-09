@@ -39,5 +39,6 @@ export function useLiffPerformance(
         gameId: gameId!,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId && !!gameId,
+    staleTime: 60_000,
   })
 }
