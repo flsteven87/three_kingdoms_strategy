@@ -8,6 +8,7 @@ Three Kingdoms Strategy Manager FastAPI Application
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -36,11 +37,21 @@ from src.core.config import settings
 from src.core.exceptions import SeasonQuotaExhaustedError
 from src.core.idempotency import IdempotencyMiddleware, create_idempotency_storage
 from src.core.rate_limit import limiter
+from src.core.startup import assert_production_config
 
 logger = logging.getLogger(__name__)
 
 # Create idempotency storage (Supabase in production, in-memory in development)
 idempotency_storage = create_idempotency_storage()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Fail-closed startup checks — revenue-critical config must be complete in prod."""
+    assert_production_config(settings)
+    logger.info("Startup config validated (environment=%s)", settings.environment)
+    yield
+
 
 # Create FastAPI app
 # 符合 CLAUDE.md 🔴: redirect_slashes=False for cloud deployment
@@ -51,6 +62,7 @@ app = FastAPI(
     redirect_slashes=False,
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
+    lifespan=lifespan,
 )
 
 # Rate limiter (per-IP, applied via decorators on individual endpoints)
