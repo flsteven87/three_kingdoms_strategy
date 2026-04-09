@@ -9,7 +9,8 @@
  * - Visual alignment with LINE Bot Flex Messages
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EventBadge } from "@/components/ui/event-badge";
@@ -27,12 +28,13 @@ import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import {
   useLiffEventList,
   useLiffEventReportInline,
+  liffBattleKeys,
 } from "../hooks/use-liff-battle";
 import { type EventType } from "@/constants/event-types";
 import { formatScore, formatEventTime } from "@/lib/format-utils";
 import { liffTypography } from "@/lib/typography";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
-import type { EventListItem } from "../lib/liff-api-client";
+import { getEventReport, type EventListItem } from "../lib/liff-api-client";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
@@ -386,6 +388,23 @@ export function BattleTab({ session }: Props) {
     eventContext,
     effectiveGameId,
   );
+
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!eventList?.events) return;
+    eventList.events.slice(0, 5).forEach((event) => {
+      queryClient.prefetchQuery({
+        queryKey: liffBattleKeys.report(session.lineGroupId, event.event_id),
+        queryFn: () =>
+          getEventReport({
+            lineGroupId: session.lineGroupId,
+            eventId: event.event_id,
+          }),
+        staleTime: 60_000,
+      });
+    });
+  }, [eventList, session.lineGroupId, queryClient]);
 
   const handleToggleEvent = (eventId: string) => {
     setExpandedEventId((prev) => (prev === eventId ? null : eventId));
