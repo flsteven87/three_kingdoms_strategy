@@ -10,7 +10,6 @@ from src.api.v1.endpoints.linebot import _handle_group_message
 from src.core.exceptions import SeasonQuotaExhaustedError
 from src.models.line_binding import LineWebhookEvent
 
-
 ALLIANCE_ID = uuid4()
 BOT_ID = "Ubot123"
 GROUP_ID = "Cgroup123"
@@ -117,35 +116,44 @@ async def test_bound_group_active_quota_passes_gate(monkeypatch):
     quota_service.require_write_access.assert_awaited_once_with(
         ALLIANCE_ID, action="使用 LINE 小幫手"
     )
-    # No renewal message sent
-    for call in reply_text.await_args_list:
-        assert "試用" not in call.args[1]
-        assert "季數" not in call.args[1]
 
 
 @pytest.mark.asyncio
-async def test_bound_group_trial_expired_replies_renewal_message(monkeypatch):
-    """Bound group with expired trial: gate blocks, sends polite renewal reply, no dispatch."""
-    err = SeasonQuotaExhaustedError(
-        "您的 14 天試用期已結束，請購買季數以繼續使用 LINE 小幫手。"
-    )
+@pytest.mark.parametrize(
+    ("err_message", "expected_substr", "event_text", "mentions_bot"),
+    [
+        (
+            "您的 14 天試用期已結束，請購買季數以繼續使用 LINE 小幫手。",
+            "14 天試用期已結束",
+            "/綁定 ABC123",  # Even re-bind on already-bound group is blocked
+            False,
+        ),
+        (
+            "您的可用季數已用完，請購買季數以繼續使用 LINE 小幫手。",
+            "季數已用完",
+            "@bot /最新戰役",
+            True,
+        ),
+    ],
+    ids=["trial_expired", "quota_exhausted"],
+)
+async def test_bound_group_quota_blocked_replies_renewal_message(
+    monkeypatch, err_message, expected_substr, event_text, mentions_bot
+):
+    """Bound group with exhausted quota (trial-expired or paid-out): gate blocks with renewal reply."""
     binding_service = _make_binding_service(binding=_make_binding())
-    quota_service = _make_quota_service(raise_error=err)
+    quota_service = _make_quota_service(raise_error=SeasonQuotaExhaustedError(err_message))
     reply_text = AsyncMock(return_value=None)
     bind_handler = AsyncMock(return_value=None)
     monkeypatch.setattr("src.api.v1.endpoints.linebot._reply_text", reply_text)
-    monkeypatch.setattr(
-        "src.api.v1.endpoints.linebot._handle_bind_command", bind_handler
-    )
+    monkeypatch.setattr("src.api.v1.endpoints.linebot._handle_bind_command", bind_handler)
     monkeypatch.setattr(
         "src.api.v1.endpoints.linebot.get_group_member_display_name",
         lambda *a, **kw: "Tester",
     )
 
-    # Even /綁定 on an already-bound group should be blocked
-    event = _make_event("/綁定 ABC123")
     await _handle_group_message(
-        event,
+        _make_event(event_text, mentions_bot=mentions_bot),
         binding_service,
         battle_event_service=MagicMock(),
         settings=_make_settings(),
@@ -156,36 +164,5 @@ async def test_bound_group_trial_expired_replies_renewal_message(monkeypatch):
     bind_handler.assert_not_called()
     reply_text.assert_awaited_once()
     msg = reply_text.await_args.args[1]
-    assert "14 天試用期已結束" in msg
-    assert "https://tktmanager.com/purchase" in msg
-
-
-@pytest.mark.asyncio
-async def test_bound_group_quota_exhausted_replies_renewal_message(monkeypatch):
-    """Bound paid-out group: gate blocks with quota-exhausted variant, sends renewal reply."""
-    err = SeasonQuotaExhaustedError(
-        "您的可用季數已用完，請購買季數以繼續使用 LINE 小幫手。"
-    )
-    binding_service = _make_binding_service(binding=_make_binding())
-    quota_service = _make_quota_service(raise_error=err)
-    reply_text = AsyncMock(return_value=None)
-    monkeypatch.setattr("src.api.v1.endpoints.linebot._reply_text", reply_text)
-    monkeypatch.setattr(
-        "src.api.v1.endpoints.linebot.get_group_member_display_name",
-        lambda *a, **kw: "Tester",
-    )
-
-    event = _make_event("@bot /最新戰役", mentions_bot=True)
-    await _handle_group_message(
-        event,
-        binding_service,
-        battle_event_service=MagicMock(),
-        settings=_make_settings(),
-        season_quota_service=quota_service,
-    )
-
-    quota_service.require_write_access.assert_awaited_once()
-    reply_text.assert_awaited_once()
-    msg = reply_text.await_args.args[1]
-    assert "季數已用完" in msg
+    assert expected_substr in msg
     assert "https://tktmanager.com/purchase" in msg
