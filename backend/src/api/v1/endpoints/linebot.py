@@ -60,6 +60,7 @@ from src.models.line_binding import (
     LineCustomCommandCreate,
     LineCustomCommandResponse,
     LineCustomCommandUpdate,
+    LineGroupBinding,
     LineGroupBindingResponse,
     LineWebhookEvent,
     LineWebhookRequest,
@@ -91,12 +92,15 @@ async def _resolve_alliance_and_season(
     line_group_id: str,
     reply_token: str,
     service: LineBindingService,
+    group_binding: LineGroupBinding | None = None,  # skip re-fetch if already fetched
 ) -> tuple[UUID, UUID | None] | None:
     """
     Resolve group binding to (alliance_id, season_id).
     Sends error reply and returns None if the group is not bound.
+    Pass group_binding to skip the DB round-trip when already fetched by the caller.
     """
-    group_binding = await service.get_group_binding(line_group_id)
+    if group_binding is None:
+        group_binding = await service.get_group_binding(line_group_id)
     if not group_binding:
         await _reply_text(reply_token, _MSG_GROUP_NOT_BOUND)
         return None
@@ -912,6 +916,7 @@ async def _handle_group_message(
                     reply_token=reply_token,
                     line_binding_service=service,
                     battle_event_service=battle_event_service,
+                    group_binding=group_binding,
                 )
                 return
 
@@ -925,6 +930,7 @@ async def _handle_group_message(
                     line_binding_service=service,
                     battle_event_service=battle_event_service,
                     settings=settings,
+                    group_binding=group_binding,
                 )
                 return
 
@@ -1053,6 +1059,7 @@ async def _handle_event_command(
     line_binding_service: LineBindingService,
     battle_event_service: BattleEventService,
     settings: Settings,
+    group_binding: LineGroupBinding | None = None,
 ) -> None:
     """
     處理 /戰役 指令
@@ -1060,7 +1067,9 @@ async def _handle_event_command(
     - /戰役: 列出最近 5 場已完成戰役 (Carousel)
     - /戰役 {名稱}: 發送該戰役的詳細報告 (有 5 分鐘群組 CD)
     """
-    result = await _resolve_alliance_and_season(line_group_id, reply_token, line_binding_service)
+    result = await _resolve_alliance_and_season(
+        line_group_id, reply_token, line_binding_service, group_binding=group_binding
+    )
     if not result:
         return
 
@@ -1203,13 +1212,16 @@ async def _handle_latest_event_report(
     reply_token: str,
     line_binding_service: LineBindingService,
     battle_event_service: BattleEventService,
+    group_binding: LineGroupBinding | None = None,
 ) -> None:
     """
     處理 /最新戰役 指令
 
     查詢該群組綁定同盟的最新已完成戰役，並發送分析報告。
     """
-    result = await _resolve_alliance_and_season(line_group_id, reply_token, line_binding_service)
+    result = await _resolve_alliance_and_season(
+        line_group_id, reply_token, line_binding_service, group_binding=group_binding
+    )
     if not result:
         return
 
