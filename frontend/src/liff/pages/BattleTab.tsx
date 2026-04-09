@@ -9,7 +9,7 @@
  * - Visual alignment with LINE Bot Flex Messages
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -371,7 +371,9 @@ export function BattleTab({ session }: Props) {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [allEvents, setAllEvents] = useState<EventListItem[]>([]);
   const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const loadedOffsetsRef = useRef(new Set<number>());
+  const hasPrefetchedRef = useRef(false);
+  const queryClient = useQueryClient();
 
   const context = {
     lineUserId: session.lineUserId,
@@ -391,6 +393,8 @@ export function BattleTab({ session }: Props) {
   useEffect(() => {
     setOffset(0);
     setAllEvents([]);
+    loadedOffsetsRef.current = new Set<number>();
+    hasPrefetchedRef.current = false;
   }, [effectiveGameId]);
 
   // Get event list
@@ -401,27 +405,25 @@ export function BattleTab({ session }: Props) {
     offset,
   );
 
-  // Accumulate pages (deduplicate to guard against refetch appending duplicates)
+  // Derive hasMore from query result (no separate state needed)
+  const hasMore = eventList?.has_more ?? false;
+
+  // Accumulate pages — use offset ref to prevent re-appending on background refetch
   useEffect(() => {
     if (!eventList) return;
     if (offset === 0) {
       setAllEvents(eventList.events);
-    } else {
-      setAllEvents((prev) => {
-        const existingIds = new Set(prev.map((e) => e.event_id));
-        const newEvents = eventList.events.filter(
-          (e) => !existingIds.has(e.event_id),
-        );
-        return [...prev, ...newEvents];
-      });
+      loadedOffsetsRef.current = new Set([0]);
+    } else if (!loadedOffsetsRef.current.has(offset)) {
+      loadedOffsetsRef.current.add(offset);
+      setAllEvents((prev) => [...prev, ...eventList.events]);
     }
-    setHasMore(eventList.has_more);
   }, [eventList, offset]);
 
-  const queryClient = useQueryClient();
-
+  // Prefetch first 5 event reports (only on initial page load)
   useEffect(() => {
-    if (!allEvents.length) return;
+    if (hasPrefetchedRef.current || !allEvents.length) return;
+    hasPrefetchedRef.current = true;
     allEvents.slice(0, 5).forEach((event) => {
       queryClient.prefetchQuery({
         queryKey: liffBattleKeys.report(session.lineGroupId, event.event_id),

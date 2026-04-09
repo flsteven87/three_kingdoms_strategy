@@ -11,11 +11,16 @@ AS $$
 SELECT json_build_object(
     'is_bound', EXISTS(
         SELECT 1 FROM line_group_bindings
-        WHERE line_group_id = p_line_group_id AND unbound_at IS NULL
+        WHERE line_group_id = p_line_group_id AND is_active = true
     ),
     'is_registered', EXISTS(
         SELECT 1 FROM member_line_bindings
         WHERE line_user_id = p_line_user_id
+          AND alliance_id = (
+              SELECT alliance_id FROM line_group_bindings
+              WHERE line_group_id = p_line_group_id AND is_active = true
+              LIMIT 1
+          )
     ),
     'in_cooldown', EXISTS(
         SELECT 1 FROM line_user_notifications

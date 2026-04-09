@@ -1143,16 +1143,16 @@ class LineBindingService:
         member = await self.repository.get_member_by_game_id(alliance_id, game_id)
         member_id = member.id if member else None
 
-        # 5. Batch fetch user's metrics for all events
+        # 5-6. Batch fetch user metrics + event summaries in parallel
         event_ids = [e.id for e in completed_events]
-        user_metrics_map: dict[UUID, BattleEventMetrics] = {}
         if member_id:
-            user_metrics_map = await self._metrics_repo.get_user_metrics_for_events(
-                event_ids, member_id
+            user_metrics_map, all_metrics_map = await asyncio.gather(
+                self._metrics_repo.get_user_metrics_for_events(event_ids, member_id),
+                self._metrics_repo.get_by_events_with_member_and_group(event_ids),
             )
-
-        # 6. Batch fetch event summaries (avoid N+1)
-        all_metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(event_ids)
+        else:
+            user_metrics_map = {}
+            all_metrics_map = await self._metrics_repo.get_by_events_with_member_and_group(event_ids)
 
         # 7. Build response items
         items: list[EventListItem] = []
