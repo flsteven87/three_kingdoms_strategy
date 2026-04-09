@@ -338,6 +338,7 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .select("*")
             .eq("alliance_id", str(alliance_id))
             .or_(f"game_id.ilike.%{safe_query}%,line_display_name.ilike.%{safe_query}%")
+            .limit(10)
             .execute()
         )
 
