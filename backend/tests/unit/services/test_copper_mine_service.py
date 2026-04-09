@@ -7,6 +7,7 @@ Tests cover:
 3. Level validation - reject when level doesn't match rule
 4. Mine count validation - reject when exceeding max allowed
 5. Edge cases - no rules, no member_id/season_id
+6. LIFF mine list metadata - source-of-truth readiness and searchable counties
 
 符合 test-writing skill 規範:
 - AAA pattern (Arrange-Act-Assert)
@@ -14,6 +15,7 @@ Tests cover:
 - Coverage: happy path + edge cases + error cases
 """
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -51,6 +53,7 @@ def mock_copper_mine_repo() -> MagicMock:
     repo = MagicMock()
     repo.count_member_mines = AsyncMock(return_value=0)
     repo.get_claimed_tiers = AsyncMock(return_value=set())
+    repo.get_mines_by_alliance = AsyncMock(return_value=[])
     return repo
 
 
@@ -69,6 +72,33 @@ def mock_snapshot_repo() -> MagicMock:
 
 
 @pytest.fixture
+def mock_line_binding_repo() -> MagicMock:
+    """Create mock LineBindingRepository"""
+    repo = MagicMock()
+    repo.get_group_binding_by_line_group_id = AsyncMock()
+    repo.get_member_bindings_by_line_user = AsyncMock(return_value=[])
+    return repo
+
+
+@pytest.fixture
+def mock_season_repo() -> MagicMock:
+    """Create mock SeasonRepository"""
+    repo = MagicMock()
+    repo.get_current_season = AsyncMock(return_value=None)
+    repo.get_by_id = AsyncMock(return_value=None)
+    return repo
+
+
+@pytest.fixture
+def mock_coordinate_repo() -> MagicMock:
+    """Create mock CopperMineCoordinateRepository"""
+    repo = MagicMock()
+    repo.has_data = AsyncMock(return_value=False)
+    repo.list_searchable_counties = AsyncMock(return_value=[])
+    return repo
+
+
+@pytest.fixture
 def copper_mine_service(
     mock_copper_mine_repo: MagicMock,
     mock_rule_repo: MagicMock,
@@ -79,6 +109,25 @@ def copper_mine_service(
         repository=mock_copper_mine_repo,
         rule_repository=mock_rule_repo,
         snapshot_repository=mock_snapshot_repo,
+    )
+    return service
+
+
+@pytest.fixture
+def copper_mine_list_service(
+    mock_copper_mine_repo: MagicMock,
+    mock_rule_repo: MagicMock,
+    mock_line_binding_repo: MagicMock,
+    mock_season_repo: MagicMock,
+    mock_coordinate_repo: MagicMock,
+) -> CopperMineService:
+    """Create CopperMineService with mocked dependencies for list queries"""
+    service = CopperMineService(
+        repository=mock_copper_mine_repo,
+        line_binding_repository=mock_line_binding_repo,
+        season_repository=mock_season_repo,
+        rule_repository=mock_rule_repo,
+        coordinate_repository=mock_coordinate_repo,
     )
     return service
 
@@ -105,6 +154,25 @@ def create_mock_snapshot(
     snapshot.total_merit = total_merit
     snapshot.group_name = group_name
     return snapshot
+
+
+def create_mock_mine(
+    game_id: str = "Jason",
+    coord_x: int = 123,
+    coord_y: int = 456,
+    level: int = 9,
+) -> MagicMock:
+    """Factory for creating mock copper mine records"""
+    mine = MagicMock()
+    mine.id = UUID("55555555-5555-5555-5555-555555555555")
+    mine.game_id = game_id
+    mine.coord_x = coord_x
+    mine.coord_y = coord_y
+    mine.level = level
+    mine.status = "active"
+    mine.notes = None
+    mine.registered_at = datetime(2026, 4, 9, 12, 0, 0)
+    return mine
 
 
 # =============================================================================
@@ -498,3 +566,87 @@ class TestIsLevelAllowed:
         """allowed_level='both' 應該允許 9 和 10 級"""
         assert copper_mine_service._is_level_allowed(9, "both") is True
         assert copper_mine_service._is_level_allowed(10, "both") is True
+
+
+class TestGetMinesListMetadata:
+    """Tests for LIFF mine list source-of-truth metadata."""
+
+    @pytest.mark.asyncio
+    async def test_should_include_source_of_truth_metadata_for_current_season(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_copper_mine_repo: MagicMock,
+        mock_rule_repo: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should expose current-season source-of-truth readiness and counties."""
+        # Arrange
+        line_group_id = "Cgroup123"
+        line_user_id = "Uuser123"
+        mock_line_binding_repo.get_group_binding_by_line_group_id.return_value = MagicMock(
+            alliance_id=alliance_id
+        )
+        mock_line_binding_repo.get_member_bindings_by_line_user.return_value = [
+            MagicMock(game_id="Jason"),
+            MagicMock(game_id="Alice"),
+        ]
+        mock_season_repo.get_current_season.return_value = MagicMock(id=season_id)
+        mock_season_repo.get_by_id.return_value = MagicMock(game_season_tag="PK23")
+        mock_copper_mine_repo.get_mines_by_alliance.return_value = [
+            create_mock_mine(game_id="Jason")
+        ]
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(
+            return_value=[
+                create_mock_rule(tier=1),
+                create_mock_rule(tier=2),
+            ]
+        )
+        mock_coordinate_repo.has_data.return_value = True
+        mock_coordinate_repo.list_searchable_counties.return_value = ["巴郡", "漢中郡"]
+
+        # Act
+        result = await copper_mine_list_service.get_mines_list(line_group_id, line_user_id)
+
+        # Assert
+        assert result.has_source_data is True
+        assert result.available_counties == ["巴郡", "漢中郡"]
+        assert result.max_allowed == 2
+        assert result.mine_counts_by_game_id == {"Jason": 1, "Alice": 0}
+        mock_coordinate_repo.list_searchable_counties.assert_awaited_once_with(
+            "PK23", level_filter=[9, 10]
+        )
+
+    @pytest.mark.asyncio
+    async def test_should_return_empty_counties_when_source_of_truth_not_ready(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_copper_mine_repo: MagicMock,
+        mock_rule_repo: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Should keep counties empty when the current season has no source data."""
+        # Arrange
+        mock_line_binding_repo.get_group_binding_by_line_group_id.return_value = MagicMock(
+            alliance_id=alliance_id
+        )
+        mock_season_repo.get_current_season.return_value = MagicMock(id=season_id)
+        mock_season_repo.get_by_id.return_value = MagicMock(game_season_tag="PK24")
+        mock_copper_mine_repo.get_mines_by_alliance.return_value = []
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=[create_mock_rule(tier=1)])
+        mock_coordinate_repo.has_data.return_value = False
+
+        # Act
+        result = await copper_mine_list_service.get_mines_list("Cgroup123", "Uuser123")
+
+        # Assert
+        assert result.has_source_data is False
+        assert result.available_counties == []
+        mock_coordinate_repo.list_searchable_counties.assert_not_awaited()

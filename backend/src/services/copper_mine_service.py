@@ -146,8 +146,13 @@ class CopperMineService:
         # Check if source of truth data exists for this season
         game_season_tag = await self._get_game_season_tag(current_season_id)
         has_source_data = False
+        available_counties: list[str] = []
         if game_season_tag:
             has_source_data = await self.coordinate_repository.has_data(game_season_tag)
+            if has_source_data:
+                available_counties = await self.coordinate_repository.list_searchable_counties(
+                    game_season_tag, level_filter=[9, 10]
+                )
 
         # 計算每個綁定 game_id 的銅礦數量
         mine_counts_by_game_id: dict[str, int] = {}
@@ -169,6 +174,7 @@ class CopperMineService:
             mine_counts_by_game_id=mine_counts_by_game_id,
             max_allowed=max_allowed,
             has_source_data=has_source_data,
+            available_counties=available_counties,
         )
 
     async def _get_current_season_id(self, alliance_id: UUID) -> UUID | None:

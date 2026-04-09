@@ -47,6 +47,28 @@ class CopperMineCoordinateRepository(SupabaseRepository[CopperMineCoordinate]):
 
         return (result.count or 0) > 0
 
+    async def list_searchable_counties(
+        self, game_season_tag: str, level_filter: list[int] | None = None
+    ) -> list[str]:
+        """List distinct county names available in source-of-truth search data."""
+        query = (
+            self.client.from_(self.table_name)
+            .select("county")
+            .eq("game_season_tag", game_season_tag)
+        )
+        if level_filter:
+            query = query.in_("level", level_filter)
+
+        result = await self._execute_async(lambda: query.execute())
+        data = self._handle_supabase_result(result, allow_empty=True)
+
+        counties = {
+            str(row["county"]).strip()
+            for row in data
+            if row.get("county") and str(row["county"]).strip()
+        }
+        return sorted(counties)
+
     async def search_by_location(
         self, game_season_tag: str, query: str, level_filter: list[int] | None = None
     ) -> list[CopperMineCoordinate]:

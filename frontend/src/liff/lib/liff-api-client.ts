@@ -200,6 +200,7 @@ export interface CopperMineListResponse {
   mine_counts_by_game_id: Record<string, number>;
   max_allowed: number;
   has_source_data: boolean;
+  available_counties: string[];
 }
 
 export interface RegisterCopperResponse {

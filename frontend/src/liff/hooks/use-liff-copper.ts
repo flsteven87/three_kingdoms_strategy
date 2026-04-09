@@ -112,6 +112,7 @@ export function useLiffRegisterCopper(context: LiffContext | null) {
           mine_counts_by_game_id: newCounts,
           max_allowed: old?.max_allowed || 0,
           has_source_data: old?.has_source_data || false,
+          available_counties: old?.available_counties || [],
         }
       })
 
@@ -179,6 +180,7 @@ export function useLiffDeleteCopper(context: LiffContext | null) {
           mine_counts_by_game_id: newCounts,
           max_allowed: old?.max_allowed || 0,
           has_source_data: old?.has_source_data || false,
+          available_counties: old?.available_counties || [],
         }
       })
 

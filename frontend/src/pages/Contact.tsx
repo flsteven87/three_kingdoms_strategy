@@ -31,7 +31,6 @@ function Contact() {
   // Reset stale mutation state when page is revisited
   useEffect(() => {
     mutation.reset()
-    // eslint-disable-next-line react-compiler/react-compiler
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = (e: FormEvent) => {

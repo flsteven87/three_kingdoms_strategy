@@ -19,9 +19,10 @@ import { OnboardingFlow } from "./OnboardingFlow";
 import { IdManagementPage } from "./IdManagementPage";
 import { BattleTab } from "./BattleTab";
 import { CopperTab } from "./CopperTab";
+import { CopperSearchPage } from "./CopperSearchPage";
 import { PerformanceTab } from "./PerformanceTab";
 
-type PageView = "main" | "id-management";
+type PageView = "main" | "id-management" | "copper-search";
 
 export function LiffHome() {
   const { session } = useLiffContext();
@@ -88,6 +89,13 @@ export function LiffHome() {
     );
   }
 
+  // Copper search page (full screen)
+  if (pageView === "copper-search") {
+    return (
+      <CopperSearchPage session={session} onBack={() => setPageView("main")} />
+    );
+  }
+
   // Main view with 2-tab layout
   return (
     <Tabs
@@ -146,7 +154,7 @@ export function LiffHome() {
           <BattleTab session={session} />
         </TabsContent>
         <TabsContent value="copper" className="m-0">
-          <CopperTab session={session} />
+          <CopperTab session={session} onNavigateSearch={() => setPageView("copper-search")} />
         </TabsContent>
       </div>
     </Tabs>

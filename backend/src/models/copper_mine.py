@@ -88,11 +88,12 @@ class CopperMineResponse(BaseModel):
 class CopperMineListResponse(BaseModel):
     """Response for copper mine list query"""
 
-    mines: list[CopperMineResponse] = []
+    mines: list[CopperMineResponse] = Field(default_factory=list)
     total: int = 0
-    mine_counts_by_game_id: dict[str, int] = {}  # {game_id: count}
+    mine_counts_by_game_id: dict[str, int] = Field(default_factory=dict)  # {game_id: count}
     max_allowed: int = 0
     has_source_data: bool = False
+    available_counties: list[str] = Field(default_factory=list)
 
 
 class RegisterCopperResponse(BaseModel):

@@ -5,7 +5,7 @@
  * Compact copper mine registration for LIFF Tall mode.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Plus,
   MapPin,
@@ -30,7 +30,6 @@ import {
   useLiffCopperRules,
   useLiffRegisterCopper,
   useLiffDeleteCopper,
-  useLiffCopperSearch,
 } from "../hooks/use-liff-copper";
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
@@ -38,21 +37,18 @@ import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
+  readonly onNavigateSearch: () => void;
 }
 
-export function CopperTab({ session }: Props) {
+export function CopperTab({ session, onNavigateSearch }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [coordX, setCoordX] = useState("");
   const [coordY, setCoordY] = useState("");
   const [level, setLevel] = useState("9");
   const [formError, setFormError] = useState("");
-  const [searchResult, setSearchResult] = useState<string | null>(null);
   const [showOtherMines, setShowOtherMines] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [locationQuery, setLocationQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [showLocationResults, setShowLocationResults] = useState(false);
 
   const context = {
     lineUserId: session.lineUserId,
@@ -75,17 +71,7 @@ export function CopperTab({ session }: Props) {
   const registerMutation = useLiffRegisterCopper(context);
   const deleteMutation = useLiffDeleteCopper(context);
 
-  // Location search with debounce
   const hasSourceData = data?.has_source_data ?? false;
-  const { data: locationResults } = useLiffCopperSearch(
-    hasSourceData ? session.lineGroupId : null,
-    debouncedQuery,
-  );
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(locationQuery), 300);
-    return () => clearTimeout(timer);
-  }, [locationQuery]);
 
   // Get all game_ids owned by this user
   const myGameIds = new Set(
@@ -112,31 +98,6 @@ export function CopperTab({ session }: Props) {
   const maxAllowed = data?.max_allowed ?? 0;
   const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
-  const handleSearch = () => {
-    if (!coordX.trim() || !coordY.trim()) {
-      setSearchResult(null);
-      return;
-    }
-
-    const x = parseInt(coordX, 10);
-    const y = parseInt(coordY, 10);
-
-    if (isNaN(x) || x < 0 || isNaN(y) || y < 0) {
-      setSearchResult(null);
-      return;
-    }
-
-    const existingMine = mines.find(
-      (mine) => mine.coord_x === x && mine.coord_y === y
-    );
-
-    if (existingMine) {
-      setSearchResult(`已被 ${existingMine.game_id} 註冊 (Lv.${existingMine.level})`);
-    } else {
-      setSearchResult("座標可用 ✓");
-    }
-  };
-
   const handleRegister = async () => {
     if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return;
 
@@ -153,7 +114,6 @@ export function CopperTab({ session }: Props) {
     }
 
     setFormError("");
-    setSearchResult(null);
     try {
       await registerMutation.mutateAsync({
         gameId: effectiveGameId,
@@ -274,51 +234,19 @@ export function CopperTab({ session }: Props) {
               </SelectContent>
             </Select>
           </div>
-          {hasSourceData && (
-            <div className="relative">
-              <div className="flex items-center gap-1.5">
-                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-                <Input
-                  value={locationQuery}
-                  onChange={(e) => {
-                    setLocationQuery(e.target.value);
-                    setShowLocationResults(true);
-                  }}
-                  onFocus={() => setShowLocationResults(true)}
-                  placeholder="搜尋郡/縣名..."
-                  className="h-10"
-                />
-              </div>
-              {showLocationResults && locationResults && locationResults.length > 0 && (
-                <div className="absolute z-10 top-full mt-1 w-full bg-background border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {locationResults.map((result) => (
-                    <button
-                      key={`${result.coord_x}-${result.coord_y}`}
-                      type="button"
-                      disabled={result.is_taken}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between gap-2"
-                      onClick={() => {
-                        setCoordX(String(result.coord_x));
-                        setCoordY(String(result.coord_y));
-                        setLevel(String(result.level));
-                        setLocationQuery("");
-                        setShowLocationResults(false);
-                        setSearchResult(null);
-                      }}
-                    >
-                      <span className="truncate">
-                        {result.county} · {result.district}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">
-                        Lv.{result.level} ({result.coord_x},{result.coord_y})
-                        {result.is_taken && " 已佔"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <Button
+            variant="outline"
+            className="w-full h-10"
+            onClick={onNavigateSearch}
+          >
+            <Search className="h-4 w-4 mr-2" />
+            搜尋銅礦
+            {hasSourceData && (
+              <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                資料來源
+              </span>
+            )}
+          </Button>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 flex-1">
               <span className="text-sm text-muted-foreground shrink-0">X</span>
@@ -346,44 +274,27 @@ export function CopperTab({ session }: Props) {
               />
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={handleSearch}
-              disabled={!coordX.trim() || !coordY.trim()}
-              variant="outline"
-              className="h-10 flex-1"
-            >
-              <Search className="h-4 w-4 mr-2" />
-              查詢
-            </Button>
-            <Button
-              onClick={handleRegister}
-              disabled={
-                !canApply ||
-                !effectiveGameId ||
-                !coordX.trim() ||
-                !coordY.trim() ||
-                registerMutation.isPending
-              }
-              className="h-10 flex-1"
-            >
-              {registerMutation.isPending ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  註冊
-                </>
-              )}
-            </Button>
-          </div>
+          <Button
+            onClick={handleRegister}
+            disabled={
+              !canApply ||
+              !effectiveGameId ||
+              !coordX.trim() ||
+              !coordY.trim() ||
+              registerMutation.isPending
+            }
+            className="h-10 w-full"
+          >
+            {registerMutation.isPending ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                註冊
+              </>
+            )}
+          </Button>
         </div>
-
-        {searchResult && (
-          <p className={`text-xs ${searchResult.includes("✓") ? "text-green-600" : "text-amber-600"}`}>
-            {searchResult}
-          </p>
-        )}
 
         {(formError || registerMutation.error) && (
           <p className="text-xs text-destructive">
