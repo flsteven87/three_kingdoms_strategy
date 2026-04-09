@@ -73,6 +73,7 @@ logs/
 .serena/
 CLAUDE.md
 PLANNING.md
+.worktrees/
 
 # data
 data/
