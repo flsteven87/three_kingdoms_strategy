@@ -20,15 +20,24 @@ export const seasonQuotaKeys = {
   status: () => [...seasonQuotaKeys.all, 'status'] as const,
 }
 
+interface UseSeasonQuotaOptions {
+  /**
+   * Poll the quota endpoint at this interval (ms). Used by the purchase
+   * flow to watch for webhook-driven grant updates. Default: no polling.
+   */
+  readonly refetchInterval?: number | false
+}
+
 /**
  * Hook to fetch current user's season quota status
  */
-export function useSeasonQuota() {
+export function useSeasonQuota(options?: UseSeasonQuotaOptions) {
   return useQuery({
     queryKey: seasonQuotaKeys.status(),
     queryFn: () => apiClient.getSeasonQuotaStatus(),
     staleTime: 60 * 1000, // 1 minute - quota status doesn't change often
     retry: 1, // Only retry once for quota checks
+    refetchInterval: options?.refetchInterval,
   })
 }
 
