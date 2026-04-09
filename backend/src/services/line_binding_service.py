@@ -1090,16 +1090,20 @@ class LineBindingService:
     # Event List Operations (LIFF Battle Tab)
     # =========================================================================
 
-    async def get_event_list_for_liff(self, line_group_id: str, game_id: str) -> EventListResponse:
+    async def get_event_list_for_liff(
+        self, line_group_id: str, game_id: str, limit: int = 10, offset: int = 0
+    ) -> EventListResponse:
         """
         Get list of completed events with user participation status for LIFF.
 
         Args:
             line_group_id: LINE group ID
             game_id: User's game ID to check participation
+            limit: Maximum number of events to return (1-50)
+            offset: Number of events to skip for pagination
 
         Returns:
-            EventListResponse with events and user participation status
+            EventListResponse with events, user participation status, and pagination info
 
         Raises:
             HTTPException 404: If group not bound
@@ -1122,14 +1126,18 @@ class LineBindingService:
         season_id = current_season.id if current_season else None
 
         if not season_id:
-            return EventListResponse(season_name=None, events=[])
+            return EventListResponse(season_name=None, events=[], has_more=False, total_count=0)
 
-        # 3. Get completed events for this season (limit 10 most recent)
+        # 3. Get completed events for this season, paginated
         events = await self._event_repo.get_by_season(season_id)
-        completed_events = [e for e in events if e.status == EventStatus.COMPLETED][:10]
+        completed_events = [e for e in events if e.status == EventStatus.COMPLETED]
+        total_count = len(completed_events)
+        completed_events = completed_events[offset : offset + limit]
 
         if not completed_events:
-            return EventListResponse(season_name=season_name, events=[])
+            return EventListResponse(
+                season_name=season_name, events=[], has_more=False, total_count=total_count
+            )
 
         # 4. Get member_id from game_id
         member = await self.repository.get_member_by_game_id(alliance_id, game_id)
@@ -1177,7 +1185,12 @@ class LineBindingService:
                 )
             )
 
-        return EventListResponse(season_name=season_name, events=items)
+        return EventListResponse(
+            season_name=season_name,
+            events=items,
+            has_more=(offset + limit) < total_count,
+            total_count=total_count,
+        )
 
     def _build_user_participation(
         self,

@@ -462,9 +462,13 @@ async def get_event_list_for_liff(
     service: LineBindingServiceDep,
     g: Annotated[str, Query(description="LINE group ID")],
     game_id: Annotated[str, Query(description="Game ID to check participation")],
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> EventListResponse:
     """Get event list for LIFF battle tab"""
-    return await service.get_event_list_for_liff(line_group_id=g, game_id=game_id)
+    return await service.get_event_list_for_liff(
+        line_group_id=g, game_id=game_id, limit=limit, offset=offset
+    )
 
 
 # =============================================================================

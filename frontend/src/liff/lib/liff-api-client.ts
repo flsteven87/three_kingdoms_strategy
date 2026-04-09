@@ -452,14 +452,22 @@ export interface EventListItem {
 export interface EventListResponse {
   season_name: string | null;
   events: EventListItem[];
+  has_more: boolean;
+  total_count: number;
 }
 
 export async function getEventList(
-  options: Pick<LiffApiOptions, "lineGroupId"> & { gameId: string },
+  options: Pick<LiffApiOptions, "lineGroupId"> & {
+    gameId: string;
+    limit?: number;
+    offset?: number;
+  },
 ): Promise<EventListResponse> {
   const url = new URL(`${API_BASE_URL}/api/v1/linebot/events/list`);
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("game_id", options.gameId);
+  if (options.limit != null) url.searchParams.set("limit", String(options.limit));
+  if (options.offset != null) url.searchParams.set("offset", String(options.offset));
 
   const response = await fetch(url.toString(), {
     headers: { "Content-Type": "application/json" },

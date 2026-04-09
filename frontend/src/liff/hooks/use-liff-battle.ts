@@ -19,8 +19,8 @@ interface LiffContext {
 // Query key factory
 export const liffBattleKeys = {
   all: ["liff-battle"] as const,
-  list: (groupId: string, gameId: string) =>
-    [...liffBattleKeys.all, "list", groupId, gameId] as const,
+  list: (groupId: string, gameId: string, offset: number = 0) =>
+    [...liffBattleKeys.all, "list", groupId, gameId, offset] as const,
   report: (groupId: string, eventId: string) =>
     [...liffBattleKeys.all, "report", groupId, eventId] as const,
 };
@@ -28,13 +28,15 @@ export const liffBattleKeys = {
 export function useLiffEventList(
   context: LiffContext | null,
   gameId: string | null,
+  offset: number = 0,
 ) {
   return useQuery<EventListResponse>({
-    queryKey: liffBattleKeys.list(context?.lineGroupId ?? "", gameId ?? ""),
+    queryKey: liffBattleKeys.list(context?.lineGroupId ?? "", gameId ?? "", offset),
     queryFn: () =>
       getEventList({
         lineGroupId: context!.lineGroupId,
         gameId: gameId!,
+        offset,
       }),
     enabled: !!context?.lineGroupId && !!gameId,
     staleTime: 30_000,

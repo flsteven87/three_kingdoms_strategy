@@ -386,3 +386,5 @@ class EventListResponse(BaseModel):
 
     season_name: str | None = Field(None, description="Current season name")
     events: list[EventListItem] = Field(default_factory=list, description="List of events")
+    has_more: bool = Field(False, description="Whether more events are available")
+    total_count: int = Field(0, description="Total number of completed events")

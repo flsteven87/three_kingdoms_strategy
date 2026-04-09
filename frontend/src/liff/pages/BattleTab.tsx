@@ -364,9 +364,14 @@ function RankingList({ members }: RankingListProps) {
   );
 }
 
+const PAGE_SIZE = 10;
+
 export function BattleTab({ session }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [allEvents, setAllEvents] = useState<EventListItem[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   const context = {
     lineUserId: session.lineUserId,
@@ -382,18 +387,36 @@ export function BattleTab({ session }: Props) {
   const accounts = memberInfo?.registered_ids || [];
   const effectiveGameId = selectedGameId || accounts[0]?.game_id || null;
 
+  // Reset pagination when account changes
+  useEffect(() => {
+    setOffset(0);
+    setAllEvents([]);
+  }, [effectiveGameId]);
+
   // Get event list
   const eventContext = { lineGroupId: session.lineGroupId };
-  const { data: eventList, isLoading: isLoadingEvents } = useLiffEventList(
+  const { data: eventList, isLoading: isLoadingEvents, isFetching } = useLiffEventList(
     eventContext,
     effectiveGameId,
+    offset,
   );
+
+  // Accumulate pages
+  useEffect(() => {
+    if (!eventList) return;
+    if (offset === 0) {
+      setAllEvents(eventList.events);
+    } else {
+      setAllEvents((prev) => [...prev, ...eventList.events]);
+    }
+    setHasMore(eventList.has_more);
+  }, [eventList, offset]);
 
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!eventList?.events) return;
-    eventList.events.slice(0, 5).forEach((event) => {
+    if (!allEvents.length) return;
+    allEvents.slice(0, 5).forEach((event) => {
       queryClient.prefetchQuery({
         queryKey: liffBattleKeys.report(session.lineGroupId, event.event_id),
         queryFn: () =>
@@ -404,7 +427,7 @@ export function BattleTab({ session }: Props) {
         staleTime: 60_000,
       });
     });
-  }, [eventList, session.lineGroupId, queryClient]);
+  }, [allEvents, session.lineGroupId, queryClient]);
 
   const handleToggleEvent = (eventId: string) => {
     setExpandedEventId((prev) => (prev === eventId ? null : eventId));
@@ -457,15 +480,15 @@ export function BattleTab({ session }: Props) {
       )}
 
       {/* Event list */}
-      {!isLoadingEvents && eventList && (
+      {!isLoadingEvents && (
         <>
-          {eventList.events.length === 0 ? (
+          {allEvents.length === 0 ? (
             <div className="py-8 text-center">
               <p className={liffTypography.body}>暫無戰役記錄</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {eventList.events.map((event) => (
+              {allEvents.map((event) => (
                 <EventCard
                   key={event.event_id}
                   event={event}
@@ -474,6 +497,16 @@ export function BattleTab({ session }: Props) {
                   lineGroupId={session.lineGroupId}
                 />
               ))}
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                  disabled={isFetching}
+                  className="w-full py-2 text-sm text-primary hover:text-primary/80 disabled:opacity-50"
+                >
+                  {isFetching ? "載入中..." : "載入更多"}
+                </button>
+              )}
             </div>
           )}
         </>
