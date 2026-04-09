@@ -401,13 +401,19 @@ export function BattleTab({ session }: Props) {
     offset,
   );
 
-  // Accumulate pages
+  // Accumulate pages (deduplicate to guard against refetch appending duplicates)
   useEffect(() => {
     if (!eventList) return;
     if (offset === 0) {
       setAllEvents(eventList.events);
     } else {
-      setAllEvents((prev) => [...prev, ...eventList.events]);
+      setAllEvents((prev) => {
+        const existingIds = new Set(prev.map((e) => e.event_id));
+        const newEvents = eventList.events.filter(
+          (e) => !existingIds.has(e.event_id),
+        );
+        return [...prev, ...newEvents];
+      });
     }
     setHasMore(eventList.has_more);
   }, [eventList, offset]);
@@ -479,37 +485,36 @@ export function BattleTab({ session }: Props) {
         </div>
       )}
 
+      {/* Empty state — only show after loading completes with no results */}
+      {!isLoadingEvents && !isFetching && allEvents.length === 0 && (
+        <div className="py-8 text-center">
+          <p className={liffTypography.body}>暫無戰役記錄</p>
+        </div>
+      )}
+
       {/* Event list */}
-      {!isLoadingEvents && (
-        <>
-          {allEvents.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className={liffTypography.body}>暫無戰役記錄</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {allEvents.map((event) => (
-                <EventCard
-                  key={event.event_id}
-                  event={event}
-                  isExpanded={expandedEventId === event.event_id}
-                  onToggle={() => handleToggleEvent(event.event_id)}
-                  lineGroupId={session.lineGroupId}
-                />
-              ))}
-              {hasMore && (
-                <button
-                  type="button"
-                  onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
-                  disabled={isFetching}
-                  className="w-full py-2 text-sm text-primary hover:text-primary/80 disabled:opacity-50"
-                >
-                  {isFetching ? "載入中..." : "載入更多"}
-                </button>
-              )}
-            </div>
+      {allEvents.length > 0 && (
+        <div className="space-y-2">
+          {allEvents.map((event) => (
+            <EventCard
+              key={event.event_id}
+              event={event}
+              isExpanded={expandedEventId === event.event_id}
+              onToggle={() => handleToggleEvent(event.event_id)}
+              lineGroupId={session.lineGroupId}
+            />
+          ))}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+              disabled={isFetching}
+              className="w-full py-2 text-sm text-primary hover:text-primary/80 disabled:opacity-50"
+            >
+              {isFetching ? "載入中..." : "載入更多"}
+            </button>
           )}
-        </>
+        </div>
       )}
     </div>
   );
