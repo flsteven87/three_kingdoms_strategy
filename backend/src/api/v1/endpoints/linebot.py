@@ -1377,7 +1377,7 @@ async def _send_liff_first_message_reminder(
     await _send_flex_message(reply_token, flex_message)
 
 
-def _send_reply(reply_token: str, messages: list) -> None:
+async def _send_reply(reply_token: str, messages: list) -> None:
     """Send a reply via LINE Bot API with error handling."""
     line_bot = get_line_bot_api()
     if not line_bot:
@@ -1385,18 +1385,21 @@ def _send_reply(reply_token: str, messages: list) -> None:
         return
 
     try:
-        line_bot.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=messages))
+        await asyncio.to_thread(
+            line_bot.reply_message,
+            ReplyMessageRequest(reply_token=reply_token, messages=messages),
+        )
     except ApiException as e:
-        logger.error(f"LINE API reply failed: {e}")
+        logger.error("LINE API reply failed: %s", e)
 
 
 async def _send_flex_message(reply_token: str, flex_message) -> None:
     """發送 Flex Message"""
     if not flex_message:
         return
-    _send_reply(reply_token, [flex_message])
+    await _send_reply(reply_token, [flex_message])
 
 
 async def _reply_text(reply_token: str, text: str) -> None:
     """發送文字回覆"""
-    _send_reply(reply_token, [TextMessage(text=text)])
+    await _send_reply(reply_token, [TextMessage(text=text)])
