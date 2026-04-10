@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAlliance } from '@/hooks/use-alliance'
 import { useAuth } from '@/hooks/use-auth'
 import { useSeasonQuota } from '@/hooks/use-season-quota'
+import { getQuotaDisplayState } from '@/types/season-quota'
 import { AllianceForm } from '@/components/alliance/AllianceForm'
 import { AllianceCollaboratorManager } from '@/components/alliance/AllianceCollaboratorManager'
 
@@ -35,6 +36,7 @@ function Settings() {
   const { data: alliance } = useAlliance()
   const { user } = useAuth()
   const { data: quota } = useSeasonQuota()
+  const quotaDisplay = getQuotaDisplayState(quota)
   const [activeTab, setActiveTab] = useState('alliance')
 
   return (
@@ -216,16 +218,26 @@ function Settings() {
             <CardContent>
               {quota ? (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
-                  <dt className="text-muted-foreground">已購買</dt>
-                  <dd>{quota.purchased_seasons} 季</dd>
-                  <dt className="text-muted-foreground">已使用</dt>
-                  <dd>{quota.used_seasons} 季</dd>
-                  <dt className="text-muted-foreground">剩餘可用</dt>
+                  <dt className="text-muted-foreground">目前狀態</dt>
                   <dd>
-                    <span className={quota.available_seasons > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                      {quota.available_seasons} 季
-                    </span>
+                    <Badge variant={quotaDisplay.badgeColor === 'red' ? 'destructive' : 'secondary'}>
+                      {quotaDisplay.settingsLabel}
+                    </Badge>
                   </dd>
+                  {quota.purchased_seasons > 0 && (
+                    <>
+                      <dt className="text-muted-foreground">已購買</dt>
+                      <dd>{quota.purchased_seasons} 季</dd>
+                      <dt className="text-muted-foreground">已使用</dt>
+                      <dd>{quota.used_seasons} 季</dd>
+                      <dt className="text-muted-foreground">剩餘可用</dt>
+                      <dd>
+                        <span className={quota.available_seasons > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+                          {quota.available_seasons} 季
+                        </span>
+                      </dd>
+                    </>
+                  )}
                   {quota.current_season_is_trial && quota.trial_days_remaining !== null && (
                     <>
                       <dt className="text-muted-foreground">試用期剩餘</dt>

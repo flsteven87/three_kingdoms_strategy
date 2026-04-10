@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { useSeasonQuota } from '@/hooks/use-season-quota'
+import { getQuotaDisplayState } from '@/types/season-quota'
 import { usePurchaseFlow, type PaymentFlowState } from '@/hooks/use-purchase-flow'
 import { createCheckoutSession } from '@/lib/api'
 import { PRICE_PER_SEASON } from '@/constants'
@@ -171,7 +172,7 @@ function PurchaseSeason() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { data: quotaStatus, isLoading: isQuotaLoading } = useSeasonQuota()
+  const { data: quotaStatus } = useSeasonQuota()
   const { checkout, isCheckingOut } = useRecur()
   const purchaseFlow = usePurchaseFlow()
   const isBusy = isCheckingOut || isRedirecting
@@ -329,47 +330,28 @@ function PurchaseSeason() {
     }
   }
 
-  const getQuotaStatusText = () => {
-    if (isQuotaLoading || !quotaStatus) {
-      return '載入中...'
+  const quotaDisplay = getQuotaDisplayState(quotaStatus)
+
+  // Purchase page uses slightly more descriptive text than the badge
+  const purchaseStatusText = (() => {
+    switch (quotaDisplay.phase) {
+      case 'loading': return '載入中...'
+      case 'trial_available': return '尚未使用試用，啟用第一個賽季即可開始 14 天試用'
+      case 'trial_active':
+      case 'trial_warning':
+      case 'trial_critical': return `試用期剩餘 ${quotaDisplay.trialDaysRemaining} 天`
+      case 'has_quota': return `剩餘 ${quotaDisplay.availableSeasons} 季可啟用`
+      case 'active': return '賽季使用中'
+      case 'trial_expired':
+      case 'quota_exhausted': return '已用完，購買後可繼續使用'
     }
+  })()
 
-    const { available_seasons, has_trial_available, current_season_is_trial, trial_days_remaining, can_write } = quotaStatus
-
-    if (has_trial_available) {
-      return '尚未使用試用，啟用第一個賽季即可開始 14 天試用'
-    }
-
-    if (current_season_is_trial && trial_days_remaining !== null && trial_days_remaining > 0) {
-      return `試用期剩餘 ${trial_days_remaining} 天`
-    }
-
-    if (available_seasons > 0) {
-      return `剩餘 ${available_seasons} 季可啟用`
-    }
-
-    if (can_write) {
-      return '賽季使用中'
-    }
-
-    return '已用完，購買後可繼續使用'
-  }
-
-  const getQuotaStatusColor = () => {
-    if (!quotaStatus) return 'text-muted-foreground'
-
-    const { available_seasons, current_season_is_trial, trial_days_remaining, can_write } = quotaStatus
-
-    if (!can_write && !quotaStatus.can_activate_season) {
-      return 'text-destructive'
-    }
-
-    if (available_seasons <= 2 || (current_season_is_trial && trial_days_remaining !== null && trial_days_remaining <= 3)) {
-      return 'text-orange-500'
-    }
-
-    return 'text-foreground'
-  }
+  const purchaseStatusColor = quotaDisplay.showPurchaseLink
+    ? 'text-destructive'
+    : quotaDisplay.badgeColor === 'red' || quotaDisplay.badgeColor === 'yellow'
+      ? 'text-orange-500'
+      : 'text-foreground'
 
   return (
     <div className="mx-auto max-w-2xl space-y-12 py-8">
@@ -444,8 +426,8 @@ function PurchaseSeason() {
       {/* Current Quota Status */}
       <div className="flex items-center justify-center gap-2 rounded-xl bg-secondary/50 px-6 py-4 mx-auto max-w-md">
         <Info className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <span className={cn('text-sm', getQuotaStatusColor())}>
-          {getQuotaStatusText()}
+        <span className={cn('text-sm', purchaseStatusColor)}>
+          {purchaseStatusText}
         </span>
         {quotaStatus && !quotaStatus.can_activate_season && (
           <span className="text-sm text-destructive ml-1">

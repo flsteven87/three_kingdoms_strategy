@@ -3,10 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   useSeasonQuota,
-  useCanActivateSeason,
-  useAvailableSeasons,
   useQuotaWarning,
-  useSeasonQuotaDisplay,
   seasonQuotaKeys,
 } from "../use-season-quota";
 import { createWrapper, createTestQueryClient, createMockSeasonQuotaStatus as createMockStatus } from "../../__tests__/test-utils";
@@ -56,82 +53,7 @@ describe("useSeasonQuota", () => {
 });
 
 // =============================================================================
-// useCanActivateSeason
-// =============================================================================
-
-describe("useCanActivateSeason", () => {
-  let queryClient: QueryClient;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    queryClient = createTestQueryClient();
-  });
-
-  it("returns true when can activate", () => {
-    const mockStatus = createMockStatus({ can_activate_season: true });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useCanActivateSeason(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current).toBe(true);
-  });
-
-  it("returns false when cannot activate", () => {
-    const mockStatus = createMockStatus({ can_activate_season: false });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useCanActivateSeason(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current).toBe(false);
-  });
-
-  it("returns false when data not loaded", () => {
-    const { result } = renderHook(() => useCanActivateSeason(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current).toBe(false);
-  });
-});
-
-// =============================================================================
-// useAvailableSeasons
-// =============================================================================
-
-describe("useAvailableSeasons", () => {
-  let queryClient: QueryClient;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    queryClient = createTestQueryClient();
-  });
-
-  it("returns available count from data", () => {
-    const mockStatus = createMockStatus({ available_seasons: 7 });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useAvailableSeasons(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current).toBe(7);
-  });
-
-  it("returns 0 when data not loaded", () => {
-    const { result } = renderHook(() => useAvailableSeasons(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current).toBe(0);
-  });
-});
-
-// =============================================================================
-// useQuotaWarning
+// useQuotaWarning (delegates to getQuotaDisplayState)
 // =============================================================================
 
 describe("useQuotaWarning", () => {
@@ -150,7 +72,7 @@ describe("useQuotaWarning", () => {
     expect(result.current).toEqual({
       level: "none",
       message: null,
-      isExpired: false,
+      isExpired: true, // loading state: both canWrite and canActivate are false
       trialDaysRemaining: null,
       availableSeasons: 0,
     });
@@ -170,7 +92,9 @@ describe("useQuotaWarning", () => {
 
     expect(result.current.level).toBe("expired");
     expect(result.current.isExpired).toBe(true);
-    expect(result.current.message).toBe("試用期已結束，歡迎購買賽季繼續使用");
+    expect(result.current.message).toBe(
+      "試用期已結束，購買後自動升級為正式版"
+    );
   });
 
   it("returns critical state for trial with 2 days", () => {
@@ -186,7 +110,9 @@ describe("useQuotaWarning", () => {
 
     expect(result.current.level).toBe("critical");
     expect(result.current.isExpired).toBe(false);
-    expect(result.current.message).toBe("試用期剩餘 2 天");
+    expect(result.current.message).toBe(
+      "試用期剩餘 2 天，購買後自動升級為正式版"
+    );
     expect(result.current.trialDaysRemaining).toBe(2);
   });
 
@@ -204,146 +130,5 @@ describe("useQuotaWarning", () => {
     expect(result.current.level).toBe("none");
     expect(result.current.message).toBeNull();
     expect(result.current.availableSeasons).toBe(3);
-  });
-});
-
-// =============================================================================
-// useSeasonQuotaDisplay
-// =============================================================================
-
-describe("useSeasonQuotaDisplay", () => {
-  let queryClient: QueryClient;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    queryClient = createTestQueryClient();
-  });
-
-  it("returns loading state when no data", () => {
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("載入中...");
-    expect(result.current.statusColor).toBe("gray");
-    expect(result.current.canActivate).toBe(false);
-    expect(result.current.canWrite).toBe(false);
-  });
-
-  it("returns trial available state", () => {
-    const mockStatus = createMockStatus({
-      has_trial_available: true,
-      can_activate_season: true,
-      can_write: true,
-    });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("可免費試用");
-    expect(result.current.statusColor).toBe("green");
-    expect(result.current.hasTrialAvailable).toBe(true);
-  });
-
-  it("returns trial in progress with days", () => {
-    const mockStatus = createMockStatus({
-      current_season_is_trial: true,
-      trial_days_remaining: 10,
-      can_activate_season: true,
-      can_write: true,
-    });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("試用中 (10 天)");
-    expect(result.current.statusColor).toBe("green");
-  });
-
-  it("returns yellow for trial with 3 days or less", () => {
-    const mockStatus = createMockStatus({
-      current_season_is_trial: true,
-      trial_days_remaining: 2,
-      can_activate_season: true,
-      can_write: true,
-    });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("試用中 (2 天)");
-    expect(result.current.statusColor).toBe("yellow");
-  });
-
-  it("returns remaining seasons count", () => {
-    const mockStatus = createMockStatus({
-      available_seasons: 5,
-      can_activate_season: true,
-      can_write: true,
-    });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("剩餘 5 季");
-    expect(result.current.statusColor).toBe("green");
-  });
-
-  it("returns generic usable state", () => {
-    const mockStatus = createMockStatus({
-      can_activate_season: true,
-      can_write: true,
-      available_seasons: 0,
-      has_trial_available: false,
-      current_season_is_trial: false,
-    });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("可使用");
-    expect(result.current.statusColor).toBe("green");
-  });
-
-  it("returns trial expired state", () => {
-    const mockStatus = createMockStatus({
-      can_write: false,
-      can_activate_season: false,
-      current_season_is_trial: true,
-    });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("試用已過期");
-    expect(result.current.statusColor).toBe("red");
-  });
-
-  it("returns need purchase state for non-trial", () => {
-    const mockStatus = createMockStatus({
-      can_write: false,
-      can_activate_season: false,
-      current_season_is_trial: false,
-    });
-    queryClient.setQueryData(seasonQuotaKeys.status(), mockStatus);
-
-    const { result } = renderHook(() => useSeasonQuotaDisplay(), {
-      wrapper: createWrapper(queryClient),
-    });
-
-    expect(result.current.status).toBe("需購買賽季");
-    expect(result.current.statusColor).toBe("red");
   });
 });

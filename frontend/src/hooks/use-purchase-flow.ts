@@ -33,9 +33,9 @@ export interface UsePurchaseFlowResult {
 
 export function usePurchaseFlow(): UsePurchaseFlowResult {
   const [state, setState] = useState<PaymentFlowState>('idle')
+  const [trialConverted, setTrialConverted] = useState(false)
   const baselineRef = useRef<number | null>(null)
   const wasTrialRef = useRef(false)
-  const trialConvertedRef = useRef(false)
   const queryClient = useQueryClient()
 
   const isPolling = state === 'pending'
@@ -44,6 +44,9 @@ export function usePurchaseFlow(): UsePurchaseFlowResult {
   )
 
   const currentPurchased = quota?.purchased_seasons ?? null
+  const currentIsTrial = quota?.current_season_is_trial ?? null
+  const currentUsed = quota?.used_seasons ?? null
+  const currentAvailable = quota?.available_seasons ?? null
 
   // Detect grant: purchased_seasons crossed the baseline.
   // For the redirect path (baseline=null), any positive count suffices.
@@ -55,12 +58,23 @@ export function usePurchaseFlow(): UsePurchaseFlowResult {
       baseline == null ? currentPurchased > 0 : currentPurchased > baseline
 
     if (granted) {
-      // Snapshot was trial before purchase but isn't after → auto-converted.
-      trialConvertedRef.current =
-        wasTrialRef.current && quota?.current_season_is_trial === false
+      // Detect trial auto-conversion:
+      // - Modal path: wasTrialRef captured pre-purchase state accurately.
+      // - Redirect path (baseline=null): wasTrialRef is unreliable because
+      //   quota may not have loaded when startPolling ran. Fall back to
+      //   heuristic: purchased>0 + is_trial=false + used>0 + available=0
+      //   only occurs after trial conversion (bought 1, used 1 for convert).
+      const modalPathConverted =
+        wasTrialRef.current && currentIsTrial === false
+      const redirectPathConverted =
+        baseline == null &&
+        currentIsTrial === false &&
+        currentUsed !== null && currentUsed > 0 &&
+        currentAvailable === 0
+      setTrialConverted(modalPathConverted || redirectPathConverted)
       setState('granted')
     }
-  }, [state, currentPurchased, quota?.current_season_is_trial])
+  }, [state, currentPurchased, currentIsTrial, currentUsed, currentAvailable])
 
   useEffect(() => {
     if (state !== 'pending') return
@@ -73,7 +87,7 @@ export function usePurchaseFlow(): UsePurchaseFlowResult {
   const startPolling = (baseline: number | null) => {
     baselineRef.current = baseline
     wasTrialRef.current = quota?.current_season_is_trial ?? false
-    trialConvertedRef.current = false
+    setTrialConverted(false)
     setState('pending')
     void queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
   }
@@ -81,14 +95,14 @@ export function usePurchaseFlow(): UsePurchaseFlowResult {
   const reset = () => {
     baselineRef.current = null
     wasTrialRef.current = false
-    trialConvertedRef.current = false
+    setTrialConverted(false)
     setState('idle')
   }
 
   return {
     state,
-    availableSeasons: quota?.available_seasons ?? null,
-    trialConverted: trialConvertedRef.current,
+    availableSeasons: currentAvailable,
+    trialConverted,
     startPolling,
     reset,
   }

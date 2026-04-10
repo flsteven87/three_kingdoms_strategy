@@ -16,6 +16,7 @@
  */
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Plus, Loader2, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -40,7 +41,8 @@ import { SeasonCard } from "@/components/seasons/SeasonCard";
 import { AllianceGuard } from "@/components/alliance/AllianceGuard";
 import { RoleGuard } from "@/components/alliance/RoleGuard";
 import { useAlliance } from "@/hooks/use-alliance";
-import { useSeasonQuotaDisplay } from "@/hooks/use-season-quota";
+import { useSeasonQuota } from "@/hooks/use-season-quota";
+import { getQuotaDisplayState } from "@/types/season-quota";
 import {
   useSeasons,
   useCreateSeason,
@@ -72,7 +74,8 @@ function Seasons() {
   const { data: seasons, isLoading } = useSeasons();
 
   // Season quota status for display
-  const quotaDisplay = useSeasonQuotaDisplay();
+  const { data: quotaData } = useSeasonQuota();
+  const quotaDisplay = getQuotaDisplayState(quotaData);
 
   // Mutations
   const createMutation = useCreateSeason();
@@ -197,23 +200,27 @@ function Seasons() {
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight">賽季管理</h2>
             <RoleGuard requiredRoles={["owner", "collaborator"]}>
-              <Badge
-                variant={
-                  quotaDisplay.statusColor === "red"
-                    ? "destructive"
-                    : "secondary"
-                }
-                className="text-xs"
-              >
-                {quotaDisplay.hasTrialAvailable
-                  ? "可免費試用"
-                  : quotaDisplay.trialDaysRemaining !== null &&
-                    quotaDisplay.trialDaysRemaining > 0
-                    ? `試用 ${quotaDisplay.trialDaysRemaining} 天`
-                    : quotaDisplay.availableSeasons > 0
-                      ? `剩餘 ${quotaDisplay.availableSeasons} 季`
-                      : "需購買"}
-              </Badge>
+              {quotaDisplay.showPurchaseLink ? (
+                <Link to="/purchase">
+                  <Badge
+                    variant="destructive"
+                    className="text-xs cursor-pointer hover:bg-destructive/80"
+                  >
+                    {quotaDisplay.badgeText}
+                  </Badge>
+                </Link>
+              ) : (
+                <Badge
+                  variant={
+                    quotaDisplay.badgeColor === "red"
+                      ? "destructive"
+                      : "secondary"
+                  }
+                  className="text-xs"
+                >
+                  {quotaDisplay.badgeText}
+                </Badge>
+              )}
             </RoleGuard>
           </div>
           <RoleGuard requiredRoles={["owner", "collaborator"]}>
@@ -416,6 +423,7 @@ function Seasons() {
               <SeasonCard
                 key={season.id}
                 season={season}
+                quotaDisplay={quotaDisplay}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
                 onActivate={handleActivate}

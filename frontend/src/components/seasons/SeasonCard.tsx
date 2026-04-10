@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/select";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { useCanManageSeasons } from "@/hooks/use-user-role";
-import { useCanActivateSeason } from "@/hooks/use-season-quota";
+import type { QuotaDisplayState } from "@/types/season-quota";
 import type { Season } from "@/types/season";
 import {
   canActivate,
@@ -54,6 +54,7 @@ import { GAME_SEASON_TAGS } from "@/constants/game-seasons";
 
 interface SeasonCardProps {
   readonly season: Season;
+  readonly quotaDisplay: QuotaDisplayState;
   readonly onUpdate: (seasonId: string, data: Partial<Season>) => Promise<void>;
   readonly onDelete: (seasonId: string) => Promise<void>;
   readonly onActivate: (seasonId: string) => Promise<void>;
@@ -64,6 +65,7 @@ interface SeasonCardProps {
 
 export function SeasonCard({
   season,
+  quotaDisplay,
   onUpdate,
   onDelete,
   onActivate,
@@ -86,7 +88,10 @@ export function SeasonCard({
   });
 
   const canManageSeasons = useCanManageSeasons();
-  const canActivateSeasonStatus = useCanActivateSeason();
+
+  const activateWarningMessage = quotaDisplay.hasTrialAvailable
+    ? "這是你的第一個賽季，啟用後開始 14 天免費試用。開始日期將鎖定不可更改。"
+    : `啟用後會消耗 1 季額度（剩餘 ${quotaDisplay.availableSeasons} 季）。開始日期將鎖定不可更改。`;
 
   // Event handlers - React Compiler handles memoization automatically
   const handleEdit = () => {
@@ -167,7 +172,7 @@ export function SeasonCard({
   };
 
   // Determine which buttons to show based on activation_status and is_current
-  const showActivateButton = canActivate(season) && canActivateSeasonStatus;
+  const showActivateButton = canActivate(season) && quotaDisplay.canActivate;
   const showSetCurrentButton = canSetAsCurrent(season) && !season.is_current;
   const showCompleteButton =
     season.activation_status === "activated" && onComplete;
@@ -454,7 +459,7 @@ export function SeasonCard({
         title="啟用賽季"
         description="確定要啟用此賽季嗎？"
         itemName={season.name}
-        warningMessage="啟用後會消耗 1 季（試用期間免費），開始日期將鎖定不可更改。此賽季可設為「目前賽季」來進行數據分析。"
+        warningMessage={activateWarningMessage}
         confirmText="確定啟用"
         variant="default"
       />
