@@ -6,7 +6,6 @@
  */
 
 import { useState } from 'react'
-import { MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -76,9 +75,11 @@ export function LineBinding() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-                <MessageSquare className="h-8 w-8 text-muted-foreground" />
-              </div>
+              <img
+                src="/assets/logo-200.png"
+                alt="LINE 三國小幫手"
+                className="h-16 w-16 rounded-full mb-4"
+              />
               <p className="text-muted-foreground">
                 請先至「設定」頁面建立你的同盟
               </p>

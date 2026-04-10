@@ -1,4 +1,4 @@
-import { AlertCircle, ExternalLink, MessageSquare, RefreshCw } from 'lucide-react'
+import { AlertCircle, ExternalLink, RefreshCw } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -41,9 +41,11 @@ export function UnboundCard({
         {!isTest && (
           <div className="rounded-lg border bg-muted/30 p-5 space-y-4">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 shrink-0">
-                <MessageSquare className="h-6 w-6 text-primary" />
-              </div>
+              <img
+                src="/assets/logo-200.png"
+                alt="LINE 三國小幫手"
+                className="h-12 w-12 rounded-full shrink-0"
+              />
               <div>
                 <p className="font-medium text-lg">為什麼要綁定 LINE 群組？</p>
                 <p className="text-sm text-muted-foreground mt-2">
@@ -73,9 +75,11 @@ export function UnboundCard({
         <div className="space-y-3">
           <h4 className="font-medium">Step 1：加入 Bot 到群組</h4>
           <div className="flex items-center gap-4 p-4 rounded-lg border">
-            <div className="flex h-10 w-10 items-center justify-center rounded bg-[#06C755] shrink-0">
-              <MessageSquare className="h-5 w-5 text-white" />
-            </div>
+            <img
+              src="/assets/logo-200.png"
+              alt="LINE 三國小幫手"
+              className="h-10 w-10 rounded shrink-0"
+            />
             <div className="flex-1 min-w-0">
               <p className="font-medium">LINE 三國小幫手</p>
               <p className="text-sm text-muted-foreground">Bot ID: {LINE_BOT_ID}</p>

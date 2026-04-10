@@ -1,4 +1,4 @@
-import { MessageSquare, Unlink, Users } from 'lucide-react'
+import { Unlink, Users } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -51,9 +51,11 @@ export function GroupBindingCard({
                 className="h-12 w-12 rounded-full object-cover shrink-0"
               />
             ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 shrink-0">
-                <MessageSquare className="h-6 w-6 text-green-600" />
-              </div>
+              <img
+                src="/assets/logo-200.png"
+                alt="群組"
+                className="h-12 w-12 rounded-full shrink-0"
+              />
             )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
