@@ -3,9 +3,7 @@
  *
  * Tab structure:
  * - 同盟管理: Alliance settings + Collaborator management
- * - 帳戶設定: Personal account settings
- *
- * Note: 賽季額度功能已移至獨立的 /purchase 頁面
+ * - 帳戶設定: Personal profile (read-only) + Season quota display
  */
 
 import { useState } from 'react'
@@ -28,11 +26,15 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { useAlliance } from '@/hooks/use-alliance'
+import { useAuth } from '@/hooks/use-auth'
+import { useSeasonQuota } from '@/hooks/use-season-quota'
 import { AllianceForm } from '@/components/alliance/AllianceForm'
 import { AllianceCollaboratorManager } from '@/components/alliance/AllianceCollaboratorManager'
 
 function Settings() {
   const { data: alliance } = useAlliance()
+  const { user } = useAuth()
+  const { data: quota } = useSeasonQuota()
   const [activeTab, setActiveTab] = useState('alliance')
 
   return (
@@ -185,17 +187,59 @@ function Settings() {
 
         {/* Account Settings Tab */}
         <TabsContent value="account" className="space-y-4">
+          {/* Personal Profile */}
           <Card>
             <CardHeader>
               <CardTitle>個人資料</CardTitle>
-              <CardDescription>管理你的個人資訊</CardDescription>
+              <CardDescription>你的帳戶基本資訊</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <p className="text-muted-foreground">
-                  此功能即將推出
-                </p>
-              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+                <dt className="text-muted-foreground">顯示名稱</dt>
+                <dd>{user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? '—'}</dd>
+                <dt className="text-muted-foreground">電子信箱</dt>
+                <dd>{user?.email ?? '—'}</dd>
+                <dt className="text-muted-foreground">登入方式</dt>
+                <dd className="capitalize">{user?.app_metadata?.provider ?? '—'}</dd>
+              </dl>
+            </CardContent>
+          </Card>
+
+          {/* Season Quota */}
+          <Card>
+            <CardHeader>
+              <CardTitle>賽季額度</CardTitle>
+              <CardDescription>
+                {alliance ? `${alliance.name} 的賽季使用狀況` : '所屬同盟的賽季使用狀況'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {quota ? (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+                  <dt className="text-muted-foreground">已購買</dt>
+                  <dd>{quota.purchased_seasons} 季</dd>
+                  <dt className="text-muted-foreground">已使用</dt>
+                  <dd>{quota.used_seasons} 季</dd>
+                  <dt className="text-muted-foreground">剩餘可用</dt>
+                  <dd>
+                    <span className={quota.available_seasons > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                      {quota.available_seasons} 季
+                    </span>
+                  </dd>
+                  {quota.current_season_is_trial && quota.trial_days_remaining !== null && (
+                    <>
+                      <dt className="text-muted-foreground">試用期剩餘</dt>
+                      <dd>
+                        <Badge variant={quota.trial_days_remaining <= 3 ? 'destructive' : 'secondary'}>
+                          {quota.trial_days_remaining} 天
+                        </Badge>
+                      </dd>
+                    </>
+                  )}
+                </dl>
+              ) : (
+                <p className="text-sm text-muted-foreground">尚未建立同盟</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
