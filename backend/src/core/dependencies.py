@@ -35,6 +35,7 @@ from src.services.analytics import (
     MemberAnalyticsService,
 )
 from src.services.battle_event_service import BattleEventService
+from src.services.checkout_service import CheckoutService
 from src.services.contact_form_service import ContactFormService
 from src.services.copper_mine_rule_service import CopperMineRuleService
 from src.services.copper_mine_service import CopperMineService
@@ -132,6 +133,11 @@ def get_contact_form_service() -> ContactFormService:
     return ContactFormService()
 
 
+def get_checkout_service() -> CheckoutService:
+    """Get checkout service instance"""
+    return CheckoutService()
+
+
 def get_payment_service() -> PaymentService:
     """Get payment service instance"""
     return PaymentService()
@@ -173,5 +179,6 @@ LineBindingServiceDep = Annotated[LineBindingService, Depends(get_line_binding_s
 CopperMineServiceDep = Annotated[CopperMineService, Depends(get_copper_mine_service)]
 CopperMineRuleServiceDep = Annotated[CopperMineRuleService, Depends(get_copper_mine_rule_service)]
 ContactFormServiceDep = Annotated[ContactFormService, Depends(get_contact_form_service)]
+CheckoutServiceDep = Annotated[CheckoutService, Depends(get_checkout_service)]
 PaymentServiceDep = Annotated[PaymentService, Depends(get_payment_service)]
 SeasonQuotaServiceDep = Annotated[SeasonQuotaService, Depends(get_season_quota_service)]

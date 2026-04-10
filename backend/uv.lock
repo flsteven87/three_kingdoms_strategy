@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.13"
 
 [[package]]
@@ -1213,6 +1213,7 @@ source = { editable = "." }
 dependencies = [
     { name = "email-validator" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "line-bot-sdk" },
     { name = "openpyxl" },
     { name = "pydantic" },
@@ -1245,6 +1246,7 @@ dev = [
 requires-dist = [
     { name = "email-validator", specifier = ">=2.3.0" },
     { name = "fastapi", specifier = ">=0.118.0" },
+    { name = "httpx", specifier = ">=0.28.0" },
     { name = "line-bot-sdk", specifier = ">=3.21.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pydantic", specifier = ">=2.12.0" },

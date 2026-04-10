@@ -292,13 +292,13 @@ class TestValidationPermanentFailures:
         self, client: AsyncClient, mock_settings, mock_deps, mock_alert
     ):
         _, repo = mock_deps
-        body = envelope("order.paid", "evt_amt_001", order_paid(amount=1))
+        body = envelope("order.paid", "evt_amt_001", order_paid(amount=0))
         response = await post_webhook(client, body)
 
         assert response.status_code == 200
         j = response.json()
         assert j["status"] == "permanent_failure"
-        assert j["code"] == "amount_mismatch"
+        assert j["code"] == "amount_out_of_range"
         repo.process_event.assert_not_awaited()
         mock_alert.assert_awaited_once()
 

@@ -12,6 +12,7 @@ from uuid import UUID
 import pytest
 
 from src.core.exceptions import SeasonQuotaExhaustedError
+from src.core.webhook_errors import WebhookPermanentError
 from src.models.alliance import Alliance
 from src.models.season import Season
 from src.repositories.webhook_event_repository import WebhookProcessingResult
@@ -278,6 +279,67 @@ class TestWebhookIdempotency:
         assert result1["seasons_added"] == 1
         assert result2["status"] == "duplicate_event"
         assert result2["seasons_added"] == 0
+
+
+class TestDiscountedAmountValidation:
+    """Coupon-discounted amounts should be accepted; invalid amounts rejected."""
+
+    async def test_discounted_amount_accepted(
+        self,
+        payment_service: PaymentService,
+        mock_alliance_repo: MagicMock,
+        mock_webhook_repo: MagicMock,
+    ):
+        """Webhook with coupon-discounted amount (799) should be accepted."""
+        alliance = make_alliance(ALLIANCE_ID, purchased_seasons=0, used_seasons=0)
+        mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance)
+        mock_webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(status="granted", available_seasons=1)
+        )
+
+        data = valid_event_data()
+        data["amount"] = 799  # NT$999 - NT$200 coupon
+
+        result = await payment_service.handle_payment_success(
+            data, event_id="evt_discount_1", event_type="order.paid",
+        )
+        assert result["status"] == "granted"
+
+    async def test_amount_zero_rejected(
+        self,
+        payment_service: PaymentService,
+    ):
+        """Zero amount should be rejected even with valid signature."""
+        data = valid_event_data()
+        data["amount"] = 0
+        with pytest.raises(WebhookPermanentError, match="amount_out_of_range"):
+            await payment_service.handle_payment_success(
+                data, event_id="evt_zero", event_type="order.paid",
+            )
+
+    async def test_amount_above_expected_rejected(
+        self,
+        payment_service: PaymentService,
+    ):
+        """Amount exceeding expected price should be rejected."""
+        data = valid_event_data()
+        data["amount"] = 1500
+        with pytest.raises(WebhookPermanentError, match="amount_out_of_range"):
+            await payment_service.handle_payment_success(
+                data, event_id="evt_over", event_type="order.paid",
+            )
+
+    async def test_negative_amount_rejected(
+        self,
+        payment_service: PaymentService,
+    ):
+        """Negative amount should be rejected."""
+        data = valid_event_data()
+        data["amount"] = -100
+        with pytest.raises(WebhookPermanentError, match="amount_out_of_range"):
+            await payment_service.handle_payment_success(
+                data, event_id="evt_neg", event_type="order.paid",
+            )
 
 
 class TestSeasonActivationConsumesQuota:

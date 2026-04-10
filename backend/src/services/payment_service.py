@@ -206,9 +206,12 @@ class PaymentService:
             raise WebhookPermanentError(
                 "amount_unparseable", event_id=event_id, expected=expected, actual=raw
             ) from e
-        if actual != expected:
+        # Webhook signature guarantees authenticity. Product ID check ensures
+        # our product. Allow any positive amount up to the base price — this
+        # covers valid coupon discounts without hardcoding specific amounts.
+        if actual is None or actual <= 0 or actual > expected:
             raise WebhookPermanentError(
-                "amount_mismatch", event_id=event_id, expected=expected, actual=actual
+                "amount_out_of_range", event_id=event_id, expected=expected, actual=actual
             )
 
     @staticmethod

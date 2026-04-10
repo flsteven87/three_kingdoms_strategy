@@ -27,6 +27,7 @@ export * from "./donation-api";
 export * from "./line-api";
 export * from "./copper-mine-api";
 export * from "./season-quota-api";
+export * from "./payment-api";
 
 // Import all functions for apiClient object
 import { setAuthToken } from "./base-client";
@@ -40,6 +41,7 @@ import * as donationApi from "./donation-api";
 import * as lineApi from "./line-api";
 import * as copperMineApi from "./copper-mine-api";
 import * as seasonQuotaApi from "./season-quota-api";
+import * as paymentApi from "./payment-api";
 
 /**
  * API client object
@@ -151,4 +153,7 @@ export const apiClient = {
 
   // Season Quota
   getSeasonQuotaStatus: seasonQuotaApi.getSeasonQuotaStatus,
+
+  // Payment
+  createCheckoutSession: paymentApi.createCheckoutSession,
 };

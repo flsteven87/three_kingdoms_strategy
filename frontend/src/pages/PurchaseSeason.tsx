@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { useSeasonQuota } from '@/hooks/use-season-quota'
 import { usePurchaseFlow, type PaymentFlowState } from '@/hooks/use-purchase-flow'
+import { createCheckoutSession } from '@/lib/api'
 import { PRICE_PER_SEASON } from '@/constants'
 
 interface FaqItem {
@@ -156,10 +157,16 @@ const FAQ_ITEMS: readonly FaqItem[] = [
     answer:
       '可以。在設定中邀請協作者，他們就能一起上傳數據、查看分析，不需要額外購買。',
   },
+  {
+    question: '有優惠碼可以用嗎？',
+    answer:
+      '有！點擊「有優惠碼？」前往結帳頁面，在付款時輸入優惠碼即可享有折扣。每個帳號每個優惠碼限用一次。',
+  },
 ]
 
 function PurchaseSeason() {
   const [error, setError] = useState<string | null>(null)
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -167,6 +174,9 @@ function PurchaseSeason() {
   const { data: quotaStatus, isLoading: isQuotaLoading } = useSeasonQuota()
   const { checkout, isCheckingOut } = useRecur()
   const purchaseFlow = usePurchaseFlow()
+  const isBusy = isCheckingOut || isRedirecting
+  const baseUrl = window.location.origin
+  const customerName = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? undefined
 
   // Handle payment success from URL parameters (redirect back from Recur).
   // We don't have a pre-purchase baseline on this code path (the page just
@@ -209,27 +219,23 @@ function PurchaseSeason() {
       return
     }
 
-    // customerEmail is REQUIRED for embedded/modal checkout
     const customerEmail = user.email
     if (!customerEmail) {
       setError('無法取得您的電子郵件，請確認帳戶設定')
       return
     }
 
-    const baseUrl = window.location.origin
-
     const baselineSeasons = quotaStatus?.purchased_seasons ?? 0
+    // externalCustomerId = user UUID ONLY. The server treats every successful
+    // checkout as exactly 1 season for the configured product. Do NOT encode
+    // quantity client-side — the webhook would trust it.
+    const externalCustomerId = user.id
 
     try {
-      // externalCustomerId = user UUID ONLY. The server treats every successful
-      // checkout as exactly 1 season for the configured product. Do NOT encode
-      // quantity client-side — the webhook would trust it.
-      const externalCustomerId = user.id
-
       await checkout({
         productId,
         customerEmail,
-        customerName: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
+        customerName,
         externalCustomerId,
         successUrl: `${baseUrl}/purchase?payment=success`,
         onError: (checkoutError) => {
@@ -241,10 +247,8 @@ function PurchaseSeason() {
           setError(`付款錯誤：${msg}`)
         },
         onPaymentComplete: async () => {
-          // Do NOT trust this callback as proof of grant — it fires when
-          // Recur collects payment, not when our webhook lands. Poll the
-          // backend quota endpoint until the count strictly increases past
-          // the captured baseline (grant confirmed) or we hit the timeout.
+          // Poll backend until quota increases — onPaymentComplete fires when
+          // Recur collects payment, not when our webhook grants the season.
           purchaseFlow.startPolling(baselineSeasons)
         },
         onPaymentFailed: (err) => {
@@ -284,7 +288,6 @@ function PurchaseSeason() {
     } catch (err: unknown) {
       let errorMessage: string
       if (err instanceof Error) {
-        // Recur SDK may wrap error objects, resulting in "[object Object]" as message
         errorMessage = err.message === '[object Object]'
           ? '付款處理失敗，請稍後再試或聯繫客服'
           : err.message
@@ -297,6 +300,32 @@ function PurchaseSeason() {
         errorMessage = String(err)
       }
       setError(`付款過程發生錯誤：${errorMessage}`)
+    }
+  }
+
+  const handlePromoCheckout = async () => {
+    setError(null)
+
+    const customerEmail = user?.email
+    if (!customerEmail) {
+      setError('請先登入')
+      return
+    }
+
+    setIsRedirecting(true)
+
+    try {
+      const { checkout_url } = await createCheckoutSession({
+        customer_email: customerEmail,
+        customer_name: customerName,
+        success_url: `${baseUrl}/purchase?payment=success`,
+        cancel_url: `${baseUrl}/purchase`,
+      })
+      window.location.href = checkout_url
+    } catch (err: unknown) {
+      setIsRedirecting(false)
+      const message = err instanceof Error ? err.message : '無法建立結帳頁面'
+      setError(message)
     }
   }
 
@@ -386,10 +415,20 @@ function PurchaseSeason() {
             size="lg"
             className="w-full h-13 text-base font-semibold"
             onClick={handlePurchase}
-            disabled={isCheckingOut}
+            disabled={isBusy}
           >
-            {isCheckingOut ? '處理中...' : '立即購買'}
+            {isBusy ? '處理中...' : '立即購買'}
           </Button>
+
+          {/* Promo code link — redirects to hosted checkout where user enters code */}
+          <button
+            type="button"
+            onClick={handlePromoCheckout}
+            disabled={isBusy}
+            className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            有優惠碼？點此前往結帳頁輸入
+          </button>
 
           {/* Legal disclosure & consent */}
           <p className="text-center text-xs text-muted-foreground leading-relaxed">

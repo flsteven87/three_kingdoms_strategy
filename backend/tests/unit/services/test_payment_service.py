@@ -51,7 +51,9 @@ def service(fake_settings, mock_alliance):
     svc._quota_service.get_alliance_by_user = AsyncMock(return_value=mock_alliance)
     svc._webhook_repo = MagicMock()
     svc._webhook_repo.process_event = AsyncMock(
-        return_value=WebhookProcessingResult(status="granted", available_seasons=5, trial_converted=False)
+        return_value=WebhookProcessingResult(
+            status="granted", available_seasons=5, trial_converted=False
+        )
     )
     return svc
 
@@ -88,7 +90,9 @@ class TestEventTypeRouting:
     @pytest.mark.asyncio
     async def test_checkout_completed_is_audit_only(self, service):
         service._webhook_repo.process_event = AsyncMock(
-            return_value=WebhookProcessingResult(status="audit_only", available_seasons=5, trial_converted=False)
+            return_value=WebhookProcessingResult(
+                status="audit_only", available_seasons=5, trial_converted=False
+            )
         )
         result = await service.handle_payment_success(
             checkout_completed(), event_id="evt_chk_1", event_type="checkout.completed"
@@ -111,7 +115,9 @@ class TestEventTypeRouting:
     @pytest.mark.asyncio
     async def test_duplicate_purchase_status_propagated(self, service):
         service._webhook_repo.process_event = AsyncMock(
-            return_value=WebhookProcessingResult(status="duplicate_purchase", available_seasons=6, trial_converted=False)
+            return_value=WebhookProcessingResult(
+                status="duplicate_purchase", available_seasons=6, trial_converted=False
+            )
         )
         result = await service.handle_payment_success(
             order_paid(), event_id="evt_sibling", event_type="order.paid"
@@ -196,11 +202,11 @@ class TestValidation:
         assert ei.value.code == "product_mismatch"
 
     @pytest.mark.asyncio
-    async def test_amount_mismatch_is_permanent(self, service):
-        payload = clone(order_paid(amount=1))
+    async def test_amount_out_of_range_is_permanent(self, service):
+        payload = clone(order_paid(amount=0))
         with pytest.raises(WebhookPermanentError) as ei:
             await service.handle_payment_success(payload, event_id="evt_1", event_type="order.paid")
-        assert ei.value.code == "amount_mismatch"
+        assert ei.value.code == "amount_out_of_range"
 
     @pytest.mark.asyncio
     async def test_amount_unparseable_has_distinct_code(self, service):
