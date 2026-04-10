@@ -1,19 +1,49 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Loader2, AlertTriangle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
+
+const AUTH_TIMEOUT_MS = 10_000
 
 export function AuthCallback() {
   const navigate = useNavigate()
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Supabase will automatically handle the OAuth callback
-    // We just need to wait for the auth state to update and redirect
-    const timer = setTimeout(() => {
-      navigate('/analytics')
-    }, 1000)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigate('/analytics', { replace: true })
+      }
+    })
 
-    return () => clearTimeout(timer)
+    const timer = setTimeout(() => {
+      setError('登入逾時，請重新嘗試')
+    }, AUTH_TIMEOUT_MS)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timer)
+    }
   }, [navigate])
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+          <h2 className="mt-4 text-lg font-semibold">{error}</h2>
+          <Button
+            variant="link"
+            onClick={() => navigate('/landing', { replace: true })}
+            className="mt-4"
+          >
+            返回登入頁面
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center">

@@ -92,7 +92,9 @@ async def recur_webhook(
     try:
         if event_type in ("checkout.completed", "order.paid"):
             result = await payment_service.handle_payment_success(
-                event_data, event_id=event_id, event_type=event_type,
+                event_data,
+                event_id=event_id,
+                event_type=event_type,
             )
             return {"received": True, **result}
 
@@ -114,16 +116,14 @@ async def recur_webhook(
         # Note: keyword is `error_code`, not `code` — alert_critical's first
         # parameter is named `code`, so passing `code=...` collides. The
         # domain error's code is ferried through as context metadata.
-        await alert_critical(
-            "recur.webhook.permanent", error_code=e.code, **e.context
-        )
-        return {"received": True, "status": "permanent_failure", "code": e.code}
+        await alert_critical("recur.webhook.permanent", error_code=e.code, **e.context)
+        return {"received": True, "status": "permanent_failure"}
 
     except WebhookTransientError as e:
         logger.error("Transient webhook error code=%s context=%s", e.code, e.context)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"transient:{e.code}",
+            detail="Internal error",
         ) from e
 
     except Exception as e:

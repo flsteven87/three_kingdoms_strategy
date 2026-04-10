@@ -6,6 +6,7 @@ Provides high-performance JWT validation with caching and proper error handling.
 
 import hashlib
 import time
+from collections import OrderedDict
 from functools import lru_cache
 
 from fastapi import HTTPException, status
@@ -48,8 +49,9 @@ class AuthService:
         """Initialize auth service with configuration."""
         self.jwt_secret = settings.supabase_jwt_secret
         self.jwt_algorithms = ["HS256"]
-        self._token_cache: dict[str, tuple[TokenClaims, float]] = {}
+        self._token_cache: OrderedDict[str, tuple[TokenClaims, float]] = OrderedDict()
         self._cache_ttl = 300  # 5 minutes cache TTL
+        self._cache_max_size = 1000
 
     @staticmethod
     def _token_cache_key(token: str) -> str:
@@ -125,7 +127,9 @@ class AuthService:
             if claims.is_expired:
                 raise TokenExpiredError("Token has expired")
 
-            # Cache valid token
+            # Cache valid token; O(1) LRU eviction via OrderedDict
+            if len(self._token_cache) >= self._cache_max_size:
+                self._token_cache.popitem(last=False)
             self._token_cache[cache_key] = (claims, time.time())
 
             return claims

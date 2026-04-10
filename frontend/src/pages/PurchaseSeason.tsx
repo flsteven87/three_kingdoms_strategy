@@ -28,6 +28,8 @@ import { usePurchaseFlow, type PaymentFlowState } from '@/hooks/use-purchase-flo
 import { createCheckoutSession } from '@/lib/api'
 import { PRICE_PER_SEASON } from '@/constants'
 
+const PURCHASE_BASELINE_KEY = 'purchaseBaseline'
+
 interface FaqItem {
   readonly question: string
   readonly answer: string
@@ -180,19 +182,15 @@ function PurchaseSeason() {
   const customerName = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? undefined
 
   // Handle payment success from URL parameters (redirect back from Recur).
-  // We don't have a pre-purchase baseline on this code path (the page just
-  // loaded fresh), so polling succeeds on any positive count within the
-  // timeout window. If the grant genuinely failed, the banner will flip to
-  // 'timeout' instead of lying about success.
-  //
-  // This effect is self-limiting: after startPolling() + setSearchParams({}),
-  // subsequent re-runs see no ?payment=success and early-return, so
-  // including purchaseFlow.startPolling in deps is safe even though its
-  // identity changes per render.
+  // Read the pre-purchase baseline from sessionStorage so we detect an actual
+  // increment rather than treating any positive count as a grant.
   const { startPolling } = purchaseFlow
   useEffect(() => {
     if (searchParams.get('payment') !== 'success') return
-    startPolling(null)
+    const stored = sessionStorage.getItem(PURCHASE_BASELINE_KEY)
+    sessionStorage.removeItem(PURCHASE_BASELINE_KEY)
+    const baseline = stored !== null ? Number(stored) : null
+    startPolling(baseline)
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams, startPolling])
 
@@ -227,6 +225,9 @@ function PurchaseSeason() {
     }
 
     const baselineSeasons = quotaStatus?.purchased_seasons ?? 0
+    // Persist baseline for the redirect fallback path (sessionStorage survives
+    // page navigation but not tab close, which is the right lifetime).
+    sessionStorage.setItem(PURCHASE_BASELINE_KEY, String(baselineSeasons))
     // externalCustomerId = user UUID ONLY. The server treats every successful
     // checkout as exactly 1 season for the configured product. Do NOT encode
     // quantity client-side — the webhook would trust it.
@@ -314,6 +315,7 @@ function PurchaseSeason() {
     }
 
     setIsRedirecting(true)
+    sessionStorage.setItem(PURCHASE_BASELINE_KEY, String(quotaStatus?.purchased_seasons ?? 0))
 
     try {
       const { checkout_url } = await createCheckoutSession({

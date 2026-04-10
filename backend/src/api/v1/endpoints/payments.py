@@ -1,6 +1,7 @@
 """Payment endpoints — checkout session creation with promotion codes."""
 
 import logging
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException
 
@@ -28,6 +29,16 @@ async def create_checkout_session(
     product_id = settings.recur_product_id
     if not product_id:
         raise HTTPException(status_code=503, detail="Payment not configured")
+
+    # Validate redirect URLs against allowed origin (urlparse prevents scheme://host@attacker tricks)
+    allowed = urlparse(settings.frontend_url)
+    allowed_origin = f"{allowed.scheme}://{allowed.netloc}"
+    for url_field, url_value in [("success_url", body.success_url), ("cancel_url", body.cancel_url)]:
+        if not url_value:
+            continue
+        parsed = urlparse(url_value)
+        if f"{parsed.scheme}://{parsed.netloc}" != allowed_origin:
+            raise HTTPException(status_code=400, detail=f"{url_field} must originate from {allowed_origin}")
 
     try:
         checkout_url = await service.create_session(

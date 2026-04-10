@@ -80,6 +80,11 @@ def assert_production_config(settings: Settings) -> None:
             + ", ".join(sorted(missing_required))
         )
 
+    if settings.recur_secret_key and not settings.recur_secret_key.startswith("sk_live_"):
+        raise StartupConfigError(
+            "recur_secret_key must be a live key (sk_live_*) in production"
+        )
+
     missing_recommended = missing_recommended_settings(settings)
     if missing_recommended:
         logger.critical(

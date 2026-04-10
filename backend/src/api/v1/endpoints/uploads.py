@@ -14,6 +14,7 @@ from uuid import UUID
 from fastapi import APIRouter, File, Form, UploadFile
 
 from src.core.dependencies import CSVUploadServiceDep, UserIdDep
+from src.utils.csv_io import read_csv_upload
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
@@ -45,13 +46,7 @@ async def upload_csv(
     # Parse season_id string to UUID
     season_uuid = UUID(season_id)
 
-    # Validate file type
-    if not file.filename or not file.filename.endswith(".csv"):
-        raise ValueError("File must be a CSV file")
-
-    # Read file content
-    content = await file.read()
-    csv_content = content.decode("utf-8")
+    csv_content = await read_csv_upload(file)
 
     # Upload CSV
     result = await service.upload_csv(

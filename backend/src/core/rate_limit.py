@@ -13,10 +13,24 @@ switch to a shared backend (e.g., Redis via `storage_uri` parameter).
 """
 
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from starlette.requests import Request
+
+
+def _get_real_client_ip(request: Request) -> str:
+    """Extract real client IP from X-Forwarded-For behind reverse proxy.
+
+    Zeabur (and most cloud LBs) prepend the real client IP as the first
+    entry in X-Forwarded-For. Falls back to direct peer IP when the
+    header is absent (local development).
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
 
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_get_real_client_ip,
     default_limits=["120/minute"],
 )
 

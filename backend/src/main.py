@@ -125,33 +125,45 @@ async def validation_exception_handler(
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     """
-    Handle ValueError exceptions globally
+    Handle ValueError exceptions globally.
 
-    Converts ValueError (domain exceptions) to HTTP 400 Bad Request
-    This eliminates the need for repetitive try/except blocks in endpoints
+    Domain ValueError messages are user-facing; UnicodeDecodeError and other
+    library-raised subclasses may leak internals, so we sanitize those.
     """
     logger.error("[ValueError] URL: %s, Error: %s", request.url, exc)
-    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
+    if isinstance(exc, UnicodeDecodeError):
+        detail = "無法解析檔案編碼，請使用 UTF-8 格式"
+    else:
+        detail = str(exc)
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": detail})
 
 
 @app.exception_handler(FileNotFoundError)
 async def file_not_found_handler(request: Request, exc: FileNotFoundError) -> JSONResponse:
     """
-    Handle FileNotFoundError exceptions globally
+    Handle FileNotFoundError exceptions globally.
 
-    Converts FileNotFoundError to HTTP 404 Not Found
+    Returns generic message to avoid exposing filesystem paths.
     """
-    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+    logger.error("[FileNotFoundError] URL: %s, Error: %s", request.url, exc)
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": "找不到請求的資源"},
+    )
 
 
 @app.exception_handler(PermissionError)
 async def permission_error_handler(request: Request, exc: PermissionError) -> JSONResponse:
     """
-    Handle PermissionError exceptions globally
+    Handle PermissionError exceptions globally.
 
-    Converts PermissionError to HTTP 403 Forbidden
+    Returns generic message to avoid leaking internal permission details.
     """
-    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
+    logger.error("[PermissionError] URL: %s, Error: %s", request.url, exc)
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={"detail": "您沒有權限執行此操作"},
+    )
 
 
 @app.exception_handler(SeasonQuotaExhaustedError)

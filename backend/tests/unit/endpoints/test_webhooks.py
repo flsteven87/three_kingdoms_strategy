@@ -288,7 +288,7 @@ class TestRecurWebhookEndpoint:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "permanent_failure"
-        assert body["code"] == "product_mismatch"
+        assert "code" not in body  # internal codes must not leak
         mock_alert.assert_awaited_once()
         call = mock_alert.await_args
         assert call.args[0] == "recur.webhook.permanent"

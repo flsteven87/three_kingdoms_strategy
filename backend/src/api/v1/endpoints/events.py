@@ -41,6 +41,7 @@ from src.core.dependencies import (
     UserIdDep,
 )
 from src.models.battle_event import BattleEventCreate, BattleEventUpdate, EventCategory
+from src.utils.csv_io import read_csv_upload
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -77,11 +78,7 @@ async def upload_event_csv(
     # Verify user access to season
     await season_service.verify_user_access(user_id, season_uuid)
 
-    if not file.filename or not file.filename.endswith(".csv"):
-        raise ValueError("File must be a CSV file")
-
-    content = await file.read()
-    csv_content = content.decode("utf-8")
+    csv_content = await read_csv_upload(file)
 
     result = await csv_service.upload_csv(
         user_id=user_id,
