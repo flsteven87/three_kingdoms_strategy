@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, type ComponentType } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -17,22 +17,40 @@ import { PublicLayout } from './components/layout/PublicLayout'
 import { LiffLayout } from './liff/components/LiffLayout'
 import { LiffHome } from './liff/pages/LiffHome'
 
+// Retry dynamic imports on chunk load failure (stale deployment)
+function lazyWithRetry<T extends ComponentType>(
+  factory: () => Promise<{ default: T }>
+) {
+  return lazy(() =>
+    factory().catch((error: unknown) => {
+      const hasReloaded = sessionStorage.getItem('chunk_reload')
+      if (!hasReloaded) {
+        sessionStorage.setItem('chunk_reload', '1')
+        window.location.reload()
+        return new Promise<{ default: T }>(() => {})
+      }
+      sessionStorage.removeItem('chunk_reload')
+      throw error
+    })
+  )
+}
+
 // Protected pages — lazy loaded (only after auth)
-const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout').then(m => ({ default: m.DashboardLayout })))
-const Seasons = lazy(() => import('./pages/Seasons').then(m => ({ default: m.Seasons })))
-const DataManagement = lazy(() => import('./pages/DataManagement').then(m => ({ default: m.DataManagement })))
-const HegemonyWeights = lazy(() => import('./pages/HegemonyWeights').then(m => ({ default: m.HegemonyWeights })))
-const MemberPerformance = lazy(() => import('./pages/MemberPerformance').then(m => ({ default: m.MemberPerformance })))
-const AllianceAnalytics = lazy(() => import('./pages/AllianceAnalytics').then(m => ({ default: m.AllianceAnalytics })))
-const GroupAnalytics = lazy(() => import('./pages/GroupAnalytics').then(m => ({ default: m.GroupAnalytics })))
-const EventAnalytics = lazy(() => import('./pages/EventAnalytics').then(m => ({ default: m.EventAnalytics })))
-const EventDetail = lazy(() => import('./pages/EventDetail').then(m => ({ default: m.EventDetail })))
-const DonationAnalytics = lazy(() => import('./pages/DonationAnalytics').then(m => ({ default: m.DonationAnalytics })))
-const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
-const PurchaseSeason = lazy(() => import('./pages/PurchaseSeason').then(m => ({ default: m.PurchaseSeason })))
-const LineBinding = lazy(() => import('./pages/LineBinding').then(m => ({ default: m.LineBinding })))
-const CopperMines = lazy(() => import('./pages/CopperMines').then(m => ({ default: m.CopperMines })))
-const QuickSetup = lazy(() => import('./pages/QuickSetup').then(m => ({ default: m.QuickSetup })))
+const DashboardLayout = lazyWithRetry(() => import('./components/layout/DashboardLayout').then(m => ({ default: m.DashboardLayout as ComponentType })))
+const Seasons = lazyWithRetry(() => import('./pages/Seasons').then(m => ({ default: m.Seasons as ComponentType })))
+const DataManagement = lazyWithRetry(() => import('./pages/DataManagement').then(m => ({ default: m.DataManagement as ComponentType })))
+const HegemonyWeights = lazyWithRetry(() => import('./pages/HegemonyWeights').then(m => ({ default: m.HegemonyWeights as ComponentType })))
+const MemberPerformance = lazyWithRetry(() => import('./pages/MemberPerformance').then(m => ({ default: m.MemberPerformance as ComponentType })))
+const AllianceAnalytics = lazyWithRetry(() => import('./pages/AllianceAnalytics').then(m => ({ default: m.AllianceAnalytics as ComponentType })))
+const GroupAnalytics = lazyWithRetry(() => import('./pages/GroupAnalytics').then(m => ({ default: m.GroupAnalytics as ComponentType })))
+const EventAnalytics = lazyWithRetry(() => import('./pages/EventAnalytics').then(m => ({ default: m.EventAnalytics as ComponentType })))
+const EventDetail = lazyWithRetry(() => import('./pages/EventDetail').then(m => ({ default: m.EventDetail as ComponentType })))
+const DonationAnalytics = lazyWithRetry(() => import('./pages/DonationAnalytics').then(m => ({ default: m.DonationAnalytics as ComponentType })))
+const Settings = lazyWithRetry(() => import('./pages/Settings').then(m => ({ default: m.Settings as ComponentType })))
+const PurchaseSeason = lazyWithRetry(() => import('./pages/PurchaseSeason').then(m => ({ default: m.PurchaseSeason as ComponentType })))
+const LineBinding = lazyWithRetry(() => import('./pages/LineBinding').then(m => ({ default: m.LineBinding as ComponentType })))
+const CopperMines = lazyWithRetry(() => import('./pages/CopperMines').then(m => ({ default: m.CopperMines as ComponentType })))
+const QuickSetup = lazyWithRetry(() => import('./pages/QuickSetup').then(m => ({ default: m.QuickSetup as ComponentType })))
 
 function FullPageSpinner() {
   return (
