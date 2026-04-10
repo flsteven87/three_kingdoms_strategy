@@ -1,20 +1,11 @@
 /**
  * Purchase Flow Hook — Baseline-aware polling for season-quota grant.
  *
- * Solves the "hardcoded success banner lies when grant fails" problem:
- * instead of trusting the Recur SDK's `onPaymentComplete` callback (which
- * fires when Recur collects payment, NOT when our backend webhook lands
- * the grant), this hook captures a baseline `available_seasons` snapshot
- * before checkout and polls `/api/v1/season-quota` until either:
- *
- *   - the count strictly increases above the baseline → `granted`
- *   - 30 seconds elapse without a change              → `timeout`
- *
- * The redirect path (Recur `successUrl` back to `/purchase?payment=success`)
- * has no baseline because the page just loaded fresh; it uses the weaker
- * "any positive count within timeout" heuristic, which matches the
- * pre-existing behavior but adds a timeout ceiling so a truly failed grant
- * surfaces a clear error instead of the old permanently-hopeful banner.
+ * Polls `/api/v1/season-quota` until `purchased_seasons` strictly increases
+ * above the pre-checkout baseline, confirming the backend webhook granted
+ * the purchase. Uses `purchased_seasons` (not `available_seasons`) because
+ * trial auto-conversion may consume the newly granted season immediately,
+ * leaving `available_seasons` unchanged.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -29,10 +20,11 @@ const POLL_TIMEOUT_MS = 30_000
 export interface UsePurchaseFlowResult {
   readonly state: PaymentFlowState
   readonly availableSeasons: number | null
+  readonly trialConverted: boolean
   /**
    * Start polling for a grant.
    *
-   * @param baseline - pre-purchase quota snapshot (modal path).
+   * @param baseline - pre-purchase `purchased_seasons` snapshot (modal path).
    *                   Pass `null` when baseline is unknown (redirect path).
    */
   readonly startPolling: (baseline: number | null) => void
@@ -42,7 +34,8 @@ export interface UsePurchaseFlowResult {
 export function usePurchaseFlow(): UsePurchaseFlowResult {
   const [state, setState] = useState<PaymentFlowState>('idle')
   const baselineRef = useRef<number | null>(null)
-  const startedAtRef = useRef<number | null>(null)
+  const wasTrialRef = useRef(false)
+  const trialConvertedRef = useRef(false)
   const queryClient = useQueryClient()
 
   const isPolling = state === 'pending'
@@ -50,26 +43,25 @@ export function usePurchaseFlow(): UsePurchaseFlowResult {
     isPolling ? { refetchInterval: POLL_INTERVAL_MS } : undefined,
   )
 
-  const currentSeasons = quota?.available_seasons ?? null
+  const currentPurchased = quota?.purchased_seasons ?? null
 
-  // Watch for grant: flips state to 'granted' when the quota crosses the
-  // baseline. For the redirect path (baseline=null), accept any positive
-  // count as evidence of a successful grant.
+  // Detect grant: purchased_seasons crossed the baseline.
+  // For the redirect path (baseline=null), any positive count suffices.
   useEffect(() => {
-    if (state !== 'pending' || currentSeasons == null) return
+    if (state !== 'pending' || currentPurchased == null) return
 
     const baseline = baselineRef.current
     const granted =
-      baseline == null ? currentSeasons > 0 : currentSeasons > baseline
+      baseline == null ? currentPurchased > 0 : currentPurchased > baseline
 
     if (granted) {
+      // Snapshot was trial before purchase but isn't after → auto-converted.
+      trialConvertedRef.current =
+        wasTrialRef.current && quota?.current_season_is_trial === false
       setState('granted')
     }
-  }, [state, currentSeasons])
+  }, [state, currentPurchased, quota?.current_season_is_trial])
 
-  // Hard timeout: flips to 'timeout' after POLL_TIMEOUT_MS if we never saw
-  // the grant land. Cleanup prevents stale timers after state change or
-  // unmount (CLAUDE.md 🔴: every timer-using effect must return cleanup).
   useEffect(() => {
     if (state !== 'pending') return
     const timerId = setTimeout(() => {
@@ -80,22 +72,23 @@ export function usePurchaseFlow(): UsePurchaseFlowResult {
 
   const startPolling = (baseline: number | null) => {
     baselineRef.current = baseline
-    startedAtRef.current = Date.now()
+    wasTrialRef.current = quota?.current_season_is_trial ?? false
+    trialConvertedRef.current = false
     setState('pending')
-    // Kick off the first refetch immediately so the user doesn't have to
-    // wait POLL_INTERVAL_MS for the first datapoint.
     void queryClient.invalidateQueries({ queryKey: seasonQuotaKeys.all })
   }
 
   const reset = () => {
     baselineRef.current = null
-    startedAtRef.current = null
+    wasTrialRef.current = false
+    trialConvertedRef.current = false
     setState('idle')
   }
 
   return {
     state,
-    availableSeasons: currentSeasons,
+    availableSeasons: quota?.available_seasons ?? null,
+    trialConverted: trialConvertedRef.current,
     startPolling,
     reset,
   }

@@ -34,6 +34,7 @@ interface FaqItem {
 interface PaymentStatusBannerProps {
   readonly state: PaymentFlowState
   readonly availableSeasons: number | null
+  readonly trialConverted: boolean
   readonly onClose: () => void
   readonly onNavigateToSeasons: () => void
 }
@@ -41,6 +42,7 @@ interface PaymentStatusBannerProps {
 function PaymentStatusBanner({
   state,
   availableSeasons,
+  trialConverted,
   onClose,
   onNavigateToSeasons,
 }: PaymentStatusBannerProps) {
@@ -101,16 +103,18 @@ function PaymentStatusBanner({
         <div className="flex-1 space-y-2">
           <p className="font-medium text-green-800 dark:text-green-200">付款成功</p>
           <p className="text-sm text-green-700 dark:text-green-300">
-            {availableSeasons != null
-              ? `額度已入帳，目前共 ${availableSeasons} 季可用`
-              : '額度已入帳'}
+            {trialConverted
+              ? '你的賽季已升級為正式版，可以繼續使用'
+              : availableSeasons != null
+                ? `額度已入帳，目前共 ${availableSeasons} 季可用`
+                : '額度已入帳'}
           </p>
           <button
             type="button"
             onClick={onNavigateToSeasons}
             className="mt-1 text-sm font-medium text-green-700 underline-offset-4 hover:underline dark:text-green-300"
           >
-            開始新賽季 →
+            {trialConverted ? '回到賽季 →' : '開始新賽季 →'}
           </button>
         </div>
         <button
@@ -135,7 +139,7 @@ const FAQ_ITEMS: readonly FaqItem[] = [
   {
     question: '試用期結束後會怎樣？',
     answer:
-      '14 天試用期間可以無限使用。試用結束後，需要購買才能開啟新賽季，但已建立的賽季數據都會保留。',
+      '14 天試用期間可以無限使用。試用結束後需要購買才能繼續，購買後你的賽季會自動升級為正式版，所有數據都會保留。',
   },
   {
     question: '一季可以用多久？',
@@ -214,10 +218,7 @@ function PurchaseSeason() {
 
     const baseUrl = window.location.origin
 
-    // Capture the pre-purchase quota snapshot so the purchase flow can poll
-    // until the backend grant lands (baseline+1). If quotaStatus hasn't
-    // loaded yet, fall back to 0 — the grant will still strictly increase.
-    const baselineSeasons = quotaStatus?.available_seasons ?? 0
+    const baselineSeasons = quotaStatus?.purchased_seasons ?? 0
 
     try {
       // externalCustomerId = user UUID ONLY. The server treats every successful
@@ -304,7 +305,7 @@ function PurchaseSeason() {
       return '載入中...'
     }
 
-    const { available_seasons, has_trial_available, current_season_is_trial, trial_days_remaining } = quotaStatus
+    const { available_seasons, has_trial_available, current_season_is_trial, trial_days_remaining, can_write } = quotaStatus
 
     if (has_trial_available) {
       return '尚未使用試用，啟用第一個賽季即可開始 14 天試用'
@@ -315,10 +316,14 @@ function PurchaseSeason() {
     }
 
     if (available_seasons > 0) {
-      return `剩餘 ${available_seasons} 季`
+      return `剩餘 ${available_seasons} 季可啟用`
     }
 
-    return '已用完，購買後可開新賽季'
+    if (can_write) {
+      return '賽季使用中'
+    }
+
+    return '已用完，購買後可繼續使用'
   }
 
   const getQuotaStatusColor = () => {
@@ -348,6 +353,7 @@ function PurchaseSeason() {
       <PaymentStatusBanner
         state={purchaseFlow.state}
         availableSeasons={purchaseFlow.availableSeasons}
+        trialConverted={purchaseFlow.trialConverted}
         onClose={closeBanner}
         onNavigateToSeasons={handleNavigateToSeasons}
       />

@@ -54,7 +54,7 @@ export function getQuotaWarningMessage(
   switch (level) {
     case 'expired':
       if (status.current_season_is_trial) {
-        return '試用期已結束，歡迎購買賽季繼續使用'
+        return '試用期已結束，購買後自動升級為正式版'
       }
       return '目前沒有可用賽季，歡迎購買以繼續使用'
 

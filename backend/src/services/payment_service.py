@@ -125,6 +125,7 @@ class PaymentService:
             "order_id": order_id,
             "seasons_added": seasons_added,
             "available_seasons": result.available_seasons,
+            "trial_converted": result.trial_converted,
         }
 
     # ------------------------------------------------------------------

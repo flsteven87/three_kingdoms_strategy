@@ -51,6 +51,7 @@ class WebhookProcessingResult(BaseModel):
         "audit_only",
     ]
     available_seasons: int
+    trial_converted: bool = False
 
 
 class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
@@ -109,4 +110,5 @@ class WebhookEventRepository(SupabaseRepository[WebhookEvent]):
         return WebhookProcessingResult(
             status=row["status"],
             available_seasons=int(row["available_seasons"]),
+            trial_converted=bool(row.get("trial_converted", False)),
         )

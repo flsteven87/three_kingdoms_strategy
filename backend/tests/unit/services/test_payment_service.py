@@ -51,7 +51,7 @@ def service(fake_settings, mock_alliance):
     svc._quota_service.get_alliance_by_user = AsyncMock(return_value=mock_alliance)
     svc._webhook_repo = MagicMock()
     svc._webhook_repo.process_event = AsyncMock(
-        return_value=WebhookProcessingResult(status="granted", available_seasons=5)
+        return_value=WebhookProcessingResult(status="granted", available_seasons=5, trial_converted=False)
     )
     return svc
 
@@ -64,15 +64,31 @@ class TestEventTypeRouting:
         )
         assert result["status"] == "granted"
         assert result["seasons_added"] == 1
+        assert result["trial_converted"] is False
         kwargs = service._webhook_repo.process_event.await_args.kwargs
         assert kwargs["seasons"] == 1
         assert kwargs["checkout_id"] == TEST_CHECKOUT_ID
         assert kwargs["order_id"] == TEST_ORDER_ID
 
     @pytest.mark.asyncio
+    async def test_order_paid_with_trial_conversion(self, service):
+        service._webhook_repo.process_event = AsyncMock(
+            return_value=WebhookProcessingResult(
+                status="granted", available_seasons=0, trial_converted=True
+            )
+        )
+        result = await service.handle_payment_success(
+            order_paid(), event_id="evt_trial_conv", event_type="order.paid"
+        )
+        assert result["status"] == "granted"
+        assert result["seasons_added"] == 1
+        assert result["trial_converted"] is True
+        assert result["available_seasons"] == 0
+
+    @pytest.mark.asyncio
     async def test_checkout_completed_is_audit_only(self, service):
         service._webhook_repo.process_event = AsyncMock(
-            return_value=WebhookProcessingResult(status="audit_only", available_seasons=5)
+            return_value=WebhookProcessingResult(status="audit_only", available_seasons=5, trial_converted=False)
         )
         result = await service.handle_payment_success(
             checkout_completed(), event_id="evt_chk_1", event_type="checkout.completed"
@@ -95,7 +111,7 @@ class TestEventTypeRouting:
     @pytest.mark.asyncio
     async def test_duplicate_purchase_status_propagated(self, service):
         service._webhook_repo.process_event = AsyncMock(
-            return_value=WebhookProcessingResult(status="duplicate_purchase", available_seasons=6)
+            return_value=WebhookProcessingResult(status="duplicate_purchase", available_seasons=6, trial_converted=False)
         )
         result = await service.handle_payment_success(
             order_paid(), event_id="evt_sibling", event_type="order.paid"
