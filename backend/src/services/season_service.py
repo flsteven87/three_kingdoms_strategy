@@ -59,65 +59,6 @@ class SeasonService:
         if duration > MAX_SEASON_DAYS:
             raise ValueError(f"賽季長度不能超過 {MAX_SEASON_DAYS} 天（約 4 個月）")
 
-    def _check_dates_overlap(
-        self,
-        start_a: date,
-        end_a: date | None,
-        start_b: date,
-        end_b: date | None,
-    ) -> bool:
-        """
-        Check if two date ranges overlap.
-
-        For seasons without end_date, we treat them as ongoing (use a far future date).
-
-        Args:
-            start_a, end_a: First date range
-            start_b, end_b: Second date range
-
-        Returns:
-            True if ranges overlap, False otherwise
-        """
-        # Use a far future date for ongoing seasons
-        far_future = date(2999, 12, 31)
-        actual_end_a = end_a if end_a else far_future
-        actual_end_b = end_b if end_b else far_future
-
-        # Two ranges overlap if: start_a <= end_b AND start_b <= end_a
-        # We use < instead of <= to allow adjacent seasons (end_date = next start_date - 1)
-        return start_a < actual_end_b and start_b < actual_end_a
-
-    async def _validate_no_date_overlap(
-        self,
-        alliance_id: UUID,
-        start_date: date,
-        end_date: date | None,
-        exclude_season_id: UUID | None = None,
-    ) -> None:
-        """
-        Validate that the date range does not overlap with any existing season.
-
-        Checks all seasons (draft, activated, completed) in the alliance.
-
-        Args:
-            alliance_id: Alliance UUID
-            start_date: New season start date
-            end_date: New season end date
-            exclude_season_id: Season ID to exclude (for updates)
-
-        Raises:
-            ValueError: If date range overlaps with another season
-        """
-        all_seasons = await self._repo.get_by_alliance(alliance_id)
-
-        for season in all_seasons:
-            # Skip the season being updated
-            if exclude_season_id and season.id == exclude_season_id:
-                continue
-
-            if self._check_dates_overlap(start_date, end_date, season.start_date, season.end_date):
-                raise ValueError(f"日期範圍與「{season.name}」重疊，請選擇不同的日期")
-
     async def verify_user_access(self, user_id: UUID, season_id: UUID) -> UUID:
         """
         Verify user has access to season and return alliance_id
@@ -252,11 +193,6 @@ class SeasonService:
         # Validate season duration (if end_date is provided)
         self._validate_season_duration(season_data.start_date, season_data.end_date)
 
-        # Validate no date overlap with existing seasons
-        await self._validate_no_date_overlap(
-            alliance.id, season_data.start_date, season_data.end_date
-        )
-
         # Create season as draft (not current)
         data = season_data.model_dump()
         data["alliance_id"] = str(alliance.id)
@@ -305,11 +241,6 @@ class SeasonService:
         # Validate season duration if end_date is set
         if season.end_date is not None:
             self._validate_season_duration(season.start_date, season.end_date)
-
-        # Validate no date overlap (re-check in case other seasons were created)
-        await self._validate_no_date_overlap(
-            season.alliance_id, season.start_date, season.end_date, exclude_season_id=season_id
-        )
 
         # Verify can activate (has trial or seasons)
         await self._season_quota_service.require_season_activation(season.alliance_id)
@@ -398,13 +329,6 @@ class SeasonService:
                 if new_end_date is not None:
                     # Validate duration
                     self._validate_season_duration(season.start_date, new_end_date)
-                    # Validate no overlap
-                    await self._validate_no_date_overlap(
-                        season.alliance_id,
-                        season.start_date,
-                        new_end_date,
-                        exclude_season_id=season_id,
-                    )
 
         elif season.activation_status == "completed":
             # Both dates are locked after completion
@@ -422,10 +346,6 @@ class SeasonService:
             if new_end is not None:
                 self._validate_season_duration(new_start, new_end)
 
-            # Validate no overlap
-            await self._validate_no_date_overlap(
-                season.alliance_id, new_start, new_end, exclude_season_id=season_id
-            )
 
         # Convert date objects to ISO format strings for Supabase
         if "start_date" in update_data and update_data["start_date"]:

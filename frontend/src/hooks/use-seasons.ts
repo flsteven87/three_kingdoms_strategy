@@ -85,6 +85,12 @@ export function useCreateSeason() {
         queryClient.invalidateQueries({ queryKey: seasonKeys.current() });
       }
     },
+    onError: (error) => {
+      const message =
+        (error as { response?: { data?: { detail?: string } } }).response?.data
+          ?.detail ?? "建立賽季失敗";
+      toast.error(message);
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: seasonKeys.all });
     },
