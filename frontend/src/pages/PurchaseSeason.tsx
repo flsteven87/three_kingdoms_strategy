@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useRecur } from 'recur-tw'
+import { createCheckoutSession } from '@/lib/api/payment-api'
 import { Info, CheckCircle, Loader2, AlertTriangle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +26,6 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSeasonQuota } from '@/hooks/use-season-quota'
 import { getQuotaDisplayState } from '@/types/season-quota'
 import { usePurchaseFlow, type PaymentFlowState } from '@/hooks/use-purchase-flow'
-import { createCheckoutSession } from '@/lib/api'
 import { PRICE_PER_SEASON } from '@/constants'
 
 const PURCHASE_BASELINE_KEY = 'purchaseBaseline'

@@ -268,7 +268,8 @@ class TestValidationPermanentFailures:
         assert response.status_code == 200
         j = response.json()
         assert j["status"] == "permanent_failure"
-        assert j["code"] == "product_mismatch"
+        # error code is NOT exposed in response (security hardening)
+        # but alert_critical IS called with the correct code
         repo.process_event.assert_not_awaited()
         mock_alert.assert_awaited_once()
         assert mock_alert.await_args.args[0] == "recur.webhook.permanent"
@@ -284,9 +285,9 @@ class TestValidationPermanentFailures:
         assert response.status_code == 200
         j = response.json()
         assert j["status"] == "permanent_failure"
-        assert j["code"] == "currency_mismatch"
         repo.process_event.assert_not_awaited()
         mock_alert.assert_awaited_once()
+        assert mock_alert.await_args.kwargs["error_code"] == "currency_mismatch"
 
     async def test_wrong_amount_is_permanent(
         self, client: AsyncClient, mock_settings, mock_deps, mock_alert
@@ -298,9 +299,9 @@ class TestValidationPermanentFailures:
         assert response.status_code == 200
         j = response.json()
         assert j["status"] == "permanent_failure"
-        assert j["code"] == "amount_out_of_range"
         repo.process_event.assert_not_awaited()
         mock_alert.assert_awaited_once()
+        assert mock_alert.await_args.kwargs["error_code"] == "amount_out_of_range"
 
 
 class TestExtractionPermanentFailures:
@@ -317,9 +318,9 @@ class TestExtractionPermanentFailures:
         assert response.status_code == 200
         j = response.json()
         assert j["status"] == "permanent_failure"
-        assert j["code"] == "missing_external_customer_id"
         repo.process_event.assert_not_awaited()
         mock_alert.assert_awaited_once()
+        assert mock_alert.await_args.kwargs["error_code"] == "missing_external_customer_id"
 
     async def test_missing_checkout_id_on_order_paid_is_permanent(
         self, client: AsyncClient, mock_settings, mock_deps, mock_alert
@@ -334,9 +335,9 @@ class TestExtractionPermanentFailures:
         assert response.status_code == 200
         j = response.json()
         assert j["status"] == "permanent_failure"
-        assert j["code"] == "missing_checkout_id"
         repo.process_event.assert_not_awaited()
         mock_alert.assert_awaited_once()
+        assert mock_alert.await_args.kwargs["error_code"] == "missing_checkout_id"
 
 
 class TestAllianceLookupErrors:
@@ -352,9 +353,9 @@ class TestAllianceLookupErrors:
         assert response.status_code == 200
         j = response.json()
         assert j["status"] == "permanent_failure"
-        assert j["code"] == "alliance_not_found"
         repo.process_event.assert_not_awaited()
         mock_alert.assert_awaited_once()
+        assert mock_alert.await_args.kwargs["error_code"] == "alliance_not_found"
 
     async def test_alliance_lookup_api_error_is_transient(
         self, client: AsyncClient, mock_settings, mock_deps, mock_alert
@@ -368,7 +369,8 @@ class TestAllianceLookupErrors:
         response = await post_webhook(client, body)
 
         assert response.status_code == 500
-        assert "transient:alliance_lookup_failed" in response.json()["detail"]
+        # Generic error detail (security hardening — no internal codes exposed)
+        assert response.json()["detail"] == "Internal error"
         repo.process_event.assert_not_awaited()
         mock_alert.assert_not_awaited()
 
@@ -386,7 +388,7 @@ class TestRpcErrors:
         response = await post_webhook(client, body)
 
         assert response.status_code == 500
-        assert "transient:rpc_api_error" in response.json()["detail"]
+        assert response.json()["detail"] == "Internal error"
         mock_alert.assert_not_awaited()
 
 

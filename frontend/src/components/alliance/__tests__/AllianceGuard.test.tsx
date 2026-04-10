@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AllianceGuard } from "../AllianceGuard";
 import type { Alliance } from "@/types/alliance";
@@ -6,11 +7,6 @@ import type { Alliance } from "@/types/alliance";
 // Mock hooks and sub-components so tests are isolated
 vi.mock("@/hooks/use-alliance", () => ({
   useAlliance: vi.fn(),
-}));
-
-// AllianceSetupForm renders a form with a heading that identifies it
-vi.mock("../AllianceSetupForm", () => ({
-  AllianceSetupForm: () => <div data-testid="alliance-setup-form">AllianceSetupForm</div>,
 }));
 
 import { useAlliance } from "@/hooks/use-alliance";
@@ -77,29 +73,33 @@ describe("AllianceGuard", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // No alliance — setup form
+  // No alliance — redirect to /setup
   // ---------------------------------------------------------------------------
 
-  it("shows setup form when fetch completed with no alliance", () => {
+  it("redirects to /setup when fetch completed with no alliance", () => {
     mockAllianceHook(null, { isFetched: true });
 
     render(
-      <AllianceGuard>
-        <span>hidden content</span>
-      </AllianceGuard>
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <AllianceGuard>
+          <span>hidden content</span>
+        </AllianceGuard>
+      </MemoryRouter>
     );
 
-    expect(screen.getByTestId("alliance-setup-form")).toBeInTheDocument();
+    // Navigate renders nothing visible — children should not appear
     expect(screen.queryByText("hidden content")).not.toBeInTheDocument();
   });
 
-  it("does not render children alongside setup form", () => {
+  it("does not render children when no alliance", () => {
     mockAllianceHook(null, { isFetched: true });
 
     render(
-      <AllianceGuard>
-        <span>should not render</span>
-      </AllianceGuard>
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <AllianceGuard>
+          <span>should not render</span>
+        </AllianceGuard>
+      </MemoryRouter>
     );
 
     expect(screen.queryByText("should not render")).not.toBeInTheDocument();
@@ -140,15 +140,17 @@ describe("AllianceGuard", () => {
   // Edge case — fetched but data undefined (e.g. network race)
   // ---------------------------------------------------------------------------
 
-  it("shows setup form when isFetched is true but data is undefined", () => {
+  it("redirects when isFetched is true but data is undefined", () => {
     mockAllianceHook(undefined, { isFetched: true, isLoading: false });
 
     render(
-      <AllianceGuard>
-        <span>hidden</span>
-      </AllianceGuard>
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <AllianceGuard>
+          <span>hidden</span>
+        </AllianceGuard>
+      </MemoryRouter>
     );
 
-    expect(screen.getByTestId("alliance-setup-form")).toBeInTheDocument();
+    expect(screen.queryByText("hidden")).not.toBeInTheDocument();
   });
 });
