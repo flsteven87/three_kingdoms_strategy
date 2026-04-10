@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { SeasonSelector } from './SeasonSelector'
+import { OnboardingChecklist } from './OnboardingChecklist'
 import { APP_VERSION } from '@/constants'
 
 interface SidebarProps {
@@ -149,6 +150,9 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Season Selector - Global context indicator */}
       <SeasonSelector />
+
+      {/* Onboarding Checklist - shown until dismissed */}
+      <OnboardingChecklist />
 
       {/* Navigation Links */}
       <nav className="flex-1 space-y-1 px-3 py-4">

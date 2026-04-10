@@ -32,6 +32,7 @@ const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.S
 const PurchaseSeason = lazy(() => import('./pages/PurchaseSeason').then(m => ({ default: m.PurchaseSeason })))
 const LineBinding = lazy(() => import('./pages/LineBinding').then(m => ({ default: m.LineBinding })))
 const CopperMines = lazy(() => import('./pages/CopperMines').then(m => ({ default: m.CopperMines })))
+const QuickSetup = lazy(() => import('./pages/QuickSetup').then(m => ({ default: m.QuickSetup })))
 
 function FullPageSpinner() {
   return (
@@ -71,8 +72,15 @@ function App() {
             <Route index element={<LiffHome />} />
           </Route>
 
-          {/* Protected dashboard — lazy loaded */}
+          {/* Protected routes — lazy loaded */}
           <Route element={<ProtectedRoute />}>
+            {/* Quick Setup — standalone page, no DashboardLayout */}
+            <Route path="setup" element={
+              <Suspense fallback={<FullPageSpinner />}>
+                <QuickSetup />
+              </Suspense>
+            } />
+
             <Route element={
               <Suspense fallback={<FullPageSpinner />}>
                 <DashboardLayout />

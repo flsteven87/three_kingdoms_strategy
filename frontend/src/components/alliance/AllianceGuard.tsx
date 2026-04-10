@@ -2,7 +2,7 @@
  * Alliance Guard Component
  *
  * 檢查用戶是否已設定同盟
- * 如果沒有同盟，顯示設定表單
+ * 如果沒有同盟，導向 /setup 快速設定頁
  * 如果有同盟，顯示子組件
  *
  * Performance: Uses Skeleton for better perceived loading experience
@@ -11,8 +11,8 @@
  */
 
 import type { ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useAlliance } from '@/hooks/use-alliance'
-import { AllianceSetupForm } from './AllianceSetupForm'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface AllianceGuardProps {
@@ -52,13 +52,9 @@ export function AllianceGuard({ children }: AllianceGuardProps) {
     )
   }
 
-  // After fetch completes, if no alliance, show setup form
+  // After fetch completes, if no alliance, redirect to quick setup
   if (isFetched && !alliance) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center py-8">
-        <AllianceSetupForm />
-      </div>
-    )
+    return <Navigate to="/setup" replace />
   }
 
   // Alliance exists, render children
