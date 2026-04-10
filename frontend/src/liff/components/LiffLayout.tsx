@@ -77,14 +77,18 @@ export function LiffLayout() {
   };
 
   return (
-    <div className="h-full bg-background overflow-auto">
-      <ErrorBoundary variant="compact">
-        {session.eventId ? (
-          <LiffEventReport session={session} eventId={session.eventId} />
-        ) : (
-          <Outlet context={{ session } satisfies LiffContextType} />
-        )}
-      </ErrorBoundary>
+    <div className="min-h-full overflow-auto bg-background md:bg-muted/20">
+      <div className="mx-auto w-full max-w-[1200px] md:px-4 md:py-4 lg:px-6 lg:py-6">
+        <div className="min-h-full bg-background md:overflow-hidden md:rounded-3xl md:border md:shadow-sm">
+          <ErrorBoundary variant="compact">
+            {session.eventId ? (
+              <LiffEventReport session={session} eventId={session.eventId} />
+            ) : (
+              <Outlet context={{ session } satisfies LiffContextType} />
+            )}
+          </ErrorBoundary>
+        </div>
+      </div>
     </div>
   );
 }

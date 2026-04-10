@@ -185,153 +185,157 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
 
   return (
     <>
-      <div className="p-3 space-y-3">
-        {/* Quota status */}
-        {maxAllowed > 0 && (
-          <div
-            className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${canApply ? "bg-muted/50" : "bg-destructive/10"
+      <div className="mx-auto w-full max-w-4xl space-y-3 p-3 md:grid md:grid-cols-[minmax(0,360px)_minmax(0,1fr)] md:gap-4 md:space-y-0 md:p-4">
+        <div className="space-y-3">
+          {/* Quota status */}
+          {maxAllowed > 0 && (
+            <div
+              className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
+                canApply ? "bg-muted/50" : "bg-destructive/10"
               }`}
-          >
-            <span
-              className={
-                canApply ? "text-muted-foreground" : "text-destructive"
-              }
             >
-              已申請 {myCount} / {maxAllowed} 座
-            </span>
-            {!canApply && (
-              <span className="text-destructive font-medium">已達上限</span>
-            )}
-          </div>
-        )}
-
-        {/* Compact form */}
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            {/* Account selector */}
-            {memberInfo?.registered_ids?.length === 1 ? (
-              <div className="h-10 flex-1 flex items-center px-3 bg-muted/50 rounded-md text-sm">
-                {effectiveGameId}
-              </div>
-            ) : (
-              <Select
-                value={effectiveGameId || ""}
-                onValueChange={setSelectedGameId}
+              <span
+                className={
+                  canApply ? "text-muted-foreground" : "text-destructive"
+                }
               >
-                <SelectTrigger className="h-10 flex-1">
-                  <SelectValue placeholder="選擇帳號" />
+                已申請 {myCount} / {maxAllowed} 座
+              </span>
+              {!canApply && (
+                <span className="font-medium text-destructive">已達上限</span>
+              )}
+            </div>
+          )}
+
+          {/* Compact form */}
+          <div className="space-y-2 rounded-xl border bg-card p-3">
+            <div className="flex gap-2">
+              {memberInfo?.registered_ids?.length === 1 ? (
+                <div className="flex h-10 flex-1 items-center rounded-md bg-muted/50 px-3 text-sm">
+                  {effectiveGameId}
+                </div>
+              ) : (
+                <Select
+                  value={effectiveGameId || ""}
+                  onValueChange={setSelectedGameId}
+                >
+                  <SelectTrigger className="h-10 flex-1">
+                    <SelectValue placeholder="選擇帳號" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {memberInfo?.registered_ids?.map((acc) => (
+                      <SelectItem key={acc.game_id} value={acc.game_id}>
+                        {acc.game_id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select
+                value={level}
+                onValueChange={setLevel}
+                disabled={!canApply || hasSourceData}
+              >
+                <SelectTrigger className="h-10 w-20">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {memberInfo?.registered_ids?.map((acc) => (
-                    <SelectItem key={acc.game_id} value={acc.game_id}>
-                      {acc.game_id}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="10">10 級</SelectItem>
+                  <SelectItem value="9">9 級</SelectItem>
                 </SelectContent>
               </Select>
-            )}
-            <Select value={level} onValueChange={setLevel} disabled={!canApply || hasSourceData}>
-              <SelectTrigger className="h-10 w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10 級</SelectItem>
-                <SelectItem value="9">9 級</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="outline"
-            className="w-full h-10"
-            onClick={() => effectiveGameId && onNavigateSearch(effectiveGameId)}
-            disabled={!canUseSearch}
-          >
-            <Search className="h-4 w-4 mr-2" />
-            搜尋銅礦
-            {hasSourceData && (
-              <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                {sourceDataLabel}
-              </span>
-            )}
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 flex-1">
-              <span className="text-sm text-muted-foreground shrink-0">X</span>
-              <Input
-                value={coordX}
-                onChange={(e) => setCoordX(e.target.value)}
-                placeholder="123"
-                className="h-10"
-                inputMode="numeric"
-                pattern="[0-9]*"
-              />
             </div>
-            <div className="flex items-center gap-1.5 flex-1">
-              <span className="text-sm text-muted-foreground shrink-0">Y</span>
-              <Input
-                value={coordY}
-                onChange={(e) => setCoordY(e.target.value)}
-                placeholder="456"
-                className="h-10"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                onKeyDown={(e) =>
-                  e.key === "Enter" && canApply && handleRegister()
-                }
-              />
+            <Button
+              variant="outline"
+              className="h-10 w-full"
+              onClick={() => effectiveGameId && onNavigateSearch(effectiveGameId)}
+              disabled={!canUseSearch}
+            >
+              <Search className="mr-2 h-4 w-4" />
+              搜尋銅礦
+              {hasSourceData && (
+                <span className="ml-2 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  {sourceDataLabel}
+                </span>
+              )}
+            </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center gap-1.5">
+                <span className="shrink-0 text-sm text-muted-foreground">X</span>
+                <Input
+                  value={coordX}
+                  onChange={(e) => setCoordX(e.target.value)}
+                  placeholder="123"
+                  className="h-10"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                />
+              </div>
+              <div className="flex flex-1 items-center gap-1.5">
+                <span className="shrink-0 text-sm text-muted-foreground">Y</span>
+                <Input
+                  value={coordY}
+                  onChange={(e) => setCoordY(e.target.value)}
+                  placeholder="456"
+                  className="h-10"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && canApply && handleRegister()
+                  }
+                />
+              </div>
             </div>
+            <Button
+              onClick={handleRegister}
+              disabled={
+                !canApply ||
+                !effectiveGameId ||
+                !coordX.trim() ||
+                !coordY.trim() ||
+                registerMutation.isPending
+              }
+              className="h-10 w-full"
+            >
+              {registerMutation.isPending ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  註冊
+                </>
+              )}
+            </Button>
           </div>
-          <Button
-            onClick={handleRegister}
-            disabled={
-              !canApply ||
-              !effectiveGameId ||
-              !coordX.trim() ||
-              !coordY.trim() ||
-              registerMutation.isPending
-            }
-            className="h-10 w-full"
-          >
-            {registerMutation.isPending ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                註冊
-              </>
-            )}
-          </Button>
+
+          {(formError || registerMutation.error) && (
+            <p className="text-xs text-destructive">
+              {formError || registerMutation.error?.message}
+            </p>
+          )}
+
+          {rules && rules.length > 0 && (
+            <div className="rounded-xl bg-muted/50 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Info className="h-4 w-4" />
+                申請條件
+              </div>
+              <div className="grid gap-1">
+                {rules.map((rule) => (
+                  <div key={rule.tier} className="flex justify-between text-xs">
+                    <span>第 {rule.tier} 座</span>
+                    <span>
+                      {formatLevel(rule.allowed_level)} · 戰功 ≥{" "}
+                      {formatMerit(rule.required_merit)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {(formError || registerMutation.error) && (
-          <p className="text-xs text-destructive">
-            {formError || registerMutation.error?.message}
-          </p>
-        )}
-
-        {/* Rules display */}
-        {rules && rules.length > 0 && (
-          <div className="bg-muted/50 rounded-lg p-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-              <Info className="h-4 w-4" />
-              申請條件
-            </div>
-            <div className="grid gap-1">
-              {rules.map((rule) => (
-                <div key={rule.tier} className="flex justify-between text-xs">
-                  <span>第 {rule.tier} 座</span>
-                  <span>
-                    {formatLevel(rule.allowed_level)} · 戰功 ≥{" "}
-                    {formatMerit(rule.required_merit)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Mines list */}
-        <div className="pt-2">
+        <div className="pt-2 md:pt-0">
           <div className="text-xs text-muted-foreground mb-2">
             {effectiveGameId} 的銅礦 ({selectedMines.length})
           </div>

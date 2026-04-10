@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "recur": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.recur.tw/"]
+    }
+  }
+}

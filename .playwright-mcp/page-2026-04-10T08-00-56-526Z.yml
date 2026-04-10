@@ -1,0 +1,251 @@
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - img "三國志戰略版同盟管理中心" [ref=e7]
+          - generic [ref=e8]: 同盟管理中心
+        - navigation [ref=e9]:
+          - link "功能" [ref=e10] [cursor=pointer]:
+            - /url: "#features"
+          - link "定價" [ref=e11] [cursor=pointer]:
+            - /url: "#pricing"
+          - link "常見問題" [ref=e12] [cursor=pointer]:
+            - /url: "#faq"
+        - generic [ref=e13]:
+          - button "Switch to dark mode" [ref=e14]:
+            - img [ref=e15]
+          - button "免費開始" [ref=e21]
+    - main [ref=e22]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]: 三國志戰略版 · 同盟管理工具
+          - heading "同盟數據，盡在掌握" [level=1] [ref=e27]
+          - paragraph [ref=e28]:
+            - text: 出席、貢獻、活躍度全自動追蹤。
+            - text: 誰該賞、誰該罰，數據替你說話。
+        - generic [ref=e29]:
+          - button "免費體驗 14 天" [ref=e30]:
+            - img
+            - text: 免費體驗 14 天
+          - paragraph [ref=e31]:
+            - text: 使用 Google 帳戶登入 · 同意
+            - link "服務條款" [ref=e32] [cursor=pointer]:
+              - /url: /terms
+            - text: 及
+            - link "隱私政策" [ref=e33] [cursor=pointer]:
+              - /url: /privacy
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - heading "管同盟，不再靠感覺" [level=2] [ref=e37]
+          - paragraph [ref=e38]: 每個決策都有數據撐腰
+        - region [ref=e39]:
+          - generic [ref=e41]:
+            - group [ref=e42]:
+              - generic [ref=e43]:
+                - img "三國志戰略版管理系統 - 誰在衝、誰停滯？" [ref=e46]
+                - generic [ref=e47]:
+                  - heading "誰在衝、誰停滯？" [level=3] [ref=e48]
+                  - paragraph [ref=e49]: 同盟整體貢獻趨勢與分佈，活躍度變化不用猜
+            - group [ref=e50]:
+              - generic [ref=e51]:
+                - img "三國志戰略版管理系統 - 戰役打完，誰沒來？" [ref=e54]
+                - generic [ref=e55]:
+                  - heading "戰役打完，誰沒來？" [level=3] [ref=e56]
+                  - paragraph [ref=e57]: 參與率、缺席名單、戰功統計，事後不用翻紀錄
+            - group [ref=e58]:
+              - generic [ref=e59]:
+                - generic [ref=e61]:
+                  - img "三國志戰略版管理系統 - 每場戰役都有數據"
+                - generic [ref=e62]:
+                  - heading "每場戰役都有數據" [level=3] [ref=e63]
+                  - paragraph [ref=e64]: 戰功分佈箱型圖，誰扛傷害誰划水一目瞭然
+            - group [ref=e65]:
+              - generic [ref=e66]:
+                - generic [ref=e68]:
+                  - img "三國志戰略版管理系統 - 成員實力一張圖看完"
+                - generic [ref=e69]:
+                  - heading "成員實力一張圖看完" [level=3] [ref=e70]
+                  - paragraph [ref=e71]: 五維能力雷達圖，貢獻、戰功、助攻全面評估
+            - group [ref=e72]:
+              - generic [ref=e73]:
+                - generic [ref=e75]:
+                  - img "三國志戰略版管理系統 - 戰功明細逐日追蹤"
+                - generic [ref=e76]:
+                  - heading "戰功明細逐日追蹤" [level=3] [ref=e77]
+                  - paragraph [ref=e78]: 每日戰功與助攻趨勢，對比同盟平均不留死角
+            - group [ref=e79]:
+              - generic [ref=e80]:
+                - generic [ref=e82]:
+                  - img "三國志戰略版管理系統 - 分組強弱立見"
+                - generic [ref=e83]:
+                  - heading "分組強弱立見" [level=3] [ref=e84]
+                  - paragraph [ref=e85]: 各組參與率、貢獻值並排比較，資源分配有據
+            - group [ref=e86]:
+              - generic [ref=e87]:
+                - generic [ref=e89]:
+                  - img "三國志戰略版管理系統 - 戰報直送 LINE 群組"
+                - generic [ref=e90]:
+                  - heading "戰報直送 LINE 群組" [level=3] [ref=e91]
+                  - paragraph [ref=e92]: 戰役結束自動產出報告，出席率一鍵推送
+            - group [ref=e93]:
+              - generic [ref=e94]:
+                - generic [ref=e96]:
+                  - img "三國志戰略版管理系統 - 遊戲名對不上 LINE？"
+                - generic [ref=e97]:
+                  - heading "遊戲名對不上 LINE？" [level=3] [ref=e98]
+                  - paragraph [ref=e99]: 成員自助綁定，找人一搜就到，不用群裡喊
+            - group [ref=e100]:
+              - generic [ref=e101]:
+                - generic [ref=e103]:
+                  - img "三國志戰略版管理系統 - 獎懲怎麼讓人服氣？"
+                - generic [ref=e104]:
+                  - heading "獎懲怎麼讓人服氣？" [level=3] [ref=e105]
+                  - paragraph [ref=e106]: 銅碼申請規則透明，功勳門檻公開可查
+            - group [ref=e107]:
+              - generic [ref=e108]:
+                - generic [ref=e110]:
+                  - img "三國志戰略版管理系統 - 排名公式你決定"
+                - generic [ref=e111]:
+                  - heading "排名公式你決定" [level=3] [ref=e112]
+                  - paragraph [ref=e113]: 自訂貢獻、戰功、助攻權重，論功行賞有客觀依據
+          - generic [ref=e114]:
+            - button "Previous slide" [ref=e115]:
+              - img
+              - generic [ref=e116]: Previous slide
+            - button "Next slide" [ref=e117]:
+              - img
+              - generic [ref=e118]: Next slide
+      - generic [ref=e121]:
+        - generic [ref=e122]:
+          - img [ref=e124]
+          - heading "戰役打完了，誰沒來？" [level=3] [ref=e129]
+          - paragraph [ref=e130]: 關鍵戰打響點名點不完，事後想查誰缺席翻不到紀錄。
+        - generic [ref=e131]:
+          - img [ref=e133]
+          - heading "要找人，遊戲名跟 LINE 對不上？" [level=3] [ref=e136]
+          - paragraph [ref=e137]: 想聯絡某個成員，只知道遊戲 ID 不知道 LINE 是誰，還得在群裡喊。
+        - generic [ref=e138]:
+          - img [ref=e140]
+          - heading "獎懲怎麼讓人服氣？" [level=3] [ref=e144]
+          - paragraph [ref=e145]: 沒有客觀數據，資源怎麼分配都有人覺得不公平。
+      - generic [ref=e147]:
+        - generic [ref=e148]:
+          - heading "三步開始" [level=2] [ref=e149]
+          - paragraph [ref=e150]: 簡單上手，立刻掌握同盟全局
+        - generic [ref=e151]:
+          - generic [ref=e152]:
+            - generic [ref=e153]: "1"
+            - heading "匯入同盟數據" [level=3] [ref=e154]
+            - paragraph [ref=e155]: 從遊戲導出統計，上傳到管理中心
+          - generic [ref=e156]:
+            - generic [ref=e157]: "2"
+            - heading "系統自動分析" [level=3] [ref=e158]
+            - paragraph [ref=e159]: 活躍度、出席率、貢獻排名自動計算
+          - generic [ref=e160]:
+            - generic [ref=e161]: "3"
+            - heading "獎懲有據可查" [level=3] [ref=e162]
+            - paragraph [ref=e163]: 數據支持每個獎懲決策，公平透明
+      - generic [ref=e165]:
+        - generic [ref=e166]:
+          - heading "核心功能" [level=2] [ref=e167]
+          - paragraph [ref=e168]: 專為三國志戰略版同盟官員打造
+        - generic [ref=e169]:
+          - generic [ref=e170]:
+            - img [ref=e172]
+            - heading "活躍度追蹤" [level=3] [ref=e174]
+            - paragraph [ref=e175]: 自動記錄成員貢獻變化，誰在衝、誰停滯，趨勢一眼看清
+          - generic [ref=e176]:
+            - img [ref=e178]
+            - heading "戰役出席紀錄" [level=3] [ref=e181]
+            - paragraph [ref=e182]: 記錄關鍵戰役出席狀況，告別手動點名
+          - generic [ref=e183]:
+            - img [ref=e185]
+            - heading "LINE 身份對應" [level=3] [ref=e188]
+            - paragraph [ref=e189]: 遊戲帳號直接綁定 LINE，找人一搜就到
+          - generic [ref=e190]:
+            - img [ref=e192]
+            - heading "分組表現對比" [level=3] [ref=e194]
+            - paragraph [ref=e195]: 各組出席率、貢獻值並排比較，強弱立見
+          - generic [ref=e196]:
+            - img [ref=e198]
+            - heading "綜合排名" [level=3] [ref=e204]
+            - paragraph [ref=e205]: 自訂權重計算評分，論功行賞有客觀依據
+          - generic [ref=e206]:
+            - img [ref=e208]
+            - heading "幹部共管" [level=3] [ref=e213]
+            - paragraph [ref=e214]: 邀請副盟主、軍師共同查看，決策更有共識
+      - generic [ref=e216]:
+        - generic [ref=e217]:
+          - heading "一個價格，全部功能" [level=2] [ref=e218]
+          - paragraph [ref=e219]: 14 天免費體驗，不滿意不用付錢
+        - generic [ref=e220]:
+          - generic [ref=e222]: 免費試用 14 天
+          - generic [ref=e223]:
+            - generic [ref=e224]: NT$ 999
+            - generic [ref=e225]: / 賽季（一次性購買）
+          - list [ref=e226]:
+            - listitem [ref=e227]:
+              - img [ref=e228]
+              - generic [ref=e230]: 無限次資料匯入
+            - listitem [ref=e231]:
+              - img [ref=e232]
+              - generic [ref=e234]: 全部分析圖表
+            - listitem [ref=e235]:
+              - img [ref=e236]
+              - generic [ref=e238]: 綜合排名計算
+            - listitem [ref=e239]:
+              - img [ref=e240]
+              - generic [ref=e242]: 戰役事件追蹤
+            - listitem [ref=e243]:
+              - img [ref=e244]
+              - generic [ref=e246]: LINE 身份綁定
+            - listitem [ref=e247]:
+              - img [ref=e248]
+              - generic [ref=e250]: 多人協作
+            - listitem [ref=e251]:
+              - img [ref=e252]
+              - generic [ref=e254]: 資料永久保存
+          - button "免費開始" [ref=e255]
+          - paragraph [ref=e256]: 無自動續費 · VISA / JCB / Mastercard
+      - generic [ref=e258]:
+        - heading "常見問題" [level=2] [ref=e260]
+        - generic [ref=e261]:
+          - heading "怎麼取得遊戲的統計資料？" [level=3] [ref=e263]:
+            - button "怎麼取得遊戲的統計資料？" [ref=e264]:
+              - text: 怎麼取得遊戲的統計資料？
+              - img [ref=e265]
+          - heading "我的資料安全嗎？" [level=3] [ref=e268]:
+            - button "我的資料安全嗎？" [ref=e269]:
+              - text: 我的資料安全嗎？
+              - img [ref=e270]
+          - heading "可以多位幹部一起管理嗎？" [level=3] [ref=e273]:
+            - button "可以多位幹部一起管理嗎？" [ref=e274]:
+              - text: 可以多位幹部一起管理嗎？
+              - img [ref=e275]
+          - heading "試用期結束後會怎樣？" [level=3] [ref=e278]:
+            - button "試用期結束後會怎樣？" [ref=e279]:
+              - text: 試用期結束後會怎樣？
+              - img [ref=e280]
+          - heading "支援哪些付款方式？" [level=3] [ref=e283]:
+            - button "支援哪些付款方式？" [ref=e284]:
+              - text: 支援哪些付款方式？
+              - img [ref=e285]
+      - generic [ref=e288]:
+        - heading "準備好用數據管理你的同盟了嗎？" [level=2] [ref=e289]
+        - button "免費體驗 14 天" [ref=e290]
+    - contentinfo [ref=e291]:
+      - generic [ref=e292]:
+        - navigation [ref=e293]:
+          - link "隱私權政策" [ref=e294] [cursor=pointer]:
+            - /url: /privacy
+          - link "服務條款" [ref=e295] [cursor=pointer]:
+            - /url: /terms
+          - link "退款政策" [ref=e296] [cursor=pointer]:
+            - /url: /terms#refund
+          - link "聯繫我們" [ref=e297] [cursor=pointer]:
+            - /url: /contact
+        - generic [ref=e298]:
+          - paragraph [ref=e299]: support@tktmanager.com
+          - paragraph [ref=e300]: © 2026 三國志戰略版同盟管理中心

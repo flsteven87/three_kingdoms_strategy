@@ -460,15 +460,15 @@ export function BattleTab({ session }: Props) {
   }
 
   return (
-    <div className="p-3 space-y-3 pb-6">
+    <div className="mx-auto w-full max-w-4xl space-y-3 p-3 pb-6 md:p-4 md:pb-8">
       {/* Header: Account selector + Season */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         {accounts.length > 1 ? (
           <AccountSelector
             accounts={accounts}
             value={effectiveGameId}
             onValueChange={setSelectedGameId}
-            className="h-9 flex-1"
+            className="h-9 flex-1 md:max-w-sm"
           />
         ) : (
           <span className={liffTypography.cardTitle}>{effectiveGameId}</span>
@@ -496,7 +496,7 @@ export function BattleTab({ session }: Props) {
 
       {/* Event list */}
       {allEvents.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 md:space-y-3">
           {allEvents.map((event) => (
             <EventCard
               key={event.event_id}

@@ -112,45 +112,47 @@ export function LiffHome() {
       className="flex flex-col h-full"
     >
       {/* Sticky header with tabs */}
-      <div className="sticky top-0 z-10 bg-background border-b px-3 py-3">
-        {/* Welcome section */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="min-w-0 flex-1">
-            <p className={`${liffTypography.cardTitle} truncate`}>
-              {session.lineDisplayName} 主公您好
-            </p>
-            {unverifiedCount > 0 ? (
-              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mt-0.5">
-                <AlertCircle className="h-4 w-4" />
-                {unverifiedCount} 個帳號待匹配
+      <div className="sticky top-0 z-10 border-b bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">
+        <div className="mx-auto w-full max-w-5xl">
+          {/* Welcome section */}
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className={`${liffTypography.cardTitle} truncate`}>
+                {session.lineDisplayName} 主公您好
               </p>
-            ) : (
-              <p className={`${liffTypography.caption} mt-0.5`}>
-                已綁定 {totalCount} 個帳號
-              </p>
-            )}
+              {unverifiedCount > 0 ? (
+                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="h-4 w-4" />
+                  {unverifiedCount} 個帳號待匹配
+                </p>
+              ) : (
+                <p className={`${liffTypography.caption} mt-0.5`}>
+                  已綁定 {totalCount} 個帳號
+                </p>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setPageView("id-management")}
+            >
+              ID 管理
+              <ChevronRight className="ml-0.5 h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
-            onClick={() => setPageView("id-management")}
-          >
-            ID 管理
-            <ChevronRight className="h-4 w-4 ml-0.5" />
-          </Button>
+          <TabsList className="grid h-9 w-full grid-cols-3 md:max-w-md">
+            <TabsTrigger value="performance" className="text-sm">
+              表現
+            </TabsTrigger>
+            <TabsTrigger value="battle" className="text-sm">
+              戰役
+            </TabsTrigger>
+            <TabsTrigger value="copper" className="text-sm">
+              銅礦
+            </TabsTrigger>
+          </TabsList>
         </div>
-        <TabsList className="grid w-full grid-cols-3 h-9">
-          <TabsTrigger value="performance" className="text-sm">
-            表現
-          </TabsTrigger>
-          <TabsTrigger value="battle" className="text-sm">
-            戰役
-          </TabsTrigger>
-          <TabsTrigger value="copper" className="text-sm">
-            銅礦
-          </TabsTrigger>
-        </TabsList>
       </div>
 
       {/* Scrollable content */}

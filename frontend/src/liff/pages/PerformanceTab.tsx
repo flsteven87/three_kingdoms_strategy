@@ -202,15 +202,15 @@ export function PerformanceTab({ session }: Props) {
   const rankChange = rank?.change ?? 0;
 
   return (
-    <div className="p-3 space-y-3 pb-6">
+    <div className="mx-auto w-full max-w-5xl space-y-3 p-3 pb-6 md:p-4 md:pb-8">
       {/* Header: Account selector + Season */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         {accounts.length > 1 ? (
           <AccountSelector
             accounts={accounts}
             value={effectiveGameId}
             onValueChange={setSelectedGameId}
-            className="h-9 flex-1"
+            className="h-9 flex-1 md:max-w-sm"
           />
         ) : (
           <span className={liffTypography.cardTitle}>{effectiveGameId}</span>
@@ -223,258 +223,263 @@ export function PerformanceTab({ session }: Props) {
       </div>
 
       {/* Rank Card */}
-      {rank && (
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="py-4 text-center">
-            <div className={liffTypography.metricLabel}>貢獻排名</div>
-            <div className={`${liffTypography.metric} text-primary mt-1`}>
-              #{rank.current}
-              <span className="text-lg font-normal text-muted-foreground">
-                {" "}
-                / {rank.total}
-              </span>
-            </div>
-            {rankChange !== 0 && (
-              <div
-                className={`text-sm flex items-center justify-center gap-1 mt-1 ${
-                  rankChange > 0 ? typography.success : typography.danger
-                }`}
-              >
-                {rankChange > 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
+      {(rank || (latest && alliance_avg)) && (
+        <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)]">
+          {rank && (
+            <Card className="border-primary/20 bg-primary/5 xl:h-full">
+              <CardContent className="py-4 text-center xl:flex xl:h-full xl:flex-col xl:justify-center">
+                <div className={liffTypography.metricLabel}>貢獻排名</div>
+                <div className={`${liffTypography.metric} mt-1 text-primary`}>
+                  #{rank.current}
+                  <span className="text-lg font-normal text-muted-foreground">
+                    {" "}
+                    / {rank.total}
+                  </span>
+                </div>
+                {rankChange !== 0 && (
+                  <div
+                    className={`mt-1 flex items-center justify-center gap-1 text-sm ${
+                      rankChange > 0 ? typography.success : typography.danger
+                    }`}
+                  >
+                    {rankChange > 0 ? (
+                      <TrendingUp className="h-4 w-4" />
+                    ) : (
+                      <TrendingDown className="h-4 w-4" />
+                    )}
+                    {rankChange > 0 ? "+" : ""}
+                    {rankChange} 本期
+                  </div>
                 )}
-                {rankChange > 0 ? "+" : ""}
-                {rankChange} 本期
-              </div>
-            )}
-            {rankChange === 0 && rank.change !== null && (
-              <div className="text-sm flex items-center justify-center gap-1 mt-1 text-muted-foreground">
-                <Minus className="h-4 w-4" />
-                持平
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                {rankChange === 0 && rank.change !== null && (
+                  <div className="mt-1 flex items-center justify-center gap-1 text-sm text-muted-foreground">
+                    <Minus className="h-4 w-4" />
+                    持平
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Metrics Grid */}
-      {latest && alliance_avg && (
-        <div className="grid grid-cols-2 gap-2">
-          <MetricCard
-            label="日均貢獻"
-            value={latest.daily_contribution}
-            percentVsAvg={calcPercentVsAvg(
-              latest.daily_contribution,
-              alliance_avg.daily_contribution,
-            )}
-          />
-          <MetricCard
-            label="日均戰功"
-            value={latest.daily_merit}
-            percentVsAvg={calcPercentVsAvg(
-              latest.daily_merit,
-              alliance_avg.daily_merit,
-            )}
-          />
-          <MetricCard
-            label="日均助攻"
-            value={latest.daily_assist}
-            percentVsAvg={calcPercentVsAvg(
-              latest.daily_assist,
-              alliance_avg.daily_assist,
-            )}
-          />
-          <MetricCard
-            label="日均捐獻"
-            value={latest.daily_donation}
-            percentVsAvg={calcPercentVsAvg(
-              latest.daily_donation,
-              alliance_avg.daily_donation,
-            )}
-          />
+          {latest && alliance_avg && (
+            <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-4">
+              <MetricCard
+                label="日均貢獻"
+                value={latest.daily_contribution}
+                percentVsAvg={calcPercentVsAvg(
+                  latest.daily_contribution,
+                  alliance_avg.daily_contribution,
+                )}
+              />
+              <MetricCard
+                label="日均戰功"
+                value={latest.daily_merit}
+                percentVsAvg={calcPercentVsAvg(
+                  latest.daily_merit,
+                  alliance_avg.daily_merit,
+                )}
+              />
+              <MetricCard
+                label="日均助攻"
+                value={latest.daily_assist}
+                percentVsAvg={calcPercentVsAvg(
+                  latest.daily_assist,
+                  alliance_avg.daily_assist,
+                )}
+              />
+              <MetricCard
+                label="日均捐獻"
+                value={latest.daily_donation}
+                percentVsAvg={calcPercentVsAvg(
+                  latest.daily_donation,
+                  alliance_avg.daily_donation,
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
 
-      {/* Radar Chart - Theme-aware colors */}
-      {radarData.length > 0 && (
-        <Card>
-          <CardContent className="pt-4 pb-2">
-            <div className={`${liffTypography.caption} text-center mb-2`}>
-              五維能力 (vs 同盟平均)
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <RadarChart data={radarData}>
-                <PolarGrid stroke={liffChartColors.grid} gridType="polygon" />
-                <PolarAngleAxis
-                  dataKey="metric"
-                  tick={{ fontSize: 11, fill: liffChartColors.axisText }}
-                />
-                <PolarRadiusAxis
-                  angle={90}
-                  domain={[
-                    0,
-                    Math.max(
-                      150,
-                      ...radarData.map((d) => Math.max(d.me, d.median)),
-                    ),
-                  ]}
-                  tick={{ fontSize: 9, fill: liffChartColors.axisText }}
-                  tickFormatter={(value) => `${value}%`}
-                  tickCount={4}
-                />
-                {/* Render order: back to front for proper layering */}
-                <Radar
-                  name="盟均"
-                  dataKey="avg"
-                  stroke={radarChartColors.average.stroke}
-                  fill={radarChartColors.average.fill}
-                  fillOpacity={radarChartColors.average.fillOpacity}
-                  strokeDasharray={radarChartColors.average.strokeDasharray}
-                  strokeWidth={radarChartColors.average.strokeWidth}
-                />
-                <Radar
-                  name="中位數"
-                  dataKey="median"
-                  stroke={radarChartColors.median.stroke}
-                  fill={radarChartColors.median.fill}
-                  fillOpacity={radarChartColors.median.fillOpacity}
-                  strokeDasharray={radarChartColors.median.strokeDasharray}
-                  strokeWidth={radarChartColors.median.strokeWidth}
-                />
-                <Radar
-                  name="我"
-                  dataKey="me"
-                  stroke={radarChartColors.me.stroke}
-                  fill={radarChartColors.me.fill}
-                  fillOpacity={radarChartColors.me.fillOpacity}
-                  strokeWidth={radarChartColors.me.strokeWidth}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-            <div className="flex justify-center gap-4 text-xs mt-1">
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 bg-primary inline-block" /> 我
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 bg-muted-foreground inline-block opacity-70" />{" "}
-                盟均
-              </span>
-              <span className="flex items-center gap-1">
-                <span
-                  className="w-3 h-0.5 inline-block"
-                  style={{ backgroundColor: radarChartColors.median.stroke }}
-                />{" "}
-                中位數
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {(radarData.length > 0 || trendData.length > 1 || season_total) && (
+        <div className="grid gap-3 xl:grid-cols-[340px_minmax(0,1fr)]">
+          <div className="space-y-3">
+            {radarData.length > 0 && (
+              <Card>
+                <CardContent className="pb-2 pt-4">
+                  <div className={`${liffTypography.caption} mb-2 text-center`}>
+                    五維能力 (vs 同盟平均)
+                  </div>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <RadarChart data={radarData}>
+                      <PolarGrid stroke={liffChartColors.grid} gridType="polygon" />
+                      <PolarAngleAxis
+                        dataKey="metric"
+                        tick={{ fontSize: 11, fill: liffChartColors.axisText }}
+                      />
+                      <PolarRadiusAxis
+                        angle={90}
+                        domain={[
+                          0,
+                          Math.max(
+                            150,
+                            ...radarData.map((d) => Math.max(d.me, d.median)),
+                          ),
+                        ]}
+                        tick={{ fontSize: 9, fill: liffChartColors.axisText }}
+                        tickFormatter={(value) => `${value}%`}
+                        tickCount={4}
+                      />
+                      <Radar
+                        name="盟均"
+                        dataKey="avg"
+                        stroke={radarChartColors.average.stroke}
+                        fill={radarChartColors.average.fill}
+                        fillOpacity={radarChartColors.average.fillOpacity}
+                        strokeDasharray={radarChartColors.average.strokeDasharray}
+                        strokeWidth={radarChartColors.average.strokeWidth}
+                      />
+                      <Radar
+                        name="中位數"
+                        dataKey="median"
+                        stroke={radarChartColors.median.stroke}
+                        fill={radarChartColors.median.fill}
+                        fillOpacity={radarChartColors.median.fillOpacity}
+                        strokeDasharray={radarChartColors.median.strokeDasharray}
+                        strokeWidth={radarChartColors.median.strokeWidth}
+                      />
+                      <Radar
+                        name="我"
+                        dataKey="me"
+                        stroke={radarChartColors.me.stroke}
+                        fill={radarChartColors.me.fill}
+                        fillOpacity={radarChartColors.me.fillOpacity}
+                        strokeWidth={radarChartColors.me.strokeWidth}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-1 flex justify-center gap-4 text-xs">
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-0.5 w-3 bg-primary" /> 我
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-0.5 w-3 bg-muted-foreground opacity-70" />{" "}
+                      盟均
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="inline-block h-0.5 w-3"
+                        style={{ backgroundColor: radarChartColors.median.stroke }}
+                      />{" "}
+                      中位數
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-      {/* Trend Chart - Theme-aware colors */}
-      {trendData.length > 1 && (
-        <Card>
-          <CardContent className="pt-4 pb-2">
-            <div className={`${liffTypography.caption} text-center mb-2`}>
-              貢獻與戰功趨勢
-            </div>
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={trendData}>
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 10, fill: liffChartColors.axisText }}
-                  tickLine={false}
-                  axisLine={{ stroke: liffChartColors.grid }}
-                />
-                <YAxis
-                  yAxisId="left"
-                  tick={{ fontSize: 10, fill: liffChartColors.axisText }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => formatWan(v)}
-                  width={45}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fontSize: 10, fill: liffChartColors.axisText }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => formatWan(v)}
-                  width={45}
-                />
-                <Tooltip
-                  formatter={(value: number) => formatWan(value)}
-                  labelStyle={{ fontSize: 11 }}
-                  contentStyle={{ fontSize: 11 }}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} iconSize={10} />
-                <Line
-                  yAxisId="left"
-                  type="stepAfter"
-                  dataKey="貢獻"
-                  stroke={trendChartColors.contribution}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  yAxisId="right"
-                  type="stepAfter"
-                  dataKey="戰功"
-                  stroke={trendChartColors.merit}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
+            {season_total && (
+              <Card className="bg-muted/30">
+                <CardContent className="py-3">
+                  <div className={`${liffTypography.metricLabel} mb-2`}>賽季累計</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">總貢獻</span>
+                      <span className="font-medium tabular-nums">
+                        {formatWan(season_total.contribution)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">總捐獻</span>
+                      <span className="font-medium tabular-nums">
+                        {formatWan(season_total.donation)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">勢力值</span>
+                      <span className="font-medium tabular-nums">
+                        {formatWan(season_total.power)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">勢力變化</span>
+                      <span
+                        className={`font-medium tabular-nums ${
+                          season_total.power_change >= 0
+                            ? typography.success
+                            : typography.danger
+                        }`}
+                      >
+                        {season_total.power_change >= 0 ? "+" : ""}
+                        {formatWan(season_total.power_change)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-      {/* Season Totals */}
-      {season_total && (
-        <Card className="bg-muted/30">
-          <CardContent className="py-3">
-            <div className={`${liffTypography.metricLabel} mb-2`}>賽季累計</div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">總貢獻</span>
-                <span className="font-medium tabular-nums">
-                  {formatWan(season_total.contribution)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">總捐獻</span>
-                <span className="font-medium tabular-nums">
-                  {formatWan(season_total.donation)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">勢力值</span>
-                <span className="font-medium tabular-nums">
-                  {formatWan(season_total.power)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">勢力變化</span>
-                <span
-                  className={`font-medium tabular-nums ${
-                    season_total.power_change >= 0
-                      ? typography.success
-                      : typography.danger
-                  }`}
-                >
-                  {season_total.power_change >= 0 ? "+" : ""}
-                  {formatWan(season_total.power_change)}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {trendData.length > 1 && (
+            <Card>
+              <CardContent className="pb-2 pt-4">
+                <div className={`${liffTypography.caption} mb-2 text-center`}>
+                  貢獻與戰功趨勢
+                </div>
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart data={trendData}>
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: liffChartColors.axisText }}
+                      tickLine={false}
+                      axisLine={{ stroke: liffChartColors.grid }}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      tick={{ fontSize: 10, fill: liffChartColors.axisText }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => formatWan(v)}
+                      width={45}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 10, fill: liffChartColors.axisText }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => formatWan(v)}
+                      width={45}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => formatWan(value)}
+                      labelStyle={{ fontSize: 11 }}
+                      contentStyle={{ fontSize: 11 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} iconSize={10} />
+                    <Line
+                      yAxisId="left"
+                      type="stepAfter"
+                      dataKey="貢獻"
+                      stroke={trendChartColors.contribution}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="stepAfter"
+                      dataKey="戰功"
+                      stroke={trendChartColors.merit}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );
