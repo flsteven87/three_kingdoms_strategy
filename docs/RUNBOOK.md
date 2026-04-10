@@ -90,7 +90,7 @@ Set these in Zeabur Dashboard > Project > Environment:
 
 **Backend Production**:
 ```
-SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_URL=https://kseaylvmxjpbqahtlypb.supabase.co
 SUPABASE_ANON_KEY=<key>
 SUPABASE_SERVICE_KEY=<key>
 SUPABASE_JWT_SECRET=<secret>
@@ -98,13 +98,30 @@ SECRET_KEY=<generated-secret>
 ENVIRONMENT=production
 DEBUG=false
 CORS_ORIGINS=https://tktmanager.com
+RECUR_SECRET_KEY=sk_live_<key>
+RECUR_WEBHOOK_SECRET=<secret>
+RECUR_PRODUCT_ID=bmbzr9p44vj8fx5pkp3iquo2
+RECUR_EXPECTED_AMOUNT_TWD=999
+RECUR_EXPECTED_CURRENCY=TWD
+LINE_ACCESS_TOKEN=<token>
+LINE_CHANNEL_SECRET=<secret>
+LINE_CHANNEL_ID=<id>
+LINE_BOT_USER_ID=<uid>
+LINE_BOT_ID=@977nncax
+LIFF_ID=<liff-id>
+FRONTEND_URL=https://tktmanager.com
+BACKEND_URL=https://api.tktmanager.com
 ```
 
 **Frontend Production**:
 ```
-VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_URL=https://kseaylvmxjpbqahtlypb.supabase.co
 VITE_SUPABASE_ANON_KEY=<key>
 VITE_API_BASE_URL=https://api.tktmanager.com
+VITE_RECUR_PUBLISHABLE_KEY=pk_live_<key>
+VITE_RECUR_PRODUCT_ID=bmbzr9p44vj8fx5pkp3iquo2
+VITE_LINE_BOT_ID=@977nncax
+VITE_LIFF_ID=<liff-id>
 ```
 
 ---
@@ -337,5 +354,5 @@ npm run build
 
 ---
 
-**Last Updated**: 2026-03-26
-**Version**: 0.9.0
+**Last Updated**: 2026-04-10
+**Version**: 1.0.2
