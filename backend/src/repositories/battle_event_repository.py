@@ -43,6 +43,29 @@ class BattleEventRepository(SupabaseRepository[BattleEvent]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return self._build_models(data)
 
+    async def get_completed_by_season_paginated(
+        self, season_id: UUID, offset: int = 0, limit: int = 10
+    ) -> tuple[list[BattleEvent], int]:
+        """
+        Get completed events for a season with DB-level pagination.
+
+        Returns:
+            Tuple of (events, total_count) where total_count is the full
+            count of completed events (not just the page).
+        """
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("*", count="exact")
+            .eq("season_id", str(season_id))
+            .eq("status", EventStatus.COMPLETED.value)
+            .order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return self._build_models(data), result.count or 0
+
     async def get_by_alliance(self, alliance_id: UUID) -> list[BattleEvent]:
         """
         Get all battle events for an alliance, ordered by created_at desc

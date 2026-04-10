@@ -215,11 +215,13 @@ class LineBindingService:
             alliance_id
         )
 
+        group_ids = [b.line_group_id for b in group_bindings]
+        count_map = await self.repository.count_registered_group_members_batch(
+            alliance_id, group_ids
+        )
+
         bindings_response = []
         for binding in group_bindings:
-            member_count = await self.repository.count_group_members_registered(
-                alliance_id, binding.line_group_id
-            )
             bindings_response.append(
                 LineGroupBindingResponse(
                     id=binding.id,
@@ -230,7 +232,7 @@ class LineBindingService:
                     bound_at=binding.bound_at,
                     is_active=binding.is_active,
                     is_test=binding.is_test,
-                    member_count=member_count,
+                    member_count=count_map.get(binding.line_group_id, 0),
                 )
             )
 
@@ -327,10 +329,10 @@ class LineBindingService:
             group_picture_url=group_info.picture_url,
         )
 
-        # Get member count from group member tracking table
-        member_count = await self.repository.count_group_members_registered(
-            alliance_id, updated_binding.line_group_id
+        count_map = await self.repository.count_registered_group_members_batch(
+            alliance_id, [updated_binding.line_group_id]
         )
+        member_count = count_map.get(updated_binding.line_group_id, 0)
 
         return LineGroupBindingResponse(
             id=updated_binding.id,
@@ -1105,8 +1107,6 @@ class LineBindingService:
         Raises:
             HTTPException 404: If group not bound
         """
-        from src.models.battle_event import EventStatus
-
         # 1. Get alliance from group binding
         group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
         if not group_binding:
@@ -1125,11 +1125,10 @@ class LineBindingService:
         if not season_id:
             return EventListResponse(season_name=None, events=[], has_more=False, total_count=0)
 
-        # 3. Get completed events for this season, paginated
-        events = await self._event_repo.get_by_season(season_id)
-        completed_events = [e for e in events if e.status == EventStatus.COMPLETED]
-        total_count = len(completed_events)
-        completed_events = completed_events[offset : offset + limit]
+        # 3. Get completed events for this season, paginated at DB level
+        completed_events, total_count = await self._event_repo.get_completed_by_season_paginated(
+            season_id, offset=offset, limit=limit
+        )
 
         if not completed_events:
             return EventListResponse(

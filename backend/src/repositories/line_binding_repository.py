@@ -468,20 +468,28 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
 
         return self._handle_supabase_result(result, allow_empty=True)
 
-    async def count_group_members_registered(self, alliance_id: UUID, line_group_id: str) -> int:
-        """Count registered members who are also tracked in the given LINE group."""
-        tracked_ids = await self.get_group_member_user_ids([line_group_id])
-        if not tracked_ids:
-            return 0
+    async def count_registered_group_members_batch(
+        self, alliance_id: UUID, line_group_ids: list[str]
+    ) -> dict[str, int]:
+        """Count registered members per LINE group via single RPC call.
+
+        Returns dict mapping line_group_id → registered member count.
+        """
+        if not line_group_ids:
+            return {}
 
         result = await self._execute_async(
-            lambda: self.client.from_("member_line_bindings")
-            .select("id", count="exact")
-            .eq("alliance_id", str(alliance_id))
-            .in_("line_user_id", list(tracked_ids))
-            .execute()
+            lambda: self.client.rpc(
+                "count_registered_group_members",
+                {
+                    "p_alliance_id": str(alliance_id),
+                    "p_line_group_ids": line_group_ids,
+                },
+            ).execute()
         )
-        return result.count or 0
+        # RPC returns JSON array: [{"line_group_id": "C...", "count": 5}, ...]
+        rows = result.data if isinstance(result.data, list) else []
+        return {row["line_group_id"]: row["count"] for row in rows if row.get("line_group_id")}
 
     async def find_member_by_name(self, alliance_id: UUID, name: str) -> UUID | None:
         """Find member ID by name in members table (for auto-matching)"""
@@ -732,7 +740,10 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         )
 
     async def check_liff_notification_eligibility(
-        self, line_group_id: str, line_user_id: str, cooldown_minutes: int = 30,
+        self,
+        line_group_id: str,
+        line_user_id: str,
+        cooldown_minutes: int = 30,
     ) -> dict:
         """Single RPC: check bound + registered + cooldown status."""
         result = await self._execute_async(
