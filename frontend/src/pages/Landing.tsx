@@ -203,6 +203,18 @@ const INCLUDED_FEATURES = [
   "資料永久保存",
 ] as const;
 
+const HERO_STATS = [
+  { label: "核心流程", value: "匯入即分析" },
+  { label: "協作方式", value: "幹部共管" },
+  { label: "通知延伸", value: "LINE 整合" },
+] as const;
+
+const LOGIN_HIGHLIGHTS = [
+  "Google 帳戶一鍵登入，14 天免費體驗",
+  "支援淺色 / 深色模式，保留你的使用偏好",
+  "後續可無痛延伸 LINE 登入與群組綁定流程",
+] as const;
+
 const FAQ_ITEMS = [
   {
     question: "怎麼取得遊戲的統計資料？",
@@ -311,69 +323,130 @@ export function Landing() {
 
       <main className="flex-1">
         {/* ── 1. Hero ── */}
-        <section id="hero" className="scroll-mt-14 px-4 py-20 md:py-28">
-          <div className="mx-auto max-w-2xl text-center space-y-8">
-            <div className="space-y-4">
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-3.5 py-1 text-sm font-medium text-primary">
-                三國志戰略版 · 同盟管理工具
-              </span>
-              <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-balance">
-                同盟數據，盡在掌握
-              </h1>
-              <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto leading-relaxed text-balance">
-                出席、貢獻、活躍度全自動追蹤。
-                <br className="hidden sm:block" />
-                誰該賞、誰該罰，數據替你說話。
-              </p>
-            </div>
+        <section
+          id="hero"
+          className="scroll-mt-14 overflow-hidden px-4 py-16 md:py-24"
+        >
+          <div className="mx-auto max-w-6xl">
+            <div className="relative overflow-hidden rounded-3xl border bg-card/70 px-6 py-10 shadow-sm backdrop-blur-sm md:px-10 md:py-14 lg:px-14">
+              <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/8 via-primary/4 to-transparent" />
+              <div className="absolute -right-16 top-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+              <div className="absolute -left-10 bottom-0 h-32 w-32 rounded-full bg-secondary/40 blur-3xl" />
 
-            <div className="max-w-sm mx-auto space-y-4">
-              {webViewInfo?.isWebView && webViewInfo.platform && (
-                <WebViewWarning
-                  platform={webViewInfo.platform}
-                  suggestion={webViewInfo.suggestion}
-                />
-              )}
+              <div className="relative grid items-center gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,380px)]">
+                <div className="space-y-8 text-center lg:text-left">
+                  <div className="space-y-5">
+                    <span className="inline-flex items-center rounded-full bg-primary/10 px-3.5 py-1 text-sm font-medium text-primary">
+                      三國志戰略版 · 同盟管理工具
+                    </span>
+                    <div className="space-y-4">
+                      <h1 className="text-4xl font-bold tracking-tight text-balance md:text-6xl">
+                        同盟數據，盡在掌握
+                      </h1>
+                      <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted-foreground text-balance md:text-xl lg:mx-0">
+                        出席、貢獻、活躍度全自動追蹤。
+                        <br className="hidden sm:block" />
+                        誰該賞、誰該罰，數據替你說話。
+                      </p>
+                    </div>
+                  </div>
 
-              {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-                  <p className="text-sm text-destructive text-center">
-                    {error}
-                  </p>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {HERO_STATS.map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="rounded-2xl border bg-background/80 p-4 text-left shadow-sm"
+                      >
+                        <div className="text-sm text-muted-foreground">{stat.label}</div>
+                        <div className="mt-1 text-lg font-semibold">{stat.value}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )}
 
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={() => handleOAuthLogin("google")}
-                disabled={isLoading !== null || webViewInfo?.isWebView}
-              >
-                {isLoading === "google" ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    登入中...
-                  </>
-                ) : (
-                  <>
-                    {GOOGLE_ICON}
-                    免費體驗 14 天
-                  </>
-                )}
-              </Button>
+                <div className="mx-auto w-full max-w-md lg:mx-0">
+                  <div className="rounded-3xl border bg-background/95 p-6 shadow-lg shadow-primary/5">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-primary">開始使用</p>
+                      <h2 className="text-2xl font-semibold tracking-tight">
+                        登入管理中心
+                      </h2>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        免費體驗 14 天，無需信用卡，隨時可取消。
+                      </p>
+                    </div>
 
-              {!webViewInfo?.isWebView && (
-                <p className="text-xs text-center text-muted-foreground">
-                  使用 Google 帳戶登入 · 同意
-                  <Link to="/terms" className="text-primary hover:underline">
-                    服務條款
-                  </Link>
-                  及
-                  <Link to="/privacy" className="text-primary hover:underline">
-                    隱私政策
-                  </Link>
-                </p>
-              )}
+                    <div className="mt-6 space-y-4">
+                      {webViewInfo?.isWebView && webViewInfo.platform && (
+                        <WebViewWarning
+                          platform={webViewInfo.platform}
+                          suggestion={webViewInfo.suggestion}
+                        />
+                      )}
+
+                      {error && (
+                        <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3">
+                          <p className="text-center text-sm text-destructive">
+                            {error}
+                          </p>
+                        </div>
+                      )}
+
+                      <Button
+                        size="lg"
+                        className="w-full"
+                        onClick={() => handleOAuthLogin("google")}
+                        disabled={isLoading !== null || webViewInfo?.isWebView}
+                      >
+                        {isLoading === "google" ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            登入中...
+                          </>
+                        ) : (
+                          <>
+                            {GOOGLE_ICON}
+                            使用 Google 開始
+                          </>
+                        )}
+                      </Button>
+
+                      <div className="rounded-2xl border bg-muted/40 p-4">
+                        <ul className="space-y-3">
+                          {LOGIN_HIGHLIGHTS.map((item) => (
+                            <li
+                              key={item}
+                              className="flex items-start gap-2 text-sm leading-6 text-muted-foreground"
+                            >
+                              <Check className="mt-1 h-4 w-4 shrink-0 text-primary" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {!webViewInfo?.isWebView && (
+                        <p className="text-center text-xs text-muted-foreground">
+                          使用 Google 帳戶登入 · 同意
+                          <Link
+                            to="/terms"
+                            className="text-primary transition-colors hover:text-primary/80 hover:underline"
+                          >
+                            服務條款
+                          </Link>
+                          及
+                          <Link
+                            to="/privacy"
+                            className="text-primary transition-colors hover:text-primary/80 hover:underline"
+                          >
+                            隱私政策
+                          </Link>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

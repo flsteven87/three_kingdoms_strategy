@@ -582,9 +582,10 @@ class TestActivateSeason:
         )
         mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
         mock_season_repo.get_by_alliance = AsyncMock(return_value=[])
+        mock_season_repo.get_current_season = AsyncMock(return_value=None)
 
         activated_season = create_mock_season(
-            season_id, alliance_id, "S1", is_current=False, activation_status="activated"
+            season_id, alliance_id, "S1", is_current=True, activation_status="activated"
         )
         mock_season_repo.update = AsyncMock(return_value=activated_season)
 
@@ -602,6 +603,9 @@ class TestActivateSeason:
         assert result.success is True
         assert result.used_trial is True
         assert result.trial_ends_at is not None
+        # First season should auto-set as current
+        update_call = mock_season_repo.update.call_args[0][1]
+        assert update_call["is_current"] is True
         mock_season_quota_service.require_season_activation.assert_called_once_with(alliance_id)
         mock_season_quota_service.consume_season.assert_called_once_with(alliance_id)
 
@@ -627,6 +631,16 @@ class TestActivateSeason:
         mock_season_repo.get_by_id = AsyncMock(return_value=draft_season)
         mock_season_repo.get_by_alliance = AsyncMock(return_value=[])
 
+        # Simulate an existing current season so auto-set doesn't trigger
+        existing_current = create_mock_season(
+            UUID("00000000-0000-0000-0000-000000000099"),
+            alliance_id,
+            "S1",
+            is_current=True,
+            activation_status="activated",
+        )
+        mock_season_repo.get_current_season = AsyncMock(return_value=existing_current)
+
         activated_season = create_mock_season(
             season_id, alliance_id, "S2", is_current=False, activation_status="activated"
         )
@@ -647,6 +661,9 @@ class TestActivateSeason:
         assert result.used_trial is False
         assert result.remaining_seasons == 4
         assert result.trial_ends_at is None
+        # Should NOT auto-set as current when one already exists
+        update_call = mock_season_repo.update.call_args[0][1]
+        assert "is_current" not in update_call
 
     @pytest.mark.asyncio
     async def test_should_raise_valueerror_when_season_already_activated(

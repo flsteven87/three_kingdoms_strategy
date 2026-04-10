@@ -321,18 +321,25 @@ class SeasonService:
         )
 
         # Update season status with trial info
-        update_data = {
+        update_data: dict[str, object] = {
             "activation_status": "activated",
             "activated_at": datetime.now(UTC).isoformat(),
             "is_trial": used_trial,
         }
+
+        # Auto-set as current if no season is currently selected
+        current = await self._repo.get_current_season(season.alliance_id)
+        if current is None:
+            update_data["is_current"] = True
+
         updated_season = await self._repo.update(season_id, update_data)
 
         logger.info(
-            "Season activated - season_id=%s, used_trial=%s, remaining_seasons=%s",
+            "Season activated - season_id=%s, used_trial=%s, remaining_seasons=%s, auto_current=%s",
             season_id,
             used_trial,
             remaining,
+            current is None,
         )
 
         return SeasonActivateResponse(
