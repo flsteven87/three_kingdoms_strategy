@@ -10,6 +10,7 @@ CSV Upload Repository
 from datetime import datetime, timedelta
 from uuid import UUID
 
+from src.core.config import GAME_TIMEZONE
 from src.models.csv_upload import CsvUpload, UploadType
 from src.repositories.base import SupabaseRepository
 
@@ -166,8 +167,10 @@ class CsvUploadRepository(SupabaseRepository[CsvUpload]):
 
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
-        # Compare only date part: start_of_day <= snapshot_date < end_of_day
-        start_of_day = snapshot_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Compute same-day window in game timezone so uploads made near
+        # midnight Taipei time are bucketed by the game day, not the UTC day.
+        taipei_dt = snapshot_date.astimezone(GAME_TIMEZONE)
+        start_of_day = taipei_dt.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_day = start_of_day + timedelta(days=1)
 
         result = await self._execute_async(
