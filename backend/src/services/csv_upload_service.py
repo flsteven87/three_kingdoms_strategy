@@ -224,8 +224,8 @@ class CSVUploadService:
         total_periods = 0
         deactivated_count = 0
         if upload_type == "regular":
-            latest = await self._csv_upload_repo.get_latest_by_season(season_id)
-            is_latest = latest is None or latest.snapshot_date <= snapshot_date
+            latest_upload = await self._csv_upload_repo.get_latest_by_season(season_id)
+            is_latest = latest_upload is None or latest_upload.snapshot_date <= snapshot_date
             if is_latest:
                 present_names = {m["member_name"] for m in members_data}
                 deactivated_count = await self._member_repo.deactivate_absent_members(

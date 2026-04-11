@@ -200,8 +200,7 @@ class MemberRepository(SupabaseRepository[Member]):
         符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
         """
         if not present_names:
-            # PostgREST `.in_()` rejects an empty iterable. Callers should
-            # have already rejected an empty CSV; guard the repo anyway.
+            # PostgREST `.in_()` rejects an empty iterable.
             return 0
 
         names_list = list(present_names)
