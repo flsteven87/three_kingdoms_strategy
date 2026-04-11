@@ -510,6 +510,72 @@ class TestUploadCsv:
         assert len(update_call_args) == 1
         assert update_call_args[0]["id"] == str(unverified_binding.id)
 
+    @pytest.mark.asyncio
+    async def test_upsert_payload_carries_first_seen_at_for_db_trigger(
+        self,
+        csv_upload_service: CSVUploadService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        mock_csv_upload_repo: MagicMock,
+        mock_member_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_period_metrics_service: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        user_id: UUID,
+        season_id: UUID,
+        alliance_id: UUID,
+        upload_id: UUID,
+        valid_csv_content: str,
+    ):
+        """
+        The upsert payload intentionally includes first_seen_at so that new
+        member rows (INSERT path) satisfy the NOT NULL column. On the UPDATE
+        path, the members_preserve_first_seen_at DB trigger applies
+        LEAST(OLD, NEW) so an unchanged payload cannot move the value forward.
+        This test pins that contract so the service keeps sending the field.
+        """
+        # Arrange
+        mock_season = create_mock_season(season_id, alliance_id)
+        mock_season_repo.get_by_id = AsyncMock(return_value=mock_season)
+        mock_alliance_repo.get_by_id = AsyncMock(
+            return_value=create_mock_alliance(alliance_id)
+        )
+        mock_permission_service.require_write_permission = AsyncMock()
+        mock_csv_upload_repo.replace_same_day_upload = AsyncMock(
+            return_value=(create_mock_upload(upload_id, season_id, alliance_id), None)
+        )
+
+        captured_payload: list[dict] = []
+
+        async def capture_upsert(data):
+            captured_payload.extend(data)
+            return [create_mock_member(row["name"]) for row in data]
+
+        mock_member_repo.upsert_batch = AsyncMock(side_effect=capture_upsert)
+        mock_snapshot_repo.create_batch = AsyncMock(
+            return_value=[MagicMock(), MagicMock()]
+        )
+        mock_period_metrics_service.calculate_periods_for_season = AsyncMock(
+            return_value=[]
+        )
+        mock_line_binding_repo.get_unverified_bindings = AsyncMock(return_value=[])
+
+        # Act
+        await csv_upload_service.upload_csv(
+            user_id,
+            season_id,
+            "同盟統計2025年10月09日10时13分09秒.csv",
+            valid_csv_content,
+        )
+
+        # Assert — every payload row must carry first_seen_at, last_seen_at, is_active
+        assert captured_payload, "upsert_batch should have been called with rows"
+        for row in captured_payload:
+            assert "first_seen_at" in row
+            assert "last_seen_at" in row
+            assert "is_active" in row
+
 
 # =============================================================================
 # Tests for get_uploads_by_season
