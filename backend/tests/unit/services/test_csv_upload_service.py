@@ -14,7 +14,7 @@ Tests cover:
 - Coverage: happy path + edge cases + error cases
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -123,6 +123,13 @@ def csv_upload_service(
     service._permission_service = mock_permission_service
     service._period_metrics_service = mock_period_metrics_service
     service._line_binding_repo = mock_line_binding_repo
+
+    # Default no-op awaitables for the membership-diff step so existing tests
+    # that don't care about it still reach Step 8 without AttributeError.
+    # Individual tests may override these for assertions.
+    mock_csv_upload_repo.get_latest_by_season = AsyncMock(return_value=None)
+    mock_member_repo.deactivate_absent_members = AsyncMock(return_value=0)
+
     return service
 
 
@@ -538,9 +545,7 @@ class TestUploadCsv:
         # Arrange
         mock_season = create_mock_season(season_id, alliance_id)
         mock_season_repo.get_by_id = AsyncMock(return_value=mock_season)
-        mock_alliance_repo.get_by_id = AsyncMock(
-            return_value=create_mock_alliance(alliance_id)
-        )
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=create_mock_alliance(alliance_id))
         mock_permission_service.require_write_permission = AsyncMock()
         mock_csv_upload_repo.replace_same_day_upload = AsyncMock(
             return_value=(create_mock_upload(upload_id, season_id, alliance_id), None)
@@ -553,12 +558,8 @@ class TestUploadCsv:
             return [create_mock_member(row["name"]) for row in data]
 
         mock_member_repo.upsert_batch = AsyncMock(side_effect=capture_upsert)
-        mock_snapshot_repo.create_batch = AsyncMock(
-            return_value=[MagicMock(), MagicMock()]
-        )
-        mock_period_metrics_service.calculate_periods_for_season = AsyncMock(
-            return_value=[]
-        )
+        mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
+        mock_period_metrics_service.calculate_periods_for_season = AsyncMock(return_value=[])
         mock_line_binding_repo.get_unverified_bindings = AsyncMock(return_value=[])
 
         # Act
@@ -575,6 +576,168 @@ class TestUploadCsv:
             assert "first_seen_at" in row
             assert "last_seen_at" in row
             assert "is_active" in row
+
+    @pytest.mark.asyncio
+    async def test_latest_regular_upload_deactivates_absent_members(
+        self,
+        csv_upload_service: CSVUploadService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        mock_csv_upload_repo: MagicMock,
+        mock_member_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_period_metrics_service: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        user_id: UUID,
+        season_id: UUID,
+        alliance_id: UUID,
+        upload_id: UUID,
+        valid_csv_content: str,
+    ):
+        """
+        When a regular upload is the latest for the season, absent members
+        must be flipped to is_active=false via the membership-diff step.
+        """
+        # Arrange
+        mock_season_repo.get_by_id = AsyncMock(
+            return_value=create_mock_season(season_id, alliance_id)
+        )
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=create_mock_alliance(alliance_id))
+        mock_permission_service.require_write_permission = AsyncMock()
+        mock_csv_upload_repo.replace_same_day_upload = AsyncMock(
+            return_value=(create_mock_upload(upload_id, season_id, alliance_id), None)
+        )
+        # No previous upload → current upload IS the latest
+        mock_csv_upload_repo.get_latest_by_season = AsyncMock(return_value=None)
+        mock_member_repo.upsert_batch = AsyncMock(
+            return_value=[create_mock_member("張飛"), create_mock_member("關羽")]
+        )
+        mock_member_repo.deactivate_absent_members = AsyncMock(return_value=3)
+        mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
+        mock_period_metrics_service.calculate_periods_for_season = AsyncMock(return_value=[])
+        mock_line_binding_repo.get_unverified_bindings = AsyncMock(return_value=[])
+
+        # Act
+        result = await csv_upload_service.upload_csv(
+            user_id,
+            season_id,
+            "同盟統計2025年10月09日10时13分09秒.csv",
+            valid_csv_content,
+        )
+
+        # Assert: membership diff called once with the two CSV names
+        mock_member_repo.deactivate_absent_members.assert_called_once()
+        args, _ = mock_member_repo.deactivate_absent_members.call_args
+        assert args[0] == alliance_id
+        assert args[1] == {"張飛", "關羽"}
+        assert result["deactivated_members"] == 3
+
+    @pytest.mark.asyncio
+    async def test_non_latest_backfill_upload_skips_deactivation(
+        self,
+        csv_upload_service: CSVUploadService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        mock_csv_upload_repo: MagicMock,
+        mock_member_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_period_metrics_service: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        user_id: UUID,
+        season_id: UUID,
+        alliance_id: UUID,
+        upload_id: UUID,
+        valid_csv_content: str,
+    ):
+        """
+        Backfilling an older CSV (latest existing upload is newer than the
+        one being processed) must NOT deactivate members — otherwise members
+        who joined in a later CSV would be retroactively removed.
+        """
+        # Arrange
+        mock_season_repo.get_by_id = AsyncMock(
+            return_value=create_mock_season(season_id, alliance_id)
+        )
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=create_mock_alliance(alliance_id))
+        mock_permission_service.require_write_permission = AsyncMock()
+        mock_csv_upload_repo.replace_same_day_upload = AsyncMock(
+            return_value=(create_mock_upload(upload_id, season_id, alliance_id), None)
+        )
+        # A newer upload already exists in the season — 2026-02-14 vs 2025-10-09
+        newer_upload = create_mock_upload(uuid4(), season_id, alliance_id)
+        newer_upload.snapshot_date = datetime(2026, 2, 14, tzinfo=UTC)
+        mock_csv_upload_repo.get_latest_by_season = AsyncMock(return_value=newer_upload)
+        mock_member_repo.upsert_batch = AsyncMock(
+            return_value=[create_mock_member("張飛"), create_mock_member("關羽")]
+        )
+        mock_member_repo.deactivate_absent_members = AsyncMock(return_value=0)
+        mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
+        mock_period_metrics_service.calculate_periods_for_season = AsyncMock(return_value=[])
+        mock_line_binding_repo.get_unverified_bindings = AsyncMock(return_value=[])
+
+        # Act — filename is 2025-10-09, which is older than 2026-02-14
+        result = await csv_upload_service.upload_csv(
+            user_id,
+            season_id,
+            "同盟統計2025年10月09日10时13分09秒.csv",
+            valid_csv_content,
+        )
+
+        # Assert: deactivation NOT called — older upload must not rewrite state
+        mock_member_repo.deactivate_absent_members.assert_not_called()
+        assert result["deactivated_members"] == 0
+
+    @pytest.mark.asyncio
+    async def test_event_upload_never_deactivates_members(
+        self,
+        csv_upload_service: CSVUploadService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        mock_csv_upload_repo: MagicMock,
+        mock_member_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        user_id: UUID,
+        season_id: UUID,
+        alliance_id: UUID,
+        upload_id: UUID,
+        valid_csv_content: str,
+    ):
+        """Event uploads track specific battles, not roster changes — the
+        membership-diff step must be skipped entirely."""
+        # Arrange
+        mock_season_repo.get_by_id = AsyncMock(
+            return_value=create_mock_season(season_id, alliance_id)
+        )
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=create_mock_alliance(alliance_id))
+        mock_permission_service.require_write_permission = AsyncMock()
+        mock_csv_upload_repo.create = AsyncMock(
+            return_value=create_mock_upload(upload_id, season_id, alliance_id)
+        )
+        mock_member_repo.upsert_batch = AsyncMock(
+            return_value=[create_mock_member("張飛"), create_mock_member("關羽")]
+        )
+        mock_member_repo.deactivate_absent_members = AsyncMock(return_value=0)
+        mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
+        mock_line_binding_repo.get_unverified_bindings = AsyncMock(return_value=[])
+
+        # Act
+        result = await csv_upload_service.upload_csv(
+            user_id,
+            season_id,
+            "同盟統計2025年10月09日10时13分09秒.csv",
+            valid_csv_content,
+            upload_type="event",
+        )
+
+        # Assert: neither the latest-check nor the deactivation was called
+        mock_csv_upload_repo.get_latest_by_season.assert_not_called()
+        mock_member_repo.deactivate_absent_members.assert_not_called()
+        assert result["upload_type"] == "event"
+        assert result["deactivated_members"] == 0
 
 
 # =============================================================================

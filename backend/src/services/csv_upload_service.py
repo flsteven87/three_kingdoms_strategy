@@ -217,9 +217,20 @@ class CSVUploadService:
 
         snapshots = await self._snapshot_repo.create_batch(snapshots_data)
 
-        # Step 8: For 'regular' uploads only - calculate period metrics
+        # Step 8: For 'regular' uploads only - deactivate absent members and
+        # calculate period metrics. Deactivation only runs when this upload is
+        # the latest for the season, so backfilling an older CSV does not
+        # retroactively mark members who re-joined later as inactive.
         total_periods = 0
+        deactivated_count = 0
         if upload_type == "regular":
+            latest = await self._csv_upload_repo.get_latest_by_season(season_id)
+            is_latest = latest is None or latest.snapshot_date <= snapshot_date
+            if is_latest:
+                present_names = {m["member_name"] for m in members_data}
+                deactivated_count = await self._member_repo.deactivate_absent_members(
+                    alliance.id, present_names
+                )
             periods = await self._period_metrics_service.calculate_periods_for_season(season_id)
             total_periods = len(periods)
 
@@ -236,6 +247,7 @@ class CSVUploadService:
             "replaced_existing": existing_upload is not None,
             "upload_type": upload_type,
             "reverified_bindings": reverified_count,
+            "deactivated_members": deactivated_count,
         }
 
     async def get_uploads_by_season(self, user_id: UUID, season_id: UUID) -> list[dict]:
@@ -361,10 +373,12 @@ class CSVUploadService:
         updates: list[dict[str, str]] = []
         for binding in unverified:
             if binding.game_id in member_ids_map:
-                updates.append({
-                    "id": str(binding.id),
-                    "member_id": str(member_ids_map[binding.game_id]),
-                })
+                updates.append(
+                    {
+                        "id": str(binding.id),
+                        "member_id": str(member_ids_map[binding.game_id]),
+                    }
+                )
 
         if not updates:
             return 0
