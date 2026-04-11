@@ -182,6 +182,29 @@ async def season_quota_exhausted_handler(
     )
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Catch-all for uncaught exceptions.
+
+    Logs with full traceback server-side, returns a generic JSON 500
+    (no exception message, no stack) to the client so internal detail
+    never leaks. Handlers for specific exception types (ValueError,
+    PermissionError, etc.) still take precedence.
+    """
+    logger.exception(
+        "[Unhandled] %s %s — %s: %s",
+        request.method,
+        request.url.path,
+        type(exc).__name__,
+        exc,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"},
+    )
+
+
 # Health check endpoint (public, exempt from rate limiting for load balancers)
 @app.get("/health")
 @limiter.exempt
