@@ -6,6 +6,7 @@ import {
   parseCsvFilenameDate,
   isDateInRange,
   getGameLocalDateString,
+  getGameLocalStartOfDay,
 } from '../date-utils'
 
 // =============================================================================
@@ -145,5 +146,21 @@ describe('getGameLocalDateString', () => {
     // 2025-01-05T00:00:00Z → 2025-01-05 08:00 Taipei → "2025-01-05"
     const date = new Date('2025-01-05T00:00:00Z')
     expect(getGameLocalDateString(date)).toBe('2025-01-05')
+  })
+})
+
+// =============================================================================
+// getGameLocalStartOfDay
+// =============================================================================
+describe('getGameLocalStartOfDay', () => {
+  it('builds ISO string with game timezone offset', () => {
+    expect(getGameLocalStartOfDay('2026-02-12')).toBe('2026-02-12T00:00:00+08:00')
+  })
+
+  it('parses back to Taipei midnight', () => {
+    const iso = getGameLocalStartOfDay('2026-02-12')
+    const parsed = new Date(iso)
+    // Taipei midnight 2026-02-12 == UTC 2026-02-11 16:00
+    expect(parsed.toISOString()).toBe('2026-02-11T16:00:00.000Z')
   })
 })

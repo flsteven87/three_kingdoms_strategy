@@ -41,6 +41,7 @@ import {
   formatTimeTW,
   formatDateTimeTW,
   getGameLocalDateString,
+  getGameLocalStartOfDay,
   GAME_TIMEZONE,
 } from "@/lib/date-utils";
 
@@ -135,8 +136,6 @@ export function CSVUploadCard({
     setDateError(null);
     setSelectedFile(file);
     setParsedDate(fileDate);
-    // Use Taipei-local date (not UTC date from toISOString) so late-night
-    // uploads don't shift back a day.
     setSnapshotDate(getGameLocalDateString(fileDate));
   };
 
@@ -158,12 +157,7 @@ export function CSVUploadCard({
   const handleUpload = async () => {
     if (!selectedFile || !snapshotDate) return;
 
-    // Build start-of-day in game timezone (Asia/Taipei, UTC+8).
-    // Explicit offset prevents the backend from parsing this as a naive
-    // datetime (which it would interpret as server-local / UTC time).
-    const dateWithTime = `${snapshotDate}T00:00:00+08:00`;
-
-    await onUpload(selectedFile, dateWithTime);
+    await onUpload(selectedFile, getGameLocalStartOfDay(snapshotDate));
 
     // Reset state
     setSelectedFile(null);

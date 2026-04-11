@@ -13,24 +13,26 @@
 /** Game server timezone (Taiwan/China servers use UTC+8) */
 export const GAME_TIMEZONE = 'Asia/Taipei'
 
+/** UTC offset string for the game timezone. Co-located with GAME_TIMEZONE. */
+const GAME_UTC_OFFSET = '+08:00'
+
 /**
- * Extract YYYY-MM-DD string in game timezone (Asia/Taipei) from a Date object.
- *
- * Unlike `date.toISOString().split('T')[0]` which returns the UTC date,
- * this returns the calendar date as observed in Taiwan. Essential for
- * CSV upload date selection where the user thinks in game (Taipei) time.
- *
- * @param date - Any Date object (absolute time)
- * @returns YYYY-MM-DD string in Asia/Taipei timezone
- *
- * @example
- * // CSV uploaded at 2026-02-12 07:34 Taipei (== 2026-02-11 23:34 UTC)
- * const d = new Date('2026-02-11T23:34:50Z')
- * getGameLocalDateString(d) // "2026-02-12" (not "2026-02-11")
+ * Return YYYY-MM-DD for the given Date as observed in Taiwan (game timezone).
+ * Use this instead of `date.toISOString().split('T')[0]`, which returns the
+ * UTC date and shifts late-night Taipei uploads back a day.
  */
 export function getGameLocalDateString(date: Date): string {
-  // en-CA locale always produces YYYY-MM-DD format regardless of runtime
+  // en-CA locale always produces YYYY-MM-DD format.
   return date.toLocaleDateString('en-CA', { timeZone: GAME_TIMEZONE })
+}
+
+/**
+ * Given a YYYY-MM-DD date, return the start-of-day ISO string with the game
+ * timezone offset. Callers send this to the backend so the datetime is parsed
+ * as aware (not naive, which the backend would interpret as server-local time).
+ */
+export function getGameLocalStartOfDay(dateStr: string): string {
+  return `${dateStr}T00:00:00${GAME_UTC_OFFSET}`
 }
 
 /**
