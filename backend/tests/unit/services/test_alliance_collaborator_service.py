@@ -74,11 +74,18 @@ def mock_supabase() -> MagicMock:
 
 
 @pytest.fixture
+def mock_auth_user_repo() -> MagicMock:
+    """Create mock AuthUserRepository"""
+    return MagicMock()
+
+
+@pytest.fixture
 def collaborator_service(
     mock_collaborator_repo: MagicMock,
     mock_invitation_repo: MagicMock,
     mock_permission_service: MagicMock,
     mock_supabase: MagicMock,
+    mock_auth_user_repo: MagicMock,
 ) -> AllianceCollaboratorService:
     """Create AllianceCollaboratorService with mocked dependencies"""
     service = AllianceCollaboratorService()
@@ -86,6 +93,7 @@ def collaborator_service(
     service._invitation_repo = mock_invitation_repo
     service._permission_service = mock_permission_service
     service._supabase = mock_supabase
+    service._auth_user_repo = mock_auth_user_repo
     return service
 
 
@@ -130,15 +138,6 @@ def create_mock_pending_invitation(
     )
 
 
-def create_mock_supabase_user(user_id: UUID, email: str) -> MagicMock:
-    """Factory for creating mock Supabase user"""
-    user = MagicMock()
-    user.id = str(user_id)
-    user.email = email
-    user.user_metadata = {"full_name": "Test User", "avatar_url": "https://example.com/avatar.png"}
-    return user
-
-
 # =============================================================================
 # Tests for add_collaborator_by_email
 # =============================================================================
@@ -152,7 +151,7 @@ class TestAddCollaboratorByEmail:
         self,
         collaborator_service: AllianceCollaboratorService,
         mock_permission_service: MagicMock,
-        mock_supabase: MagicMock,
+        mock_auth_user_repo: MagicMock,
         mock_collaborator_repo: MagicMock,
         owner_user_id: UUID,
         target_user_id: UUID,
@@ -161,11 +160,10 @@ class TestAddCollaboratorByEmail:
         """Should add existing user as collaborator"""
         # Arrange
         email = "existing@example.com"
-        mock_user = create_mock_supabase_user(target_user_id, email)
         mock_collaborator = create_mock_collaborator(target_user_id, alliance_id)
 
         mock_permission_service.require_owner = AsyncMock()
-        mock_supabase.auth.admin.list_users.return_value.users = [mock_user]
+        mock_auth_user_repo.find_user_id_by_email = AsyncMock(return_value=target_user_id)
         mock_collaborator_repo.is_collaborator = AsyncMock(return_value=False)
         mock_collaborator_repo.add_collaborator = AsyncMock(return_value=mock_collaborator)
 
@@ -184,7 +182,7 @@ class TestAddCollaboratorByEmail:
         self,
         collaborator_service: AllianceCollaboratorService,
         mock_permission_service: MagicMock,
-        mock_supabase: MagicMock,
+        mock_auth_user_repo: MagicMock,
         mock_invitation_repo: MagicMock,
         owner_user_id: UUID,
         alliance_id: UUID,
@@ -195,7 +193,7 @@ class TestAddCollaboratorByEmail:
         mock_invitation = create_mock_pending_invitation(alliance_id, email)
 
         mock_permission_service.require_owner = AsyncMock()
-        mock_supabase.auth.admin.list_users.return_value.users = []  # No existing user
+        mock_auth_user_repo.find_user_id_by_email = AsyncMock(return_value=None)
         mock_invitation_repo.check_existing_invitation = AsyncMock(return_value=None)
         mock_invitation_repo.create_invitation = AsyncMock(return_value=mock_invitation)
 
@@ -215,7 +213,7 @@ class TestAddCollaboratorByEmail:
         self,
         collaborator_service: AllianceCollaboratorService,
         mock_permission_service: MagicMock,
-        mock_supabase: MagicMock,
+        mock_auth_user_repo: MagicMock,
         mock_collaborator_repo: MagicMock,
         owner_user_id: UUID,
         target_user_id: UUID,
@@ -224,17 +222,14 @@ class TestAddCollaboratorByEmail:
         """Should raise HTTPException 409 when user is already a collaborator"""
         # Arrange
         email = "existing@example.com"
-        mock_user = create_mock_supabase_user(target_user_id, email)
 
         mock_permission_service.require_owner = AsyncMock()
-        mock_supabase.auth.admin.list_users.return_value.users = [mock_user]
+        mock_auth_user_repo.find_user_id_by_email = AsyncMock(return_value=target_user_id)
         mock_collaborator_repo.is_collaborator = AsyncMock(return_value=True)
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await collaborator_service.add_collaborator_by_email(
-                owner_user_id, alliance_id, email
-            )
+            await collaborator_service.add_collaborator_by_email(owner_user_id, alliance_id, email)
         assert exc_info.value.status_code == 409
         assert "already a collaborator" in exc_info.value.detail
 
@@ -243,7 +238,7 @@ class TestAddCollaboratorByEmail:
         self,
         collaborator_service: AllianceCollaboratorService,
         mock_permission_service: MagicMock,
-        mock_supabase: MagicMock,
+        mock_auth_user_repo: MagicMock,
         mock_invitation_repo: MagicMock,
         owner_user_id: UUID,
         alliance_id: UUID,
@@ -254,16 +249,12 @@ class TestAddCollaboratorByEmail:
         existing_invitation = create_mock_pending_invitation(alliance_id, email)
 
         mock_permission_service.require_owner = AsyncMock()
-        mock_supabase.auth.admin.list_users.return_value.users = []
-        mock_invitation_repo.check_existing_invitation = AsyncMock(
-            return_value=existing_invitation
-        )
+        mock_auth_user_repo.find_user_id_by_email = AsyncMock(return_value=None)
+        mock_invitation_repo.check_existing_invitation = AsyncMock(return_value=existing_invitation)
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await collaborator_service.add_collaborator_by_email(
-                owner_user_id, alliance_id, email
-            )
+            await collaborator_service.add_collaborator_by_email(owner_user_id, alliance_id, email)
         assert exc_info.value.status_code == 409
         assert "Invitation already sent" in exc_info.value.detail
 
@@ -343,7 +334,9 @@ class TestRemoveCollaborator:
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             await collaborator_service.remove_collaborator(
-                owner_user_id, alliance_id, owner_user_id  # Same user
+                owner_user_id,
+                alliance_id,
+                owner_user_id,  # Same user
             )
         assert exc_info.value.status_code == 400
         assert "Cannot remove yourself" in exc_info.value.detail
@@ -616,9 +609,7 @@ class TestGetAllianceCollaborators:
         mock_supabase.auth.admin.get_user_by_id.return_value = mock_user_response
 
         # Act
-        result = await collaborator_service.get_alliance_collaborators(
-            owner_user_id, alliance_id
-        )
+        result = await collaborator_service.get_alliance_collaborators(owner_user_id, alliance_id)
 
         # Assert
         assert len(result) == 1

@@ -16,6 +16,7 @@ from src.core.database import get_supabase_client
 from src.repositories.alliance_collaborator_repository import (
     AllianceCollaboratorRepository,
 )
+from src.repositories.auth_user_repository import AuthUserRepository
 from src.repositories.pending_invitation_repository import PendingInvitationRepository
 from src.services.permission_service import PermissionService
 
@@ -36,6 +37,7 @@ class AllianceCollaboratorService:
         self._collaborator_repo = AllianceCollaboratorRepository()
         self._invitation_repo = PendingInvitationRepository()
         self._permission_service = PermissionService()
+        self._auth_user_repo = AuthUserRepository()
         self._supabase = get_supabase_client()
 
     async def add_collaborator_by_email(
@@ -69,14 +71,11 @@ class AllianceCollaboratorService:
                 current_user_id, alliance_id, "add collaborators"
             )
 
-            # 2. Look up user by email in auth.users
-            result = self._supabase.auth.admin.list_users()
-            users_list = result.users if hasattr(result, "users") else result
-            users_array = list(users_list)
-            target_user = next((u for u in users_array if u.email == email), None)
+            # 2. Look up user by email in auth.users via scalar RPC
+            target_user_id_lookup = await self._auth_user_repo.find_user_id_by_email(email)
 
             # 3. If user not found, create pending invitation
-            if not target_user:
+            if target_user_id_lookup is None:
                 # Check if invitation already exists
                 existing_invitation = await self._invitation_repo.check_existing_invitation(
                     alliance_id, email
@@ -107,7 +106,7 @@ class AllianceCollaboratorService:
                 }
 
             # 4. User exists - add as collaborator immediately
-            target_user_id = UUID(target_user.id)
+            target_user_id = target_user_id_lookup
 
             # Check if already a collaborator
             if await self._collaborator_repo.is_collaborator(alliance_id, target_user_id):
