@@ -5,6 +5,7 @@ import {
   formatDateTimeTW,
   parseCsvFilenameDate,
   isDateInRange,
+  getGameLocalDateString,
 } from '../date-utils'
 
 // =============================================================================
@@ -115,5 +116,34 @@ describe('isDateInRange', () => {
   it('handles null endDate (open-ended, uses today)', () => {
     const target = new Date()
     expect(isDateInRange(target, '2020-01-01', null)).toBe(true)
+  })
+})
+
+// =============================================================================
+// getGameLocalDateString
+// =============================================================================
+describe('getGameLocalDateString', () => {
+  it('returns YYYY-MM-DD in Taiwan timezone', () => {
+    // 2025-10-09T02:13:09Z → 10:13 Taipei → "2025-10-09"
+    const date = new Date('2025-10-09T02:13:09Z')
+    expect(getGameLocalDateString(date)).toBe('2025-10-09')
+  })
+
+  it('handles UTC late-night → Taipei next day', () => {
+    // 2026-02-11T23:34:50Z → 2026-02-12 07:34 Taipei → "2026-02-12"
+    const date = new Date('2026-02-11T23:34:50Z')
+    expect(getGameLocalDateString(date)).toBe('2026-02-12')
+  })
+
+  it('handles UTC late-afternoon → Taipei next day boundary', () => {
+    // 2026-02-03T16:07:45Z → 2026-02-04 00:07 Taipei → "2026-02-04"
+    const date = new Date('2026-02-03T16:07:45Z')
+    expect(getGameLocalDateString(date)).toBe('2026-02-04')
+  })
+
+  it('pads single-digit month and day', () => {
+    // 2025-01-05T00:00:00Z → 2025-01-05 08:00 Taipei → "2025-01-05"
+    const date = new Date('2025-01-05T00:00:00Z')
+    expect(getGameLocalDateString(date)).toBe('2025-01-05')
   })
 })

@@ -14,6 +14,26 @@
 export const GAME_TIMEZONE = 'Asia/Taipei'
 
 /**
+ * Extract YYYY-MM-DD string in game timezone (Asia/Taipei) from a Date object.
+ *
+ * Unlike `date.toISOString().split('T')[0]` which returns the UTC date,
+ * this returns the calendar date as observed in Taiwan. Essential for
+ * CSV upload date selection where the user thinks in game (Taipei) time.
+ *
+ * @param date - Any Date object (absolute time)
+ * @returns YYYY-MM-DD string in Asia/Taipei timezone
+ *
+ * @example
+ * // CSV uploaded at 2026-02-12 07:34 Taipei (== 2026-02-11 23:34 UTC)
+ * const d = new Date('2026-02-11T23:34:50Z')
+ * getGameLocalDateString(d) // "2026-02-12" (not "2026-02-11")
+ */
+export function getGameLocalDateString(date: Date): string {
+  // en-CA locale always produces YYYY-MM-DD format regardless of runtime
+  return date.toLocaleDateString('en-CA', { timeZone: GAME_TIMEZONE })
+}
+
+/**
  * Format UTC ISO string to Taiwan date display (YYYY/MM/DD)
  *
  * @param isoString - ISO 8601 timestamp (e.g., "2025-10-09T02:13:09Z")
