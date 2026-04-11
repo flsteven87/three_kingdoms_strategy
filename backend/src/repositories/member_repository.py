@@ -179,6 +179,47 @@ class MemberRepository(SupabaseRepository[Member]):
 
         return self._build_models(data)
 
+    async def deactivate_absent_members(self, alliance_id: UUID, present_names: set[str]) -> int:
+        """
+        Mark all currently-active members of an alliance whose name is NOT
+        in `present_names` as inactive.
+
+        Used after a regular CSV upload to reflect that members absent from
+        the latest roster have left the alliance. Service layer must only
+        call this when processing the latest upload for the alliance, so
+        that backfilling an older CSV does not retroactively deactivate
+        newer members.
+
+        Args:
+            alliance_id: Alliance UUID
+            present_names: Names of members present in the current CSV
+
+        Returns:
+            Number of members deactivated
+
+        符合 CLAUDE.md 🔴: Uses _handle_supabase_result()
+        """
+        if not present_names:
+            # PostgREST `.in_()` rejects an empty iterable. Callers should
+            # have already rejected an empty CSV; guard the repo anyway.
+            return 0
+
+        names_list = list(present_names)
+
+        def _query():
+            return (
+                self.client.from_(self.table_name)
+                .update({"is_active": False})
+                .eq("alliance_id", str(alliance_id))
+                .eq("is_active", True)
+                .not_.in_("name", names_list)
+                .execute()
+            )
+
+        result = await self._execute_async(_query)
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return len(data) if data else 0
+
     async def delete_by_alliance(self, alliance_id: UUID) -> bool:
         """
         Delete ALL members for an alliance
