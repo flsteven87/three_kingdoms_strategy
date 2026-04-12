@@ -301,7 +301,9 @@ class TestDiscountedAmountValidation:
         data["amount"] = 799  # NT$999 - NT$200 coupon
 
         result = await payment_service.handle_payment_success(
-            data, event_id="evt_discount_1", event_type="order.paid",
+            data,
+            event_id="evt_discount_1",
+            event_type="order.paid",
         )
         assert result["status"] == "granted"
 
@@ -314,7 +316,9 @@ class TestDiscountedAmountValidation:
         data["amount"] = 0
         with pytest.raises(WebhookPermanentError, match="amount_out_of_range"):
             await payment_service.handle_payment_success(
-                data, event_id="evt_zero", event_type="order.paid",
+                data,
+                event_id="evt_zero",
+                event_type="order.paid",
             )
 
     async def test_amount_above_expected_rejected(
@@ -326,7 +330,9 @@ class TestDiscountedAmountValidation:
         data["amount"] = 1500
         with pytest.raises(WebhookPermanentError, match="amount_out_of_range"):
             await payment_service.handle_payment_success(
-                data, event_id="evt_over", event_type="order.paid",
+                data,
+                event_id="evt_over",
+                event_type="order.paid",
             )
 
     async def test_negative_amount_rejected(
@@ -338,7 +344,9 @@ class TestDiscountedAmountValidation:
         data["amount"] = -100
         with pytest.raises(WebhookPermanentError, match="amount_out_of_range"):
             await payment_service.handle_payment_success(
-                data, event_id="evt_neg", event_type="order.paid",
+                data,
+                event_id="evt_neg",
+                event_type="order.paid",
             )
 
 
@@ -477,6 +485,10 @@ class TestFullPaymentToActivationFlow:
         mock_alliance_repo.get_by_collaborator = AsyncMock(return_value=alliance_exhausted)
         mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance_exhausted)
         mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
+
+        rpc_exhausted = MagicMock()
+        rpc_exhausted.data = [{"status": "exhausted", "remaining_seasons": 0}]
+        mock_supabase_client.rpc.return_value.execute.return_value = rpc_exhausted
 
         draft2 = make_season(SEASON_ID_2, ALLIANCE_ID, activation_status="draft")
         mock_season_repo.get_by_id = AsyncMock(return_value=draft2)

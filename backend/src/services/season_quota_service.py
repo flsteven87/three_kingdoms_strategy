@@ -243,18 +243,6 @@ class SeasonQuotaService:
 
             raise SeasonQuotaExhaustedError(message)
 
-    async def require_season_activation(self, alliance_id: UUID) -> None:
-        """Require alliance to be able to activate a season."""
-        alliance = await self.get_alliance_by_id(alliance_id)
-        if not alliance:
-            raise ValueError(f"Alliance not found: {alliance_id}")
-
-        can_activate = await self._can_activate_season(alliance)
-        if not can_activate:
-            logger.warning("Season activation denied - alliance_id=%s", alliance_id)
-            message = "您的可用季數已用完，請購買季數以啟用新賽季。"
-            raise SeasonQuotaExhaustedError(message)
-
     # =========================================================================
     # Season Consumption
     # =========================================================================
@@ -312,7 +300,7 @@ class SeasonQuotaService:
             return (0, True, trial_end.isoformat())
 
         # status == "exhausted"
-        raise ValueError("No available seasons or trial to consume")
+        raise SeasonQuotaExhaustedError("您的可用季數已用完，請購買季數以啟用新賽季。")
 
     async def add_purchased_seasons(self, alliance_id: UUID, seasons: int) -> int:
         """Add purchased seasons to alliance using atomic DB increment."""

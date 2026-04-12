@@ -590,7 +590,6 @@ class TestActivateSeason:
         mock_season_repo.update = AsyncMock(return_value=activated_season)
 
         # Mock quota service
-        mock_season_quota_service.require_season_activation = AsyncMock()
         mock_season_quota_service.consume_season = AsyncMock(
             return_value=(0, True, "2026-02-08T00:00:00+00:00")
         )
@@ -606,7 +605,6 @@ class TestActivateSeason:
         # First season should auto-set as current
         update_call = mock_season_repo.update.call_args[0][1]
         assert update_call["is_current"] is True
-        mock_season_quota_service.require_season_activation.assert_called_once_with(alliance_id)
         mock_season_quota_service.consume_season.assert_called_once_with(alliance_id)
 
     @pytest.mark.asyncio
@@ -647,7 +645,6 @@ class TestActivateSeason:
         mock_season_repo.update = AsyncMock(return_value=activated_season)
 
         # Mock quota service - using purchased quota
-        mock_season_quota_service.require_season_activation = AsyncMock()
         mock_season_quota_service.consume_season = AsyncMock(
             return_value=(4, False, None)  # 4 remaining, not trial
         )

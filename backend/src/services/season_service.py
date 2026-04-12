@@ -206,7 +206,9 @@ class SeasonService:
             data["end_date"] = data["end_date"].isoformat()
 
         season = await self._repo.create(data)
-        logger.info("Season created as draft - season_id=%s, alliance_id=%s", season.id, alliance.id)
+        logger.info(
+            "Season created as draft - season_id=%s, alliance_id=%s", season.id, alliance.id
+        )
 
         return season
 
@@ -242,10 +244,7 @@ class SeasonService:
         if season.end_date is not None:
             self._validate_season_duration(season.start_date, season.end_date)
 
-        # Verify can activate (has trial or seasons)
-        await self._season_quota_service.require_season_activation(season.alliance_id)
-
-        # Consume season (handles trial vs paid logic)
+        # Consume season (atomic — handles trial vs paid vs exhausted in a single RPC)
         # Returns tuple: (remaining_seasons, used_trial, trial_ends_at)
         remaining, used_trial, trial_ends_at = await self._season_quota_service.consume_season(
             season.alliance_id
@@ -346,7 +345,6 @@ class SeasonService:
             if new_end is not None:
                 self._validate_season_duration(new_start, new_end)
 
-
         # Convert date objects to ISO format strings for Supabase
         if "start_date" in update_data and update_data["start_date"]:
             update_data["start_date"] = update_data["start_date"].isoformat()
@@ -421,8 +419,7 @@ class SeasonService:
         # Only non-draft seasons can be set as current (activated or completed)
         if season.activation_status == "draft":
             raise ValueError(
-                "Cannot set draft season as current. "
-                "Please activate the season first."
+                "Cannot set draft season as current. Please activate the season first."
             )
 
         # Verify write permission (role check)

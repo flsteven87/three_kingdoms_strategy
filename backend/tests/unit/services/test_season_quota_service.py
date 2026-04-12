@@ -698,9 +698,9 @@ class TestConsumeSeason:
         mock_supabase_client.rpc.return_value.execute.return_value = rpc_result
 
         # Act & Assert
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(SeasonQuotaExhaustedError) as exc_info:
             await quota_service.consume_season(alliance_id)
-        assert "No available seasons or trial" in str(exc_info.value)
+        assert "可用季數已用完" in str(exc_info.value)
 
 
 # =============================================================================
@@ -913,60 +913,6 @@ class TestCanActivateSeasonPublic:
         result = await quota_service.can_activate_season(alliance_id)
 
         assert result is False
-
-
-# =============================================================================
-# Tests for require_season_activation
-# =============================================================================
-
-
-class TestRequireSeasonActivation:
-    """Tests for enforcing season activation requirements"""
-
-    @pytest.mark.asyncio
-    async def test_passes_when_can_activate(
-        self,
-        quota_service: SeasonQuotaService,
-        mock_alliance_repo: MagicMock,
-        mock_season_repo: MagicMock,
-        alliance_id: UUID,
-    ):
-        """Should pass silently when alliance can activate"""
-        alliance = create_mock_alliance(alliance_id, purchased_seasons=5, used_seasons=2)
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=2)
-
-        await quota_service.require_season_activation(alliance_id)
-
-    @pytest.mark.asyncio
-    async def test_raises_when_cannot_activate(
-        self,
-        quota_service: SeasonQuotaService,
-        mock_alliance_repo: MagicMock,
-        mock_season_repo: MagicMock,
-        alliance_id: UUID,
-    ):
-        """Should raise SeasonQuotaExhaustedError when no quota and trial used"""
-        alliance = create_mock_alliance(alliance_id, purchased_seasons=0)
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=alliance)
-        mock_season_repo.get_activated_seasons_count = AsyncMock(return_value=1)
-
-        with pytest.raises(SeasonQuotaExhaustedError) as exc_info:
-            await quota_service.require_season_activation(alliance_id)
-        assert "購買季數" in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_raises_when_alliance_not_found(
-        self,
-        quota_service: SeasonQuotaService,
-        mock_alliance_repo: MagicMock,
-        alliance_id: UUID,
-    ):
-        """Should raise ValueError when alliance doesn't exist"""
-        mock_alliance_repo.get_by_id = AsyncMock(return_value=None)
-
-        with pytest.raises(ValueError, match="Alliance not found"):
-            await quota_service.require_season_activation(alliance_id)
 
 
 # =============================================================================
