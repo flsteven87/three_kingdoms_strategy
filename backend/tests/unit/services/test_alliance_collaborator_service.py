@@ -568,6 +568,47 @@ class TestProcessPendingInvitations:
         mock_invitation_repo.mark_as_accepted.assert_called_once()
         mock_collaborator_repo.add_collaborator.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_should_propagate_db_outage(
+        self,
+        collaborator_service: AllianceCollaboratorService,
+        mock_invitation_repo: MagicMock,
+        target_user_id: UUID,
+    ):
+        """DB outage while fetching invitations must propagate, not return 0."""
+        # Arrange
+        email = "newuser@example.com"
+        mock_invitation_repo.get_pending_by_email = AsyncMock(
+            side_effect=RuntimeError("connection pool exhausted")
+        )
+
+        # Act & Assert
+        with pytest.raises(RuntimeError, match="connection pool exhausted"):
+            await collaborator_service.process_pending_invitations(target_user_id, email)
+
+    @pytest.mark.asyncio
+    async def test_should_propagate_per_invitation_failure(
+        self,
+        collaborator_service: AllianceCollaboratorService,
+        mock_invitation_repo: MagicMock,
+        mock_collaborator_repo: MagicMock,
+        target_user_id: UUID,
+        alliance_id: UUID,
+    ):
+        """Unexpected per-invitation error must propagate, not continue silently."""
+        # Arrange
+        email = "newuser@example.com"
+        invitation = create_mock_pending_invitation(alliance_id, email)
+        mock_invitation_repo.get_pending_by_email = AsyncMock(return_value=[invitation])
+        mock_collaborator_repo.is_collaborator = AsyncMock(return_value=False)
+        mock_collaborator_repo.add_collaborator = AsyncMock(
+            side_effect=RuntimeError("db timeout")
+        )
+
+        # Act & Assert
+        with pytest.raises(RuntimeError, match="db timeout"):
+            await collaborator_service.process_pending_invitations(target_user_id, email)
+
 
 # =============================================================================
 # Tests for get_alliance_collaborators

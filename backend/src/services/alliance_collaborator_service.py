@@ -302,75 +302,47 @@ class AllianceCollaboratorService:
         """
         Process all pending invitations for a newly registered user.
 
-        This should be called after user registration/login to automatically
-        add them to alliances they were invited to.
-
-        Args:
-            user_id: UUID of newly registered user
-            email: Email address of the user
-
-        Returns:
-            Number of invitations processed
+        Called from /collaborators/process-invitations right after login so a
+        user who was invited pre-registration auto-joins their alliance on
+        first sign-in. Unexpected errors (DB outage, RPC failure) propagate
+        to the global exception handler so the client can retry instead of
+        silently seeing ``processed_count=0``.
 
         符合 CLAUDE.md 🔴: Service layer orchestrates multi-step workflow
         """
-        try:
-            logger.info(f"Looking for pending invitations for: {email}")
+        logger.info("Looking for pending invitations for: %s", email)
 
-            # 1. Get all pending invitations for this email
-            pending_invitations = await self._invitation_repo.get_pending_by_email(email)
+        pending_invitations = await self._invitation_repo.get_pending_by_email(email)
 
-            if not pending_invitations:
-                logger.info(f"No pending invitations found for: {email}")
-                return 0
-
-            logger.info(f"Found {len(pending_invitations)} pending invitation(s) for: {email}")
-            processed_count = 0
-
-            # 2. Process each invitation
-            for invitation in pending_invitations:
-                try:
-                    logger.debug(f"Processing invitation to alliance_id: {invitation.alliance_id}")
-
-                    # Check if already a collaborator (prevent duplicates)
-                    is_existing = await self._collaborator_repo.is_collaborator(
-                        invitation.alliance_id, user_id
-                    )
-
-                    if is_existing:
-                        logger.warning(
-                            "User already a collaborator, marking invitation as accepted"
-                        )
-                        await self._invitation_repo.mark_as_accepted(invitation.id)
-                        processed_count += 1
-                        continue
-
-                    # Add user as collaborator
-                    logger.debug(f"Adding user as collaborator with role: {invitation.role}")
-                    await self._collaborator_repo.add_collaborator(
-                        alliance_id=invitation.alliance_id,
-                        user_id=user_id,
-                        role=invitation.role,
-                        invited_by=invitation.invited_by,
-                    )
-
-                    # Mark invitation as accepted
-                    await self._invitation_repo.mark_as_accepted(invitation.id)
-                    processed_count += 1
-                    logger.debug("Successfully processed invitation")
-
-                except Exception as e:
-                    logger.error(f"Failed to process invitation: {e}")
-                    # Continue processing other invitations even if one fails
-                    continue
-
-            logger.info(f"Processed {processed_count}/{len(pending_invitations)} invitations")
-            return processed_count
-
-        except Exception as e:
-            logger.error(f"Error in process_pending_invitations: {e}")
-            # Don't raise exception - this is a background process
+        if not pending_invitations:
+            logger.info("No pending invitations found for: %s", email)
             return 0
+
+        logger.info("Found %d pending invitation(s) for: %s", len(pending_invitations), email)
+        processed_count = 0
+
+        for invitation in pending_invitations:
+            is_existing = await self._collaborator_repo.is_collaborator(
+                invitation.alliance_id, user_id
+            )
+
+            if is_existing:
+                logger.warning("User already a collaborator, marking invitation as accepted")
+                await self._invitation_repo.mark_as_accepted(invitation.id)
+                processed_count += 1
+                continue
+
+            await self._collaborator_repo.add_collaborator(
+                alliance_id=invitation.alliance_id,
+                user_id=user_id,
+                role=invitation.role,
+                invited_by=invitation.invited_by,
+            )
+            await self._invitation_repo.mark_as_accepted(invitation.id)
+            processed_count += 1
+
+        logger.info("Processed %d/%d invitations", processed_count, len(pending_invitations))
+        return processed_count
 
     async def get_alliance_collaborators(
         self, current_user_id: UUID, alliance_id: UUID
