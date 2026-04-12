@@ -2,6 +2,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useRecalculateSeasonPeriods, periodKeys } from "../use-periods";
 import { csvUploadKeys } from "../use-csv-uploads";
+import { analyticsKeys } from "../use-analytics";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
 import type { QueryClient } from "@tanstack/react-query";
 
@@ -53,7 +54,7 @@ describe("useRecalculateSeasonPeriods", () => {
     expect(apiClient.recalculateSeasonPeriods).toHaveBeenCalledWith(SEASON_ID);
   });
 
-  it("invalidates period and csv-upload caches on settled", async () => {
+  it("invalidates period + csv-upload + analytics caches on settled", async () => {
     vi.mocked(apiClient.recalculateSeasonPeriods).mockResolvedValueOnce({
       success: true,
       season_id: SEASON_ID,
@@ -77,6 +78,9 @@ describe("useRecalculateSeasonPeriods", () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: csvUploadKeys.list(SEASON_ID),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: analyticsKeys.all,
     });
   });
 

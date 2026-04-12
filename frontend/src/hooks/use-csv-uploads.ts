@@ -9,6 +9,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { invalidateSeasonDerivedData } from "@/lib/query-invalidation";
 import type { CsvUpload } from "@/types/csv-upload";
 
 // Query Keys Factory
@@ -73,10 +74,7 @@ export function useUploadCsv() {
     }: UploadCsvVariables) =>
       apiClient.uploadCsv(seasonId, file, snapshotDate, idempotencyKey),
     onSettled: (_data, _error, variables) => {
-      // Always invalidate to ensure cache consistency
-      queryClient.invalidateQueries({
-        queryKey: csvUploadKeys.list(variables.seasonId),
-      });
+      invalidateSeasonDerivedData(queryClient, variables.seasonId);
     },
   });
 }
@@ -122,8 +120,7 @@ export function useDeleteCsvUpload(seasonId: string) {
       }
     },
     onSettled: () => {
-      // Refetch to sync with server
-      queryClient.invalidateQueries({ queryKey: csvUploadKeys.list(seasonId) });
+      invalidateSeasonDerivedData(queryClient, seasonId);
     },
   });
 }

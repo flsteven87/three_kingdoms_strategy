@@ -6,7 +6,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import { csvUploadKeys } from "./use-csv-uploads";
+import { invalidateSeasonDerivedData } from "@/lib/query-invalidation";
 
 // Query Keys Factory
 export const periodKeys = {
@@ -32,9 +32,7 @@ export function useRecalculateSeasonPeriods(seasonId: string) {
   return useMutation({
     mutationFn: () => apiClient.recalculateSeasonPeriods(seasonId),
     onSettled: () => {
-      // Always invalidate to ensure cache consistency
-      queryClient.invalidateQueries({ queryKey: periodKeys.list(seasonId) });
-      queryClient.invalidateQueries({ queryKey: csvUploadKeys.list(seasonId) });
+      invalidateSeasonDerivedData(queryClient, seasonId);
     },
   });
 }

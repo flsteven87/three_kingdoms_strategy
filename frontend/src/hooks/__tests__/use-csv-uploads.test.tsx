@@ -6,6 +6,8 @@ import {
   useDeleteCsvUpload,
   csvUploadKeys,
 } from "../use-csv-uploads";
+import { periodKeys } from "../use-periods";
+import { analyticsKeys } from "../use-analytics";
 import type { QueryClient } from "@tanstack/react-query";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
 import type { CsvUpload, CsvUploadResponse } from "@/types/csv-upload";
@@ -131,7 +133,7 @@ describe("useUploadCsv", () => {
     );
   });
 
-  it("invalidates csv upload list on settled", async () => {
+  it("invalidates csv upload + periods + analytics caches on settled", async () => {
     const mockUploadResponse: CsvUploadResponse = {
       upload_id: mockUploads[0].id,
       season_id: mockUploads[0].season_id,
@@ -155,6 +157,12 @@ describe("useUploadCsv", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: csvUploadKeys.list(SEASON_ID),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: periodKeys.list(SEASON_ID),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: analyticsKeys.all,
     });
   });
 });
@@ -213,5 +221,29 @@ describe("useDeleteCsvUpload", () => {
       csvUploadKeys.list(SEASON_ID)
     );
     expect(cached).toHaveLength(2);
+  });
+
+  it("invalidates csv upload + periods + analytics caches on settled", async () => {
+    queryClient.setQueryData(csvUploadKeys.list(SEASON_ID), mockUploads);
+    vi.mocked(apiClient.deleteCsvUpload).mockResolvedValueOnce(undefined);
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(
+      () => useDeleteCsvUpload(SEASON_ID),
+      { wrapper: createWrapper(queryClient) }
+    );
+
+    act(() => { result.current.mutate("upload-1"); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: csvUploadKeys.list(SEASON_ID),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: periodKeys.list(SEASON_ID),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: analyticsKeys.all,
+    });
   });
 });
