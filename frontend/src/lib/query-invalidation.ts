@@ -8,9 +8,7 @@
  */
 
 import type { QueryClient } from "@tanstack/react-query";
-import { analyticsKeys } from "@/hooks/use-analytics";
-import { csvUploadKeys } from "@/hooks/use-csv-uploads";
-import { periodKeys } from "@/hooks/use-periods";
+import { analyticsKeys, csvUploadKeys, periodKeys } from "@/lib/query-keys";
 
 /**
  * Invalidate every cache that a CSV upload, delete, or period

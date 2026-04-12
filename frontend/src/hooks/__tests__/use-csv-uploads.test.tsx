@@ -4,10 +4,8 @@ import {
   useCsvUploads,
   useUploadCsv,
   useDeleteCsvUpload,
-  csvUploadKeys,
 } from "../use-csv-uploads";
-import { periodKeys } from "../use-periods";
-import { analyticsKeys } from "../use-analytics";
+import { analyticsKeys, csvUploadKeys, periodKeys } from "@/lib/query-keys";
 import type { QueryClient } from "@tanstack/react-query";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
 import type { CsvUpload, CsvUploadResponse } from "@/types/csv-upload";

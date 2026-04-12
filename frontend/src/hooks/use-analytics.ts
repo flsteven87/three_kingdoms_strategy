@@ -11,56 +11,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-
-// Query Keys Factory
-export const analyticsKeys = {
-  all: ["analytics"] as const,
-
-  // Members list
-  members: () => [...analyticsKeys.all, "members"] as const,
-  membersList: (seasonId: string, activeOnly: boolean) =>
-    [...analyticsKeys.members(), { seasonId, activeOnly }] as const,
-
-  // Member trend
-  trends: () => [...analyticsKeys.all, "trend"] as const,
-  memberTrend: (memberId: string, seasonId: string) =>
-    [...analyticsKeys.trends(), memberId, seasonId] as const,
-
-  // Member summary
-  summaries: () => [...analyticsKeys.all, "summary"] as const,
-  memberSummary: (memberId: string, seasonId: string) =>
-    [...analyticsKeys.summaries(), memberId, seasonId] as const,
-
-  // Period averages
-  periodAverages: () => [...analyticsKeys.all, "period-averages"] as const,
-  periodAverage: (periodId: string) =>
-    [...analyticsKeys.periodAverages(), periodId] as const,
-
-  // Alliance trend
-  allianceTrend: (seasonId: string) =>
-    [...analyticsKeys.all, "alliance-trend", seasonId] as const,
-
-  // Season averages (for "賽季以來" view comparison)
-  seasonAverages: (seasonId: string) =>
-    [...analyticsKeys.all, "season-averages", seasonId] as const,
-
-  // Group analytics
-  groups: () => [...analyticsKeys.all, "groups"] as const,
-  groupsList: (seasonId: string) =>
-    [...analyticsKeys.groups(), "list", seasonId] as const,
-  groupAnalytics: (
-    groupName: string,
-    seasonId: string,
-    view: "latest" | "season" = "latest",
-  ) =>
-    [...analyticsKeys.groups(), "detail", groupName, seasonId, view] as const,
-  groupsComparison: (seasonId: string, view: "latest" | "season" = "latest") =>
-    [...analyticsKeys.groups(), "comparison", seasonId, view] as const,
-
-  // Alliance analytics
-  allianceAnalytics: (seasonId: string, view: "latest" | "season" = "latest") =>
-    [...analyticsKeys.all, "alliance-analytics", seasonId, view] as const,
-};
+import { analyticsKeys } from "@/lib/query-keys";
 
 /**
  * Hook to fetch members list for analytics selector

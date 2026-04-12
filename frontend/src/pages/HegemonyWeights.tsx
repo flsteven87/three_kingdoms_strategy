@@ -22,7 +22,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { useSeasons } from '@/hooks/use-seasons'
 import { HegemonyWeightCard } from '@/components/hegemony-weights/HegemonyWeightCard'
 import { hegemonyWeightKeys } from '@/hooks/use-hegemony-weights'
-import { csvUploadKeys } from '@/hooks/use-csv-uploads'
+import { csvUploadKeys } from '@/lib/query-keys'
 import { apiClient } from '@/lib/api-client'
 
 function HegemonyWeights() {

@@ -260,7 +260,9 @@ class SeasonQuotaService:
             Tuple of (remaining_seasons, used_trial, trial_ends_at)
 
         Raises:
-            ValueError: If alliance not found or quota exhausted.
+            ValueError: If alliance not found.
+            SeasonQuotaExhaustedError: If the alliance has no purchased
+                seasons left and its trial is already used.
         """
         try:
             result = await asyncio.to_thread(

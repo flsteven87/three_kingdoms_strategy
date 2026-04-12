@@ -1,8 +1,7 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useRecalculateSeasonPeriods, periodKeys } from "../use-periods";
-import { csvUploadKeys } from "../use-csv-uploads";
-import { analyticsKeys } from "../use-analytics";
+import { useRecalculateSeasonPeriods } from "../use-periods";
+import { analyticsKeys, csvUploadKeys, periodKeys } from "@/lib/query-keys";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
 import type { QueryClient } from "@tanstack/react-query";
 

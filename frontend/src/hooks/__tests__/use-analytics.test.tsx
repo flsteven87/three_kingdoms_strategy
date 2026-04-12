@@ -1,7 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  analyticsKeys,
   useAnalyticsMembers,
   useMemberTrend,
   useMemberSeasonSummary,
@@ -13,6 +12,7 @@ import {
   useGroupsComparison,
   useAllianceAnalytics,
 } from "../use-analytics";
+import { analyticsKeys } from "@/lib/query-keys";
 import type { QueryClient } from "@tanstack/react-query";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
 import type {

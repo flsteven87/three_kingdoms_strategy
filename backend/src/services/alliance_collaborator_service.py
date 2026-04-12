@@ -302,13 +302,9 @@ class AllianceCollaboratorService:
         """
         Process all pending invitations for a newly registered user.
 
-        Called from /collaborators/process-invitations right after login so a
-        user who was invited pre-registration auto-joins their alliance on
-        first sign-in. Unexpected errors (DB outage, RPC failure) propagate
-        to the global exception handler so the client can retry instead of
-        silently seeing ``processed_count=0``.
-
-        符合 CLAUDE.md 🔴: Service layer orchestrates multi-step workflow
+        Unexpected errors propagate to the global exception handler so the
+        client can retry — swallowing them would leave the user unable to
+        tell a transient DB outage apart from "no invitations exist".
         """
         logger.info("Looking for pending invitations for: %s", email)
 

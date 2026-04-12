@@ -9,17 +9,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { csvUploadKeys } from "@/lib/query-keys";
 import { invalidateSeasonDerivedData } from "@/lib/query-invalidation";
 import type { CsvUpload } from "@/types/csv-upload";
-
-// Query Keys Factory
-export const csvUploadKeys = {
-  all: ["csv-uploads"] as const,
-  lists: () => [...csvUploadKeys.all, "list"] as const,
-  list: (seasonId: string) => [...csvUploadKeys.lists(), { seasonId }] as const,
-  details: () => [...csvUploadKeys.all, "detail"] as const,
-  detail: (id: string) => [...csvUploadKeys.details(), id] as const,
-};
 
 /**
  * Hook to fetch CSV uploads for a season

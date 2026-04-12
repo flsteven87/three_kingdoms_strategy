@@ -8,17 +8,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { invalidateSeasonDerivedData } from "@/lib/query-invalidation";
 
-// Query Keys Factory
-export const periodKeys = {
-  all: ["periods"] as const,
-  lists: () => [...periodKeys.all, "list"] as const,
-  list: (seasonId: string) => [...periodKeys.lists(), { seasonId }] as const,
-  details: () => [...periodKeys.all, "detail"] as const,
-  detail: (id: string) => [...periodKeys.details(), id] as const,
-  metrics: (periodId: string) =>
-    [...periodKeys.all, "metrics", periodId] as const,
-};
-
 /**
  * Hook to recalculate all periods for a specific season
  *
