@@ -90,6 +90,7 @@ export function PerformanceTab({ session }: Props) {
     lineUserId: session.lineUserId,
     lineGroupId: session.lineGroupId,
     lineDisplayName: session.lineDisplayName,
+    lineIdToken: session.lineIdToken ?? "",
   };
 
   // Get registered accounts

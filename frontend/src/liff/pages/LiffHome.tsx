@@ -37,6 +37,7 @@ export function LiffHome() {
     lineUserId: session.lineUserId,
     lineGroupId: session.lineGroupId,
     lineDisplayName: session.lineDisplayName,
+    lineIdToken: session.lineIdToken ?? "",
   };
 
   const { data: memberInfo, isLoading } = useLiffMemberInfo(context);

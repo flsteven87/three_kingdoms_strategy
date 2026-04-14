@@ -369,14 +369,19 @@ class CSVUploadService:
         if not unverified:
             return 0
 
+        pending_names = {binding.game_id for binding in unverified}
+        existing_member_ids = await self._member_repo.get_ids_by_names(alliance_id, pending_names)
+        candidate_member_ids = {**existing_member_ids, **member_ids_map}
+
         # Find bindings that can now be verified
         updates: list[dict[str, str]] = []
         for binding in unverified:
-            if binding.game_id in member_ids_map:
+            member_id = candidate_member_ids.get(binding.game_id)
+            if member_id is not None:
                 updates.append(
                     {
                         "id": str(binding.id),
-                        "member_id": str(member_ids_map[binding.game_id]),
+                        "member_id": str(member_id),
                     }
                 )
 

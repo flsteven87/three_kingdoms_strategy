@@ -129,6 +129,7 @@ def csv_upload_service(
     # Individual tests may override these for assertions.
     mock_csv_upload_repo.get_latest_by_season = AsyncMock(return_value=None)
     mock_member_repo.deactivate_absent_members = AsyncMock(return_value=0)
+    mock_member_repo.get_ids_by_names = AsyncMock(return_value={})
 
     return service
 
@@ -516,6 +517,65 @@ class TestUploadCsv:
         update_call_args = mock_line_binding_repo.batch_verify_bindings.call_args[0][0]
         assert len(update_call_args) == 1
         assert update_call_args[0]["id"] == str(unverified_binding.id)
+
+    @pytest.mark.asyncio
+    async def test_should_reverify_pending_bindings_using_existing_members_not_in_current_upload(
+        self,
+        csv_upload_service: CSVUploadService,
+        mock_season_repo: MagicMock,
+        mock_alliance_repo: MagicMock,
+        mock_permission_service: MagicMock,
+        mock_csv_upload_repo: MagicMock,
+        mock_member_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_period_metrics_service: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        user_id: UUID,
+        season_id: UUID,
+        alliance_id: UUID,
+        upload_id: UUID,
+        valid_csv_content: str,
+    ):
+        """Should verify pending bindings against existing alliance members, not only current upload rows."""
+        mock_season = create_mock_season(season_id, alliance_id)
+        mock_season_repo.get_by_id = AsyncMock(return_value=mock_season)
+        mock_alliance = create_mock_alliance(alliance_id)
+        mock_alliance_repo.get_by_id = AsyncMock(return_value=mock_alliance)
+        mock_permission_service.require_write_permission = AsyncMock()
+        mock_upload = create_mock_upload(upload_id, season_id, alliance_id)
+        mock_csv_upload_repo.replace_same_day_upload = AsyncMock(return_value=(mock_upload, None))
+
+        mock_members = [
+            create_mock_member("張飛"),
+            create_mock_member("關羽"),
+        ]
+        mock_member_repo.upsert_batch = AsyncMock(return_value=mock_members)
+        mock_member_repo.get_ids_by_names = AsyncMock(
+            return_value={"趙雲": UUID("99999999-9999-9999-9999-999999999999")}
+        )
+        mock_snapshot_repo.create_batch = AsyncMock(return_value=[MagicMock(), MagicMock()])
+        mock_period_metrics_service.calculate_periods_for_season = AsyncMock(return_value=[])
+
+        unverified_binding = MagicMock()
+        unverified_binding.id = uuid4()
+        unverified_binding.game_id = "趙雲"
+        mock_line_binding_repo.get_unverified_bindings = AsyncMock(
+            return_value=[unverified_binding]
+        )
+        mock_line_binding_repo.batch_verify_bindings = AsyncMock(return_value=1)
+
+        filename = "同盟統計2025年10月09日10时13分09秒.csv"
+
+        result = await csv_upload_service.upload_csv(
+            user_id, season_id, filename, valid_csv_content
+        )
+
+        assert result["reverified_bindings"] == 1
+        mock_member_repo.get_ids_by_names.assert_awaited_once_with(alliance_id, {"趙雲"})
+
+        update_call_args = mock_line_binding_repo.batch_verify_bindings.call_args[0][0]
+        assert update_call_args[0]["id"] == str(unverified_binding.id)
+        assert update_call_args[0]["member_id"] == "99999999-9999-9999-9999-999999999999"
 
     @pytest.mark.asyncio
     async def test_upsert_payload_carries_first_seen_at_for_db_trigger(

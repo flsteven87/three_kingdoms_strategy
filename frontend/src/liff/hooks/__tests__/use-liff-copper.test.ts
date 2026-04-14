@@ -45,6 +45,7 @@ import {
 const mockContext = {
   lineUserId: "user-123",
   lineGroupId: "group-456",
+  lineIdToken: "id-token-123",
 };
 
 const mockMine: CopperMine = {

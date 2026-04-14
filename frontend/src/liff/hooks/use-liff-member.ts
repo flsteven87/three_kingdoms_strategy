@@ -21,6 +21,7 @@ interface LiffContext {
   lineUserId: string;
   lineGroupId: string;
   lineDisplayName: string;
+  lineIdToken: string;
 }
 
 // Query key factory

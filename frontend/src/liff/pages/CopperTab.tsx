@@ -54,6 +54,7 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
   const context = {
     lineUserId: session.lineUserId,
     lineGroupId: session.lineGroupId,
+    lineIdToken: session.lineIdToken ?? "",
   };
 
   const memberContext = {

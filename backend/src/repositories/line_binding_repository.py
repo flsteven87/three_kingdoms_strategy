@@ -388,6 +388,30 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .execute()
         )
 
+    async def reverify_existing_binding(
+        self,
+        binding_id: UUID,
+        group_binding_id: UUID,
+        line_display_name: str,
+        member_id: UUID | None = None,
+    ) -> None:
+        """Refresh an existing binding after the same user re-registers the same game ID."""
+        update_data: dict[str, str | bool] = {
+            "group_binding_id": str(group_binding_id),
+            "line_display_name": line_display_name,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        if member_id is not None:
+            update_data["member_id"] = str(member_id)
+            update_data["is_verified"] = True
+
+        await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .update(update_data)
+            .eq("id", str(binding_id))
+            .execute()
+        )
+
     async def get_member_bindings_by_line_user_ids(
         self, alliance_id: UUID, line_user_ids: set[str]
     ) -> list[MemberLineBinding]:

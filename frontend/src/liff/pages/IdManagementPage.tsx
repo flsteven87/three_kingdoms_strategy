@@ -227,6 +227,7 @@ export function IdManagementPage({ session, onBack }: Props) {
     lineUserId: session.lineUserId,
     lineGroupId: session.lineGroupId,
     lineDisplayName: session.lineDisplayName,
+    lineIdToken: session.lineIdToken ?? "",
   };
 
   const { data, isLoading, error } = useLiffMemberInfo(context);

@@ -13,6 +13,7 @@ import {
 interface LiffContext {
   lineUserId: string
   lineGroupId: string
+  lineIdToken: string
 }
 
 // Query key factory

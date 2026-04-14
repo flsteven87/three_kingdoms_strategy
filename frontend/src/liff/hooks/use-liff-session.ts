@@ -15,6 +15,7 @@ import liff from "@line/liff";
 export interface LiffSession {
   lineUserId: string;
   lineDisplayName: string;
+  lineIdToken: string | null;
   lineGroupId: string | null;
   eventId: string | null;
 }
@@ -105,6 +106,7 @@ export function useLiffSession(liffId: string): LiffState {
         }
 
         const profile = await liff.getProfile();
+        const idToken = liff.getIDToken();
 
         // Try to get params from URL first, then fall back to saved params
         let params = getParamsFromLiffUrl();
@@ -124,6 +126,7 @@ export function useLiffSession(liffId: string): LiffState {
             session: {
               lineUserId: profile.userId,
               lineDisplayName: profile.displayName,
+              lineIdToken: idToken,
               lineGroupId: groupId,
               eventId: eventId,
             },

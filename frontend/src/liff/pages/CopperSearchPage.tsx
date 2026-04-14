@@ -47,6 +47,7 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
   const context = {
     lineUserId: session.lineUserId,
     lineGroupId: session.lineGroupId,
+    lineIdToken: session.lineIdToken ?? "",
   };
 
   // Reads from TanStack Query cache (already fetched by CopperTab)

@@ -593,11 +593,21 @@ class LineBindingService:
 
         if existing and existing.line_user_id == line_user_id:
             # Same user re-registering same game_id (e.g. after group re-binding).
-            # Update group_binding_id so the member appears in the new group's list.
-            if existing.group_binding_id != group_binding.id:
-                await self.repository.update_member_binding_group(
-                    binding_id=existing.id, group_binding_id=group_binding.id
+            # Re-run member matching so a previously pending binding can become
+            # verified immediately without waiting for another CSV upload.
+            member_id = existing.member_id
+            if not existing.is_verified or member_id is None:
+                member_id = await self.repository.find_member_by_name(
+                    alliance_id=alliance_id,
+                    name=game_id,
                 )
+
+            await self.repository.reverify_existing_binding(
+                binding_id=existing.id,
+                group_binding_id=group_binding.id,
+                line_display_name=line_display_name,
+                member_id=member_id,
+            )
         else:
             # Try to auto-match with existing member
             member_id = await self.repository.find_member_by_name(

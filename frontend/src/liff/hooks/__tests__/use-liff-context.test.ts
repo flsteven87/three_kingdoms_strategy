@@ -21,6 +21,7 @@ import { useOutletContext } from "react-router-dom";
 const mockSession: LiffSessionWithGroup = {
   lineUserId: "user-123",
   lineDisplayName: "Test User",
+  lineIdToken: "id-token-123",
   lineGroupId: "group-456",
   eventId: null,
 };

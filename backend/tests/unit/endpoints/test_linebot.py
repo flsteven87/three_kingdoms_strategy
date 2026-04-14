@@ -49,7 +49,7 @@ from src.core.dependencies import (
     get_line_binding_service,
     get_permission_service,
 )
-from src.core.line_auth import verify_webhook_signature
+from src.core.line_auth import verify_liff_user_request, verify_webhook_signature
 from src.models.line_binding import (
     LineBindingCodeResponse,
     LineBindingStatusResponse,
@@ -180,6 +180,7 @@ def _make_app(
     test_app.dependency_overrides[get_current_user_id] = lambda: FIXED_USER_ID
     # Bypass webhook signature verification in all tests
     test_app.dependency_overrides[verify_webhook_signature] = lambda: b"{}"
+    test_app.dependency_overrides[verify_liff_user_request] = lambda: "Uverified-user"
 
     return test_app
 
@@ -534,28 +535,28 @@ class TestDeleteCustomCommand:
 
 
 class TestLiffMemberInfo:
-    """GET /api/v1/linebot/member/info — public LIFF endpoint."""
+    """GET /api/v1/linebot/member/info — LIFF endpoint."""
 
     async def test_returns_200_with_member_info(self, client):
         """Should return 200 and member info for given LINE user/group IDs."""
         response = await client.get(
             "/api/v1/linebot/member/info",
             params={"u": "Uuser123", "g": "Cgroup123"},
+            headers={"X-LIFF-ID-Token": "test-id-token"},
         )
 
         assert response.status_code == 200
 
-    async def test_succeeds_without_auth_header(self, app):
-        """Should return 200 without an Authorization header (LIFF is public)."""
-        app.dependency_overrides.pop(get_current_user_id, None)
-
+    async def test_requires_liff_id_token_header(self, app):
+        """Should reject when LIFF identity proof is missing."""
+        app.dependency_overrides.pop(verify_liff_user_request, None)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             response = await c.get(
                 "/api/v1/linebot/member/info",
                 params={"u": "Uuser123", "g": "Cgroup123"},
             )
 
-        assert response.status_code == 200
+        assert response.status_code == 401
 
     async def test_returns_422_when_params_missing(self, client):
         """Should return 422 when required query params u or g are absent."""
@@ -565,37 +566,38 @@ class TestLiffMemberInfo:
 
 
 class TestLiffMemberPerformance:
-    """GET /api/v1/linebot/member/performance — public LIFF endpoint."""
+    """GET /api/v1/linebot/member/performance — LIFF endpoint."""
 
     async def test_returns_200(self, client):
         """Should return 200 with performance data."""
         response = await client.get(
             "/api/v1/linebot/member/performance",
             params={"u": "Uuser123", "g": "Cgroup123", "game_id": "TestGame"},
+            headers={"X-LIFF-ID-Token": "test-id-token"},
         )
 
         assert response.status_code == 200
 
-    async def test_succeeds_without_auth_header(self, app):
-        """Should return 200 without an Authorization header."""
-        app.dependency_overrides.pop(get_current_user_id, None)
-
+    async def test_requires_liff_id_token_header(self, app):
+        """Should reject when LIFF identity proof is missing."""
+        app.dependency_overrides.pop(verify_liff_user_request, None)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             response = await c.get(
                 "/api/v1/linebot/member/performance",
                 params={"u": "Uuser123", "g": "Cgroup123", "game_id": "TestGame"},
             )
 
-        assert response.status_code == 200
+        assert response.status_code == 401
 
 
 class TestLiffRegisterGameId:
-    """POST /api/v1/linebot/member/register — public LIFF endpoint."""
+    """POST /api/v1/linebot/member/register — LIFF endpoint."""
 
     async def test_returns_201_on_success(self, client):
         """Should return 201 when game ID is registered."""
         response = await client.post(
             "/api/v1/linebot/member/register",
+            headers={"X-LIFF-ID-Token": "test-id-token"},
             json={
                 "line_user_id": "Uuser123",
                 "line_group_id": "Cgroup123",
@@ -606,10 +608,9 @@ class TestLiffRegisterGameId:
 
         assert response.status_code == 201
 
-    async def test_succeeds_without_auth_header(self, app):
-        """Should return 201 without an Authorization header."""
-        app.dependency_overrides.pop(get_current_user_id, None)
-
+    async def test_requires_liff_id_token_header(self, app):
+        """Should reject when LIFF identity proof is missing."""
+        app.dependency_overrides.pop(verify_liff_user_request, None)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             response = await c.post(
                 "/api/v1/linebot/member/register",
@@ -621,32 +622,32 @@ class TestLiffRegisterGameId:
                 },
             )
 
-        assert response.status_code == 201
+        assert response.status_code == 401
 
 
 class TestLiffUnregisterGameId:
-    """DELETE /api/v1/linebot/member/unregister — public LIFF endpoint."""
+    """DELETE /api/v1/linebot/member/unregister — LIFF endpoint."""
 
     async def test_returns_200_on_success(self, client):
         """Should return 200 when game ID is unregistered."""
         response = await client.delete(
             "/api/v1/linebot/member/unregister",
             params={"u": "Uuser123", "g": "Cgroup123", "game_id": "TestGame"},
+            headers={"X-LIFF-ID-Token": "test-id-token"},
         )
 
         assert response.status_code == 200
 
-    async def test_succeeds_without_auth_header(self, app):
-        """Should return 200 without an Authorization header."""
-        app.dependency_overrides.pop(get_current_user_id, None)
-
+    async def test_requires_liff_id_token_header(self, app):
+        """Should reject when LIFF identity proof is missing."""
+        app.dependency_overrides.pop(verify_liff_user_request, None)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             response = await c.delete(
                 "/api/v1/linebot/member/unregister",
                 params={"u": "Uuser123", "g": "Cgroup123", "game_id": "TestGame"},
             )
 
-        assert response.status_code == 200
+        assert response.status_code == 401
 
 
 class TestLiffMemberCandidates:
@@ -688,15 +689,3 @@ class TestLiffFindSimilarMembers:
         )
 
         assert response.status_code == 422
-
-    async def test_succeeds_without_auth_header(self, app):
-        """Should return 200 without an Authorization header."""
-        app.dependency_overrides.pop(get_current_user_id, None)
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-            response = await c.get(
-                "/api/v1/linebot/member/similar",
-                params={"g": "Cgroup123", "name": "TestName"},
-            )
-
-        assert response.status_code == 200

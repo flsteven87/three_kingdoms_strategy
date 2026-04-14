@@ -16,6 +16,7 @@ vi.mock("@line/liff", () => ({
     isLoggedIn: vi.fn(),
     login: vi.fn(),
     getProfile: vi.fn(),
+    getIDToken: vi.fn(),
   },
 }));
 
@@ -45,6 +46,7 @@ describe("useLiffSession", () => {
     vi.mocked(liff.init).mockResolvedValue(undefined);
     vi.mocked(liff.isLoggedIn).mockReturnValue(true);
     vi.mocked(liff.getProfile).mockResolvedValue(mockProfile);
+    vi.mocked(liff.getIDToken).mockReturnValue("id-token-123");
     // Clean URL search
     setWindowSearch("");
   });
@@ -84,6 +86,7 @@ describe("useLiffSession", () => {
     if (result.current.status === "ready") {
       expect(result.current.session.lineUserId).toBe("U123456");
       expect(result.current.session.lineDisplayName).toBe("Test User");
+      expect(result.current.session.lineIdToken).toBe("id-token-123");
     }
   });
 

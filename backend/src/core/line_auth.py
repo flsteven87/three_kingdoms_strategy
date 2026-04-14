@@ -11,9 +11,11 @@ Handles LINE webhook signature verification and authentication.
 import base64
 import hashlib
 import hmac
+import json
 import logging
 from typing import Annotated
 
+import httpx
 from fastapi import Depends, Header, HTTPException, Request, status
 
 from src.core.config import Settings, get_settings
@@ -81,6 +83,112 @@ async def verify_webhook_signature(
 
 # Type alias for dependency injection
 WebhookBodyDep = Annotated[bytes, Depends(verify_webhook_signature)]
+
+
+async def verify_liff_id_token(
+    id_token: str,
+    expected_user_id: str,
+    settings: Settings,
+) -> dict:
+    """Verify a LIFF ID token with LINE and ensure it belongs to the expected user."""
+    if not id_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing LIFF ID token",
+        )
+
+    if not settings.line_channel_id:
+        logger.error("LINE channel ID not configured for LIFF verification")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="LINE authentication not configured",
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                "https://api.line.me/oauth2/v2.1/verify",
+                data={
+                    "id_token": id_token,
+                    "client_id": settings.line_channel_id,
+                },
+            )
+    except httpx.HTTPError as e:
+        logger.warning("Failed to verify LIFF ID token with LINE: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to verify LINE identity",
+        ) from e
+
+    if response.status_code != status.HTTP_200_OK:
+        logger.warning(
+            "LINE LIFF ID token rejected status=%s body=%s",
+            response.status_code,
+            response.text,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid LIFF ID token",
+        )
+
+    payload = response.json()
+    if payload.get("aud") != settings.line_channel_id:
+        logger.warning("LIFF ID token audience mismatch: %s", payload.get("aud"))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid LIFF ID token audience",
+        )
+
+    if payload.get("sub") != expected_user_id:
+        logger.warning(
+            "LIFF ID token subject mismatch expected=%s actual=%s",
+            expected_user_id,
+            payload.get("sub"),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="LIFF identity does not match requested user",
+        )
+
+    return payload
+
+
+async def verify_liff_user_request(
+    request: Request,
+    x_liff_id_token: Annotated[str | None, Header(alias="X-LIFF-ID-Token")] = None,
+    settings: Settings = Depends(get_settings),
+) -> str:
+    """Verify LIFF user identity for endpoints that accept caller-supplied user IDs."""
+    expected_user_id = request.query_params.get("u")
+
+    if expected_user_id is None and request.method in {"POST", "PUT", "PATCH"}:
+        body = await request.body()
+        if body:
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid JSON body",
+                ) from e
+
+            expected_user_id = payload.get("userId") or payload.get("line_user_id")
+
+    if not expected_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing LINE user ID",
+        )
+
+    verified = await verify_liff_id_token(
+        id_token=x_liff_id_token or "",
+        expected_user_id=expected_user_id,
+        settings=settings,
+    )
+    return str(verified["sub"])
+
+
+LiffVerifiedUserDep = Annotated[str, Depends(verify_liff_user_request)]
 
 
 _line_bot_api_instance = None

@@ -34,6 +34,7 @@ from src.core.dependencies import (
 )
 from src.core.exceptions import SeasonQuotaExhaustedError
 from src.core.line_auth import (
+    LiffVerifiedUserDep,
     WebhookBodyDep,
     create_liff_url,
     get_group_info,
@@ -355,11 +356,12 @@ async def delete_custom_command(
 async def get_member_info(
     request: Request,
     service: LineBindingServiceDep,
+    verified_line_user_id: LiffVerifiedUserDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> MemberInfoResponse:
     """Get member info for LIFF page"""
-    return await service.get_member_info(line_user_id=u, line_group_id=g)
+    return await service.get_member_info(line_user_id=verified_line_user_id, line_group_id=g)
 
 
 @router.get(
@@ -372,12 +374,17 @@ async def get_member_info(
 async def get_member_performance(
     request: Request,
     service: LineBindingServiceDep,
+    verified_line_user_id: LiffVerifiedUserDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
     game_id: Annotated[str, Query(description="Game ID to get performance for")],
 ) -> MemberPerformanceResponse:
     """Get member performance analytics for LIFF page"""
-    return await service.get_member_performance(line_group_id=g, line_user_id=u, game_id=game_id)
+    return await service.get_member_performance(
+        line_group_id=g,
+        line_user_id=verified_line_user_id,
+        game_id=game_id,
+    )
 
 
 @router.post(
@@ -391,12 +398,13 @@ async def get_member_performance(
 async def register_game_id(
     request: Request,
     service: LineBindingServiceDep,
+    verified_line_user_id: LiffVerifiedUserDep,
     data: MemberLineBindingCreate,
 ) -> RegisterMemberResponse:
     """Register a game ID for a LINE user"""
     return await service.register_member(
         line_group_id=data.line_group_id,
-        line_user_id=data.line_user_id,
+        line_user_id=verified_line_user_id,
         line_display_name=data.line_display_name,
         game_id=data.game_id,
     )
@@ -412,12 +420,17 @@ async def register_game_id(
 async def unregister_game_id(
     request: Request,
     service: LineBindingServiceDep,
+    verified_line_user_id: LiffVerifiedUserDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
     game_id: Annotated[str, Query(description="Game ID to unregister")],
 ) -> RegisterMemberResponse:
     """Unregister a game ID for a LINE user"""
-    return await service.unregister_member(line_group_id=g, line_user_id=u, game_id=game_id)
+    return await service.unregister_member(
+        line_group_id=g,
+        line_user_id=verified_line_user_id,
+        game_id=game_id,
+    )
 
 
 @router.get(
@@ -576,11 +589,15 @@ async def get_copper_rules(
 async def get_copper_mines(
     request: Request,
     service: CopperMineServiceDep,
+    verified_line_user_id: LiffVerifiedUserDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> CopperMineListResponse:
     """Get copper mines list for LIFF page"""
-    return await service.get_mines_list(line_group_id=g, line_user_id=u)
+    return await service.get_mines_list(
+        line_group_id=g,
+        line_user_id=verified_line_user_id,
+    )
 
 
 @router.post(
@@ -594,12 +611,13 @@ async def get_copper_mines(
 async def register_copper_mine(
     request: Request,
     service: CopperMineServiceDep,
+    verified_line_user_id: LiffVerifiedUserDep,
     data: CopperMineCreate,
 ) -> RegisterCopperResponse:
     """Register a copper mine location"""
     return await service.register_mine(
         line_group_id=data.line_group_id,
-        line_user_id=data.line_user_id,
+        line_user_id=verified_line_user_id,
         game_id=data.game_id,
         coord_x=data.coord_x,
         coord_y=data.coord_y,
@@ -619,11 +637,16 @@ async def delete_copper_mine(
     request: Request,
     mine_id: str,
     service: CopperMineServiceDep,
+    verified_line_user_id: LiffVerifiedUserDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
 ) -> Response:
     """Delete a copper mine by ID"""
-    await service.delete_mine(mine_id=UUID(mine_id), line_group_id=g, line_user_id=u)
+    await service.delete_mine(
+        mine_id=UUID(mine_id),
+        line_group_id=g,
+        line_user_id=verified_line_user_id,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

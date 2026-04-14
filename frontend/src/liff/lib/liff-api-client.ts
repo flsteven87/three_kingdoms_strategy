@@ -1,8 +1,8 @@
 /**
  * LIFF API Client
  *
- * API client for LIFF pages - uses query params for auth instead of JWT.
- * All requests include u (userId) and g (groupId) as query parameters.
+ * API client for LIFF pages.
+ * User-scoped requests include LIFF ID token proof plus u/g query params.
  */
 
 const API_BASE_URL =
@@ -11,6 +11,7 @@ const API_BASE_URL =
 interface LiffApiOptions {
   lineUserId: string;
   lineGroupId: string;
+  lineIdToken: string;
 }
 
 async function liffFetch<T>(
@@ -26,6 +27,7 @@ async function liffFetch<T>(
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "X-LIFF-ID-Token": options.lineIdToken,
       ...init?.headers,
     },
   });
@@ -138,7 +140,10 @@ export async function registerMember(
     `${API_BASE_URL}/api/v1/linebot/member/register`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-LIFF-ID-Token": options.lineIdToken,
+      },
       body: JSON.stringify({
         groupId: options.lineGroupId,
         userId: options.lineUserId,
@@ -168,7 +173,10 @@ export async function unregisterMember(
 
   const response = await fetch(url.toString(), {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-LIFF-ID-Token": options.lineIdToken,
+    },
   });
 
   if (!response.ok) {
@@ -256,7 +264,10 @@ export async function registerCopperMine(
     `${API_BASE_URL}/api/v1/linebot/copper/register`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-LIFF-ID-Token": options.lineIdToken,
+      },
       body: JSON.stringify({
         groupId: options.lineGroupId,
         userId: options.lineUserId,
@@ -290,6 +301,10 @@ export async function deleteCopperMine(
 
   const response = await fetch(url.toString(), {
     method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      "X-LIFF-ID-Token": options.lineIdToken,
+    },
   });
 
   if (!response.ok) {
@@ -329,7 +344,10 @@ export async function searchCopperCoordinates(
   url.searchParams.set("q", options.query);
 
   const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-LIFF-ID-Token": options.lineIdToken,
+    },
   });
 
   if (!response.ok) {

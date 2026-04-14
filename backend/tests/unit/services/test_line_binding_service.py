@@ -591,6 +591,71 @@ class TestGetRegisteredMembers:
 
 
 # =============================================================================
+# Tests for register_member()
+# =============================================================================
+
+
+class TestRegisterMember:
+    """Tests for register_member() reverification behavior."""
+
+    @pytest.mark.asyncio
+    async def test_same_user_reregister_reverifies_existing_pending_binding(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should immediately verify an existing pending binding when the member now exists."""
+        binding = _make_group_binding()
+        existing = _make_member_binding(line_user_id="Uuser1", game_id="張飛", is_verified=False)
+        existing.member_id = None
+        existing.group_binding_id = None
+
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=binding)
+        mock_repository.get_member_binding_by_game_id = AsyncMock(return_value=existing)
+        mock_repository.find_member_by_name = AsyncMock(
+            return_value=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        )
+        mock_repository.reverify_existing_binding = AsyncMock()
+        mock_repository.get_member_bindings_by_line_user = AsyncMock(return_value=[existing])
+
+        await service.register_member("Cgroup1234", "Uuser1", "張飛LINE", "張飛")
+
+        mock_repository.find_member_by_name.assert_awaited_once_with(
+            alliance_id=ALLIANCE_ID,
+            name="張飛",
+        )
+        mock_repository.reverify_existing_binding.assert_awaited_once_with(
+            binding_id=existing.id,
+            group_binding_id=binding.id,
+            line_display_name="張飛LINE",
+            member_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_same_user_reregister_keeps_pending_when_member_still_missing(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should still refresh binding context even if the member does not exist yet."""
+        binding = _make_group_binding()
+        existing = _make_member_binding(line_user_id="Uuser1", game_id="張飛", is_verified=False)
+        existing.member_id = None
+        existing.group_binding_id = None
+
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=binding)
+        mock_repository.get_member_binding_by_game_id = AsyncMock(return_value=existing)
+        mock_repository.find_member_by_name = AsyncMock(return_value=None)
+        mock_repository.reverify_existing_binding = AsyncMock()
+        mock_repository.get_member_bindings_by_line_user = AsyncMock(return_value=[existing])
+
+        await service.register_member("Cgroup1234", "Uuser1", "張飛LINE", "張飛")
+
+        mock_repository.reverify_existing_binding.assert_awaited_once_with(
+            binding_id=existing.id,
+            group_binding_id=binding.id,
+            line_display_name="張飛LINE",
+            member_id=None,
+        )
+
+
+# =============================================================================
 # should_send_liff_notification — single RPC path
 # =============================================================================
 

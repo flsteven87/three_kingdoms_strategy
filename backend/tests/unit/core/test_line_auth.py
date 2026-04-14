@@ -4,6 +4,7 @@ Unit Tests for LINE Authentication Utilities
 Covers:
 - verify_line_signature(): valid HMAC-SHA256, wrong secret, tampered body,
   empty body, empty signature
+- verify_liff_id_token(): LINE verify endpoint success and failure paths
 - create_liff_url(): URL structure, liff_id and group_id embedded correctly
 - create_event_report_liff_url(): URL structure, all three parameters present
 - LineGroupInfo: attribute storage, None values
@@ -12,11 +13,18 @@ Covers:
 import base64
 import hashlib
 import hmac as hmac_module
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+import httpx
+import pytest
+from fastapi import HTTPException
 
 from src.core.line_auth import (
     LineGroupInfo,
     create_event_report_liff_url,
     create_liff_url,
+    verify_liff_id_token,
     verify_line_signature,
 )
 
@@ -46,6 +54,54 @@ class TestVerifyLineSignature:
         signature = _compute_signature(body, secret)
 
         assert verify_line_signature(body, signature, secret) is True
+
+
+class TestVerifyLiffIdToken:
+    """Tests for verify_liff_id_token()."""
+
+    @pytest.mark.asyncio
+    async def test_returns_payload_when_line_accepts_token(self):
+        settings = SimpleNamespace(line_channel_id="2001234567")
+        response = httpx.Response(
+            200,
+            json={"sub": "U123456", "aud": "2001234567"},
+            request=httpx.Request("POST", "https://api.line.me/oauth2/v2.1/verify"),
+        )
+
+        with patch("src.core.line_auth.httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+            payload = await verify_liff_id_token("token", "U123456", settings)
+
+        assert payload["sub"] == "U123456"
+
+    @pytest.mark.asyncio
+    async def test_raises_when_subject_mismatches_expected_user(self):
+        settings = SimpleNamespace(line_channel_id="2001234567")
+        response = httpx.Response(
+            200,
+            json={"sub": "Uother", "aud": "2001234567"},
+            request=httpx.Request("POST", "https://api.line.me/oauth2/v2.1/verify"),
+        )
+
+        with patch("src.core.line_auth.httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+            with pytest.raises(HTTPException) as exc_info:
+                await verify_liff_id_token("token", "U123456", settings)
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_raises_when_line_rejects_token(self):
+        settings = SimpleNamespace(line_channel_id="2001234567")
+        response = httpx.Response(
+            400,
+            json={"error": "invalid id_token"},
+            request=httpx.Request("POST", "https://api.line.me/oauth2/v2.1/verify"),
+        )
+
+        with patch("src.core.line_auth.httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+            with pytest.raises(HTTPException) as exc_info:
+                await verify_liff_id_token("token", "U123456", settings)
+
+        assert exc_info.value.status_code == 401
 
     def test_wrong_secret_returns_false(self):
         """Should return False when the secret used to verify differs from the signing secret."""

@@ -35,6 +35,7 @@ export function OnboardingFlow({ session, onComplete }: Props) {
     lineUserId: session.lineUserId,
     lineGroupId: session.lineGroupId,
     lineDisplayName: session.lineDisplayName,
+    lineIdToken: session.lineIdToken ?? "",
   };
 
   const { data: candidatesData } = useLiffMemberCandidates(session.lineGroupId);

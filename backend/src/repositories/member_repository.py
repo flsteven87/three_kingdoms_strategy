@@ -74,6 +74,31 @@ class MemberRepository(SupabaseRepository[Member]):
 
         return self._build_model(data)
 
+    async def get_ids_by_names(self, alliance_id: UUID, names: set[str]) -> dict[str, UUID]:
+        """
+        Get member IDs by name within an alliance.
+
+        Args:
+            alliance_id: Alliance UUID
+            names: Member names to look up
+
+        Returns:
+            Mapping of member name to member UUID for found members
+        """
+        if not names:
+            return {}
+
+        result = await self._execute_async(
+            lambda: self.client.from_(self.table_name)
+            .select("id,name")
+            .eq("alliance_id", str(alliance_id))
+            .in_("name", list(names))
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return {row["name"]: UUID(row["id"]) for row in data or []}
+
     async def create(self, member_data: dict) -> Member:
         """
         Create new member
