@@ -588,7 +588,10 @@ export async function getMemberPerformance(
   url.searchParams.set("game_id", options.gameId);
 
   const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-LIFF-ID-Token": options.lineIdToken,
+    },
   });
 
   if (!response.ok) {
