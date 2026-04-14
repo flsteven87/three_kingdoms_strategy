@@ -16,9 +16,11 @@ import asyncio
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
+from difflib import SequenceMatcher
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from postgrest.exceptions import APIError
 
 from src.models.battle_event import EventCategory
 from src.models.battle_event_metrics import (
@@ -1080,11 +1082,21 @@ class LineBindingService:
         if not group_binding:
             return SimilarMembersResponse(similar=[], has_exact_match=False)
 
-        data = await self.repository.find_similar_members(
-            alliance_id=group_binding.alliance_id,
-            name=name,
-            limit=5,
-        )
+        try:
+            data = await self.repository.find_similar_members(
+                alliance_id=group_binding.alliance_id,
+                name=name,
+                limit=5,
+            )
+        except APIError as e:
+            if e.code != "42883":
+                raise
+
+            logger.warning(
+                "pg_trgm similarity() unavailable, falling back to Python fuzzy matching"
+            )
+            candidates = await self.repository.get_active_member_candidates(group_binding.alliance_id)
+            data = self._find_similar_members_fallback(candidates=candidates, name=name, limit=5)
 
         similar = [
             MemberCandidate(name=row["name"], group_name=row.get("group_name")) for row in data
@@ -1094,6 +1106,41 @@ class LineBindingService:
         has_exact_match = len(similar) > 0 and similar[0].name == name
 
         return SimilarMembersResponse(similar=similar, has_exact_match=has_exact_match)
+
+    def _find_similar_members_fallback(
+        self,
+        candidates: list[dict[str, str | None]],
+        name: str,
+        limit: int = 5,
+    ) -> list[dict[str, str | None]]:
+        """Fallback fuzzy matching that does not rely on PostgreSQL extensions."""
+        query = name.strip().lower()
+        if not query:
+            return []
+
+        scored: list[tuple[float, str, dict[str, str | None]]] = []
+        for candidate in candidates:
+            candidate_name = (candidate.get("name") or "").strip()
+            if not candidate_name:
+                continue
+
+            lowered = candidate_name.lower()
+            ratio = SequenceMatcher(None, query, lowered).ratio()
+
+            if lowered == query:
+                score = 3.0
+            elif query in lowered or lowered in query:
+                score = 2.0 + ratio
+            else:
+                score = ratio
+
+            if score < 0.45:
+                continue
+
+            scored.append((score, candidate_name, candidate))
+
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [item[2] for item in scored[:limit]]
 
     # =========================================================================
     # Event List Operations (LIFF Battle Tab)

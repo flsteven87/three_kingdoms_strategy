@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
+from postgrest.exceptions import APIError
 
 from src.models.battle_event_metrics import (
     EventGroupAnalytics,
@@ -169,6 +170,91 @@ class TestGetCurrentSeasonId:
         await service.get_current_season_id(other_alliance)
 
         mock_season_repo.get_current_season.assert_called_once_with(other_alliance)
+
+
+class TestFindSimilarMembers:
+    """Tests for LineBindingService.find_similar_members()."""
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_group_not_bound(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=None)
+
+        result = await service.find_similar_members("Cmissing", "關")
+
+        assert result.similar == []
+        assert result.has_exact_match is False
+
+    @pytest.mark.asyncio
+    async def test_uses_repository_results_when_rpc_succeeds(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(
+            return_value=_make_group_binding()
+        )
+        mock_repository.find_similar_members = AsyncMock(
+            return_value=[
+                {"name": "關羽", "group_name": "一軍"},
+                {"name": "關平", "group_name": "二軍"},
+            ]
+        )
+
+        result = await service.find_similar_members(GROUP_ID, "關羽")
+
+        assert [item.name for item in result.similar] == ["關羽", "關平"]
+        assert result.has_exact_match is True
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_python_match_when_similarity_function_missing(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(
+            return_value=_make_group_binding()
+        )
+        mock_repository.find_similar_members = AsyncMock(
+            side_effect=APIError(
+                {
+                    "message": "function similarity(text, text) does not exist",
+                    "code": "42883",
+                    "hint": None,
+                    "details": None,
+                }
+            )
+        )
+        mock_repository.get_active_member_candidates = AsyncMock(
+            return_value=[
+                {"name": "關羽", "group_name": "一軍"},
+                {"name": "關平", "group_name": "二軍"},
+                {"name": "張飛", "group_name": "三軍"},
+            ]
+        )
+
+        result = await service.find_similar_members(GROUP_ID, "關羽")
+
+        assert [item.name for item in result.similar] == ["關羽", "關平"]
+        assert result.has_exact_match is True
+
+    @pytest.mark.asyncio
+    async def test_reraises_unrelated_database_errors(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(
+            return_value=_make_group_binding()
+        )
+        mock_repository.find_similar_members = AsyncMock(
+            side_effect=APIError(
+                {
+                    "message": "permission denied",
+                    "code": "42501",
+                    "hint": None,
+                    "details": None,
+                }
+            )
+        )
+
+        with pytest.raises(APIError):
+            await service.find_similar_members(GROUP_ID, "關羽")
 
 
 # =============================================================================
