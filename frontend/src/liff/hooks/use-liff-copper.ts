@@ -46,6 +46,7 @@ export function useLiffCopperMines(context: LiffContext | null) {
       getCopperMines({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineIdToken: context!.lineIdToken,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId,
     staleTime: 15_000,
@@ -81,6 +82,7 @@ export function useLiffRegisterCopper(context: LiffContext | null) {
       registerCopperMine({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineIdToken: context!.lineIdToken,
         ...params,
       }),
 
@@ -158,6 +160,7 @@ export function useLiffDeleteCopper(context: LiffContext | null) {
       deleteCopperMine({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineIdToken: context!.lineIdToken,
         mineId,
       }),
 

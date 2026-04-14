@@ -45,6 +45,7 @@ export function useLiffMemberInfo(context: LiffContext | null) {
       getMemberInfo({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineIdToken: context!.lineIdToken,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId,
     staleTime: 30_000,
@@ -59,6 +60,7 @@ export function useLiffRegisterMember(context: LiffContext | null) {
       registerMember({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineIdToken: context!.lineIdToken,
         displayName: context!.lineDisplayName,
         gameId,
       }),
@@ -84,6 +86,7 @@ export function useLiffUnregisterMember(context: LiffContext | null) {
       unregisterMember({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineIdToken: context!.lineIdToken,
         gameId,
       }),
     onSettled: () => {

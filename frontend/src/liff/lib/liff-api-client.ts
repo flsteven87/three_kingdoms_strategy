@@ -344,10 +344,7 @@ export async function searchCopperCoordinates(
   url.searchParams.set("q", options.query);
 
   const response = await fetch(url.toString(), {
-    headers: {
-      "Content-Type": "application/json",
-      "X-LIFF-ID-Token": options.lineIdToken,
-    },
+    headers: { "Content-Type": "application/json" },
   });
 
   if (!response.ok) {

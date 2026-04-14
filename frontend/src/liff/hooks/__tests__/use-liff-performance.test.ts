@@ -133,6 +133,7 @@ describe("useLiffPerformance", () => {
     expect(getMemberPerformance).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineIdToken: "id-token-123",
       gameId: "game-abc",
     });
   });

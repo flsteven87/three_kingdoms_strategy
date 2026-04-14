@@ -37,6 +37,7 @@ export function useLiffPerformance(
       getMemberPerformance({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineIdToken: context!.lineIdToken,
         gameId: gameId!,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId && !!gameId,

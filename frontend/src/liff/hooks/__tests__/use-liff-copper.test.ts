@@ -156,6 +156,7 @@ describe("useLiffCopperMines", () => {
     expect(getCopperMines).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineIdToken: "id-token-123",
     });
   });
 
@@ -296,6 +297,7 @@ describe("useLiffRegisterCopper", () => {
     expect(registerCopperMine).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineIdToken: "id-token-123",
       gameId: "game-abc",
       coordX: 10,
       coordY: 20,
@@ -467,6 +469,7 @@ describe("useLiffDeleteCopper", () => {
     expect(deleteCopperMine).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineIdToken: "id-token-123",
       mineId: "mine-1",
     });
 

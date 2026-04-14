@@ -150,6 +150,7 @@ describe("useLiffMemberInfo", () => {
     expect(getMemberInfo).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineIdToken: "id-token-123",
     });
   });
 
@@ -220,6 +221,7 @@ describe("useLiffRegisterMember", () => {
     expect(registerMember).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineIdToken: "id-token-123",
       displayName: "Test User",
       gameId: "game-abc",
     });
@@ -312,6 +314,7 @@ describe("useLiffUnregisterMember", () => {
     expect(unregisterMember).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineIdToken: "id-token-123",
       gameId: "game-abc",
     });
 
