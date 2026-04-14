@@ -97,22 +97,35 @@ async def verify_liff_id_token(
             detail="Missing LIFF ID token",
         )
 
-    if not settings.line_channel_id:
-        logger.error("LINE channel ID not configured for LIFF verification")
+    audience_candidates = settings.liff_channel_id_candidates
+    if not audience_candidates:
+        logger.error("LINE Login channel ID not configured for LIFF verification")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="LINE authentication not configured",
         )
 
+    payload: dict | None = None
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
-                "https://api.line.me/oauth2/v2.1/verify",
-                data={
-                    "id_token": id_token,
-                    "client_id": settings.line_channel_id,
-                },
-            )
+            for client_id in audience_candidates:
+                response = await client.post(
+                    "https://api.line.me/oauth2/v2.1/verify",
+                    data={
+                        "id_token": id_token,
+                        "client_id": client_id,
+                    },
+                )
+                if response.status_code == status.HTTP_200_OK:
+                    payload = response.json()
+                    break
+
+                logger.warning(
+                    "LINE LIFF ID token rejected client_id=%s status=%s body=%s",
+                    client_id,
+                    response.status_code,
+                    response.text,
+                )
     except httpx.HTTPError as e:
         logger.warning("Failed to verify LIFF ID token with LINE: %s", e)
         raise HTTPException(
@@ -120,19 +133,13 @@ async def verify_liff_id_token(
             detail="Failed to verify LINE identity",
         ) from e
 
-    if response.status_code != status.HTTP_200_OK:
-        logger.warning(
-            "LINE LIFF ID token rejected status=%s body=%s",
-            response.status_code,
-            response.text,
-        )
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid LIFF ID token",
         )
 
-    payload = response.json()
-    if payload.get("aud") != settings.line_channel_id:
+    if payload.get("aud") not in audience_candidates:
         logger.warning("LIFF ID token audience mismatch: %s", payload.get("aud"))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

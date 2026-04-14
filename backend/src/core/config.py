@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     # LINE Bot Configuration
     line_channel_id: str | None = None
+    line_login_channel_id: str | None = None
     line_channel_secret: str | None = None
     line_access_token: str | None = None
     line_bot_user_id: str | None = None  # Bot's own user ID for @mention detection
@@ -79,6 +80,24 @@ class Settings(BaseSettings):
         return all(
             [self.line_channel_id, self.line_channel_secret, self.line_access_token, self.liff_id]
         )
+
+    @property
+    def liff_channel_id_candidates(self) -> list[str]:
+        """Return channel IDs that may legitimately issue the configured LIFF ID token."""
+        candidates: list[str] = []
+
+        if self.line_login_channel_id:
+            candidates.append(self.line_login_channel_id)
+
+        if self.liff_id and "-" in self.liff_id:
+            liff_channel_id = self.liff_id.split("-", 1)[0]
+            if liff_channel_id and liff_channel_id not in candidates:
+                candidates.append(liff_channel_id)
+
+        if self.line_channel_id and self.line_channel_id not in candidates:
+            candidates.append(self.line_channel_id)
+
+        return candidates
 
     @property
     def cors_origins_list(self) -> list[str]:

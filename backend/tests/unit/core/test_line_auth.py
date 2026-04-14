@@ -61,7 +61,12 @@ class TestVerifyLiffIdToken:
 
     @pytest.mark.asyncio
     async def test_returns_payload_when_line_accepts_token(self):
-        settings = SimpleNamespace(line_channel_id="2001234567")
+        settings = SimpleNamespace(
+            line_channel_id="2001234567",
+            line_login_channel_id=None,
+            liff_id=None,
+            liff_channel_id_candidates=["2001234567"],
+        )
         response = httpx.Response(
             200,
             json={"sub": "U123456", "aud": "2001234567"},
@@ -75,7 +80,12 @@ class TestVerifyLiffIdToken:
 
     @pytest.mark.asyncio
     async def test_raises_when_subject_mismatches_expected_user(self):
-        settings = SimpleNamespace(line_channel_id="2001234567")
+        settings = SimpleNamespace(
+            line_channel_id="2001234567",
+            line_login_channel_id=None,
+            liff_id=None,
+            liff_channel_id_candidates=["2001234567"],
+        )
         response = httpx.Response(
             200,
             json={"sub": "Uother", "aud": "2001234567"},
@@ -90,7 +100,12 @@ class TestVerifyLiffIdToken:
 
     @pytest.mark.asyncio
     async def test_raises_when_line_rejects_token(self):
-        settings = SimpleNamespace(line_channel_id="2001234567")
+        settings = SimpleNamespace(
+            line_channel_id="2001234567",
+            line_login_channel_id=None,
+            liff_id=None,
+            liff_channel_id_candidates=["2001234567"],
+        )
         response = httpx.Response(
             400,
             json={"error": "invalid id_token"},
@@ -102,6 +117,38 @@ class TestVerifyLiffIdToken:
                 await verify_liff_id_token("token", "U123456", settings)
 
         assert exc_info.value.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_retries_with_liff_channel_id_when_primary_audience_is_wrong(self):
+        settings = SimpleNamespace(
+            line_channel_id="2008810127",
+            line_login_channel_id="2000000000",
+            liff_id="2008810240-GTGc1ByP",
+            liff_channel_id_candidates=["2000000000", "2008810240", "2008810127"],
+        )
+        responses = [
+            httpx.Response(
+                400,
+                json={
+                    "error": "invalid_request",
+                    "error_description": "Invalid IdToken Audience.",
+                },
+                request=httpx.Request("POST", "https://api.line.me/oauth2/v2.1/verify"),
+            ),
+            httpx.Response(
+                200,
+                json={"sub": "U123456", "aud": "2008810240"},
+                request=httpx.Request("POST", "https://api.line.me/oauth2/v2.1/verify"),
+            )
+        ]
+
+        with patch(
+            "src.core.line_auth.httpx.AsyncClient.post",
+            new=AsyncMock(side_effect=responses),
+        ):
+            payload = await verify_liff_id_token("token", "U123456", settings)
+
+        assert payload["aud"] == "2008810240"
 
     def test_wrong_secret_returns_false(self):
         """Should return False when the secret used to verify differs from the signing secret."""
