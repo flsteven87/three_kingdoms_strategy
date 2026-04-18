@@ -28,7 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateCopperMineOwnership } from "@/hooks/use-copper-mines";
+import {
+  useCreateCopperMineOwnership,
+  useCopperCoordinateLookup,
+} from "@/hooks/use-copper-mines";
 import { useAnalyticsMembers } from "@/hooks/use-analytics";
 
 // Constants for reserved copper mine (awarded as rewards, not assigned to specific member)
@@ -85,6 +88,41 @@ export function CopperMineFormDialog({
 
   const level = watch("level");
   const memberId = watch("member_id");
+  const coordXStr = watch("coord_x");
+  const coordYStr = watch("coord_y");
+  const [debouncedCoords, setDebouncedCoords] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const x = parseInt(coordXStr ?? "", 10);
+    const y = parseInt(coordYStr ?? "", 10);
+    if (Number.isNaN(x) || Number.isNaN(y) || x < 0 || y < 0) {
+      setDebouncedCoords(null);
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedCoords({ x, y }), 300);
+    return () => clearTimeout(timer);
+  }, [coordXStr, coordYStr]);
+
+  const lookup = useCopperCoordinateLookup(
+    seasonId,
+    debouncedCoords?.x ?? null,
+    debouncedCoords?.y ?? null,
+  );
+  const lookupData = lookup.data;
+  const coordInSource =
+    lookupData?.level != null && !lookupData.requires_manual_level;
+  const coordNotInSource =
+    lookupData?.requires_manual_level === true && !lookupData.is_taken;
+  const coordTaken = lookupData?.is_taken === true;
+
+  useEffect(() => {
+    if (coordInSource && lookupData?.level != null) {
+      setValue("level", String(lookupData.level) as "9" | "10");
+    }
+  }, [coordInSource, lookupData?.level, setValue]);
 
   // Sort members by name for better UX
   const sortedMembers = (() => {
@@ -233,12 +271,36 @@ export function CopperMineFormDialog({
             </div>
           </div>
 
+          {/* Coordinate lookup indicator (three states) */}
+          {lookupData && coordInSource && (
+            <Alert>
+              <AlertDescription>
+                Lv.{lookupData.level} · {lookupData.county} {lookupData.district}
+              </AlertDescription>
+            </Alert>
+          )}
+          {lookupData && coordNotInSource && (
+            <Alert className="border-yellow-500/50 text-yellow-800 dark:text-yellow-300">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {lookupData.message ?? "座標不在官方資料中，請確認等級"}
+              </AlertDescription>
+            </Alert>
+          )}
+          {lookupData && coordTaken && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>此座標已被註冊</AlertDescription>
+            </Alert>
+          )}
+
           {/* Level Selection */}
           <div className="space-y-2">
             <Label htmlFor="level">銅礦等級</Label>
             <Select
               value={level}
               onValueChange={(value: "9" | "10") => setValue("level", value)}
+              disabled={coordInSource}
             >
               <SelectTrigger id="level">
                 <SelectValue />
@@ -276,7 +338,7 @@ export function CopperMineFormDialog({
             >
               取消
             </Button>
-            <Button type="submit" disabled={isLoading || !memberId}>
+            <Button type="submit" disabled={isLoading || !memberId || coordTaken}>
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               新增
             </Button>
