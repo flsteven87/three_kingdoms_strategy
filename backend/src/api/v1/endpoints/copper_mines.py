@@ -30,7 +30,10 @@ from src.models.copper_mine import (
     CopperMineRuleResponse,
     CopperMineRuleUpdate,
 )
-from src.models.copper_mine_coordinate import CopperCoordinateSearchResult
+from src.models.copper_mine_coordinate import (
+    CopperCoordinateLookupResult,
+    CopperCoordinateSearchResult,
+)
 
 router = APIRouter(prefix="/copper-mines", tags=["copper-mines"])
 
@@ -259,6 +262,29 @@ async def search_coordinates(
     Returns matching 9/10 level coordinates with availability info.
     """
     await season_service.verify_user_access(user_id, season_id)
-    return await mine_service.search_copper_coordinates_by_season(
-        season_id=season_id, query=q
+    return await mine_service.search_copper_coordinates_by_season(season_id=season_id, query=q)
+
+
+@router.get(
+    "/coordinates/lookup",
+    response_model=CopperCoordinateLookupResult,
+)
+async def lookup_coordinate(
+    mine_service: CopperMineServiceDep,
+    season_service: SeasonServiceDep,
+    user_id: UserIdDep,
+    season_id: UUID = Query(..., description="Season UUID"),
+    coord_x: int = Query(..., description="X coordinate", ge=0),
+    coord_y: int = Query(..., description="Y coordinate", ge=0),
+) -> CopperCoordinateLookupResult:
+    """
+    Look up a single copper mine coordinate (Dashboard).
+
+    Returns source-of-truth level/county/district when available, plus registration status.
+    When the coordinate is not in the reference data, `requires_manual_level=True` and
+    a warning message is returned — callers may still register the coord.
+    """
+    await season_service.verify_user_access(user_id, season_id)
+    return await mine_service.lookup_copper_coordinate_by_season(
+        season_id=season_id, coord_x=coord_x, coord_y=coord_y
     )

@@ -828,3 +828,100 @@ class TestRegisterMine:
         assert response.success is True
         call_kwargs = mock_copper_mine_repo.create_mine.call_args.kwargs
         assert call_kwargs["level"] == 9
+
+
+class TestLookupCopperCoordinateBySeason:
+    """Tests for Dashboard-scoped single-coordinate lookup."""
+
+    @pytest.mark.asyncio
+    async def test_should_return_source_level_when_coord_in_source(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        mock_season_repo.get_by_id.return_value = MagicMock(
+            id=season_id, alliance_id=alliance_id, game_season_tag="PK23"
+        )
+        mock_coordinate_repo.has_data.return_value = True
+        mock_coordinate_repo.get_by_coords.return_value = create_mock_coordinate(level=10)
+        mock_copper_mine_repo.get_mine_by_coords.return_value = None
+
+        result = await copper_mine_list_service.lookup_copper_coordinate_by_season(
+            season_id=season_id, coord_x=123, coord_y=456
+        )
+
+        assert result.level == 10
+        assert result.county == "巴郡"
+        assert result.can_register is True
+        assert result.requires_manual_level is False
+
+    @pytest.mark.asyncio
+    async def test_should_warn_when_coord_missing_from_source(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        mock_season_repo.get_by_id.return_value = MagicMock(
+            id=season_id, alliance_id=alliance_id, game_season_tag="PK23"
+        )
+        mock_coordinate_repo.has_data.return_value = True
+        mock_coordinate_repo.get_by_coords.return_value = None
+        mock_copper_mine_repo.get_mine_by_coords.return_value = None
+
+        result = await copper_mine_list_service.lookup_copper_coordinate_by_season(
+            season_id=season_id, coord_x=999, coord_y=888
+        )
+
+        assert result.can_register is True
+        assert result.requires_manual_level is True
+        assert "PK23" in (result.message or "")
+
+    @pytest.mark.asyncio
+    async def test_should_flag_taken_when_coord_already_registered(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        mock_season_repo.get_by_id.return_value = MagicMock(
+            id=season_id, alliance_id=alliance_id, game_season_tag="PK23"
+        )
+        mock_coordinate_repo.has_data.return_value = True
+        mock_coordinate_repo.get_by_coords.return_value = create_mock_coordinate(level=10)
+        mock_copper_mine_repo.get_mine_by_coords.return_value = MagicMock(
+            id=UUID("00000000-0000-0000-0000-000000000099")
+        )
+
+        result = await copper_mine_list_service.lookup_copper_coordinate_by_season(
+            season_id=season_id, coord_x=123, coord_y=456
+        )
+
+        assert result.is_taken is True
+        assert result.can_register is False
+        assert result.message == "此座標已被註冊"
+
+    @pytest.mark.asyncio
+    async def test_should_raise_404_when_season_not_found(
+        self,
+        copper_mine_list_service: CopperMineService,
+        mock_season_repo: MagicMock,
+        season_id: UUID,
+    ):
+        mock_season_repo.get_by_id.return_value = None
+
+        with pytest.raises(HTTPException) as exc:
+            await copper_mine_list_service.lookup_copper_coordinate_by_season(
+                season_id=season_id, coord_x=1, coord_y=2
+            )
+        assert exc.value.status_code == 404

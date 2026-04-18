@@ -913,6 +913,67 @@ class CopperMineService:
             message="此座標已被註冊" if existing_mine else None,
         )
 
+    async def lookup_copper_coordinate_by_season(
+        self, season_id: UUID, coord_x: int, coord_y: int
+    ) -> CopperCoordinateLookupResult:
+        """
+        Look up a single coordinate for the Dashboard (season-scoped).
+
+        Mirror of `lookup_copper_coordinate` (LIFF group-scoped) keyed by season_id,
+        since the Dashboard form already knows the active season.
+        """
+        season = await self.season_repository.get_by_id(season_id)
+        if not season:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Season not found")
+        alliance_id = season.alliance_id
+        game_season_tag = season.game_season_tag
+
+        existing_mine = await self.repository.get_mine_by_coords(
+            alliance_id=alliance_id, coord_x=coord_x, coord_y=coord_y, season_id=season_id
+        )
+
+        has_source_data = False
+        if game_season_tag:
+            has_source_data = await self.coordinate_repository.has_data(game_season_tag)
+
+        if has_source_data and game_season_tag:
+            coordinate = await self.coordinate_repository.get_by_coords(
+                game_season_tag, coord_x, coord_y
+            )
+            if not coordinate:
+                return CopperCoordinateLookupResult(
+                    coord_x=coord_x,
+                    coord_y=coord_y,
+                    is_taken=existing_mine is not None,
+                    can_register=existing_mine is None,
+                    requires_manual_level=True,
+                    message=(
+                        "此座標已被註冊"
+                        if existing_mine
+                        else f"座標不在 {game_season_tag} 官方資料中，仍可申請，請確認等級"
+                    ),
+                )
+
+            return CopperCoordinateLookupResult(
+                coord_x=coord_x,
+                coord_y=coord_y,
+                level=coordinate.level,
+                county=coordinate.county,
+                district=coordinate.district,
+                is_taken=existing_mine is not None,
+                can_register=existing_mine is None,
+                message="此座標已被註冊" if existing_mine else None,
+            )
+
+        return CopperCoordinateLookupResult(
+            coord_x=coord_x,
+            coord_y=coord_y,
+            is_taken=existing_mine is not None,
+            can_register=existing_mine is None,
+            requires_manual_level=True,
+            message="此座標已被註冊" if existing_mine else None,
+        )
+
     async def search_copper_coordinates_by_season(
         self, season_id: UUID, query: str
     ) -> list[CopperCoordinateSearchResult]:

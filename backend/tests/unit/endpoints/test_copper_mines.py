@@ -42,7 +42,10 @@ from src.models.copper_mine import (
     CopperMineOwnershipResponse,
     CopperMineRuleResponse,
 )
-from src.models.copper_mine_coordinate import CopperCoordinateSearchResult
+from src.models.copper_mine_coordinate import (
+    CopperCoordinateLookupResult,
+    CopperCoordinateSearchResult,
+)
 from src.services.alliance_service import AllianceService
 from src.services.copper_mine_rule_service import CopperMineRuleService
 from src.services.copper_mine_service import CopperMineService
@@ -781,5 +784,88 @@ class TestSearchCoordinates:
             "/api/v1/copper-mines/coordinates/search",
             params={"season_id": str(FIXED_SEASON_ID), "q": "許昌"},
         )
+
+        assert response.status_code == 403
+
+
+# =============================================================================
+# GET /copper-mines/coordinates/lookup — Lookup Single Coordinate
+# =============================================================================
+
+
+class TestLookupCoordinate:
+    """GET /api/v1/copper-mines/coordinates/lookup"""
+
+    async def test_returns_source_data_when_found(self, client, mock_mine_service):
+        """Should return 200 with source-of-truth level/county/district when coord in reference data."""
+        mock_mine_service.lookup_copper_coordinate_by_season = AsyncMock(
+            return_value=CopperCoordinateLookupResult(
+                coord_x=123,
+                coord_y=456,
+                level=10,
+                county="巴郡",
+                district="江州",
+                is_taken=False,
+                can_register=True,
+                requires_manual_level=False,
+                message=None,
+            )
+        )
+
+        response = await client.get(
+            "/api/v1/copper-mines/coordinates/lookup",
+            params={"season_id": str(FIXED_SEASON_ID), "coord_x": 123, "coord_y": 456},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["can_register"] is True
+        assert body["level"] == 10
+        assert body["requires_manual_level"] is False
+        mock_mine_service.lookup_copper_coordinate_by_season.assert_awaited_once_with(
+            season_id=FIXED_SEASON_ID, coord_x=123, coord_y=456
+        )
+
+    async def test_warns_when_coord_not_in_source(self, client, mock_mine_service):
+        """Should return 200 with warning + can_register=True when coord missing from source."""
+        mock_mine_service.lookup_copper_coordinate_by_season = AsyncMock(
+            return_value=CopperCoordinateLookupResult(
+                coord_x=999,
+                coord_y=888,
+                is_taken=False,
+                can_register=True,
+                requires_manual_level=True,
+                message="座標不在 PK23 官方資料中，仍可申請，請確認等級",
+            )
+        )
+
+        response = await client.get(
+            "/api/v1/copper-mines/coordinates/lookup",
+            params={"season_id": str(FIXED_SEASON_ID), "coord_x": 999, "coord_y": 888},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["can_register"] is True
+        assert body["requires_manual_level"] is True
+        assert "PK23" in body["message"]
+
+    async def test_requires_all_query_params(self, client):
+        """Should return 422 when any of season_id/coord_x/coord_y is missing."""
+        response = await client.get(
+            "/api/v1/copper-mines/coordinates/lookup",
+            params={"season_id": str(FIXED_SEASON_ID), "coord_x": 123},
+        )
+        assert response.status_code == 422
+
+    async def test_missing_auth_returns_403(self, app):
+        """Should return 403 when Authorization header is absent."""
+        app.dependency_overrides.pop(get_current_user_id, None)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            response = await c.get(
+                "/api/v1/copper-mines/coordinates/lookup",
+                params={"season_id": str(FIXED_SEASON_ID), "coord_x": 1, "coord_y": 2},
+            )
 
         assert response.status_code == 403
