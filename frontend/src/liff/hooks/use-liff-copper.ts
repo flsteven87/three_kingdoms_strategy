@@ -227,9 +227,21 @@ export function useLiffCopperSearch(groupId: string | null, query: string) {
   })
 }
 
-export function useLiffCopperCoordinateLookup(groupId: string | null) {
-  return useMutation<CopperCoordinateLookupResult, Error, { coordX: number; coordY: number }>({
-    mutationFn: ({ coordX, coordY }) =>
-      lookupCopperCoordinate({ lineGroupId: groupId!, coordX, coordY }),
+export function useLiffCopperCoordinateLookup(
+  groupId: string | null,
+  coordX: number | null,
+  coordY: number | null,
+) {
+  return useQuery<CopperCoordinateLookupResult>({
+    queryKey: liffCopperKeys.lookup(groupId ?? '', coordX ?? -1, coordY ?? -1),
+    queryFn: () =>
+      lookupCopperCoordinate({
+        lineGroupId: groupId!,
+        coordX: coordX!,
+        coordY: coordY!,
+      }),
+    enabled:
+      !!groupId && coordX !== null && coordY !== null && coordX >= 0 && coordY >= 0,
+    staleTime: 30_000,
   })
 }

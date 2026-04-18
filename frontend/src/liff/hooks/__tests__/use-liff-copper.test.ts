@@ -647,7 +647,7 @@ describe("useLiffCopperCoordinateLookup", () => {
   const mockLookupResult: CopperCoordinateLookupResult = {
     coord_x: 10,
     coord_y: 20,
-    level: 9,
+    level: 10,
     county: "縣A",
     district: "區A",
     is_taken: false,
@@ -656,20 +656,18 @@ describe("useLiffCopperCoordinateLookup", () => {
     message: null,
   };
 
-  it("looks up coordinate on mutate", async () => {
+  it("returns in-source metadata when coord found", async () => {
     vi.mocked(lookupCopperCoordinate).mockResolvedValueOnce(mockLookupResult);
 
     const { result } = renderHook(
-      () => useLiffCopperCoordinateLookup("group-456"),
+      () => useLiffCopperCoordinateLookup("group-456", 10, 20),
       { wrapper: createWrapper(queryClient) },
     );
 
-    act(() => {
-      result.current.mutate({ coordX: 10, coordY: 20 });
-    });
-
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockLookupResult);
+    expect(result.current.data?.level).toBe(10);
+    expect(result.current.data?.requires_manual_level).toBe(false);
+    expect(result.current.data?.can_register).toBe(true);
     expect(lookupCopperCoordinate).toHaveBeenCalledWith({
       lineGroupId: "group-456",
       coordX: 10,
@@ -677,41 +675,65 @@ describe("useLiffCopperCoordinateLookup", () => {
     });
   });
 
+  it("returns warning state when coord not in source", async () => {
+    const warnResult: CopperCoordinateLookupResult = {
+      coord_x: 999,
+      coord_y: 888,
+      level: null,
+      county: null,
+      district: null,
+      is_taken: false,
+      can_register: true,
+      requires_manual_level: true,
+      message: "座標不在 PK23 官方資料中，仍可申請，請確認等級",
+    };
+    vi.mocked(lookupCopperCoordinate).mockResolvedValueOnce(warnResult);
+
+    const { result } = renderHook(
+      () => useLiffCopperCoordinateLookup("group-456", 999, 888),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.requires_manual_level).toBe(true);
+    expect(result.current.data?.can_register).toBe(true);
+    expect(result.current.data?.message).toContain("PK23");
+  });
+
   it("returns taken coordinate info", async () => {
     const takenResult: CopperCoordinateLookupResult = {
       ...mockLookupResult,
       is_taken: true,
       can_register: false,
-      message: "此坐標已被佔用",
+      message: "此座標已被註冊",
     };
     vi.mocked(lookupCopperCoordinate).mockResolvedValueOnce(takenResult);
 
     const { result } = renderHook(
-      () => useLiffCopperCoordinateLookup("group-456"),
+      () => useLiffCopperCoordinateLookup("group-456", 10, 20),
       { wrapper: createWrapper(queryClient) },
     );
-
-    act(() => {
-      result.current.mutate({ coordX: 10, coordY: 20 });
-    });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.is_taken).toBe(true);
     expect(result.current.data?.can_register).toBe(false);
   });
 
-  it("enters error state on api failure", async () => {
-    vi.mocked(lookupCopperCoordinate).mockRejectedValueOnce(new Error("Invalid coordinate"));
-
+  it("is disabled when coords are missing", () => {
     const { result } = renderHook(
-      () => useLiffCopperCoordinateLookup("group-456"),
+      () => useLiffCopperCoordinateLookup("group-456", null, null),
       { wrapper: createWrapper(queryClient) },
     );
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(lookupCopperCoordinate).not.toHaveBeenCalled();
+  });
 
-    act(() => {
-      result.current.mutate({ coordX: -1, coordY: -1 });
-    });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
+  it("is disabled when groupId is null", () => {
+    const { result } = renderHook(
+      () => useLiffCopperCoordinateLookup(null, 10, 20),
+      { wrapper: createWrapper(queryClient) },
+    );
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(lookupCopperCoordinate).not.toHaveBeenCalled();
   });
 });

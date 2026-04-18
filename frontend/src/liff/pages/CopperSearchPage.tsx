@@ -41,6 +41,10 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [coordX, setCoordX] = useState("");
   const [coordY, setCoordY] = useState("");
+  const [debouncedCoords, setDebouncedCoords] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [manualLookupLevel, setManualLookupLevel] = useState("9");
   const [registeringCoord, setRegisteringCoord] = useState<string | null>(null);
 
@@ -52,7 +56,11 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
 
   // Reads from TanStack Query cache (already fetched by CopperTab)
   const { data } = useLiffCopperMines(context);
-  const coordLookupMutation = useLiffCopperCoordinateLookup(session.lineGroupId);
+  const coordLookup = useLiffCopperCoordinateLookup(
+    session.lineGroupId,
+    debouncedCoords?.x ?? null,
+    debouncedCoords?.y ?? null,
+  );
   const registerMutation = useLiffRegisterCopper(context);
 
   const hasSourceData = data?.has_source_data ?? false;
@@ -74,30 +82,24 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
     hasCountySearch ? session.lineGroupId : null,
     debouncedQuery,
   );
-  const coordLookupResult = coordLookupMutation.data;
+  const coordLookupResult = coordLookup.data;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(locationQuery), 300);
     return () => clearTimeout(timer);
   }, [locationQuery]);
 
-  // Coordinate lookup
-  const handleCoordSearch = () => {
-    if (!coordX.trim() || !coordY.trim()) {
-      coordLookupMutation.reset();
-      return;
-    }
-
+  // Debounce coordinate input → trigger lookup query
+  useEffect(() => {
     const x = parseInt(coordX, 10);
     const y = parseInt(coordY, 10);
-
-    if (isNaN(x) || x < 0 || isNaN(y) || y < 0) {
-      coordLookupMutation.reset();
+    if (!coordX.trim() || !coordY.trim() || isNaN(x) || x < 0 || isNaN(y) || y < 0) {
+      setDebouncedCoords(null);
       return;
     }
-
-    coordLookupMutation.mutate({ coordX: x, coordY: y });
-  };
+    const timer = setTimeout(() => setDebouncedCoords({ x, y }), 300);
+    return () => clearTimeout(timer);
+  }, [coordX, coordY]);
 
   // Register from search result
   const handleRegister = async (result: CopperCoordinateSearchResult) => {
@@ -189,10 +191,7 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
               <span className="text-sm text-muted-foreground shrink-0">X</span>
               <Input
                 value={coordX}
-                onChange={(e) => {
-                  setCoordX(e.target.value);
-                  coordLookupMutation.reset();
-                }}
+                onChange={(e) => setCoordX(e.target.value)}
                 placeholder="123"
                 className="h-10"
                 inputMode="numeric"
@@ -203,29 +202,20 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
               <span className="text-sm text-muted-foreground shrink-0">Y</span>
               <Input
                 value={coordY}
-                onChange={(e) => {
-                  setCoordY(e.target.value);
-                  coordLookupMutation.reset();
-                }}
+                onChange={(e) => setCoordY(e.target.value)}
                 placeholder="456"
                 className="h-10"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                onKeyDown={(e) => e.key === "Enter" && handleCoordSearch()}
               />
             </div>
-            <Button
-              onClick={handleCoordSearch}
-              disabled={!coordX.trim() || !coordY.trim()}
-              variant="outline"
-              className="h-10"
-            >
-              {coordLookupMutation.isPending ? (
+            <div className="flex h-10 w-10 items-center justify-center shrink-0">
+              {coordLookup.isFetching ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               ) : (
-                <Search className="h-4 w-4" />
+                <Search className="h-4 w-4 text-muted-foreground" />
               )}
-            </Button>
+            </div>
           </div>
           {coordLookupResult && (
             <div className="rounded-lg border p-3">
@@ -294,9 +284,9 @@ export function CopperSearchPage({ session, gameId, onBack }: Props) {
               )}
             </div>
           )}
-          {coordLookupMutation.error && (
+          {coordLookup.error && (
             <p className="text-xs text-destructive">
-              {coordLookupMutation.error.message}
+              {coordLookup.error.message}
             </p>
           )}
         </div>
