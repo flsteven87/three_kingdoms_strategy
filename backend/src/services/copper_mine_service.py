@@ -884,8 +884,13 @@ class CopperMineService:
                     coord_x=coord_x,
                     coord_y=coord_y,
                     is_taken=existing_mine is not None,
-                    can_register=False,
-                    message=f"座標 ({coord_x}, {coord_y}) 不在 {game_season_tag} 的銅礦資料中",
+                    can_register=existing_mine is None,
+                    requires_manual_level=True,
+                    message=(
+                        "此座標已被註冊"
+                        if existing_mine
+                        else f"座標不在 {game_season_tag} 官方資料中，仍可申請，請確認等級"
+                    ),
                 )
 
             return CopperCoordinateLookupResult(

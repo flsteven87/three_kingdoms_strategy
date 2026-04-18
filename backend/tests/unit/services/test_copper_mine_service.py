@@ -717,16 +717,17 @@ class TestLookupCopperCoordinate:
         assert result.message is None
 
     @pytest.mark.asyncio
-    async def test_should_return_validation_message_when_coordinate_missing_from_source_data(
+    async def test_should_warn_but_allow_registration_when_coordinate_missing_from_source_data(
         self,
         copper_mine_list_service: CopperMineService,
         mock_line_binding_repo: MagicMock,
         mock_season_repo: MagicMock,
         mock_coordinate_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
         alliance_id: UUID,
         season_id: UUID,
     ):
-        """Should reject coordinates missing from source-of-truth data."""
+        """When coord not found in source data, still allow registration but surface a warning."""
         mock_line_binding_repo.get_group_binding_by_line_group_id.return_value = MagicMock(
             alliance_id=alliance_id
         )
@@ -734,6 +735,7 @@ class TestLookupCopperCoordinate:
         mock_season_repo.get_by_id.return_value = MagicMock(game_season_tag="PK23")
         mock_coordinate_repo.has_data.return_value = True
         mock_coordinate_repo.get_by_coords.return_value = None
+        mock_copper_mine_repo.get_mine_by_coords.return_value = None
 
         result = await copper_mine_list_service.lookup_copper_coordinate("Cgroup123", 999, 888)
 
@@ -741,8 +743,9 @@ class TestLookupCopperCoordinate:
         assert result.coord_y == 888
         assert result.county is None
         assert result.level is None
-        assert result.can_register is False
-        assert result.requires_manual_level is False
+        assert result.is_taken is False
+        assert result.can_register is True
+        assert result.requires_manual_level is True
         assert "PK23" in (result.message or "")
 
     @pytest.mark.asyncio
