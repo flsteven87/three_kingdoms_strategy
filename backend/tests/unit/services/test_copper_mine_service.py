@@ -101,6 +101,15 @@ def mock_coordinate_repo() -> MagicMock:
 
 
 @pytest.fixture
+def mock_member_repo() -> MagicMock:
+    """Create mock MemberRepository"""
+    repo = MagicMock()
+    repo.get_by_name = AsyncMock(return_value=None)
+    repo.get_by_id = AsyncMock(return_value=None)
+    return repo
+
+
+@pytest.fixture
 def copper_mine_service(
     mock_copper_mine_repo: MagicMock,
     mock_rule_repo: MagicMock,
@@ -762,3 +771,57 @@ class TestLookupCopperCoordinate:
         assert result.level is None
         assert result.can_register is True
         assert result.requires_manual_level is True
+
+
+class TestRegisterMine:
+    """Tests for register_mine source-of-truth resolution."""
+
+    @pytest.mark.asyncio
+    async def test_should_register_with_user_level_when_coord_not_in_source(
+        self,
+        mock_copper_mine_repo: MagicMock,
+        mock_rule_repo: MagicMock,
+        mock_line_binding_repo: MagicMock,
+        mock_season_repo: MagicMock,
+        mock_coordinate_repo: MagicMock,
+        mock_member_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+    ):
+        """Register should succeed with user-provided level when coord missing from source data."""
+        service = CopperMineService(
+            repository=mock_copper_mine_repo,
+            line_binding_repository=mock_line_binding_repo,
+            season_repository=mock_season_repo,
+            member_repository=mock_member_repo,
+            rule_repository=mock_rule_repo,
+            coordinate_repository=mock_coordinate_repo,
+        )
+        mock_line_binding_repo.get_group_binding_by_line_group_id.return_value = MagicMock(
+            alliance_id=alliance_id
+        )
+        mock_season_repo.get_current_season.return_value = MagicMock(id=season_id)
+        mock_season_repo.get_by_id.return_value = MagicMock(game_season_tag="PK23")
+        mock_coordinate_repo.has_data.return_value = True
+        mock_coordinate_repo.get_by_coords.return_value = None  # coord NOT in source
+        mock_member_repo.get_by_name.return_value = None
+        mock_copper_mine_repo.get_mine_by_coords.return_value = None
+        # Member not matched → rule validation skips claimed_tier and just checks level limit
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(
+            return_value=[create_mock_rule(tier=1, required_merit=0, allowed_level="both")]
+        )
+        mock_copper_mine_repo.create_mine = AsyncMock(return_value=create_mock_mine(level=9))
+
+        response = await service.register_mine(
+            line_group_id="Cgroup123",
+            line_user_id="U1",
+            game_id="player",
+            coord_x=999,
+            coord_y=888,
+            level=9,
+            notes=None,
+        )
+
+        assert response.success is True
+        call_kwargs = mock_copper_mine_repo.create_mine.call_args.kwargs
+        assert call_kwargs["level"] == 9

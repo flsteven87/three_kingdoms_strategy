@@ -139,7 +139,9 @@ class CopperMineService:
 
         # 只顯示當前賽季的銅礦（公開資訊）
         # 當 current_season_id 為 None 時，repository 會返回所有銅礦
-        mines = await self.repository.get_mines_by_alliance(alliance_id, season_id=current_season_id)
+        mines = await self.repository.get_mines_by_alliance(
+            alliance_id, season_id=current_season_id
+        )
 
         # P0 修復: 計算用戶銅礦申請狀態
         # 取得規則數量作為上限
@@ -200,30 +202,17 @@ class CopperMineService:
             return None
         return season.game_season_tag
 
-    async def _validate_source_of_truth(
+    async def _resolve_level_from_source(
         self, game_season_tag: str | None, coord_x: int, coord_y: int, level: int
     ) -> int:
         """
-        Validate coordinates against source of truth and return the correct level.
+        Resolve copper mine level against source-of-truth reference data.
 
-        When source of truth exists:
-        - Coordinate must exist in the reference table, otherwise 400
-        - Level is overridden by the reference data (silent override)
-
-        When no source of truth:
-        - Returns the user-provided level unchanged
-
-        Args:
-            game_season_tag: Game season tag (e.g. 'PK23'), or None
-            coord_x: X coordinate
-            coord_y: Y coordinate
-            level: User-provided mine level
-
-        Returns:
-            The validated/overridden level
-
-        Raises:
-            HTTPException 400: If coordinates not found in source of truth
+        Contract: never raises — coordinate presence is a soft signal.
+        - No tag or no reference data → return user-provided level
+        - Coord found in source → return source level (silent override)
+        - Coord NOT found in source → return user-provided level
+          (warning surfaced at lookup layer so the UI can hint before submit)
         """
         if not game_season_tag:
             return level
@@ -236,11 +225,7 @@ class CopperMineService:
             game_season_tag, coord_x, coord_y
         )
         if not coordinate:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"座標 ({coord_x}, {coord_y}) 不在 {game_season_tag} 的銅礦資料中",
-            )
-
+            return level
         return coordinate.level
 
     async def _check_coord_available(
@@ -382,7 +367,9 @@ class CopperMineService:
                 )
 
             # 檢查是否有符合戰功但等級不符的規則
-            merit_ok_rules = [r for r in unclaimed_rules if snapshot.total_merit >= r.required_merit]
+            merit_ok_rules = [
+                r for r in unclaimed_rules if snapshot.total_merit >= r.required_merit
+            ]
             if merit_ok_rules:
                 # 有符合戰功的，但等級不符
                 allowed_levels = set()
@@ -448,7 +435,7 @@ class CopperMineService:
 
         # Source of truth: validate coordinates and override level
         game_season_tag = await self._get_game_season_tag(season_id)
-        level = await self._validate_source_of_truth(game_season_tag, coord_x, coord_y, level)
+        level = await self._resolve_level_from_source(game_season_tag, coord_x, coord_y, level)
 
         # P0 修復: 使用統一的座標檢查方法
         # 當有活躍賽季時，只檢查該賽季內的座標
@@ -686,7 +673,7 @@ class CopperMineService:
 
         # Source of truth: validate coordinates and override level
         game_season_tag = await self._get_game_season_tag(season_id)
-        level = await self._validate_source_of_truth(game_season_tag, coord_x, coord_y, level)
+        level = await self._resolve_level_from_source(game_season_tag, coord_x, coord_y, level)
 
         # P0 修復: 驗證銅礦申請規則（與 LIFF 行為一致）
         # Skip validation for reserved mines
