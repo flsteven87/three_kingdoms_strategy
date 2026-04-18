@@ -5,7 +5,7 @@
  * Compact copper mine registration for LIFF Tall mode.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Plus,
   MapPin,
@@ -27,6 +27,7 @@ import {
 import { GAME_SEASON_TAGS } from "@/constants/game-seasons";
 import { liffTypography } from "@/lib/typography";
 import {
+  useLiffCopperCoordinateLookup,
   useLiffCopperMines,
   useLiffCopperRules,
   useLiffRegisterCopper,
@@ -45,6 +46,10 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [coordX, setCoordX] = useState("");
   const [coordY, setCoordY] = useState("");
+  const [debouncedCoords, setDebouncedCoords] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [level, setLevel] = useState("9");
   const [formError, setFormError] = useState("");
   const [showOtherMines, setShowOtherMines] = useState(false);
@@ -79,6 +84,37 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
       data.current_game_season_tag)
     : "資料來源";
   const canUseSearch = !!effectiveGameId;
+
+  // Debounced coordinate lookup — only meaningful when source data exists
+  useEffect(() => {
+    const x = parseInt(coordX, 10);
+    const y = parseInt(coordY, 10);
+    if (!coordX.trim() || !coordY.trim() || isNaN(x) || x < 0 || isNaN(y) || y < 0) {
+      setDebouncedCoords(null);
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedCoords({ x, y }), 300);
+    return () => clearTimeout(timer);
+  }, [coordX, coordY]);
+
+  const lookup = useLiffCopperCoordinateLookup(
+    hasSourceData ? session.lineGroupId : null,
+    debouncedCoords?.x ?? null,
+    debouncedCoords?.y ?? null,
+  );
+  const lookupData = lookup.data;
+  const coordInSource =
+    lookupData?.level != null && !lookupData.requires_manual_level;
+  const coordNotInSource =
+    lookupData?.requires_manual_level === true && !lookupData.is_taken;
+  const coordTaken = lookupData?.is_taken === true;
+
+  // Auto-sync level selector to source-of-truth value when coord is in source
+  useEffect(() => {
+    if (coordInSource && lookupData?.level != null) {
+      setLevel(String(lookupData.level));
+    }
+  }, [coordInSource, lookupData?.level]);
 
   // Get all game_ids owned by this user
   const myGameIds = new Set(
@@ -235,7 +271,7 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
               <Select
                 value={level}
                 onValueChange={setLevel}
-                disabled={!canApply || hasSourceData}
+                disabled={!canApply || coordInSource}
               >
                 <SelectTrigger className="h-10 w-20">
                   <SelectValue />
@@ -287,6 +323,25 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
                 />
               </div>
             </div>
+            {lookupData && (
+              <>
+                {coordInSource && (
+                  <div className="rounded-md bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    Lv.{lookupData.level} · {lookupData.county} {lookupData.district}
+                  </div>
+                )}
+                {coordNotInSource && (
+                  <div className="rounded-md bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                    ⚠ {lookupData.message ?? "座標不在官方資料中，請確認等級"}
+                  </div>
+                )}
+                {coordTaken && (
+                  <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    此座標已被註冊
+                  </div>
+                )}
+              </>
+            )}
             <Button
               onClick={handleRegister}
               disabled={
@@ -294,6 +349,7 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
                 !effectiveGameId ||
                 !coordX.trim() ||
                 !coordY.trim() ||
+                coordTaken ||
                 registerMutation.isPending
               }
               className="h-10 w-full"
