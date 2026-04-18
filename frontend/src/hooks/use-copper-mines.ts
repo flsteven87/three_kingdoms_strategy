@@ -14,6 +14,7 @@ import type {
   UpdateCopperMineRuleRequest,
   CreateCopperMineOwnershipRequest,
   CopperCoordinateSearchResult,
+  CopperCoordinateLookupResult,
   MemberCopperMineStatus,
 } from '@/types/copper-mine'
 
@@ -39,6 +40,10 @@ export const copperMineKeys = {
   // Coordinate search
   coordinateSearch: (seasonId: string, query: string) =>
     [...copperMineKeys.all, 'coordinate-search', seasonId, query] as const,
+
+  // Coordinate lookup (single coord)
+  coordinateLookup: (seasonId: string, coordX: number, coordY: number) =>
+    [...copperMineKeys.all, 'coordinate-lookup', seasonId, coordX, coordY] as const,
 }
 
 // =============================================================================
@@ -407,6 +412,23 @@ export function useCopperCoordinateSearch(seasonId: string | null, query: string
     queryKey: copperMineKeys.coordinateSearch(seasonId ?? '', query),
     queryFn: () => apiClient.searchCopperCoordinates(seasonId!, query),
     enabled: !!seasonId && query.length >= 1,
+    staleTime: 30 * 1000,
+  })
+}
+
+/**
+ * Look up a single coordinate against the Dashboard source-of-truth data.
+ */
+export function useCopperCoordinateLookup(
+  seasonId: string | null,
+  coordX: number | null,
+  coordY: number | null,
+) {
+  return useQuery<CopperCoordinateLookupResult>({
+    queryKey: copperMineKeys.coordinateLookup(seasonId ?? '', coordX ?? -1, coordY ?? -1),
+    queryFn: () => apiClient.lookupCopperCoordinate(seasonId!, coordX!, coordY!),
+    enabled:
+      !!seasonId && coordX !== null && coordY !== null && coordX >= 0 && coordY >= 0,
     staleTime: 30 * 1000,
   })
 }

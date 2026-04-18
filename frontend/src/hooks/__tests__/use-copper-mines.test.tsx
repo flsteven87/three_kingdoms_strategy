@@ -7,6 +7,7 @@ import {
   useCreateCopperMineRule,
   useUpdateCopperMineRule,
   useDeleteCopperMineRule,
+  useCopperCoordinateLookup,
 } from "../use-copper-mines";
 import type { QueryClient } from "@tanstack/react-query";
 import { createWrapper, createTestQueryClient } from "../../__tests__/test-utils";
@@ -14,6 +15,7 @@ import type {
   CopperMineRule,
   CopperMineOwnership,
   CopperMineOwnershipListResponse,
+  CopperCoordinateLookupResult,
 } from "@/types/copper-mine";
 
 vi.mock("@/lib/api-client", () => ({
@@ -26,6 +28,7 @@ vi.mock("@/lib/api-client", () => ({
     createCopperMineOwnership: vi.fn(),
     deleteCopperMineOwnership: vi.fn(),
     updateCopperMineOwnership: vi.fn(),
+    lookupCopperCoordinate: vi.fn(),
   },
 }));
 
@@ -498,5 +501,86 @@ describe("useDeleteCopperMineRule", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(apiClient.deleteCopperMineRule).toHaveBeenCalledWith("rule-2");
+  });
+});
+
+// =============================================================================
+// useCopperCoordinateLookup
+// =============================================================================
+
+describe("useCopperCoordinateLookup", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient = createTestQueryClient();
+  });
+
+  it("returns in-source metadata when coord found", async () => {
+    const result: CopperCoordinateLookupResult = {
+      coord_x: 123,
+      coord_y: 456,
+      level: 10,
+      county: "巴郡",
+      district: "江州",
+      is_taken: false,
+      can_register: true,
+      requires_manual_level: false,
+      message: null,
+    };
+    vi.mocked(apiClient.lookupCopperCoordinate).mockResolvedValueOnce(result);
+
+    const { result: hookResult } = renderHook(
+      () => useCopperCoordinateLookup("season-1", 123, 456),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(hookResult.current.isSuccess).toBe(true));
+    expect(hookResult.current.data?.level).toBe(10);
+    expect(hookResult.current.data?.requires_manual_level).toBe(false);
+    expect(apiClient.lookupCopperCoordinate).toHaveBeenCalledWith("season-1", 123, 456);
+  });
+
+  it("returns warning state when coord not in source", async () => {
+    const result: CopperCoordinateLookupResult = {
+      coord_x: 999,
+      coord_y: 888,
+      level: null,
+      county: null,
+      district: null,
+      is_taken: false,
+      can_register: true,
+      requires_manual_level: true,
+      message: "座標不在 PK23 官方資料中，仍可申請，請確認等級",
+    };
+    vi.mocked(apiClient.lookupCopperCoordinate).mockResolvedValueOnce(result);
+
+    const { result: hookResult } = renderHook(
+      () => useCopperCoordinateLookup("season-1", 999, 888),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(hookResult.current.isSuccess).toBe(true));
+    expect(hookResult.current.data?.requires_manual_level).toBe(true);
+    expect(hookResult.current.data?.can_register).toBe(true);
+    expect(hookResult.current.data?.message).toContain("PK23");
+  });
+
+  it("is disabled when coords are null", () => {
+    const { result } = renderHook(
+      () => useCopperCoordinateLookup("season-1", null, null),
+      { wrapper: createWrapper(queryClient) },
+    );
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(apiClient.lookupCopperCoordinate).not.toHaveBeenCalled();
+  });
+
+  it("is disabled when seasonId is null", () => {
+    const { result } = renderHook(
+      () => useCopperCoordinateLookup(null, 10, 20),
+      { wrapper: createWrapper(queryClient) },
+    );
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(apiClient.lookupCopperCoordinate).not.toHaveBeenCalled();
   });
 });

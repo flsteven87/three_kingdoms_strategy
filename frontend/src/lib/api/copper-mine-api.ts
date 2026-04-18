@@ -13,6 +13,7 @@ import type {
   CreateCopperMineOwnershipRequest,
   CopperMineOwnershipListResponse,
   CopperCoordinateSearchResult,
+  CopperCoordinateLookupResult,
 } from '@/types/copper-mine'
 
 // ==================== Copper Mine Rules API ====================
@@ -102,6 +103,20 @@ export async function searchCopperCoordinates(
     '/api/v1/copper-mines/coordinates/search',
     {
       params: { season_id: seasonId, q: query }
+    }
+  )
+  return response.data
+}
+
+export async function lookupCopperCoordinate(
+  seasonId: string,
+  coordX: number,
+  coordY: number
+): Promise<CopperCoordinateLookupResult> {
+  const response = await axiosInstance.get<CopperCoordinateLookupResult>(
+    '/api/v1/copper-mines/coordinates/lookup',
+    {
+      params: { season_id: seasonId, coord_x: coordX, coord_y: coordY }
     }
   )
   return response.data

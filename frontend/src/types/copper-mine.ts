@@ -93,6 +93,18 @@ export interface CopperCoordinateSearchResult {
   readonly is_taken: boolean
 }
 
+export interface CopperCoordinateLookupResult {
+  readonly coord_x: number
+  readonly coord_y: number
+  readonly level: number | null
+  readonly county: string | null
+  readonly district: string | null
+  readonly is_taken: boolean
+  readonly can_register: boolean
+  readonly requires_manual_level: boolean
+  readonly message: string | null
+}
+
 // =============================================================================
 // Member Status Types (For Validation)
 // =============================================================================
