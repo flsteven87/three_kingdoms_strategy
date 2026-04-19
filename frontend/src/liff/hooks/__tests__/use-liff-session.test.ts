@@ -17,6 +17,7 @@ vi.mock("@line/liff", () => ({
     login: vi.fn(),
     getProfile: vi.fn(),
     getIDToken: vi.fn(),
+    getDecodedIDToken: vi.fn(),
   },
 }));
 
@@ -47,6 +48,10 @@ describe("useLiffSession", () => {
     vi.mocked(liff.isLoggedIn).mockReturnValue(true);
     vi.mocked(liff.getProfile).mockResolvedValue(mockProfile);
     vi.mocked(liff.getIDToken).mockReturnValue("id-token-123");
+    // Default: token still valid for ~1h so refresh timer is scheduled far out
+    vi.mocked(liff.getDecodedIDToken).mockReturnValue({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
     // Clean URL search
     setWindowSearch("");
   });
@@ -300,6 +305,69 @@ describe("useLiffSession", () => {
     if (result.current.status === "error") {
       expect(result.current.error).toBe("string error");
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Token refresh scheduling (exp-1min re-login)
+  // ---------------------------------------------------------------------------
+
+  it("triggers liff.login immediately when token is already expired", async () => {
+    vi.mocked(liff.getDecodedIDToken).mockReturnValue({
+      exp: Math.floor(Date.now() / 1000) - 10,
+    });
+
+    const { result } = renderHook(() => useLiffSession(LIFF_ID));
+
+    await waitFor(() => expect(liff.login).toHaveBeenCalledTimes(1));
+    // Hook returns early — status stays loading until redirect completes
+    expect(result.current.status).toBe("loading");
+  });
+
+  it("schedules liff.login to run ~60s before token expiry", async () => {
+    const expSeconds = Math.floor(Date.now() / 1000) + 600; // 10 min from now
+    vi.mocked(liff.getDecodedIDToken).mockReturnValue({ exp: expSeconds });
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+    const { result } = renderHook(() => useLiffSession(LIFF_ID));
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(liff.login).not.toHaveBeenCalled();
+
+    // Find our refresh call among any incidental setTimeout uses by test libs.
+    // Expected delay ≈ 600_000 - 60_000 = 540_000 ms (with small jitter for Date.now drift).
+    const refreshCall = setTimeoutSpy.mock.calls.find(
+      ([, delay]) =>
+        typeof delay === "number" && delay >= 538_000 && delay <= 542_000,
+    );
+    expect(refreshCall).toBeDefined();
+
+    // Invoke the scheduled callback manually to verify it calls liff.login
+    const callback = refreshCall![0] as () => void;
+    callback();
+    expect(liff.login).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the refresh timer on unmount", async () => {
+    vi.mocked(liff.getDecodedIDToken).mockReturnValue({
+      exp: Math.floor(Date.now() / 1000) + 600,
+    });
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    const { result, unmount } = renderHook(() => useLiffSession(LIFF_ID));
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    // Locate the timer handle returned by our scheduled setTimeout
+    const refreshIdx = setTimeoutSpy.mock.calls.findIndex(
+      ([, delay]) =>
+        typeof delay === "number" && delay >= 538_000 && delay <= 542_000,
+    );
+    expect(refreshIdx).toBeGreaterThanOrEqual(0);
+    const timerHandle = setTimeoutSpy.mock.results[refreshIdx]!.value;
+
+    unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timerHandle);
   });
 
   // ---------------------------------------------------------------------------

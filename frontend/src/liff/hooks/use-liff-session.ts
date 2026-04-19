@@ -35,6 +35,13 @@ type LiffState =
 
 const LIFF_PARAMS_KEY = "liff_params";
 
+/**
+ * Refresh window before token expiry. LINE LIFF ID tokens live for ~1 hour;
+ * we trigger re-login slightly earlier so an active session never sends an
+ * expired token.
+ */
+const TOKEN_REFRESH_LEAD_MS = 60_000;
+
 function getParamsFromLiffUrl(): Record<string, string> {
   const qs = new URLSearchParams(window.location.search);
   const state = qs.get("liff.state");
@@ -92,6 +99,7 @@ export function useLiffSession(liffId: string): LiffState {
 
   useEffect(() => {
     let cancelled = false;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     // CRITICAL: Save params BEFORE liff.init() because OAuth redirect loses them
     saveParamsBeforeLogin();
@@ -107,6 +115,25 @@ export function useLiffSession(liffId: string): LiffState {
 
         const profile = await liff.getProfile();
         const idToken = liff.getIDToken();
+
+        // LINE tokens expire after ~1h. Schedule a re-login before expiry so
+        // long-open LIFF pages never send stale tokens. If already expired
+        // (e.g. user returned hours later), re-login immediately.
+        const decoded = liff.getDecodedIDToken();
+        const expMs =
+          decoded && typeof decoded.exp === "number" ? decoded.exp * 1000 : null;
+
+        if (expMs !== null && expMs <= Date.now()) {
+          liff.login();
+          return;
+        }
+
+        if (expMs !== null) {
+          const delay = Math.max(0, expMs - Date.now() - TOKEN_REFRESH_LEAD_MS);
+          refreshTimer = setTimeout(() => {
+            liff.login();
+          }, delay);
+        }
 
         // Try to get params from URL first, then fall back to saved params
         let params = getParamsFromLiffUrl();
@@ -146,6 +173,9 @@ export function useLiffSession(liffId: string): LiffState {
 
     return () => {
       cancelled = true;
+      if (refreshTimer !== null) {
+        clearTimeout(refreshTimer);
+      }
     };
   }, [liffId]);
 
