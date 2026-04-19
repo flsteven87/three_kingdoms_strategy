@@ -16,8 +16,10 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       refetchOnReconnect: 'always',
       retry: (failureCount, error) => {
-        // Don't retry on 4xx client errors
-        const status = error?.response?.status;
+        // Don't retry on 4xx client errors. Reads axios shape (error.response.status)
+        // and LIFF ApiError shape (error.status) so both clients are covered.
+        const status =
+          error?.response?.status ?? (error as { status?: number })?.status;
         if (status && status >= 400 && status < 500) {
           return false;
         }
@@ -37,7 +39,8 @@ const queryClient = new QueryClient({
     },
     mutations: {
       retry: (failureCount, error) => {
-        const status = error?.response?.status;
+        const status =
+          error?.response?.status ?? (error as { status?: number })?.status;
         // Don't retry 4xx errors except 429 (rate limit)
         if (status && status >= 400 && status < 500 && status !== 429) {
           return false;

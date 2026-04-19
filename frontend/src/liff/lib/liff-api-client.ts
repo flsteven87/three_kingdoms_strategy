@@ -14,6 +14,16 @@ const API_BASE_URL =
 // string raised by backend/src/core/line_auth.py on rejected LIFF tokens.
 const INVALID_LIFF_TOKEN_DETAIL = "Invalid LIFF ID token";
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 let reloginTriggered = false;
 
 function handleUnauthorized(detail: string | undefined): void {
@@ -55,7 +65,7 @@ async function liffFetch<T>(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   if (response.status === 204) {
@@ -118,7 +128,7 @@ export async function getMemberCandidates(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();
@@ -142,7 +152,7 @@ export async function findSimilarMembers(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();
@@ -185,7 +195,7 @@ export async function registerMember(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Register failed");
+    throw new ApiError(response.status, error.detail || "Register failed");
   }
 
   return response.json();
@@ -214,7 +224,7 @@ export async function unregisterMember(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Unregister failed");
+    throw new ApiError(response.status, error.detail || "Unregister failed");
   }
 
   return response.json();
@@ -272,7 +282,7 @@ export async function getCopperRules(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();
@@ -321,7 +331,7 @@ export async function registerCopperMine(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Register failed");
+    throw new ApiError(response.status, error.detail || "Register failed");
   }
 
   return response.json();
@@ -351,7 +361,7 @@ export async function deleteCopperMine(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Delete failed");
+    throw new ApiError(response.status, error.detail || "Delete failed");
   }
 }
 
@@ -394,7 +404,7 @@ export async function searchCopperCoordinates(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();
@@ -422,7 +432,7 @@ export async function lookupCopperCoordinate(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();
@@ -525,7 +535,7 @@ export async function getEventReport(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();
@@ -583,7 +593,7 @@ export async function getEventList(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();
@@ -653,7 +663,7 @@ export async function getMemberPerformance(
     if (response.status === 401) {
       handleUnauthorized(error.detail);
     }
-    throw new Error(error.detail || "Request failed");
+    throw new ApiError(response.status, error.detail || "Request failed");
   }
 
   return response.json();

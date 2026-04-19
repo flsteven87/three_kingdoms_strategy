@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.v1.endpoints import (
     alliance_collaborators,
@@ -179,6 +180,32 @@ async def season_quota_exhausted_handler(
     return JSONResponse(
         status_code=status.HTTP_402_PAYMENT_REQUIRED,
         content={"detail": exc.message, "error_code": exc.error_code},
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """
+    Log 4xx detail before returning the standard FastAPI HTTPException response.
+
+    FastAPI's built-in handler is silent, which makes diagnosing 4xx failures
+    in production logs impossible (only the status code reaches the access log).
+    Skips 401 to avoid noise from expected LIFF token expiry.
+    """
+    if 400 <= exc.status_code < 500 and exc.status_code != 401:
+        # exc.detail is typed Any; cap length so a future dict/list detail
+        # (e.g. validation error payload) cannot blow up a single log line.
+        logger.warning(
+            "[HTTP %d] %s %s — %s",
+            exc.status_code,
+            request.method,
+            request.url.path,
+            str(exc.detail)[:500],
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
     )
 
 
