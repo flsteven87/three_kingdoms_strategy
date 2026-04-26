@@ -264,6 +264,7 @@ export function IdManagementPage({ session, onBack }: Props) {
   };
 
   const doRegister = async (gameId: string) => {
+    setCriticalError(null);
     try {
       await registerMutation.mutateAsync({ gameId });
       setNewGameId("");
@@ -299,6 +300,20 @@ export function IdManagementPage({ session, onBack }: Props) {
     setNewGameId(candidate.name);
   };
 
+  // Raw API so registerMutation.error keeps the failure reason from the
+  // primary attempt; returns false when the rollback itself fails.
+  const restoreOldGameId = async (gameId: string): Promise<boolean> => {
+    try {
+      await registerMember({ ...context, gameId });
+      queryClient.invalidateQueries({
+        queryKey: liffMemberKeys.info(context.lineUserId, context.lineGroupId),
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleCorrect = async (oldGameId: string, targetGameId: string) => {
     setCorrectingId(oldGameId);
     setCriticalError(null);
@@ -308,21 +323,10 @@ export function IdManagementPage({ session, onBack }: Props) {
       oldIdRemoved = true;
       await registerMutation.mutateAsync({ gameId: targetGameId });
     } catch {
-      if (oldIdRemoved) {
-        try {
-          // Raw API so registerMutation.error keeps the original failure reason.
-          await registerMember({ ...context, gameId: oldGameId });
-          queryClient.invalidateQueries({
-            queryKey: liffMemberKeys.info(
-              context.lineUserId,
-              context.lineGroupId,
-            ),
-          });
-        } catch {
-          setCriticalError(
-            `修正失敗，原帳號「${oldGameId}」未能還原，請於上方手動重新綁定。`,
-          );
-        }
+      if (oldIdRemoved && !(await restoreOldGameId(oldGameId))) {
+        setCriticalError(
+          `修正失敗，原帳號「${oldGameId}」未能還原，請於上方手動重新綁定。`,
+        );
       }
     } finally {
       setCorrectingId(null);
@@ -376,18 +380,13 @@ export function IdManagementPage({ session, onBack }: Props) {
           </div>
         </div>
 
-        {(criticalError ||
-          registerMutation.error ||
-          unregisterMutation.error) && (
-          <LiffErrorBanner
-            message={
-              criticalError ||
-              registerMutation.error?.message ||
-              unregisterMutation.error?.message ||
-              ""
-            }
-          />
-        )}
+        <LiffErrorBanner
+          message={
+            criticalError ||
+            registerMutation.error?.message ||
+            unregisterMutation.error?.message
+          }
+        />
 
         {/* Loading state */}
         {isLoading && (

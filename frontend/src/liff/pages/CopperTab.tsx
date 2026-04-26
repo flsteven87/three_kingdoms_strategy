@@ -366,11 +366,9 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
             </Button>
           </div>
 
-          {(formError || registerMutation.error) && (
-            <LiffErrorBanner
-              message={formError || registerMutation.error?.message || ""}
-            />
-          )}
+          <LiffErrorBanner
+            message={formError || registerMutation.error?.message}
+          />
 
           {rules && rules.length > 0 && (
             <div className="rounded-xl bg-muted/50 p-3">

@@ -1,10 +1,11 @@
 import { AlertCircle } from "lucide-react";
 
 interface Props {
-  readonly message: string;
+  readonly message: string | null | undefined;
 }
 
 export function LiffErrorBanner({ message }: Props) {
+  if (!message) return null;
   return (
     <div
       role="alert"
