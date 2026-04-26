@@ -1,12 +1,36 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 import pkg from "./package.json" with { type: "json" };
+
+// Unique per-build identifier. Used by the runtime version check to detect
+// when the user is running a stale bundle (LINE WebView / browser cache).
+const BUILD_ID = `${pkg.version}.${Date.now()}`;
+
+// Emits dist/build-info.json so the running app can poll it and compare
+// against the embedded __BUILD_ID__. Nginx serves this file with no-cache.
+function buildInfoPlugin(buildId: string): Plugin {
+  return {
+    name: "build-info",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "build-info.json",
+        source: `${JSON.stringify({
+          buildId,
+          builtAt: new Date().toISOString(),
+        })}\n`,
+      });
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
   },
   plugins: [
     react({
@@ -14,6 +38,7 @@ export default defineConfig({
         plugins: [["babel-plugin-react-compiler", { target: "19" }]],
       },
     }),
+    buildInfoPlugin(BUILD_ID),
   ],
   resolve: {
     alias: {

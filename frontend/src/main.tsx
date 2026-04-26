@@ -5,8 +5,11 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from './components/theme-provider'
 import { RecurProvider } from './providers/RecurProvider'
 import { ErrorBoundary } from './components/ui/error-boundary'
+import { startBuildVersionCheck } from './lib/build-version-check'
 import './index.css'
 import App from './App.tsx'
+
+startBuildVersionCheck()
 
 const queryClient = new QueryClient({
   defaultOptions: {
