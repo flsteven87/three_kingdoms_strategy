@@ -190,6 +190,7 @@ export function useLiffDeleteCopper(context: LiffContext | null) {
           mines: old?.mines.filter((m) => m.id !== mineId) || [],
           total: Math.max((old?.total || 0) - 1, 0),
           mine_counts_by_game_id: newCounts,
+          merit_by_game_id: old?.merit_by_game_id || {},
           max_allowed: old?.max_allowed || 0,
           has_source_data: old?.has_source_data || false,
           current_game_season_tag: old?.current_game_season_tag ?? null,

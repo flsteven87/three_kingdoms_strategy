@@ -57,12 +57,14 @@ const mockMine: CopperMine = {
   status: "active",
   notes: null,
   registered_at: "2026-01-01T00:00:00Z",
+  claimed_tier: null,
 };
 
 const mockMineListResponse: CopperMineListResponse = {
   mines: [mockMine],
   total: 1,
   mine_counts_by_game_id: { "game-abc": 1 },
+  merit_by_game_id: {},
   max_allowed: 3,
   has_source_data: true,
   current_game_season_tag: "S1",
@@ -73,6 +75,7 @@ const mockEmptyMineListResponse: CopperMineListResponse = {
   mines: [],
   total: 0,
   mine_counts_by_game_id: {},
+  merit_by_game_id: {},
   max_allowed: 3,
   has_source_data: false,
   current_game_season_tag: null,

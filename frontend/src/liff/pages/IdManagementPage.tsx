@@ -304,7 +304,11 @@ export function IdManagementPage({ session, onBack }: Props) {
   // primary attempt; returns false when the rollback itself fails.
   const restoreOldGameId = async (gameId: string): Promise<boolean> => {
     try {
-      await registerMember({ ...context, gameId });
+      await registerMember({
+        ...context,
+        gameId,
+        displayName: context.lineDisplayName,
+      });
       queryClient.invalidateQueries({
         queryKey: liffMemberKeys.info(context.lineUserId, context.lineGroupId),
       });
