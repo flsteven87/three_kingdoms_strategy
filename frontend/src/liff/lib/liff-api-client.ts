@@ -34,28 +34,10 @@ function handleUnauthorized(detail: string | undefined): void {
   liff.login();
 }
 
-interface LiffApiOptions {
-  lineUserId: string;
-  lineGroupId: string;
-  lineIdToken: string;
-}
-
-async function liffFetch<T>(
-  endpoint: string,
-  options: LiffApiOptions,
-  init?: RequestInit,
-): Promise<T> {
-  const url = new URL(`${API_BASE_URL}/api/v1${endpoint}`);
-  url.searchParams.set("u", options.lineUserId);
-  url.searchParams.set("g", options.lineGroupId);
-
-  const response = await fetch(url.toString(), {
+async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(url, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-LIFF-ID-Token": options.lineIdToken,
-      ...init?.headers,
-    },
+    headers: { "Content-Type": "application/json", ...init.headers },
   });
 
   if (!response.ok) {
@@ -73,6 +55,27 @@ async function liffFetch<T>(
   }
 
   return response.json();
+}
+
+interface LiffApiOptions {
+  lineUserId: string;
+  lineGroupId: string;
+  lineIdToken: string;
+}
+
+async function liffFetch<T>(
+  endpoint: string,
+  options: LiffApiOptions,
+  init?: RequestInit,
+): Promise<T> {
+  const url = new URL(`${API_BASE_URL}/api/v1${endpoint}`);
+  url.searchParams.set("u", options.lineUserId);
+  url.searchParams.set("g", options.lineGroupId);
+
+  return request<T>(url.toString(), {
+    ...init,
+    headers: { "X-LIFF-ID-Token": options.lineIdToken, ...init?.headers },
+  });
 }
 
 // Member API
@@ -116,22 +119,7 @@ export async function getMemberCandidates(
 ): Promise<MemberCandidatesResponse> {
   const url = new URL(`${API_BASE_URL}/api/v1/linebot/member/candidates`);
   url.searchParams.set("g", options.lineGroupId);
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
+  return request<MemberCandidatesResponse>(url.toString());
 }
 
 export async function findSimilarMembers(
@@ -140,22 +128,7 @@ export async function findSimilarMembers(
   const url = new URL(`${API_BASE_URL}/api/v1/linebot/member/similar`);
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("name", options.name);
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
+  return request<SimilarMembersResponse>(url.toString());
 }
 
 export async function getMemberInfo(
@@ -171,14 +144,11 @@ export async function registerMember(
   },
 ): Promise<RegisterMemberResponse> {
   // P1 修復: POST body 已包含 userId/groupId，不需要 query params
-  const response = await fetch(
+  return request<RegisterMemberResponse>(
     `${API_BASE_URL}/api/v1/linebot/member/register`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-LIFF-ID-Token": options.lineIdToken,
-      },
+      headers: { "X-LIFF-ID-Token": options.lineIdToken },
       body: JSON.stringify({
         groupId: options.lineGroupId,
         userId: options.lineUserId,
@@ -187,18 +157,6 @@ export async function registerMember(
       }),
     },
   );
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Register failed");
-  }
-
-  return response.json();
 }
 
 export async function unregisterMember(
@@ -209,25 +167,10 @@ export async function unregisterMember(
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("game_id", options.gameId);
 
-  const response = await fetch(url.toString(), {
+  return request<RegisterMemberResponse>(url.toString(), {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      "X-LIFF-ID-Token": options.lineIdToken,
-    },
+    headers: { "X-LIFF-ID-Token": options.lineIdToken },
   });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Unregister failed");
-  }
-
-  return response.json();
 }
 
 // Copper Mine API
@@ -270,22 +213,7 @@ export async function getCopperRules(
 ): Promise<CopperMineRule[]> {
   const url = new URL(`${API_BASE_URL}/api/v1/linebot/copper/rules`);
   url.searchParams.set("g", options.lineGroupId);
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
+  return request<CopperMineRule[]>(url.toString());
 }
 
 export async function getCopperMines(
@@ -304,14 +232,11 @@ export async function registerCopperMine(
   },
 ): Promise<RegisterCopperResponse> {
   // P1 修復: POST body 已包含 userId/groupId，不需要 query params
-  const response = await fetch(
+  return request<RegisterCopperResponse>(
     `${API_BASE_URL}/api/v1/linebot/copper/register`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-LIFF-ID-Token": options.lineIdToken,
-      },
+      headers: { "X-LIFF-ID-Token": options.lineIdToken },
       body: JSON.stringify({
         groupId: options.lineGroupId,
         userId: options.lineUserId,
@@ -323,18 +248,6 @@ export async function registerCopperMine(
       }),
     },
   );
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Register failed");
-  }
-
-  return response.json();
 }
 
 export async function deleteCopperMine(
@@ -346,23 +259,10 @@ export async function deleteCopperMine(
   url.searchParams.set("u", options.lineUserId);
   url.searchParams.set("g", options.lineGroupId);
 
-  const response = await fetch(url.toString(), {
+  await request<void>(url.toString(), {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      "X-LIFF-ID-Token": options.lineIdToken,
-    },
+    headers: { "X-LIFF-ID-Token": options.lineIdToken },
   });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Delete failed");
-  }
 }
 
 export interface CopperCoordinateSearchResult {
@@ -392,22 +292,7 @@ export async function searchCopperCoordinates(
   const url = new URL(`${API_BASE_URL}/api/v1/linebot/copper/search`);
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("q", options.query);
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
+  return request<CopperCoordinateSearchResult[]>(url.toString());
 }
 
 export async function lookupCopperCoordinate(
@@ -420,22 +305,7 @@ export async function lookupCopperCoordinate(
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("x", String(options.coordX));
   url.searchParams.set("y", String(options.coordY));
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
+  return request<CopperCoordinateLookupResult>(url.toString());
 }
 
 // Event Report API
@@ -523,22 +393,7 @@ export async function getEventReport(
   const url = new URL(`${API_BASE_URL}/api/v1/linebot/event/report`);
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("e", options.eventId);
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
+  return request<EventReportResponse>(url.toString());
 }
 
 // Event List API (for Battle Tab)
@@ -581,22 +436,7 @@ export async function getEventList(
   url.searchParams.set("game_id", options.gameId);
   if (options.limit != null) url.searchParams.set("limit", String(options.limit));
   if (options.offset != null) url.searchParams.set("offset", String(options.offset));
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
+  return request<EventListResponse>(url.toString());
 }
 
 // Performance API
@@ -649,22 +489,7 @@ export async function getMemberPerformance(
   url.searchParams.set("g", options.lineGroupId);
   url.searchParams.set("game_id", options.gameId);
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      "Content-Type": "application/json",
-      "X-LIFF-ID-Token": options.lineIdToken,
-    },
+  return request<MemberPerformanceResponse>(url.toString(), {
+    headers: { "X-LIFF-ID-Token": options.lineIdToken },
   });
-
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(error.detail);
-    }
-    throw new ApiError(response.status, error.detail || "Request failed");
-  }
-
-  return response.json();
 }

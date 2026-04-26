@@ -14,7 +14,6 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
-  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +36,7 @@ import {
 import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
+import { LiffErrorBanner } from "../components/LiffErrorBanner";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
@@ -367,15 +367,9 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
           </div>
 
           {(formError || registerMutation.error) && (
-            <div
-              role="alert"
-              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="leading-snug">
-                {formError || registerMutation.error?.message}
-              </span>
-            </div>
+            <LiffErrorBanner
+              message={formError || registerMutation.error?.message || ""}
+            />
           )}
 
           {rules && rules.length > 0 && (

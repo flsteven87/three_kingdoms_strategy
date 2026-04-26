@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Check, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  liffMemberKeys,
   useLiffMemberInfo,
   useLiffMemberCandidates,
   useLiffRegisterMember,
@@ -24,12 +26,14 @@ import {
   useLiffSimilarMembers,
 } from "../hooks/use-liff-member";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
-import type {
-  MemberCandidate,
-  RegisteredAccount,
+import {
+  registerMember,
+  type MemberCandidate,
+  type RegisteredAccount,
 } from "../lib/liff-api-client";
 import { GameIdAutocomplete } from "../components/GameIdAutocomplete";
 import { SuggestionDialog } from "../components/SuggestionDialog";
+import { LiffErrorBanner } from "../components/LiffErrorBanner";
 
 // ============================================================================
 // UnverifiedAccountItem - Shows suggestions for unverified game IDs
@@ -222,6 +226,8 @@ export function IdManagementPage({ session, onBack }: Props) {
   const [correctingId, setCorrectingId] = useState<string | null>(null);
   const [showSuggestionDialog, setShowSuggestionDialog] = useState(false);
   const [pendingGameId, setPendingGameId] = useState("");
+  const [criticalError, setCriticalError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const context = {
     lineUserId: session.lineUserId,
@@ -295,11 +301,29 @@ export function IdManagementPage({ session, onBack }: Props) {
 
   const handleCorrect = async (oldGameId: string, targetGameId: string) => {
     setCorrectingId(oldGameId);
+    setCriticalError(null);
+    let oldIdRemoved = false;
     try {
       await unregisterMutation.mutateAsync({ gameId: oldGameId });
+      oldIdRemoved = true;
       await registerMutation.mutateAsync({ gameId: targetGameId });
     } catch {
-      // Error handled by mutations
+      if (oldIdRemoved) {
+        try {
+          // Raw API so registerMutation.error keeps the original failure reason.
+          await registerMember({ ...context, gameId: oldGameId });
+          queryClient.invalidateQueries({
+            queryKey: liffMemberKeys.info(
+              context.lineUserId,
+              context.lineGroupId,
+            ),
+          });
+        } catch {
+          setCriticalError(
+            `修正失敗，原帳號「${oldGameId}」未能還原，請於上方手動重新綁定。`,
+          );
+        }
+      }
     } finally {
       setCorrectingId(null);
     }
@@ -352,17 +376,17 @@ export function IdManagementPage({ session, onBack }: Props) {
           </div>
         </div>
 
-        {(registerMutation.error || unregisterMutation.error) && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span className="leading-snug">
-              {registerMutation.error?.message ||
-                unregisterMutation.error?.message}
-            </span>
-          </div>
+        {(criticalError ||
+          registerMutation.error ||
+          unregisterMutation.error) && (
+          <LiffErrorBanner
+            message={
+              criticalError ||
+              registerMutation.error?.message ||
+              unregisterMutation.error?.message ||
+              ""
+            }
+          />
         )}
 
         {/* Loading state */}
