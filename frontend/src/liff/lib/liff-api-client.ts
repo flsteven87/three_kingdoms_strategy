@@ -6,6 +6,7 @@
  */
 
 import liff from "@line/liff";
+import { handleDevMock, isDevMockActive } from "./liff-dev-mocks";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8087";
@@ -35,10 +36,12 @@ function handleUnauthorized(detail: string | undefined): void {
 }
 
 async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, {
+  const fetchInit: RequestInit = {
     ...init,
     headers: { "Content-Type": "application/json", ...init.headers },
-  });
+  };
+  const mocked = isDevMockActive() ? await handleDevMock(url, fetchInit) : null;
+  const response = mocked ?? (await fetch(url, fetchInit));
 
   if (!response.ok) {
     const error = await response
@@ -184,12 +187,14 @@ export interface CopperMine {
   status: string;
   notes: string | null;
   registered_at: string;
+  claimed_tier: number | null;
 }
 
 export interface CopperMineListResponse {
   mines: CopperMine[];
   total: number;
   mine_counts_by_game_id: Record<string, number>;
+  merit_by_game_id: Record<string, number>;
   max_allowed: number;
   has_source_data: boolean;
   current_game_season_tag: string | null;
@@ -229,6 +234,7 @@ export async function registerCopperMine(
     coordY: number;
     level: number;
     notes?: string;
+    claimedTier?: number;
   },
 ): Promise<RegisterCopperResponse> {
   // P1 修復: POST body 已包含 userId/groupId，不需要 query params
@@ -245,6 +251,7 @@ export async function registerCopperMine(
         coordY: options.coordY,
         level: options.level,
         notes: options.notes,
+        claimedTier: options.claimedTier,
       }),
     },
   );

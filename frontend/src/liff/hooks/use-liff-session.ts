@@ -94,10 +94,34 @@ function getSavedParams(): Record<string, string> | null {
   return null;
 }
 
+/**
+ * Dev-only escape hatch: when running `vite dev` and URL contains `?dev=1`,
+ * skip LIFF SDK init and return a mock session so designers can preview the
+ * LIFF UI in a regular browser. Tree-shaken out of production builds because
+ * `import.meta.env.DEV` resolves to `false` at build time.
+ */
+function getDevMockSession(): LiffSession | null {
+  if (!import.meta.env.DEV) return null;
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get("dev") !== "1") return null;
+  return {
+    lineUserId: qs.get("u") || "U_dev_mock_user",
+    lineDisplayName: qs.get("name") || "開發測試",
+    lineIdToken: "dev-mock-token",
+    lineGroupId: qs.get("g") || "C_dev_mock_group",
+    eventId: qs.get("e") || null,
+  };
+}
+
 export function useLiffSession(liffId: string): LiffState {
-  const [state, setState] = useState<LiffState>({ status: "loading" });
+  const [state, setState] = useState<LiffState>(() => {
+    const mock = getDevMockSession();
+    return mock ? { status: "ready", session: mock } : { status: "loading" };
+  });
 
   useEffect(() => {
+    if (getDevMockSession()) return;
+
     let cancelled = false;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 

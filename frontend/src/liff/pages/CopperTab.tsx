@@ -10,10 +10,11 @@ import {
   Plus,
   MapPin,
   Trash2,
-  Info,
   ChevronDown,
   ChevronRight,
   Search,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,11 @@ import { useLiffMemberInfo } from "../hooks/use-liff-member";
 import type { LiffSessionWithGroup } from "../hooks/use-liff-session";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog";
 import { LiffErrorBanner } from "../components/LiffErrorBanner";
+import { TierPicker } from "../components/TierPicker";
+import {
+  buildTierOptions,
+  deriveLevelForTier,
+} from "../components/tier-picker-utils";
 
 interface Props {
   readonly session: LiffSessionWithGroup;
@@ -51,7 +57,8 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
     x: number;
     y: number;
   } | null>(null);
-  const [level, setLevel] = useState("9");
+  const [autoPickTier, setAutoPickTier] = useState(true);
+  const [selectedTier, setSelectedTier] = useState<number | null>(null);
   const [formError, setFormError] = useState("");
   const [showOtherMines, setShowOtherMines] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -104,18 +111,13 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
     debouncedCoords?.y ?? null,
   );
   const lookupData = lookup.data;
-  const coordInSource =
-    lookupData?.level != null && !lookupData.requires_manual_level;
   const coordNotInSource =
     lookupData?.requires_manual_level === true && !lookupData.is_taken;
   const coordTaken = lookupData?.is_taken === true;
-
-  // Auto-sync level selector to source-of-truth value when coord is in source
-  useEffect(() => {
-    if (coordInSource && lookupData?.level != null) {
-      setLevel(String(lookupData.level));
-    }
-  }, [coordInSource, lookupData?.level]);
+  const coordSourceLevel =
+    lookupData?.level != null && !lookupData.requires_manual_level
+      ? lookupData.level
+      : null;
 
   // Get all game_ids owned by this user
   const myGameIds = new Set(
@@ -142,6 +144,35 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
   const maxAllowed = data?.max_allowed ?? 0;
   const canApply = maxAllowed === 0 || myCount < maxAllowed;
 
+  // Tier picker options (derived from rules + claimed tiers + merit + coord)
+  const claimedTiers = new Set(
+    selectedMines
+      .map((m) => m.claimed_tier)
+      .filter((t): t is number => t != null),
+  );
+  const claimedMineLabels = new Map<number, string>(
+    selectedMines
+      .filter((m) => m.claimed_tier != null)
+      .map((m) => [m.claimed_tier!, `(${m.coord_x},${m.coord_y}) Lv.${m.level}`]),
+  );
+  const currentMerit =
+    effectiveGameId && data?.merit_by_game_id
+      ? (data.merit_by_game_id[effectiveGameId] ?? null)
+      : null;
+  const tierOptions = buildTierOptions({
+    rules: rules ?? [],
+    claimedTiers,
+    claimedMineLabels,
+    currentMerit,
+    coordLevel: coordSourceLevel,
+  });
+  const selectedRule = tierOptions.find(
+    (o) => o.rule.tier === selectedTier,
+  )?.rule;
+  const resolvedLevel = selectedRule
+    ? deriveLevelForTier(selectedRule, coordSourceLevel)
+    : coordSourceLevel;
+
   const handleRegister = async () => {
     if (!effectiveGameId || !coordX.trim() || !coordY.trim()) return;
 
@@ -157,16 +188,23 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
       return;
     }
 
+    // Resolve level: tier rule wins for nine/ten; otherwise fall back to
+    // coord source level. Default to 9 only when nothing is determinable —
+    // backend re-validates either way.
+    const level = resolvedLevel ?? 9;
+
     setFormError("");
     try {
       await registerMutation.mutateAsync({
         gameId: effectiveGameId,
         coordX: x,
         coordY: y,
-        level: parseInt(level, 10),
+        level,
+        claimedTier: autoPickTier ? undefined : (selectedTier ?? undefined),
       });
       setCoordX("");
       setCoordY("");
+      setSelectedTier(null);
     } catch {
       // Error handled by mutation
     }
@@ -211,16 +249,6 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
     );
   }
 
-  // Format level text for display
-  const formatLevel = (allowedLevel: "nine" | "ten" | "both") => {
-    if (allowedLevel === "nine") return "9 級";
-    if (allowedLevel === "ten") return "10 級";
-    return "9/10 級";
-  };
-
-  // Format merit number with comma separators
-  const formatMerit = (merit: number) => merit.toLocaleString("zh-TW");
-
   return (
     <>
       <div className="mx-auto w-full max-w-4xl space-y-3 p-3 md:grid md:grid-cols-[minmax(0,360px)_minmax(0,1fr)] md:gap-4 md:space-y-0 md:p-4">
@@ -245,58 +273,65 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
             </div>
           )}
 
-          {/* Compact form */}
-          <div className="space-y-2 rounded-xl border bg-card p-3">
-            <div className="flex gap-2">
-              {memberInfo?.registered_ids?.length === 1 ? (
-                <div className="flex h-10 flex-1 items-center rounded-md bg-muted/50 px-3 text-sm">
-                  {effectiveGameId}
-                </div>
-              ) : (
-                <Select
-                  value={effectiveGameId || ""}
-                  onValueChange={setSelectedGameId}
+          {/* Register form */}
+          <div className="space-y-3 rounded-xl border bg-card p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
+                註冊新銅礦
+              </span>
+              {effectiveGameId && (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-primary disabled:text-muted-foreground"
+                  onClick={() => onNavigateSearch(effectiveGameId)}
+                  disabled={!canUseSearch}
                 >
-                  <SelectTrigger className="h-10 flex-1">
-                    <SelectValue placeholder="選擇帳號" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {memberInfo?.registered_ids?.map((acc) => (
-                      <SelectItem key={acc.game_id} value={acc.game_id}>
-                        {acc.game_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Search className="h-3.5 w-3.5" />
+                  搜尋可用座標
+                  {hasSourceData && (
+                    <span className="ml-1 text-[10px] text-muted-foreground">
+                      · {sourceDataLabel}
+                    </span>
+                  )}
+                </button>
               )}
+            </div>
+
+            {memberInfo?.registered_ids?.length === 1 ? (
+              <div className="flex h-10 items-center rounded-md bg-muted/50 px-3 text-sm">
+                {effectiveGameId}
+              </div>
+            ) : (
               <Select
-                value={level}
-                onValueChange={setLevel}
-                disabled={!canApply || coordInSource}
+                value={effectiveGameId || ""}
+                onValueChange={setSelectedGameId}
               >
-                <SelectTrigger className="h-10 w-20">
-                  <SelectValue />
+                <SelectTrigger className="h-10" aria-label="選擇遊戲帳號">
+                  <SelectValue placeholder="選擇帳號" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="10">10 級</SelectItem>
-                  <SelectItem value="9">9 級</SelectItem>
+                  {memberInfo?.registered_ids?.map((acc) => (
+                    <SelectItem key={acc.game_id} value={acc.game_id}>
+                      {acc.game_id}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
-            <Button
-              variant="outline"
-              className="h-10 w-full"
-              onClick={() => effectiveGameId && onNavigateSearch(effectiveGameId)}
-              disabled={!canUseSearch}
-            >
-              <Search className="mr-2 h-4 w-4" />
-              搜尋銅礦
-              {hasSourceData && (
-                <span className="ml-2 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                  {sourceDataLabel}
-                </span>
-              )}
-            </Button>
+            )}
+
+            {tierOptions.length > 0 && (
+              <TierPicker
+                options={tierOptions}
+                value={selectedTier}
+                onChange={setSelectedTier}
+                autoPick={autoPickTier}
+                onAutoPickChange={(auto) => {
+                  setAutoPickTier(auto);
+                  if (auto) setSelectedTier(null);
+                }}
+              />
+            )}
+
             <div className="flex items-center gap-2">
               <div className="flex flex-1 items-center gap-1.5">
                 <span className="shrink-0 text-sm text-muted-foreground">X</span>
@@ -306,7 +341,10 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
                   placeholder="123"
                   className="h-10"
                   inputMode="numeric"
-                  pattern="[0-9]*"
+                  aria-label="X 座標"
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && canApply && handleRegister()
+                  }
                 />
               </div>
               <div className="flex flex-1 items-center gap-1.5">
@@ -317,7 +355,7 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
                   placeholder="456"
                   className="h-10"
                   inputMode="numeric"
-                  pattern="[0-9]*"
+                  aria-label="Y 座標"
                   onKeyDown={(e) =>
                     e.key === "Enter" && canApply && handleRegister()
                   }
@@ -326,14 +364,21 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
             </div>
             {lookupData && (
               <>
-                {coordInSource && (
-                  <div className="rounded-md bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                    Lv.{lookupData.level} · {lookupData.county} {lookupData.district}
+                {coordSourceLevel != null && (
+                  <div className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Lv.{lookupData.level} · {lookupData.county}{" "}
+                      {lookupData.district}
+                    </span>
                   </div>
                 )}
                 {coordNotInSource && (
-                  <div className="rounded-md bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
-                    ⚠ {lookupData.message ?? "座標不在官方資料中，請確認等級"}
+                  <div className="flex items-center gap-2 rounded-md bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      {lookupData.message ?? "座標不在官方資料中，請確認等級"}
+                    </span>
                   </div>
                 )}
                 {coordTaken && (
@@ -351,16 +396,21 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
                 !coordX.trim() ||
                 !coordY.trim() ||
                 coordTaken ||
+                (!autoPickTier && selectedTier === null) ||
                 registerMutation.isPending
               }
-              className="h-10 w-full"
+              className="h-12 w-full"
             >
               {registerMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  註冊
+                  {autoPickTier
+                    ? "註冊"
+                    : selectedTier
+                      ? `註冊第 ${selectedTier} 座`
+                      : "註冊"}
                 </>
               )}
             </Button>
@@ -369,26 +419,6 @@ export function CopperTab({ session, onNavigateSearch }: Props) {
           <LiffErrorBanner
             message={formError || registerMutation.error?.message}
           />
-
-          {rules && rules.length > 0 && (
-            <div className="rounded-xl bg-muted/50 p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Info className="h-4 w-4" />
-                申請條件
-              </div>
-              <div className="grid gap-1">
-                {rules.map((rule) => (
-                  <div key={rule.tier} className="flex justify-between text-xs">
-                    <span>第 {rule.tier} 座</span>
-                    <span>
-                      {formatLevel(rule.allowed_level)} · 戰功 ≥{" "}
-                      {formatMerit(rule.required_merit)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="pt-2 md:pt-0">

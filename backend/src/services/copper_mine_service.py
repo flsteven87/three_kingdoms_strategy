@@ -89,6 +89,7 @@ class CopperMineService:
             status=mine.status,
             notes=mine.notes,
             registered_at=mine.registered_at,
+            claimed_tier=mine.claimed_tier,
         )
 
     async def get_rules_for_liff(self, line_group_id: str) -> list:
@@ -159,8 +160,9 @@ class CopperMineService:
                     game_season_tag, level_filter=[9, 10]
                 )
 
-        # 計算每個綁定 game_id 的銅礦數量
+        # 計算每個綁定 game_id 的銅礦數量 + 取得最新戰功（供前端 tier picker 使用）
         mine_counts_by_game_id: dict[str, int] = {}
+        merit_by_game_id: dict[str, int] = {}
         member_bindings = await self.line_binding_repository.get_member_bindings_by_line_user(
             alliance_id, line_user_id
         )
@@ -173,10 +175,28 @@ class CopperMineService:
                 if mine.game_id in my_game_ids:
                     mine_counts_by_game_id[mine.game_id] += 1
 
+            # Batch fetch snapshots for matched members (skip unverified/unmatched bindings)
+            if current_season_id:
+                member_id_to_game_id = {
+                    str(b.member_id): b.game_id for b in member_bindings if b.member_id is not None
+                }
+                if member_id_to_game_id:
+                    snapshots_by_id = (
+                        await self.snapshot_repository.get_latest_by_members_in_season(
+                            [b.member_id for b in member_bindings if b.member_id is not None],
+                            current_season_id,
+                        )
+                    )
+                    for member_id_str, snapshot in snapshots_by_id.items():
+                        gid = member_id_to_game_id.get(member_id_str)
+                        if gid:
+                            merit_by_game_id[gid] = snapshot.total_merit
+
         return CopperMineListResponse(
             mines=[self._to_response(mine) for mine in mines],
             total=len(mines),
             mine_counts_by_game_id=mine_counts_by_game_id,
+            merit_by_game_id=merit_by_game_id,
             max_allowed=max_allowed,
             has_source_data=has_source_data,
             current_game_season_tag=game_season_tag,
@@ -275,7 +295,12 @@ class CopperMineService:
         return False
 
     async def _validate_rule(
-        self, alliance_id: UUID, member_id: UUID | None, season_id: UUID | None, level: int
+        self,
+        alliance_id: UUID,
+        member_id: UUID | None,
+        season_id: UUID | None,
+        level: int,
+        desired_tier: int | None = None,
     ) -> int | None:
         """
         Validate copper mine registration against alliance rules.
@@ -283,16 +308,10 @@ class CopperMineService:
         Flexible tier system:
         - Users can skip tiers if they have enough merit and level matches
         - System tracks which tiers have been claimed to prevent double-claiming
+        - When `desired_tier` is provided, validate that exact tier instead of
+          auto-picking the lowest eligible one (lets users pick e.g. tier 3
+          while tier 1/2 stay open for later)
         - Returns the claimed tier number for storage
-
-        Args:
-            alliance_id: Alliance UUID
-            member_id: Member UUID (may be None if not matched)
-            season_id: Season UUID (may be None if no active season)
-            level: Mine level (9 or 10)
-
-        Returns:
-            The tier number that was claimed (to be stored with the mine)
 
         Raises:
             HTTPException 403: If rule validation fails
@@ -337,10 +356,42 @@ class CopperMineService:
                 status_code=status.HTTP_403_FORBIDDEN, detail="成員戰功不存在，無法驗證戰功要求"
             )
 
-        # 5. 找出符合條件且未被領取的最低階規則
+        sorted_rules = sorted(all_rules, key=lambda r: r.tier)
+
+        # 5a. 使用者明確指定 tier：只驗證該 tier，不退回 auto-pick
+        if desired_tier is not None:
+            target_rule = next((r for r in sorted_rules if r.tier == desired_tier), None)
+            if target_rule is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"第 {desired_tier} 座銅礦不存在於同盟規則中",
+                )
+            if target_rule.tier in claimed_tiers:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"第 {target_rule.tier} 座銅礦已申請過",
+                )
+            if snapshot.total_merit < target_rule.required_merit:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"第 {target_rule.tier} 座戰功不足："
+                        f"需要 {target_rule.required_merit:,}，"
+                        f"目前 {snapshot.total_merit:,}"
+                    ),
+                )
+            if not self._is_level_allowed(level, target_rule.allowed_level):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"第 {target_rule.tier} 座等級限制：{LEVEL_TEXT[target_rule.allowed_level]}"
+                    ),
+                )
+            return target_rule.tier
+
+        # 5b. 自動挑選：找出符合條件且未被領取的最低階規則
         # 條件：(1) 戰功符合 (2) 等級符合 (3) 該 tier 尚未被領取
         eligible_rule = None
-        sorted_rules = sorted(all_rules, key=lambda r: r.tier)
 
         for candidate_rule in sorted_rules:
             # 跳過已領取的 tier
@@ -403,6 +454,7 @@ class CopperMineService:
         coord_y: int,
         level: int,
         notes: str | None = None,
+        desired_tier: int | None = None,
     ) -> RegisterCopperResponse:
         """
         Register a new copper mine (LIFF)
@@ -445,7 +497,11 @@ class CopperMineService:
 
         # P1 修復: 驗證銅礦申請規則，返回領取的 tier
         claimed_tier = await self._validate_rule(
-            alliance_id=alliance_id, member_id=member_id, season_id=season_id, level=level
+            alliance_id=alliance_id,
+            member_id=member_id,
+            season_id=season_id,
+            level=level,
+            desired_tier=desired_tier,
         )
 
         # Create the mine

@@ -68,6 +68,7 @@ interface RegisterCopperParams {
   coordY: number
   level: number
   notes?: string
+  claimedTier?: number
 }
 
 interface RegisterMutationContext {
@@ -108,6 +109,7 @@ export function useLiffRegisterCopper(context: LiffContext | null) {
         status: 'active',
         notes: params.notes || null,
         registered_at: new Date().toISOString(),
+        claimed_tier: params.claimedTier ?? null,
       }
 
       queryClient.setQueryData<CopperMineListResponse>(queryKey, (old) => {
@@ -117,6 +119,7 @@ export function useLiffRegisterCopper(context: LiffContext | null) {
           mines: [optimisticMine, ...(old?.mines || [])],
           total: (old?.total || 0) + 1,
           mine_counts_by_game_id: newCounts,
+          merit_by_game_id: old?.merit_by_game_id || {},
           max_allowed: old?.max_allowed || 0,
           has_source_data: old?.has_source_data || false,
           current_game_season_tag: old?.current_game_season_tag ?? null,

@@ -623,6 +623,7 @@ async def register_copper_mine(
         coord_y=data.coord_y,
         level=data.level,
         notes=data.notes,
+        desired_tier=data.claimed_tier,
     )
 
 

@@ -131,14 +131,17 @@ def copper_mine_list_service(
     mock_line_binding_repo: MagicMock,
     mock_season_repo: MagicMock,
     mock_coordinate_repo: MagicMock,
+    mock_snapshot_repo: MagicMock,
 ) -> CopperMineService:
     """Create CopperMineService with mocked dependencies for list queries"""
+    mock_snapshot_repo.get_latest_by_members_in_season = AsyncMock(return_value={})
     service = CopperMineService(
         repository=mock_copper_mine_repo,
         line_binding_repository=mock_line_binding_repo,
         season_repository=mock_season_repo,
         rule_repository=mock_rule_repo,
         coordinate_repository=mock_coordinate_repo,
+        snapshot_repository=mock_snapshot_repo,
     )
     return service
 
@@ -925,3 +928,213 @@ class TestLookupCopperCoordinateBySeason:
                 season_id=season_id, coord_x=1, coord_y=2
             )
         assert exc.value.status_code == 404
+
+
+class TestValidateRuleDesiredTier:
+    """
+    Tests for explicit tier selection (desired_tier param).
+
+    Users can pick which tier slot to claim instead of accepting the
+    auto-pick of the lowest-eligible tier. Backend validates the chosen
+    tier against claimed set, merit, and level constraints.
+    """
+
+    @pytest.mark.asyncio
+    async def test_should_claim_chosen_tier_when_skipping_lower_unclaimed(
+        self,
+        copper_mine_service: CopperMineService,
+        mock_rule_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+        member_id: UUID,
+    ):
+        """desired_tier=3 should be claimed even when tier 1 and 2 are unclaimed."""
+        # Arrange — 4 tiers, none claimed, user has merit for all
+        rules = [
+            create_mock_rule(tier=1, required_merit=0, allowed_level="nine"),
+            create_mock_rule(tier=2, required_merit=50_000, allowed_level="ten"),
+            create_mock_rule(tier=3, required_merit=100_000, allowed_level="ten"),
+            create_mock_rule(tier=4, required_merit=200_000, allowed_level="ten"),
+        ]
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=rules)
+        mock_copper_mine_repo.get_claimed_tiers = AsyncMock(return_value=set())
+        mock_snapshot_repo.get_latest_by_member_in_season = AsyncMock(
+            return_value=create_mock_snapshot(total_merit=500_000)
+        )
+
+        # Act
+        claimed = await copper_mine_service._validate_rule(
+            alliance_id=alliance_id,
+            member_id=member_id,
+            season_id=season_id,
+            level=10,
+            desired_tier=3,
+        )
+
+        # Assert — backend honors explicit choice instead of auto-picking tier 2
+        assert claimed == 3
+
+    @pytest.mark.asyncio
+    async def test_should_reject_when_desired_tier_already_claimed(
+        self,
+        copper_mine_service: CopperMineService,
+        mock_rule_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+        member_id: UUID,
+    ):
+        """Selecting an already-claimed tier should be rejected with 403."""
+        rules = [
+            create_mock_rule(tier=1, required_merit=0, allowed_level="both"),
+            create_mock_rule(tier=2, required_merit=50_000, allowed_level="ten"),
+        ]
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=rules)
+        mock_copper_mine_repo.get_claimed_tiers = AsyncMock(return_value={2})
+        mock_snapshot_repo.get_latest_by_member_in_season = AsyncMock(
+            return_value=create_mock_snapshot(total_merit=500_000)
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await copper_mine_service._validate_rule(
+                alliance_id=alliance_id,
+                member_id=member_id,
+                season_id=season_id,
+                level=10,
+                desired_tier=2,
+            )
+
+        assert exc_info.value.status_code == 403
+        assert "已申請" in exc_info.value.detail or "已領" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_should_reject_when_merit_insufficient_for_desired_tier(
+        self,
+        copper_mine_service: CopperMineService,
+        mock_rule_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+        member_id: UUID,
+    ):
+        """desired_tier with merit threshold above user's merit should reject."""
+        rules = [
+            create_mock_rule(tier=1, required_merit=0, allowed_level="both"),
+            create_mock_rule(tier=3, required_merit=100_000, allowed_level="ten"),
+        ]
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=rules)
+        mock_copper_mine_repo.get_claimed_tiers = AsyncMock(return_value=set())
+        mock_snapshot_repo.get_latest_by_member_in_season = AsyncMock(
+            return_value=create_mock_snapshot(total_merit=50_000)
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await copper_mine_service._validate_rule(
+                alliance_id=alliance_id,
+                member_id=member_id,
+                season_id=season_id,
+                level=10,
+                desired_tier=3,
+            )
+
+        assert exc_info.value.status_code == 403
+        assert "戰功" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_should_reject_when_level_does_not_match_desired_tier(
+        self,
+        copper_mine_service: CopperMineService,
+        mock_rule_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+        member_id: UUID,
+    ):
+        """Tier requiring 'ten' must reject a level=9 submission."""
+        rules = [
+            create_mock_rule(tier=1, required_merit=0, allowed_level="nine"),
+            create_mock_rule(tier=2, required_merit=50_000, allowed_level="ten"),
+        ]
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=rules)
+        mock_copper_mine_repo.get_claimed_tiers = AsyncMock(return_value=set())
+        mock_snapshot_repo.get_latest_by_member_in_season = AsyncMock(
+            return_value=create_mock_snapshot(total_merit=500_000)
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await copper_mine_service._validate_rule(
+                alliance_id=alliance_id,
+                member_id=member_id,
+                season_id=season_id,
+                level=9,
+                desired_tier=2,
+            )
+
+        assert exc_info.value.status_code == 403
+        assert "等級" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_should_reject_when_desired_tier_does_not_exist(
+        self,
+        copper_mine_service: CopperMineService,
+        mock_rule_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+        member_id: UUID,
+    ):
+        """Picking a tier number that has no rule should be rejected."""
+        rules = [create_mock_rule(tier=1, required_merit=0, allowed_level="both")]
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=rules)
+        mock_copper_mine_repo.get_claimed_tiers = AsyncMock(return_value=set())
+        mock_snapshot_repo.get_latest_by_member_in_season = AsyncMock(
+            return_value=create_mock_snapshot(total_merit=500_000)
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await copper_mine_service._validate_rule(
+                alliance_id=alliance_id,
+                member_id=member_id,
+                season_id=season_id,
+                level=10,
+                desired_tier=99,
+            )
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_should_fall_back_to_auto_pick_when_no_desired_tier(
+        self,
+        copper_mine_service: CopperMineService,
+        mock_rule_repo: MagicMock,
+        mock_snapshot_repo: MagicMock,
+        mock_copper_mine_repo: MagicMock,
+        alliance_id: UUID,
+        season_id: UUID,
+        member_id: UUID,
+    ):
+        """Backward compat: omitting desired_tier auto-picks lowest eligible."""
+        rules = [
+            create_mock_rule(tier=1, required_merit=0, allowed_level="both"),
+            create_mock_rule(tier=2, required_merit=50_000, allowed_level="ten"),
+        ]
+        mock_rule_repo.get_rules_by_alliance = AsyncMock(return_value=rules)
+        mock_copper_mine_repo.get_claimed_tiers = AsyncMock(return_value=set())
+        mock_snapshot_repo.get_latest_by_member_in_season = AsyncMock(
+            return_value=create_mock_snapshot(total_merit=500_000)
+        )
+
+        claimed = await copper_mine_service._validate_rule(
+            alliance_id=alliance_id,
+            member_id=member_id,
+            season_id=season_id,
+            level=10,
+        )
+
+        assert claimed == 1

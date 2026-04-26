@@ -63,6 +63,7 @@ class CopperMineCreate(BaseModel):
     coord_y: int = Field(..., alias="coordY", ge=0)
     level: int = Field(..., ge=1, le=10)
     notes: str | None = Field(None, max_length=500)
+    claimed_tier: int | None = Field(None, alias="claimedTier", ge=1, le=10)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -83,6 +84,7 @@ class CopperMineResponse(BaseModel):
     status: str
     notes: str | None = None
     registered_at: datetime
+    claimed_tier: int | None = None
 
 
 class CopperMineListResponse(BaseModel):
@@ -91,6 +93,9 @@ class CopperMineListResponse(BaseModel):
     mines: list[CopperMineResponse] = Field(default_factory=list)
     total: int = 0
     mine_counts_by_game_id: dict[str, int] = Field(default_factory=dict)  # {game_id: count}
+    # Latest total_merit per owned game_id; lets the LIFF tier picker gray out
+    # tiers the user can't yet meet without a round-trip to the server.
+    merit_by_game_id: dict[str, int] = Field(default_factory=dict)
     max_allowed: int = 0
     has_source_data: bool = False
     current_game_season_tag: str | None = None
