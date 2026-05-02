@@ -77,3 +77,8 @@ PLANNING.md
 
 # data
 data/
+# MCP config (contains tokens)
+.mcp.json
+
+# graphify (derived artifacts)
+graphify-out/

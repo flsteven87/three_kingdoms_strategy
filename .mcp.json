@@ -3,6 +3,13 @@
     "recur": {
       "command": "npx",
       "args": ["-y", "mcp-remote", "https://mcp.recur.tw/"]
+    },
+    "zeabur": {
+      "command": "npx",
+      "args": ["-y", "@zeabur/mcp-server"],
+      "env": {
+        "ZEABUR_TOKEN": "sk-n364gjdb7a3unmwi6mhhvtvrq7uva"
+      }
     }
   }
 }
