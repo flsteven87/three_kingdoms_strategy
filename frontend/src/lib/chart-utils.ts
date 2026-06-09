@@ -54,11 +54,6 @@ export function getDiffClassName(diff: number): string {
  * Format a date string to MM/DD format for chart labels.
  */
 export function formatDateLabel(dateStr: string): string {
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
-  if (dateOnlyMatch) {
-    return `${Number(dateOnlyMatch[2])}/${Number(dateOnlyMatch[3])}`
-  }
-
   const date = new Date(dateStr)
   return `${date.getMonth() + 1}/${date.getDate()}`
 }
