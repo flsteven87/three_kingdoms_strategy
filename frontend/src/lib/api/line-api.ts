@@ -11,7 +11,8 @@ import type {
   LineCustomCommand,
   LineCustomCommandCreate,
   LineCustomCommandUpdate,
-  RegisteredMembersResponse
+  RegisteredMembersResponse,
+  RosterUploadResponse
 } from '@/types/line-binding'
 
 export async function getLineBindingStatus(): Promise<LineBindingStatusResponse> {
@@ -41,6 +42,22 @@ export async function unbindLineGroup(isTest: boolean = false): Promise<void> {
 export async function getRegisteredMembers(): Promise<RegisteredMembersResponse> {
   const response = await axiosInstance.get<RegisteredMembersResponse>(
     '/api/v1/linebot/binding/members'
+  )
+  return response.data
+}
+
+export async function uploadLineRoster(file: File): Promise<RosterUploadResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await axiosInstance.post<RosterUploadResponse>(
+    '/api/v1/linebot/binding/roster-upload',
+    formData,
+    {
+      headers: {
+        'Content-Type': undefined
+      }
+    }
   )
   return response.data
 }

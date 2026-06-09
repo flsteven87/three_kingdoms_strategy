@@ -135,6 +135,7 @@ export const apiClient = {
   generateLineBindingCode: lineApi.generateLineBindingCode,
   unbindLineGroup: lineApi.unbindLineGroup,
   getRegisteredMembers: lineApi.getRegisteredMembers,
+  uploadLineRoster: lineApi.uploadLineRoster,
   getLineCustomCommands: lineApi.getLineCustomCommands,
   createLineCustomCommand: lineApi.createLineCustomCommand,
   updateLineCustomCommand: lineApi.updateLineCustomCommand,

@@ -19,6 +19,7 @@ import type {
   LineCustomCommandCreate,
   LineCustomCommandUpdate,
   RegisteredMembersResponse,
+  RosterUploadResponse,
 } from "@/types/line-binding";
 
 // =============================================================================
@@ -99,6 +100,20 @@ export function useRegisteredMembers(enabled: boolean = true) {
     queryFn: (): Promise<RegisteredMembersResponse> =>
       apiClient.getRegisteredMembers(),
     enabled,
+  });
+}
+
+export function useUploadLineRoster() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File): Promise<RosterUploadResponse> =>
+      apiClient.uploadLineRoster(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: lineBindingKeys.members(),
+      });
+    },
   });
 }
 

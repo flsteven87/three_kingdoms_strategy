@@ -71,6 +71,40 @@ export interface RegisteredMembersResponse {
   readonly unregistered_count: number
 }
 
+export interface RosterVerifiedMemberItem {
+  readonly line_user_id: string
+  readonly line_display_name: string
+  readonly game_id: string
+  readonly was_verified: boolean
+  readonly newly_verified: boolean
+  readonly registered_at: string
+}
+
+export interface RosterBoundNotOnRosterItem {
+  readonly line_user_id: string
+  readonly line_display_name: string
+  readonly game_id: string
+  readonly is_verified: boolean
+  readonly registered_at: string
+}
+
+export interface RosterUploadSummary {
+  readonly roster_rows: number
+  readonly unique_game_ids: number
+  readonly duplicate_game_ids: number
+  readonly newly_verified: number
+  readonly verified_on_roster_count: number
+  readonly line_group_unregistered_count: number
+  readonly bound_not_on_roster_count: number
+}
+
+export interface RosterUploadResponse {
+  readonly verified_on_roster: RosterVerifiedMemberItem[]
+  readonly line_group_unregistered: UnregisteredMemberItem[]
+  readonly bound_not_on_roster: RosterBoundNotOnRosterItem[]
+  readonly summary: RosterUploadSummary
+}
+
 export interface LineCustomCommand {
   readonly id: string
   readonly command_name: string
