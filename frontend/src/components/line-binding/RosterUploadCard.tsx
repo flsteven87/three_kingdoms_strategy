@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Upload, UserX } from 'lucide-react'
+import { AlertCircle, ChevronDown, FileSpreadsheet, Loader2, Upload, UserX } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,7 @@ function getErrorMessage(error: unknown): string {
     return error.response.data.detail
   }
 
-  return error instanceof Error ? error.message : 'Upload failed'
+  return error instanceof Error ? error.message : '上傳失敗'
 }
 
 interface RosterUploadCardProps {
@@ -48,21 +48,21 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Roster CSV Upload</CardTitle>
+        <CardTitle>名冊 CSV 上傳</CardTitle>
         <CardDescription>
-          Upload one game ID per row to verify LINE bindings against the production group.
+          每列填入一個遊戲 ID，用正式 LINE 群組成員名單驗證綁定狀態。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         {canUpdate ? (
           <div className="space-y-4">
             <CsvDropZone
-              label="Member roster"
+              label="成員名冊"
               file={file}
               onFileChange={setFile}
               disabled={uploadRoster.isPending}
-              description="Upload or drop a roster CSV"
-              helperText="Single column, one game ID per row"
+              description="上傳或拖放名冊 CSV"
+              helperText="單欄格式，每列一個遊戲 ID"
               compact
             />
 
@@ -83,55 +83,46 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
               )}
-              {uploadRoster.isPending ? 'Uploading...' : 'Upload roster'}
+              {uploadRoster.isPending ? '上傳中...' : '上傳名冊'}
             </Button>
           </div>
         ) : (
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Owner or collaborator permission is required to upload a roster.
+              需要盟主或協作者權限才能上傳名冊。
             </AlertDescription>
           </Alert>
         )}
 
         {result && (
           <div className="space-y-5 border-t pt-5">
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2">
               <Metric
                 icon={<FileSpreadsheet className="h-4 w-4 text-muted-foreground" />}
-                label="Roster IDs"
-                value={result.summary.unique_game_ids}
-              />
-              <Metric
-                icon={<CheckCircle2 className="h-4 w-4 text-green-600" />}
-                label="On roster"
+                label="已登記且在名冊"
                 value={result.summary.verified_on_roster_count}
               />
               <Metric
                 icon={<UserX className="h-4 w-4 text-muted-foreground" />}
-                label="No game ID"
-                value={result.summary.line_group_unregistered_count}
-              />
-              <Metric
-                icon={<AlertCircle className="h-4 w-4 text-orange-600" />}
-                label="Not on roster"
-                value={result.summary.bound_not_on_roster_count}
+                label="名冊內未登記"
+                value={result.summary.unregistered_game_id_count}
               />
             </div>
 
             <RosterResultSection
-              title="Verified on roster"
+              title="1. 已登記且在名冊內的遊戲 ID"
               count={result.verified_on_roster.length}
-              emptyText="No LINE bindings matched the roster."
+              emptyText="沒有已登記且符合名冊的遊戲 ID。"
+              defaultOpen={false}
             >
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="p-3 font-medium">LINE name</th>
-                    <th className="p-3 font-medium">Game ID</th>
-                    <th className="p-3 font-medium">Status</th>
-                    <th className="p-3 text-right font-medium">Registered</th>
+                    <th className="p-3 font-medium">LINE 名稱</th>
+                    <th className="p-3 font-medium">遊戲 ID</th>
+                    <th className="p-3 font-medium">狀態</th>
+                    <th className="p-3 text-right font-medium">登記日期</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -141,7 +132,7 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                       <td className="p-3 font-medium">{member.game_id}</td>
                       <td className="p-3">
                         <Badge variant={member.newly_verified ? 'default' : 'secondary'}>
-                          {member.newly_verified ? 'Newly verified' : 'Already verified'}
+                          {member.newly_verified ? '本次驗證' : '已驗證'}
                         </Badge>
                       </td>
                       <td className="p-3 text-right text-muted-foreground">
@@ -154,61 +145,21 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
             </RosterResultSection>
 
             <RosterResultSection
-              title="LINE group members without game ID"
-              count={result.line_group_unregistered.length}
-              emptyText="Every tracked LINE group member has registered a game ID."
+              title="2. 名冊內但尚未登記的遊戲 ID"
+              count={result.unregistered_game_ids.length}
+              emptyText="名冊內的遊戲 ID 都已完成登記。"
+              defaultOpen
             >
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="p-3 font-medium">LINE name</th>
-                    <th className="p-3 text-right font-medium">Tracked</th>
+                    <th className="p-3 font-medium">遊戲 ID</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {result.line_group_unregistered.map(member => (
-                    <tr key={member.line_user_id} className="border-b">
-                      <td className="p-3">
-                        {member.line_display_name ?? (
-                          <span className="italic text-muted-foreground">Unknown</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right text-muted-foreground">
-                        {formatDateTW(member.tracked_at, { padded: true })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </RosterResultSection>
-
-            <RosterResultSection
-              title="Registered game IDs not on roster"
-              count={result.bound_not_on_roster.length}
-              emptyText="No registered game IDs are missing from the roster."
-            >
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="p-3 font-medium">LINE name</th>
-                    <th className="p-3 font-medium">Game ID</th>
-                    <th className="p-3 font-medium">Current status</th>
-                    <th className="p-3 text-right font-medium">Registered</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.bound_not_on_roster.map(member => (
-                    <tr key={`${member.line_user_id}-${member.game_id}`} className="border-b">
-                      <td className="p-3">{member.line_display_name}</td>
+                  {result.unregistered_game_ids.map(member => (
+                    <tr key={member.game_id} className="border-b">
                       <td className="p-3 font-medium">{member.game_id}</td>
-                      <td className="p-3">
-                        <Badge variant={member.is_verified ? 'default' : 'secondary'}>
-                          {member.is_verified ? 'Verified' : 'Pending'}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-right text-muted-foreground">
-                        {formatDateTW(member.registered_at, { padded: true })}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -243,6 +194,7 @@ interface RosterResultSectionProps {
   readonly title: string
   readonly count: number
   readonly emptyText: string
+  readonly defaultOpen?: boolean
   readonly children: ReactNode
 }
 
@@ -250,20 +202,32 @@ function RosterResultSection({
   title,
   count,
   emptyText,
+  defaultOpen = true,
   children
 }: RosterResultSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-medium">{title}</h3>
-        <Badge variant="outline">{count}</Badge>
-      </div>
-      {count > 0 ? (
-        <div className="overflow-x-auto rounded-lg border">{children}</div>
-      ) : (
-        <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-          {emptyText}
+      <button
+        type="button"
+        onClick={() => setIsOpen(open => !open)}
+        className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left hover:bg-muted/40"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">{title}</h3>
+          <Badge variant="outline">{count}</Badge>
         </div>
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        count > 0 ? (
+          <div className="overflow-x-auto rounded-lg border">{children}</div>
+        ) : (
+          <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+            {emptyText}
+          </div>
+        )
       )}
     </div>
   )

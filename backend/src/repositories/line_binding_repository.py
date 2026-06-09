@@ -330,6 +330,21 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         data = self._handle_supabase_result(result, allow_empty=True)
         return [MemberLineBinding(**row) for row in data]
 
+    async def get_all_member_bindings_by_alliance(
+        self, alliance_id: UUID
+    ) -> list[MemberLineBinding]:
+        """Get all member LINE bindings for an alliance."""
+        result = await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .select("*")
+            .eq("alliance_id", str(alliance_id))
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        data = self._handle_supabase_result(result, allow_empty=True)
+        return [MemberLineBinding(**row) for row in data]
+
     async def search_id_bindings(self, alliance_id: UUID, query: str) -> list[MemberLineBinding]:
         """Search member bindings by game ID or LINE display name (case-insensitive)."""
         safe_query = sanitize_postgrest_filter_input(query)

@@ -191,14 +191,13 @@ class RosterVerifiedMemberItem(BaseModel):
     registered_at: datetime
 
 
-class RosterBoundNotOnRosterItem(BaseModel):
-    """LINE-bound member whose game ID is missing from the uploaded roster"""
+class RosterUnregisteredGameIdItem(BaseModel):
+    """Roster game ID that does not have a LINE binding in the production group"""
 
-    line_user_id: str
-    line_display_name: str
     game_id: str
-    is_verified: bool
-    registered_at: datetime
+    has_member_row: bool
+    possible_line_display_name: str | None = None
+    possible_line_user_id: str | None = None
 
 
 class RosterUploadSummary(BaseModel):
@@ -210,7 +209,7 @@ class RosterUploadSummary(BaseModel):
     newly_verified: int
     verified_on_roster_count: int
     line_group_unregistered_count: int
-    bound_not_on_roster_count: int
+    unregistered_game_id_count: int
 
 
 class RosterUploadResponse(BaseModel):
@@ -218,7 +217,7 @@ class RosterUploadResponse(BaseModel):
 
     verified_on_roster: list[RosterVerifiedMemberItem]
     line_group_unregistered: list[UnregisteredMemberItem]
-    bound_not_on_roster: list[RosterBoundNotOnRosterItem]
+    unregistered_game_ids: list[RosterUnregisteredGameIdItem]
     summary: RosterUploadSummary
 
 

@@ -54,9 +54,9 @@ from src.models.line_binding import (
     RegisteredMemberItem,
     RegisteredMembersResponse,
     RegisterMemberResponse,
-    RosterBoundNotOnRosterItem,
     RosterUploadResponse,
     RosterUploadSummary,
+    RosterUnregisteredGameIdItem,
     RosterVerifiedMemberItem,
     SimilarMembersResponse,
     UnregisteredMemberItem,
@@ -442,7 +442,7 @@ class LineBindingService:
             if len(non_empty_cells) > 1:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Roster CSV must contain a single game ID column (row {row_index})",
+                    detail=f"名冊 CSV 必須是單一遊戲 ID 欄位（第 {row_index} 列）",
                 )
 
             value = non_empty_cells[0]
@@ -458,7 +458,7 @@ class LineBindingService:
         if not unique_game_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Roster CSV is empty",
+                detail="名冊 CSV 沒有可匯入的遊戲 ID",
             )
 
         return game_ids, unique_game_ids
@@ -474,6 +474,13 @@ class LineBindingService:
         intentionally left untouched.
         """
         roster_rows, roster_game_ids = self._parse_roster_game_ids(csv_content)
+        logger.info(
+            "[ROSTER] Parsed upload: rows=%s unique_game_ids=%s duplicates=%s game_ids=%s",
+            len(roster_rows),
+            len(roster_game_ids),
+            len(roster_rows) - len(roster_game_ids),
+            sorted(roster_game_ids),
+        )
 
         production_binding = await self.repository.get_active_group_binding_by_alliance(
             alliance_id, is_test=False
@@ -481,12 +488,19 @@ class LineBindingService:
         if not production_binding:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Production LINE group is not bound",
+                detail="尚未綁定正式 LINE 群組",
             )
 
         group_members = await self.repository.get_group_members(
             [production_binding.line_group_id]
         )
+        logger.info(
+            "[ROSTER] Production group: alliance_id=%s group_id=%s tracked_rows=%s",
+            alliance_id,
+            production_binding.line_group_id,
+            len(group_members),
+        )
+
         group_member_map: dict[str, dict] = {}
         for member in group_members:
             uid = member["line_user_id"]
@@ -496,24 +510,57 @@ class LineBindingService:
                 group_member_map[uid] = member
 
         tracked_user_ids = set(group_member_map.keys())
-        bindings = await self.repository.get_member_bindings_by_line_user_ids(
-            alliance_id, tracked_user_ids
+        all_bindings = await self.repository.get_all_member_bindings_by_alliance(alliance_id)
+        bindings_by_game_id: dict[str, MemberLineBinding] = {}
+        for binding in all_bindings:
+            if binding.game_id not in bindings_by_game_id:
+                bindings_by_game_id[binding.game_id] = binding
+
+        bindings = list(bindings_by_game_id.values())
+        logger.info(
+            "[ROSTER] Alliance bindings: tracked_users=%s raw_bindings=%s unique_game_ids=%s "
+            "game_ids=%s",
+            len(tracked_user_ids),
+            len(all_bindings),
+            len(bindings),
+            sorted(binding.game_id for binding in bindings),
         )
 
         member_ids_by_name = await self._member_repo.get_ids_by_names(
             alliance_id, roster_game_ids
         )
+        logger.info(
+            "[ROSTER] Existing member rows matched: count=%s game_ids=%s",
+            len(member_ids_by_name),
+            sorted(member_ids_by_name.keys()),
+        )
 
         updates: list[dict[str, str | None]] = []
         verified_on_roster: list[RosterVerifiedMemberItem] = []
-        bound_not_on_roster: list[RosterBoundNotOnRosterItem] = []
 
         for binding in bindings:
             is_on_roster = binding.game_id in roster_game_ids
+            logger.info(
+                "[ROSTER] Compare binding: line_user_id=%s line_display_name=%s game_id=%s "
+                "is_verified=%s on_roster=%s has_member_row=%s",
+                binding.line_user_id,
+                binding.line_display_name,
+                binding.game_id,
+                binding.is_verified,
+                is_on_roster,
+                binding.game_id in member_ids_by_name,
+            )
+
             if is_on_roster:
                 newly_verified = not binding.is_verified
                 if newly_verified:
                     member_id = member_ids_by_name.get(binding.game_id)
+                    logger.info(
+                        "[ROSTER] Queue verify: binding_id=%s game_id=%s member_id=%s",
+                        binding.id,
+                        binding.game_id,
+                        member_id,
+                    )
                     updates.append(
                         {
                             "id": str(binding.id),
@@ -531,21 +578,33 @@ class LineBindingService:
                         registered_at=binding.created_at,
                     )
                 )
-            else:
-                bound_not_on_roster.append(
-                    RosterBoundNotOnRosterItem(
-                        line_user_id=binding.line_user_id,
-                        line_display_name=binding.line_display_name,
-                        game_id=binding.game_id,
-                        is_verified=binding.is_verified,
-                        registered_at=binding.created_at,
-                    )
-                )
 
         if updates:
-            await self.repository.batch_verify_roster_bindings(updates)
+            # Dry-run mode: keep the response identical to the mutating flow,
+            # but do not write verification changes while manual review is ongoing.
+            # updated_count = await self.repository.batch_verify_roster_bindings(updates)
+            updated_count = len(updates)
+            logger.info("[ROSTER] Verified bindings update skipped: would_update=%s", updated_count)
+        else:
+            logger.info("[ROSTER] No unverified roster matches needed updates")
 
-        registered_user_ids = {binding.line_user_id for binding in bindings}
+        registered_game_ids = {binding.game_id for binding in bindings}
+        unregistered_roster_game_ids = roster_game_ids - registered_game_ids
+        unregistered_game_ids = [
+            RosterUnregisteredGameIdItem(
+                game_id=game_id,
+                has_member_row=game_id in member_ids_by_name,
+                possible_line_display_name=None,
+                possible_line_user_id=None,
+            )
+            for game_id in unregistered_roster_game_ids
+        ]
+
+        registered_user_ids = {
+            binding.line_user_id
+            for binding in all_bindings
+            if binding.line_user_id in tracked_user_ids
+        }
         line_group_unregistered = [
             UnregisteredMemberItem(
                 line_user_id=uid,
@@ -556,13 +615,13 @@ class LineBindingService:
         ]
 
         verified_on_roster.sort(key=lambda item: item.game_id)
-        bound_not_on_roster.sort(key=lambda item: item.game_id)
+        unregistered_game_ids.sort(key=lambda item: item.game_id)
         line_group_unregistered.sort(key=lambda item: item.line_display_name or item.line_user_id)
 
-        return RosterUploadResponse(
+        response = RosterUploadResponse(
             verified_on_roster=verified_on_roster,
             line_group_unregistered=line_group_unregistered,
-            bound_not_on_roster=bound_not_on_roster,
+            unregistered_game_ids=unregistered_game_ids,
             summary=RosterUploadSummary(
                 roster_rows=len(roster_rows),
                 unique_game_ids=len(roster_game_ids),
@@ -570,9 +629,21 @@ class LineBindingService:
                 newly_verified=len(updates),
                 verified_on_roster_count=len(verified_on_roster),
                 line_group_unregistered_count=len(line_group_unregistered),
-                bound_not_on_roster_count=len(bound_not_on_roster),
+                unregistered_game_id_count=len(unregistered_game_ids),
             ),
         )
+        logger.info(
+            "[ROSTER] Return summary: %s",
+            response.summary.model_dump(),
+        )
+        logger.info(
+            "[ROSTER] Return lists: verified_on_roster=%s line_group_unregistered=%s "
+            "unregistered_game_ids=%s",
+            [item.model_dump() for item in response.verified_on_roster],
+            [item.model_dump() for item in response.line_group_unregistered],
+            [item.model_dump() for item in response.unregistered_game_ids],
+        )
+        return response
 
     async def search_registered_members(
         self, line_group_id: str, query: str

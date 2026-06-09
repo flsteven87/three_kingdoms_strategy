@@ -80,12 +80,11 @@ export interface RosterVerifiedMemberItem {
   readonly registered_at: string
 }
 
-export interface RosterBoundNotOnRosterItem {
-  readonly line_user_id: string
-  readonly line_display_name: string
+export interface RosterUnregisteredGameIdItem {
   readonly game_id: string
-  readonly is_verified: boolean
-  readonly registered_at: string
+  readonly has_member_row: boolean
+  readonly possible_line_display_name: string | null
+  readonly possible_line_user_id: string | null
 }
 
 export interface RosterUploadSummary {
@@ -95,13 +94,13 @@ export interface RosterUploadSummary {
   readonly newly_verified: number
   readonly verified_on_roster_count: number
   readonly line_group_unregistered_count: number
-  readonly bound_not_on_roster_count: number
+  readonly unregistered_game_id_count: number
 }
 
 export interface RosterUploadResponse {
   readonly verified_on_roster: RosterVerifiedMemberItem[]
   readonly line_group_unregistered: UnregisteredMemberItem[]
-  readonly bound_not_on_roster: RosterBoundNotOnRosterItem[]
+  readonly unregistered_game_ids: RosterUnregisteredGameIdItem[]
   readonly summary: RosterUploadSummary
 }
 
