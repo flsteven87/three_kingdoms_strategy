@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import { GroupTab } from '@/components/line-binding/GroupTab'
 import { RegisteredMembersCard } from '@/components/line-binding/RegisteredMembersCard'
+import { RosterUploadCard } from '@/components/line-binding/RosterUploadCard'
 import { CustomCommandsTab } from '@/components/line-binding/CustomCommandsTab'
 import { useAlliance } from '@/hooks/use-alliance'
 import { useCanUpdateAlliance } from '@/hooks/use-user-role'
@@ -137,7 +138,12 @@ export function LineBinding() {
               isUnbinding={unbindGroup.isPending}
               generateError={generateCode.error}
             />
-            {productionBinding && <RegisteredMembersCard />}
+            {productionBinding && (
+              <>
+                <RosterUploadCard canUpdate={canUpdate} />
+                <RegisteredMembersCard />
+              </>
+            )}
           </div>
         </TabsContent>
 
