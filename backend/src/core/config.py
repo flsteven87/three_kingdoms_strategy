@@ -8,6 +8,7 @@ from datetime import timedelta, timezone
 from functools import lru_cache
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Game server timezone (Taiwan/China server time is UTC+8)
@@ -50,6 +51,18 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
     debug: bool = True
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value: object) -> object:
+        """Accept deployment-style DEBUG values used in local env files."""
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "prod", "production"}:
+                return False
+            if normalized in {"debug", "dev", "development"}:
+                return True
+        return value
 
     # Logging
     log_level: str = "INFO"

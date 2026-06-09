@@ -120,7 +120,7 @@ def format_event_time(dt: datetime | None) -> str:
     """
     if not dt:
         return ""
-    local_dt = dt.astimezone(GAME_TIMEZONE)
+    local_dt = dt if dt.tzinfo is None else dt.astimezone(GAME_TIMEZONE)
     return local_dt.strftime("%m/%d %H:%M")
 
 

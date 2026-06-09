@@ -19,7 +19,17 @@ import re
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from linebot.v3.messaging import ApiException, ReplyMessageRequest, TextMessage
 
 from src.core.config import GAME_TIMEZONE, Settings, get_settings
