@@ -13,10 +13,12 @@ Business logic for LINE Bot integration:
 """
 
 import asyncio
+import csv
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
+from io import StringIO
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -52,6 +54,10 @@ from src.models.line_binding import (
     RegisteredMemberItem,
     RegisteredMembersResponse,
     RegisterMemberResponse,
+    RosterBoundNotOnRosterItem,
+    RosterUploadResponse,
+    RosterUploadSummary,
+    RosterVerifiedMemberItem,
     SimilarMembersResponse,
     UnregisteredMemberItem,
     UserEventParticipation,
@@ -59,6 +65,7 @@ from src.models.line_binding import (
 from src.repositories.battle_event_metrics_repository import BattleEventMetricsRepository
 from src.repositories.battle_event_repository import BattleEventRepository
 from src.repositories.line_binding_repository import LineBindingRepository
+from src.repositories.member_repository import MemberRepository
 from src.repositories.season_repository import SeasonRepository
 from src.services.analytics import MemberAnalyticsService
 
@@ -70,6 +77,7 @@ BINDING_CODE_EXPIRY_MINUTES = 5
 MAX_CODES_PER_HOUR = 3
 # Remove confusing characters: 0, O, I, 1
 BINDING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+ROSTER_HEADER_NAMES = {"game_id", "gameid", "name", "遊戲id", "遊戲 id"}
 
 
 class LineBindingService:
@@ -80,6 +88,7 @@ class LineBindingService:
         self._event_repo = BattleEventRepository()
         self._metrics_repo = BattleEventMetricsRepository()
         self._season_repo = SeasonRepository()
+        self._member_repo = MemberRepository()
         self._analytics_service = MemberAnalyticsService()
 
     # =========================================================================
@@ -413,6 +422,156 @@ class LineBindingService:
             unregistered=unregistered,
             total=len(members),
             unregistered_count=len(unregistered),
+        )
+
+    @staticmethod
+    def _parse_roster_game_ids(csv_content: str) -> tuple[list[str], set[str]]:
+        """Parse a single-column game ID roster CSV."""
+        if csv_content.startswith("\ufeff"):
+            csv_content = csv_content[1:]
+
+        rows = csv.reader(StringIO(csv_content))
+        game_ids: list[str] = []
+        has_seen_data = False
+
+        for row_index, row in enumerate(rows, start=1):
+            non_empty_cells = [cell.strip() for cell in row if cell.strip()]
+            if not non_empty_cells:
+                continue
+
+            if len(non_empty_cells) > 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Roster CSV must contain a single game ID column (row {row_index})",
+                )
+
+            value = non_empty_cells[0]
+            normalized = value.casefold()
+            if not has_seen_data and normalized in ROSTER_HEADER_NAMES:
+                has_seen_data = True
+                continue
+
+            has_seen_data = True
+            game_ids.append(value)
+
+        unique_game_ids = set(game_ids)
+        if not unique_game_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Roster CSV is empty",
+            )
+
+        return game_ids, unique_game_ids
+
+    async def upload_member_roster(
+        self, alliance_id: UUID, csv_content: str
+    ) -> RosterUploadResponse:
+        """
+        Compare an uploaded game ID roster against the production LINE group.
+
+        Only roster-matched unverified bindings are changed. Verified bindings
+        that are missing from the roster are reported for admin follow-up and
+        intentionally left untouched.
+        """
+        roster_rows, roster_game_ids = self._parse_roster_game_ids(csv_content)
+
+        production_binding = await self.repository.get_active_group_binding_by_alliance(
+            alliance_id, is_test=False
+        )
+        if not production_binding:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Production LINE group is not bound",
+            )
+
+        group_members = await self.repository.get_group_members(
+            [production_binding.line_group_id]
+        )
+        group_member_map: dict[str, dict] = {}
+        for member in group_members:
+            uid = member["line_user_id"]
+            if uid not in group_member_map or member["tracked_at"] > group_member_map[uid][
+                "tracked_at"
+            ]:
+                group_member_map[uid] = member
+
+        tracked_user_ids = set(group_member_map.keys())
+        bindings = await self.repository.get_member_bindings_by_line_user_ids(
+            alliance_id, tracked_user_ids
+        )
+
+        member_ids_by_name = await self._member_repo.get_ids_by_names(
+            alliance_id, roster_game_ids
+        )
+
+        updates: list[dict[str, str | None]] = []
+        verified_on_roster: list[RosterVerifiedMemberItem] = []
+        bound_not_on_roster: list[RosterBoundNotOnRosterItem] = []
+
+        for binding in bindings:
+            is_on_roster = binding.game_id in roster_game_ids
+            if is_on_roster:
+                newly_verified = not binding.is_verified
+                if newly_verified:
+                    member_id = member_ids_by_name.get(binding.game_id)
+                    updates.append(
+                        {
+                            "id": str(binding.id),
+                            "member_id": str(member_id) if member_id else None,
+                        }
+                    )
+
+                verified_on_roster.append(
+                    RosterVerifiedMemberItem(
+                        line_user_id=binding.line_user_id,
+                        line_display_name=binding.line_display_name,
+                        game_id=binding.game_id,
+                        was_verified=binding.is_verified,
+                        newly_verified=newly_verified,
+                        registered_at=binding.created_at,
+                    )
+                )
+            else:
+                bound_not_on_roster.append(
+                    RosterBoundNotOnRosterItem(
+                        line_user_id=binding.line_user_id,
+                        line_display_name=binding.line_display_name,
+                        game_id=binding.game_id,
+                        is_verified=binding.is_verified,
+                        registered_at=binding.created_at,
+                    )
+                )
+
+        if updates:
+            await self.repository.batch_verify_roster_bindings(updates)
+
+        registered_user_ids = {binding.line_user_id for binding in bindings}
+        line_group_unregistered = [
+            UnregisteredMemberItem(
+                line_user_id=uid,
+                line_display_name=group_member_map[uid].get("line_display_name"),
+                tracked_at=group_member_map[uid]["tracked_at"],
+            )
+            for uid in tracked_user_ids - registered_user_ids
+        ]
+
+        verified_on_roster.sort(key=lambda item: item.game_id)
+        bound_not_on_roster.sort(key=lambda item: item.game_id)
+        line_group_unregistered.sort(key=lambda item: item.line_display_name or item.line_user_id)
+
+        return RosterUploadResponse(
+            verified_on_roster=verified_on_roster,
+            line_group_unregistered=line_group_unregistered,
+            bound_not_on_roster=bound_not_on_roster,
+            summary=RosterUploadSummary(
+                roster_rows=len(roster_rows),
+                unique_game_ids=len(roster_game_ids),
+                duplicate_game_ids=len(roster_rows) - len(roster_game_ids),
+                newly_verified=len(updates),
+                verified_on_roster_count=len(verified_on_roster),
+                line_group_unregistered_count=len(line_group_unregistered),
+                bound_not_on_roster_count=len(bound_not_on_roster),
+            ),
         )
 
     async def search_registered_members(

@@ -924,3 +924,40 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
         await asyncio.gather(*tasks)
 
         return len(binding_updates)
+
+    async def batch_verify_roster_bindings(
+        self, binding_updates: list[dict[str, str | None]]
+    ) -> int:
+        """
+        Batch verify roster-matched bindings.
+
+        Unlike CSV snapshot reverification, roster upload is itself proof that a
+        game ID is valid. member_id is attached when an existing member row is
+        available, but verification does not depend on that row existing.
+        """
+        if not binding_updates:
+            return 0
+
+        now_iso = datetime.now(UTC).isoformat()
+        tasks = []
+        for update in binding_updates:
+            update_data: dict[str, str | bool] = {
+                "is_verified": True,
+                "updated_at": now_iso,
+            }
+            if update.get("member_id") is not None:
+                update_data["member_id"] = update["member_id"]
+
+            tasks.append(
+                self._execute_async(
+                    lambda u=update, data=update_data: self.client.from_(
+                        "member_line_bindings"
+                    )
+                    .update(data)
+                    .eq("id", u["id"])
+                    .execute()
+                )
+            )
+
+        await asyncio.gather(*tasks)
+        return len(binding_updates)

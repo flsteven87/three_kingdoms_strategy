@@ -19,7 +19,7 @@ import re
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from linebot.v3.messaging import ApiException, ReplyMessageRequest, TextMessage
 
 from src.core.config import GAME_TIMEZONE, Settings, get_settings
@@ -74,11 +74,13 @@ from src.models.line_binding import (
     MemberPerformanceResponse,
     RegisteredMembersResponse,
     RegisterMemberResponse,
+    RosterUploadResponse,
     SimilarMembersResponse,
 )
 from src.services.battle_event_service import BattleEventService
 from src.services.line_binding_service import LineBindingService
 from src.services.season_quota_service import SeasonQuotaService
+from src.utils.csv_io import read_csv_upload
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +240,32 @@ async def get_registered_members(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
 
     return await service.get_registered_members(alliance.id)
+
+
+@router.post(
+    "/binding/roster-upload",
+    response_model=RosterUploadResponse,
+    summary="Upload production LINE roster",
+    description="Upload a single-column game ID roster and compare it to the production LINE group",
+)
+async def upload_member_roster(
+    user_id: UserIdDep,
+    service: LineBindingServiceDep,
+    alliance_service: AllianceServiceDep,
+    permission_service: PermissionServiceDep,
+    file: Annotated[UploadFile, File()],
+) -> RosterUploadResponse:
+    """Upload production roster CSV for LINE game ID verification."""
+    alliance = await alliance_service.get_user_alliance(user_id)
+    if not alliance:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User has no alliance")
+
+    await permission_service.require_owner_or_collaborator(
+        user_id, alliance.id, "upload LINE member roster"
+    )
+
+    csv_content = await read_csv_upload(file)
+    return await service.upload_member_roster(alliance.id, csv_content)
 
 
 @router.get(

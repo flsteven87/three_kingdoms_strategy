@@ -180,6 +180,48 @@ class RegisteredMembersResponse(BaseModel):
     unregistered_count: int
 
 
+class RosterVerifiedMemberItem(BaseModel):
+    """LINE-bound member whose game ID appears on the uploaded roster"""
+
+    line_user_id: str
+    line_display_name: str
+    game_id: str
+    was_verified: bool
+    newly_verified: bool
+    registered_at: datetime
+
+
+class RosterBoundNotOnRosterItem(BaseModel):
+    """LINE-bound member whose game ID is missing from the uploaded roster"""
+
+    line_user_id: str
+    line_display_name: str
+    game_id: str
+    is_verified: bool
+    registered_at: datetime
+
+
+class RosterUploadSummary(BaseModel):
+    """Aggregate counts for a roster upload result"""
+
+    roster_rows: int
+    unique_game_ids: int
+    duplicate_game_ids: int
+    newly_verified: int
+    verified_on_roster_count: int
+    line_group_unregistered_count: int
+    bound_not_on_roster_count: int
+
+
+class RosterUploadResponse(BaseModel):
+    """Result of comparing a roster upload against the production LINE group"""
+
+    verified_on_roster: list[RosterVerifiedMemberItem]
+    line_group_unregistered: list[UnregisteredMemberItem]
+    bound_not_on_roster: list[RosterBoundNotOnRosterItem]
+    summary: RosterUploadSummary
+
+
 class LineCustomCommandBase(BaseModel):
     command_name: str = Field(..., min_length=1, max_length=100)
     trigger_keyword: str = Field(..., min_length=2, max_length=50, pattern=r"^/[^\s]+$")
