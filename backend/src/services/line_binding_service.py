@@ -16,6 +16,7 @@ import asyncio
 import csv
 import logging
 import secrets
+import unicodedata
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
 from io import StringIO
@@ -78,6 +79,14 @@ MAX_CODES_PER_HOUR = 3
 # Remove confusing characters: 0, O, I, 1
 BINDING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 ROSTER_HEADER_NAMES = {"game_id", "gameid", "name", "遊戲id", "遊戲 id"}
+ROSTER_FUZZY_MATCH_THRESHOLD = 0.75
+CHINESE_VARIANT_TRANSLATION = str.maketrans(
+    {
+        "猫": "貓",
+        "裏": "裡",
+        "里": "裡",
+    }
+)
 
 
 class LineBindingService:
@@ -463,6 +472,73 @@ class LineBindingService:
 
         return game_ids, unique_game_ids
 
+    @staticmethod
+    def _normalize_roster_match_text(value: str) -> str:
+        """Normalize game IDs for rough roster suggestions."""
+        normalized = unicodedata.normalize("NFKC", value)
+        normalized = normalized.translate(CHINESE_VARIANT_TRANSLATION)
+        return "".join(normalized.split()).casefold()
+
+    def _find_roster_fuzzy_match(
+        self,
+        roster_game_id: str,
+        bindings_by_game_id: dict[str, MemberLineBinding],
+    ) -> tuple[MemberLineBinding, float] | None:
+        """Find the closest registered game ID for an unmatched roster game ID."""
+        normalized_roster_id = self._normalize_roster_match_text(roster_game_id)
+        if not normalized_roster_id:
+            return None
+
+        candidates: list[tuple[float, str, MemberLineBinding]] = []
+        for registered_game_id, binding in bindings_by_game_id.items():
+            normalized_registered_id = self._normalize_roster_match_text(registered_game_id)
+            if not normalized_registered_id:
+                continue
+
+            score = SequenceMatcher(
+                None, normalized_roster_id, normalized_registered_id
+            ).ratio()
+            if score >= ROSTER_FUZZY_MATCH_THRESHOLD:
+                candidates.append((score, registered_game_id, binding))
+
+        if not candidates:
+            return None
+
+        candidates.sort(key=lambda item: (-item[0], item[1]))
+        best_score, _registered_game_id, binding = candidates[0]
+        return binding, round(best_score, 3)
+
+    def _build_unregistered_roster_item(
+        self,
+        game_id: str,
+        has_member_row: bool,
+        bindings_by_game_id: dict[str, MemberLineBinding],
+    ) -> RosterUnregisteredGameIdItem:
+        fuzzy_match = self._find_roster_fuzzy_match(game_id, bindings_by_game_id)
+        if not fuzzy_match:
+            return RosterUnregisteredGameIdItem(
+                game_id=game_id,
+                has_member_row=has_member_row,
+            )
+
+        binding, score = fuzzy_match
+        logger.info(
+            "[ROSTER] Fuzzy suggestion: roster_game_id=%s registered_game_id=%s "
+            "line_display_name=%s score=%s",
+            game_id,
+            binding.game_id,
+            binding.line_display_name,
+            score,
+        )
+        return RosterUnregisteredGameIdItem(
+            game_id=game_id,
+            has_member_row=has_member_row,
+            possible_line_display_name=binding.line_display_name,
+            possible_line_user_id=binding.line_user_id,
+            possible_registered_game_id=binding.game_id,
+            similarity_score=score,
+        )
+
     async def upload_member_roster(
         self, alliance_id: UUID, csv_content: str
     ) -> RosterUploadResponse:
@@ -591,11 +667,10 @@ class LineBindingService:
         registered_game_ids = {binding.game_id for binding in bindings}
         unregistered_roster_game_ids = roster_game_ids - registered_game_ids
         unregistered_game_ids = [
-            RosterUnregisteredGameIdItem(
+            self._build_unregistered_roster_item(
                 game_id=game_id,
                 has_member_row=game_id in member_ids_by_name,
-                possible_line_display_name=None,
-                possible_line_user_id=None,
+                bindings_by_game_id=bindings_by_game_id,
             )
             for game_id in unregistered_roster_game_ids
         ]

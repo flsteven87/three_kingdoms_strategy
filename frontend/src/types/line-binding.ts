@@ -85,6 +85,8 @@ export interface RosterUnregisteredGameIdItem {
   readonly has_member_row: boolean
   readonly possible_line_display_name: string | null
   readonly possible_line_user_id: string | null
+  readonly possible_registered_game_id: string | null
+  readonly similarity_score: number | null
 }
 
 export interface RosterUploadSummary {

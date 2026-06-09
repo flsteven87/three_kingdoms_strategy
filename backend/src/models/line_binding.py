@@ -198,6 +198,8 @@ class RosterUnregisteredGameIdItem(BaseModel):
     has_member_row: bool
     possible_line_display_name: str | None = None
     possible_line_user_id: str | None = None
+    possible_registered_game_id: str | None = None
+    similarity_score: float | None = None
 
 
 class RosterUploadSummary(BaseModel):

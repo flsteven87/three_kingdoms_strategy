@@ -154,12 +154,30 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                 <thead>
                   <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                     <th className="p-3 font-medium">遊戲 ID</th>
+                    <th className="p-3 font-medium">可能符合的登記 ID</th>
+                    <th className="p-3 font-medium">LINE 名稱</th>
+                    <th className="p-3 text-right font-medium">相似度</th>
                   </tr>
                 </thead>
                 <tbody>
                   {result.unregistered_game_ids.map(member => (
                     <tr key={member.game_id} className="border-b">
                       <td className="p-3 font-medium">{member.game_id}</td>
+                      <td className="p-3">
+                        {member.possible_registered_game_id ?? (
+                          <span className="text-muted-foreground">無紀錄</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {member.possible_line_display_name ?? (
+                          <span className="text-muted-foreground">無紀錄</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right tabular-nums text-muted-foreground">
+                        {member.similarity_score !== null
+                          ? `${Math.round(member.similarity_score * 100)}%`
+                          : '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
