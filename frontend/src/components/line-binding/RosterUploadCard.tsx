@@ -162,7 +162,6 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                     <th className="p-3 font-medium">遊戲 ID</th>
                     <th className="p-3 font-medium">可能符合的登記 ID</th>
                     <th className="p-3 font-medium">LINE 名稱</th>
-                    <th className="p-3 text-right font-medium">相似度</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -178,11 +177,6 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                         {member.possible_line_display_name ?? (
                           <span className="text-muted-foreground">無紀錄</span>
                         )}
-                      </td>
-                      <td className="p-3 text-right tabular-nums text-muted-foreground">
-                        {member.similarity_score !== null
-                          ? `${Math.round(member.similarity_score * 100)}%`
-                          : '-'}
                       </td>
                     </tr>
                   ))}
