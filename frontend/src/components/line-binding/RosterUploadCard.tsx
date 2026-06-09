@@ -36,6 +36,12 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<RosterUploadResponse | null>(null)
   const uploadRoster = useUploadLineRoster()
+  const fuzzyMatchedGameIds = result?.unregistered_game_ids.filter(
+    member => member.possible_registered_game_id !== null
+  ) ?? []
+  const unmatchedGameIds = result?.unregistered_game_ids.filter(
+    member => member.possible_registered_game_id === null
+  ) ?? []
 
   const handleUpload = async () => {
     if (!file) return
@@ -145,9 +151,9 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
             </RosterResultSection>
 
             <RosterResultSection
-              title="2. 名冊內但尚未登記的遊戲 ID"
-              count={result.unregistered_game_ids.length}
-              emptyText="名冊內的遊戲 ID 都已完成登記。"
+              title="2. 名冊內有可能符合的遊戲 ID"
+              count={fuzzyMatchedGameIds.length}
+              emptyText="沒有找到可能符合的遊戲 ID。"
               defaultOpen
             >
               <table className="w-full text-sm">
@@ -160,7 +166,7 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.unregistered_game_ids.map(member => (
+                  {fuzzyMatchedGameIds.map(member => (
                     <tr key={member.game_id} className="border-b">
                       <td className="p-3 font-medium">{member.game_id}</td>
                       <td className="p-3">
@@ -178,6 +184,28 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                           ? `${Math.round(member.similarity_score * 100)}%`
                           : '-'}
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </RosterResultSection>
+
+            <RosterResultSection
+              title="3. 名冊內但尚未登記的遊戲 ID"
+              count={unmatchedGameIds.length}
+              emptyText="名冊內的遊戲 ID 都已完成登記或有可能符合。"
+              defaultOpen
+            >
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                    <th className="p-3 font-medium">遊戲 ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {unmatchedGameIds.map(member => (
+                    <tr key={member.game_id} className="border-b">
+                      <td className="p-3 font-medium">{member.game_id}</td>
                     </tr>
                   ))}
                 </tbody>
