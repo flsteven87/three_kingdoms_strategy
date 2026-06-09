@@ -54,9 +54,9 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>名冊 CSV 上傳</CardTitle>
+        <CardTitle>名冊登記比對</CardTitle>
         <CardDescription>
-          每列填入一個遊戲 ID，用正式 LINE 群組成員名單驗證綁定狀態。
+          上傳遊戲 ID 名冊，檢查哪些玩家已完成 LINE 登記；此功能只顯示比對結果，不更新玩家資料。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -67,7 +67,7 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
               file={file}
               onFileChange={setFile}
               disabled={uploadRoster.isPending}
-              description="上傳或拖放名冊 CSV"
+              description="上傳或拖放比對用 CSV"
               helperText="單欄格式，每列一個遊戲 ID"
               compact
             />
@@ -89,14 +89,14 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
               )}
-              {uploadRoster.isPending ? '上傳中...' : '上傳名冊'}
+              {uploadRoster.isPending ? '比對中...' : '開始比對'}
             </Button>
           </div>
         ) : (
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              需要盟主或協作者權限才能上傳名冊。
+              需要盟主或協作者權限才能執行名冊比對。
             </AlertDescription>
           </Alert>
         )}
@@ -117,7 +117,7 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
             </div>
 
             <RosterResultSection
-              title="1. 已登記且在名冊內的遊戲 ID"
+              title="已登記且在名冊內的遊戲 ID"
               count={result.verified_on_roster.length}
               emptyText="沒有已登記且符合名冊的遊戲 ID。"
               defaultOpen={false}
@@ -127,7 +127,6 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                   <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                     <th className="p-3 font-medium">LINE 名稱</th>
                     <th className="p-3 font-medium">遊戲 ID</th>
-                    <th className="p-3 font-medium">狀態</th>
                     <th className="p-3 text-right font-medium">登記日期</th>
                   </tr>
                 </thead>
@@ -136,11 +135,6 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                     <tr key={`${member.line_user_id}-${member.game_id}`} className="border-b">
                       <td className="p-3">{member.line_display_name}</td>
                       <td className="p-3 font-medium">{member.game_id}</td>
-                      <td className="p-3">
-                        <Badge variant={member.newly_verified ? 'default' : 'secondary'}>
-                          {member.newly_verified ? '本次驗證' : '已驗證'}
-                        </Badge>
-                      </td>
                       <td className="p-3 text-right text-muted-foreground">
                         {formatDateTW(member.registered_at, { padded: true })}
                       </td>
@@ -151,7 +145,7 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
             </RosterResultSection>
 
             <RosterResultSection
-              title="2. 名冊內有可能符合的遊戲 ID"
+              title="名冊內有可能符合的遊戲 ID"
               count={fuzzyMatchedGameIds.length}
               emptyText="沒有找到可能符合的遊戲 ID。"
               defaultOpen
@@ -185,7 +179,7 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
             </RosterResultSection>
 
             <RosterResultSection
-              title="3. 名冊內但尚未登記的遊戲 ID"
+              title="名冊內但尚未登記的遊戲 ID"
               count={unmatchedGameIds.length}
               emptyText="名冊內的遊戲 ID 都已完成登記或有可能符合。"
               defaultOpen
