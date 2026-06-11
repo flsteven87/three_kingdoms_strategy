@@ -507,6 +507,42 @@ def _make_member_binding(
 
 
 # =============================================================================
+# Tests for upload_member_roster()
+# =============================================================================
+
+
+class TestUploadMemberRoster:
+    """Tests for roster upload matching behavior."""
+
+    @pytest.mark.asyncio
+    async def test_treats_fullwidth_vertical_line_as_exact_cjk_separator_match(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Visually equivalent vertical separators should be exact roster matches."""
+        registered = _make_member_binding(
+            line_user_id="Uorange",
+            game_id="軍｜橙",
+            is_verified=True,
+        )
+        mock_repository.get_active_group_binding_by_alliance = AsyncMock(
+            return_value=_make_group_binding()
+        )
+        mock_repository.get_group_members = AsyncMock(return_value=[])
+        mock_repository.get_all_member_bindings_by_alliance = AsyncMock(
+            return_value=[registered]
+        )
+        service._member_repo = MagicMock()
+        service._member_repo.get_ids_by_names = AsyncMock(return_value={})
+
+        result = await service.upload_member_roster(ALLIANCE_ID, "軍丨橙\n")
+
+        assert [member.game_id for member in result.verified_on_roster] == ["軍｜橙"]
+        assert result.unregistered_game_ids == []
+        assert result.summary.verified_on_roster_count == 1
+        assert result.summary.unregistered_game_id_count == 0
+
+
+# =============================================================================
 # Tests for get_registered_members()
 # =============================================================================
 

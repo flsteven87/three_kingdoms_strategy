@@ -32,56 +32,51 @@ interface RosterUploadCardProps {
   readonly canUpdate: boolean
 }
 
-interface RosterSearchRow {
-  readonly lineName: string
-  readonly gameName: string
-}
-
-function getRosterSearchRows(result: RosterUploadResponse | null): RosterSearchRow[] {
-  if (!result) return []
-
-  const seen = new Set<string>()
-  const rows: RosterSearchRow[] = []
-
-  const addRow = (lineName: string, gameName: string) => {
-    const key = `${lineName}\u0000${gameName}`
-    if (seen.has(key)) return
-
-    seen.add(key)
-    rows.push({ lineName, gameName })
-  }
-
-  result.verified_on_roster.forEach(member => {
-    addRow(member.line_display_name, member.game_id)
-  })
-
-  result.unregistered_game_ids.forEach(member => {
-    if (member.possible_line_display_name && member.possible_registered_game_id) {
-      addRow(member.possible_line_display_name, member.possible_registered_game_id)
-    }
-  })
-
-  return rows
-}
-
 export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<RosterUploadResponse | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const uploadRoster = useUploadLineRoster()
-  const unmatchedGameIds = result?.unregistered_game_ids.filter(
-    member => member.possible_registered_game_id === null
-  ) ?? []
-  const rosterSearchRows = useMemo(() => getRosterSearchRows(result), [result])
-  const filteredRosterRows = useMemo(() => {
+  const exactMatches = useMemo(() => result?.verified_on_roster ?? [], [result])
+  const likelyMatches = useMemo(
+    () => result?.unregistered_game_ids.filter(
+      member => member.possible_registered_game_id !== null
+    ) ?? [],
+    [result]
+  )
+  const notFoundGameIds = useMemo(
+    () => result?.unregistered_game_ids.filter(
+      member => member.possible_registered_game_id === null
+    ) ?? [],
+    [result]
+  )
+  const filteredExactMatches = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    if (!query) return rosterSearchRows
+    if (!query) return exactMatches
 
-    return rosterSearchRows.filter(row =>
-      row.lineName.toLowerCase().includes(query) ||
-      row.gameName.toLowerCase().includes(query)
+    return exactMatches.filter(member =>
+      member.line_display_name.toLowerCase().includes(query) ||
+      member.game_id.toLowerCase().includes(query)
     )
-  }, [rosterSearchRows, searchQuery])
+  }, [exactMatches, searchQuery])
+  const filteredLikelyMatches = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return likelyMatches
+
+    return likelyMatches.filter(member =>
+      member.game_id.toLowerCase().includes(query) ||
+      (member.possible_line_display_name?.toLowerCase().includes(query) ?? false) ||
+      (member.possible_registered_game_id?.toLowerCase().includes(query) ?? false)
+    )
+  }, [likelyMatches, searchQuery])
+  const filteredNotFoundGameIds = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return notFoundGameIds
+
+    return notFoundGameIds.filter(member =>
+      member.game_id.toLowerCase().includes(query)
+    )
+  }, [notFoundGameIds, searchQuery])
 
   const handleUpload = async () => {
     if (!file) return
@@ -144,16 +139,21 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
 
         {result && (
           <div className="space-y-5 border-t pt-5">
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <Metric
                 icon={<FileSpreadsheet className="h-4 w-4 text-muted-foreground" />}
-                label="已登記且在名冊"
-                value={result.summary.verified_on_roster_count}
+                label="精確符合"
+                value={exactMatches.length}
+              />
+              <Metric
+                icon={<Search className="h-4 w-4 text-muted-foreground" />}
+                label="可能符合"
+                value={likelyMatches.length}
               />
               <Metric
                 icon={<UserX className="h-4 w-4 text-muted-foreground" />}
-                label="名冊內未登記"
-                value={result.summary.unregistered_game_id_count}
+                label="找不到登記"
+                value={notFoundGameIds.length}
               />
             </div>
 
@@ -169,8 +169,8 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
               </div>
 
               <RosterResultSection
-                title="LINE 名稱 / 遊戲名稱"
-                count={filteredRosterRows.length}
+                title="精確符合"
+                count={filteredExactMatches.length}
                 emptyText="沒有符合搜尋條件的結果。"
                 defaultOpen
               >
@@ -182,38 +182,70 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRosterRows.map(row => (
-                      <tr key={`${row.lineName}-${row.gameName}`} className="border-b">
-                        <td className="p-3">{row.lineName}</td>
-                        <td className="p-3 font-medium">{row.gameName}</td>
+                    {filteredExactMatches.map(member => (
+                      <tr key={member.line_user_id} className="border-b">
+                        <td className="p-3">{member.line_display_name}</td>
+                        <td className="p-3 font-medium">{member.game_id}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </RosterResultSection>
+
+              <RosterResultSection
+                title="可能符合"
+                count={filteredLikelyMatches.length}
+                emptyText="沒有可能符合的結果。"
+                defaultOpen
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                      <th className="p-3 font-medium">名冊遊戲 ID</th>
+                      <th className="p-3 font-medium">可能登記 ID</th>
+                      <th className="p-3 font-medium">LINE 名稱</th>
+                      <th className="p-3 font-medium">相似度</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLikelyMatches.map(member => (
+                      <tr key={member.game_id} className="border-b">
+                        <td className="p-3 font-medium">{member.game_id}</td>
+                        <td className="p-3">{member.possible_registered_game_id}</td>
+                        <td className="p-3">{member.possible_line_display_name}</td>
+                        <td className="p-3">
+                          {member.similarity_score === null
+                            ? '-'
+                            : `${Math.round(member.similarity_score * 100)}%`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </RosterResultSection>
+
+              <RosterResultSection
+                title="找不到登記"
+                count={filteredNotFoundGameIds.length}
+                emptyText="名冊內的遊戲 ID 都已完成登記或有可能符合。"
+                defaultOpen
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                      <th className="p-3 font-medium">遊戲 ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredNotFoundGameIds.map(member => (
+                      <tr key={member.game_id} className="border-b">
+                        <td className="p-3 font-medium">{member.game_id}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </RosterResultSection>
             </div>
-
-            <RosterResultSection
-              title="名冊內但尚未登記的遊戲 ID"
-              count={unmatchedGameIds.length}
-              emptyText="名冊內的遊戲 ID 都已完成登記或有可能符合。"
-              defaultOpen
-            >
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="p-3 font-medium">遊戲 ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unmatchedGameIds.map(member => (
-                    <tr key={member.game_id} className="border-b">
-                      <td className="p-3 font-medium">{member.game_id}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </RosterResultSection>
           </div>
         )}
       </CardContent>

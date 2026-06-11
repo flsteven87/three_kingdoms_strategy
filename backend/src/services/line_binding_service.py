@@ -82,9 +82,11 @@ ROSTER_HEADER_NAMES = {"game_id", "gameid", "name", "遊戲id", "遊戲 id"}
 ROSTER_FUZZY_MATCH_THRESHOLD = 0.75
 CHINESE_VARIANT_TRANSLATION = str.maketrans(
     {
+        "|": "丨",
         "猫": "貓",
         "裏": "裡",
         "里": "裡",
+        "｜": "丨",
     }
 )
 
@@ -550,6 +552,14 @@ class LineBindingService:
         intentionally left untouched.
         """
         roster_rows, roster_game_ids = self._parse_roster_game_ids(csv_content)
+        roster_match_keys = {
+            self._normalize_roster_match_text(game_id) for game_id in roster_game_ids
+        }
+        roster_game_id_by_match_key: dict[str, str] = {}
+        for game_id in roster_rows:
+            roster_game_id_by_match_key.setdefault(
+                self._normalize_roster_match_text(game_id), game_id
+            )
         logger.info(
             "[ROSTER] Parsed upload: rows=%s unique_game_ids=%s duplicates=%s game_ids=%s",
             len(roster_rows),
@@ -615,7 +625,16 @@ class LineBindingService:
         verified_on_roster: list[RosterVerifiedMemberItem] = []
 
         for binding in bindings:
-            is_on_roster = binding.game_id in roster_game_ids
+            binding_match_key = self._normalize_roster_match_text(binding.game_id)
+            matched_roster_game_id = roster_game_id_by_match_key.get(binding_match_key)
+            is_on_roster = binding_match_key in roster_match_keys
+            has_member_row = (
+                binding.game_id in member_ids_by_name
+                or (
+                    matched_roster_game_id is not None
+                    and matched_roster_game_id in member_ids_by_name
+                )
+            )
             logger.info(
                 "[ROSTER] Compare binding: line_user_id=%s line_display_name=%s game_id=%s "
                 "is_verified=%s on_roster=%s has_member_row=%s",
@@ -624,13 +643,15 @@ class LineBindingService:
                 binding.game_id,
                 binding.is_verified,
                 is_on_roster,
-                binding.game_id in member_ids_by_name,
+                has_member_row,
             )
 
             if is_on_roster:
                 newly_verified = not binding.is_verified
                 if newly_verified:
                     member_id = member_ids_by_name.get(binding.game_id)
+                    if member_id is None and matched_roster_game_id is not None:
+                        member_id = member_ids_by_name.get(matched_roster_game_id)
                     logger.info(
                         "[ROSTER] Queue verify: binding_id=%s game_id=%s member_id=%s",
                         binding.id,
@@ -664,8 +685,14 @@ class LineBindingService:
         else:
             logger.info("[ROSTER] No unverified roster matches needed updates")
 
-        registered_game_ids = {binding.game_id for binding in bindings}
-        unregistered_roster_game_ids = roster_game_ids - registered_game_ids
+        registered_match_keys = {
+            self._normalize_roster_match_text(binding.game_id) for binding in bindings
+        }
+        unregistered_roster_game_ids = {
+            game_id
+            for game_id in roster_game_ids
+            if self._normalize_roster_match_text(game_id) not in registered_match_keys
+        }
         unregistered_game_ids = [
             self._build_unregistered_roster_item(
                 game_id=game_id,
