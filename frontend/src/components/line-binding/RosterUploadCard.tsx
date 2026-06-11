@@ -1,12 +1,12 @@
-import { useState, type ReactNode } from 'react'
-import { AlertCircle, ChevronDown, FileSpreadsheet, Loader2, Upload, UserX } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { AlertCircle, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, UserX } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { CsvDropZone } from '@/components/uploads/CsvDropZone'
 import { useUploadLineRoster } from '@/hooks/use-line-binding'
-import { formatDateTW } from '@/lib/date-utils'
 import type { RosterUploadResponse } from '@/types/line-binding'
 
 function getErrorMessage(error: unknown): string {
@@ -32,22 +32,63 @@ interface RosterUploadCardProps {
   readonly canUpdate: boolean
 }
 
+interface RosterSearchRow {
+  readonly lineName: string
+  readonly gameName: string
+}
+
+function getRosterSearchRows(result: RosterUploadResponse | null): RosterSearchRow[] {
+  if (!result) return []
+
+  const seen = new Set<string>()
+  const rows: RosterSearchRow[] = []
+
+  const addRow = (lineName: string, gameName: string) => {
+    const key = `${lineName}\u0000${gameName}`
+    if (seen.has(key)) return
+
+    seen.add(key)
+    rows.push({ lineName, gameName })
+  }
+
+  result.verified_on_roster.forEach(member => {
+    addRow(member.line_display_name, member.game_id)
+  })
+
+  result.unregistered_game_ids.forEach(member => {
+    if (member.possible_line_display_name && member.possible_registered_game_id) {
+      addRow(member.possible_line_display_name, member.possible_registered_game_id)
+    }
+  })
+
+  return rows
+}
+
 export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<RosterUploadResponse | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const uploadRoster = useUploadLineRoster()
-  const fuzzyMatchedGameIds = result?.unregistered_game_ids.filter(
-    member => member.possible_registered_game_id !== null
-  ) ?? []
   const unmatchedGameIds = result?.unregistered_game_ids.filter(
     member => member.possible_registered_game_id === null
   ) ?? []
+  const rosterSearchRows = useMemo(() => getRosterSearchRows(result), [result])
+  const filteredRosterRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return rosterSearchRows
+
+    return rosterSearchRows.filter(row =>
+      row.lineName.toLowerCase().includes(query) ||
+      row.gameName.toLowerCase().includes(query)
+    )
+  }, [rosterSearchRows, searchQuery])
 
   const handleUpload = async () => {
     if (!file) return
 
     const response = await uploadRoster.mutateAsync(file)
     setResult(response)
+    setSearchQuery('')
     setFile(null)
   }
 
@@ -116,67 +157,41 @@ export function RosterUploadCard({ canUpdate }: RosterUploadCardProps) {
               />
             </div>
 
-            <RosterResultSection
-              title="已登記且在名冊內的遊戲 ID"
-              count={result.verified_on_roster.length}
-              emptyText="沒有已登記且符合名冊的遊戲 ID。"
-              defaultOpen={false}
-            >
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="p-3 font-medium">LINE 名稱</th>
-                    <th className="p-3 font-medium">遊戲 ID</th>
-                    <th className="p-3 text-right font-medium">登記日期</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.verified_on_roster.map(member => (
-                    <tr key={`${member.line_user_id}-${member.game_id}`} className="border-b">
-                      <td className="p-3">{member.line_display_name}</td>
-                      <td className="p-3 font-medium">{member.game_id}</td>
-                      <td className="p-3 text-right text-muted-foreground">
-                        {formatDateTW(member.registered_at, { padded: true })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </RosterResultSection>
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={event => setSearchQuery(event.target.value)}
+                  placeholder="搜尋 LINE 名稱或遊戲名稱"
+                  className="pl-9"
+                />
+              </div>
 
-            <RosterResultSection
-              title="名冊內有可能符合的遊戲 ID"
-              count={fuzzyMatchedGameIds.length}
-              emptyText="沒有找到可能符合的遊戲 ID。"
-              defaultOpen
-            >
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="p-3 font-medium">遊戲 ID</th>
-                    <th className="p-3 font-medium">可能符合的登記 ID</th>
-                    <th className="p-3 font-medium">LINE 名稱</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fuzzyMatchedGameIds.map(member => (
-                    <tr key={member.game_id} className="border-b">
-                      <td className="p-3 font-medium">{member.game_id}</td>
-                      <td className="p-3">
-                        {member.possible_registered_game_id ?? (
-                          <span className="text-muted-foreground">無紀錄</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {member.possible_line_display_name ?? (
-                          <span className="text-muted-foreground">無紀錄</span>
-                        )}
-                      </td>
+              <RosterResultSection
+                title="LINE 名稱 / 遊戲名稱"
+                count={filteredRosterRows.length}
+                emptyText="沒有符合搜尋條件的結果。"
+                defaultOpen
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                      <th className="p-3 font-medium">LINE 名稱</th>
+                      <th className="p-3 font-medium">遊戲名稱</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </RosterResultSection>
+                  </thead>
+                  <tbody>
+                    {filteredRosterRows.map(row => (
+                      <tr key={`${row.lineName}-${row.gameName}`} className="border-b">
+                        <td className="p-3">{row.lineName}</td>
+                        <td className="p-3 font-medium">{row.gameName}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </RosterResultSection>
+            </div>
 
             <RosterResultSection
               title="名冊內但尚未登記的遊戲 ID"
