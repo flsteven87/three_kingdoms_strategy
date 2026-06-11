@@ -543,7 +543,57 @@ class TestUploadMemberRoster:
 
 
 # =============================================================================
-# Tests for get_registered_members()
+# Tests for get_member_info()
+# =============================================================================
+
+
+class TestGetMemberInfo:
+    """Tests for get_member_info() registration read and display-name refresh."""
+
+    @pytest.mark.asyncio
+    async def test_refreshes_display_name_before_returning_registrations(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should update existing bindings with the latest LIFF profile display name."""
+        binding = _make_group_binding()
+        existing = _make_member_binding(line_user_id="Uuser1", game_id="張飛")
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=binding)
+        mock_repository.upsert_group_member = AsyncMock()
+        mock_repository.update_member_binding_display_name = AsyncMock()
+        mock_repository.get_member_bindings_by_line_user = AsyncMock(return_value=[existing])
+
+        result = await service.get_member_info("Uuser1", GROUP_ID, "New LINE Name")
+
+        mock_repository.upsert_group_member.assert_awaited_once_with(
+            GROUP_ID, "Uuser1", "New LINE Name"
+        )
+        mock_repository.update_member_binding_display_name.assert_awaited_once_with(
+            alliance_id=ALLIANCE_ID,
+            line_user_id="Uuser1",
+            line_display_name="New LINE Name",
+        )
+        assert result.has_registered is True
+
+    @pytest.mark.asyncio
+    async def test_does_not_refresh_display_name_when_liff_name_missing(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should keep stored names when LIFF does not provide a usable display name."""
+        binding = _make_group_binding()
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=binding)
+        mock_repository.upsert_group_member = AsyncMock()
+        mock_repository.update_member_binding_display_name = AsyncMock()
+        mock_repository.get_member_bindings_by_line_user = AsyncMock(return_value=[])
+
+        result = await service.get_member_info("Uuser1", GROUP_ID, " ")
+
+        mock_repository.upsert_group_member.assert_not_awaited()
+        mock_repository.update_member_binding_display_name.assert_not_awaited()
+        assert result.has_registered is False
+
+
+# =============================================================================
+# Tests for group member tracking
 # =============================================================================
 
 
@@ -556,12 +606,39 @@ class TestGroupMemberTracking:
     ):
         """Should upsert each joined user into line_group_members."""
         mock_repository.upsert_group_member = AsyncMock()
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=None)
 
         await service.track_members_joined("Cgroup123", ["Uaaa", "Ubbb"])
 
         assert mock_repository.upsert_group_member.call_count == 2
         mock_repository.upsert_group_member.assert_any_call("Cgroup123", "Uaaa", None)
         mock_repository.upsert_group_member.assert_any_call("Cgroup123", "Ubbb", None)
+
+    @pytest.mark.asyncio
+    async def test_track_members_joined_refreshes_registered_display_names(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should refresh stored binding display names from memberJoined profile data."""
+        binding = _make_group_binding()
+        mock_repository.upsert_group_member = AsyncMock()
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=binding)
+        mock_repository.update_member_binding_display_name = AsyncMock()
+
+        await service.track_members_joined(
+            "Cgroup123", ["Uaaa", "Ubbb"], {"Uaaa": "Alpha", "Ubbb": "Beta"}
+        )
+
+        assert mock_repository.update_member_binding_display_name.await_count == 2
+        mock_repository.update_member_binding_display_name.assert_any_await(
+            alliance_id=ALLIANCE_ID,
+            line_user_id="Uaaa",
+            line_display_name="Alpha",
+        )
+        mock_repository.update_member_binding_display_name.assert_any_await(
+            alliance_id=ALLIANCE_ID,
+            line_user_id="Ubbb",
+            line_display_name="Beta",
+        )
 
     @pytest.mark.asyncio
     async def test_track_members_left_calls_remove_for_each(
@@ -580,10 +657,43 @@ class TestGroupMemberTracking:
     ):
         """Should upsert a single user on message event (passive tracking)."""
         mock_repository.upsert_group_member = AsyncMock()
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=None)
 
         await service.track_group_presence("Cgroup123", "Uaaa")
 
         mock_repository.upsert_group_member.assert_called_once_with("Cgroup123", "Uaaa", None)
+
+    @pytest.mark.asyncio
+    async def test_track_group_presence_refreshes_registered_display_name(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should refresh stored binding display names when webhook profile data is newer."""
+        binding = _make_group_binding()
+        mock_repository.upsert_group_member = AsyncMock()
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=binding)
+        mock_repository.update_member_binding_display_name = AsyncMock()
+
+        await service.track_group_presence("Cgroup123", "Uaaa", "New LINE Name")
+
+        mock_repository.update_member_binding_display_name.assert_awaited_once_with(
+            alliance_id=ALLIANCE_ID,
+            line_user_id="Uaaa",
+            line_display_name="New LINE Name",
+        )
+
+    @pytest.mark.asyncio
+    async def test_track_group_presence_does_not_refresh_empty_display_name(
+        self, service: LineBindingService, mock_repository: MagicMock
+    ):
+        """Should not overwrite stored binding display names with empty webhook data."""
+        binding = _make_group_binding()
+        mock_repository.upsert_group_member = AsyncMock()
+        mock_repository.get_group_binding_by_line_group_id = AsyncMock(return_value=binding)
+        mock_repository.update_member_binding_display_name = AsyncMock()
+
+        await service.track_group_presence("Cgroup123", "Uaaa", " ")
+
+        mock_repository.update_member_binding_display_name.assert_not_awaited()
 
 
 # =============================================================================

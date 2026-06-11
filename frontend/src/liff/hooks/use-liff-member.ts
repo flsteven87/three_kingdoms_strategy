@@ -45,6 +45,7 @@ export function useLiffMemberInfo(context: LiffContext | null) {
       getMemberInfo({
         lineUserId: context!.lineUserId,
         lineGroupId: context!.lineGroupId,
+        lineDisplayName: context!.lineDisplayName,
         lineIdToken: context!.lineIdToken,
       }),
     enabled: !!context?.lineUserId && !!context?.lineGroupId,

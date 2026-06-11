@@ -427,6 +427,23 @@ class LineBindingRepository(SupabaseRepository[LineBindingCode]):
             .execute()
         )
 
+    async def update_member_binding_display_name(
+        self, alliance_id: UUID, line_user_id: str, line_display_name: str
+    ) -> None:
+        """Refresh LINE display name on all bindings for a LINE user in an alliance."""
+        await self._execute_async(
+            lambda: self.client.from_("member_line_bindings")
+            .update(
+                {
+                    "line_display_name": line_display_name,
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
+            )
+            .eq("alliance_id", str(alliance_id))
+            .eq("line_user_id", line_user_id)
+            .execute()
+        )
+
     async def get_member_bindings_by_line_user_ids(
         self, alliance_id: UUID, line_user_ids: set[str]
     ) -> list[MemberLineBinding]:

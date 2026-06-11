@@ -64,6 +64,7 @@ interface LiffApiOptions {
   lineUserId: string;
   lineGroupId: string;
   lineIdToken: string;
+  lineDisplayName?: string;
 }
 
 async function liffFetch<T>(
@@ -74,6 +75,9 @@ async function liffFetch<T>(
   const url = new URL(`${API_BASE_URL}/api/v1${endpoint}`);
   url.searchParams.set("u", options.lineUserId);
   url.searchParams.set("g", options.lineGroupId);
+  if (options.lineDisplayName) {
+    url.searchParams.set("display_name", options.lineDisplayName);
+  }
 
   return request<T>(url.toString(), {
     ...init,

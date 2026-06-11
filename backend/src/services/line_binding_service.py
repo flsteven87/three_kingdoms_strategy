@@ -850,7 +850,23 @@ class LineBindingService:
             for b in bindings
         ]
 
-    async def get_member_info(self, line_user_id: str, line_group_id: str) -> MemberInfoResponse:
+    async def _refresh_member_binding_display_name(
+        self, alliance_id: UUID, line_user_id: str, line_display_name: str | None
+    ) -> None:
+        """Persist the latest LINE display name for existing registered game IDs."""
+        normalized_name = line_display_name.strip() if line_display_name else ""
+        if not normalized_name:
+            return
+
+        await self.repository.update_member_binding_display_name(
+            alliance_id=alliance_id,
+            line_user_id=line_user_id,
+            line_display_name=normalized_name,
+        )
+
+    async def get_member_info(
+        self, line_user_id: str, line_group_id: str, line_display_name: str | None = None
+    ) -> MemberInfoResponse:
         """
         Get member info for LIFF display
 
@@ -871,6 +887,15 @@ class LineBindingService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Group not bound to any alliance"
             )
+
+        normalized_display_name = line_display_name.strip() if line_display_name else ""
+        if normalized_display_name:
+            await self.repository.upsert_group_member(
+                line_group_id, line_user_id, normalized_display_name
+            )
+        await self._refresh_member_binding_display_name(
+            group_binding.alliance_id, line_user_id, normalized_display_name
+        )
 
         # Get user's registrations
         bindings = await self.repository.get_member_bindings_by_line_user(
@@ -1077,6 +1102,16 @@ class LineBindingService:
                 for uid in user_ids
             )
         )
+        group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
+        if group_binding:
+            await asyncio.gather(
+                *(
+                    self._refresh_member_binding_display_name(
+                        group_binding.alliance_id, uid, names.get(uid)
+                    )
+                    for uid in user_ids
+                )
+            )
 
     async def track_members_left(self, line_group_id: str, user_ids: list[str]) -> None:
         """Remove users who left a LINE group (from memberLeft webhook)."""
@@ -1089,6 +1124,11 @@ class LineBindingService:
     ) -> None:
         """Track a user's presence from any group event (passive tracking)."""
         await self.repository.upsert_group_member(line_group_id, user_id, line_display_name)
+        group_binding = await self.repository.get_group_binding_by_line_group_id(line_group_id)
+        if group_binding:
+            await self._refresh_member_binding_display_name(
+                group_binding.alliance_id, user_id, line_display_name
+            )
 
     # =========================================================================
     # LIFF Notification CD Operations (30 分鐘群組層級 CD)

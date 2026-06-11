@@ -397,9 +397,14 @@ async def get_member_info(
     verified_line_user_id: LiffVerifiedUserDep,
     u: Annotated[str, Query(description="LINE user ID")],
     g: Annotated[str, Query(description="LINE group ID")],
+    display_name: Annotated[str | None, Query(description="Current LINE display name")] = None,
 ) -> MemberInfoResponse:
     """Get member info for LIFF page"""
-    return await service.get_member_info(line_user_id=verified_line_user_id, line_group_id=g)
+    return await service.get_member_info(
+        line_user_id=verified_line_user_id,
+        line_group_id=g,
+        line_display_name=display_name,
+    )
 
 
 @router.get(

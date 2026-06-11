@@ -150,6 +150,7 @@ describe("useLiffMemberInfo", () => {
     expect(getMemberInfo).toHaveBeenCalledWith({
       lineUserId: "user-123",
       lineGroupId: "group-456",
+      lineDisplayName: "Test User",
       lineIdToken: "id-token-123",
     });
   });
